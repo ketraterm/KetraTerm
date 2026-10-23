@@ -106,6 +106,11 @@ quadratic byte copying is appropriate for small protocol fixtures.
 
 ## Running Testkit Tests
 
+The [graphics sender corpus](../tools/kitty-graphics/README.md) pins Yazi and
+Kitty serializer output independently of terminal implementation. Ordinary tests
+verify fixture integrity, decoded source pixels, and JDK PNG decoder assumptions.
+Regenerating the corpus is an explicit developer operation, not a CI download.
+
 Run commands from the repository root with JDK 25; use `gradlew.bat` on Windows.
 
 ```text

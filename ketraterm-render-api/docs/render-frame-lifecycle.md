@@ -19,6 +19,20 @@ send it to another thread. Readers may reuse a frame instance across calls.
 Caller-owned destination arrays retain the copied values after the read returns;
 the consumer owns their subsequent synchronization.
 
+`copyImages` delivers primitive placement metadata in stacking order. Placement
+coordinates and clipping are fractional cells in the requested viewport; crops
+use source pixels. `TerminalRenderImage` is the exception to the borrowed lifetime:
+its immutable ARGB pixels may be retained across frames. Replacement creates a
+new resource identity. Copy resource references and placement metadata during the
+callback; prepare backend rasters afterwards. Caches must release obsolete resource
+references on replacement, failed copying and reset. `graphicsGeneration`, source
+identity, viewport and structure qualify cached placement geometry.
+
+`isRetainedBySource` is a thread-visible, monotonic lifetime hint, independent of
+pixel validity. Renderers may release an absent resource's raster once its source
+retires it; an installed or pinned frame must still render that resource. Providers
+without retirement tracking inherit `true`, so caches must retain their own bounds.
+
 Nested reads on the same reader need not be supported. An unsupported nested read
 must throw `IllegalStateException` without disturbing the enclosing frame. A
 consumer should finish its current read before requesting another viewport.
@@ -42,6 +56,7 @@ cache keys, and reset caches when unrelated content replaces that source.
 | `contentGeneration` | Retained cell content and terminal-owned row mapping, including off-screen history. Cursor-only changes need not advance it. Defaults to `frameGeneration`. |
 | `historyContentGeneration` | Retained-history identity/layout in the active buffer. Replacement, clearing, and resize/reflow advance it; ordinary live edits, history admission, and eviction do not. Defaults to `contentGeneration`. |
 | `structureGeneration` | Terminal-owned row mapping/shape changes, including scrolling, resize, reset, buffer switches, and reflow. |
+| `graphicsGeneration` | Image resources, placements or image geometry. Image providers advance this and `frameGeneration` when image presentation changes; text-row generations need not change. Defaults to zero for providers without images. |
 | `lineGeneration(row)` | Visual cell content, attributes, hyperlinks, cluster text, or wrap status for that visible row. |
 | `lineId(row)` | Stable line identity moving with content. `0` means unavailable. |
 

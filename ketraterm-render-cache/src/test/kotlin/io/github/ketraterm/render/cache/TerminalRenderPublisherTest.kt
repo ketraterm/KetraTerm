@@ -37,6 +37,105 @@ class TerminalRenderPublisherTest {
     }
 
     @Test
+    fun `retired buffers release image references and restore unchanged images on reuse`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        val frame = ImageFrame()
+        publisher.updateAndPublish(frame)
+        val retired = checkNotNull(publisher.current())
+        val image = checkNotNull(frame.image)
+
+        frame.image = null
+        publisher.updateAndPublish(frame)
+        assertEquals(0, retired.images.size)
+        assertEquals(0, publisher.current()?.images?.size)
+        assertEquals("abc", retired.rowText(0), "Retirement preserves reusable row storage")
+        frame.image = image
+        repeat(2) { publisher.updateAndPublish(frame) }
+
+        assertSame(retired, publisher.current(), "The original buffer is reused after rotation")
+        assertSame(image, retired.images.image(0), "Equal graphics generations must still restore retired references")
+    }
+
+    @Test
+    fun `retired image snapshots stay pinned until their final lease is released`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        val frame = ImageFrame()
+        publisher.updateAndPublish(frame)
+        val first = checkNotNull(publisher.acquireFrontLease())
+        val second = checkNotNull(publisher.acquireFrontLease())
+        val old = checkNotNull(frame.image)
+        var firstReleased = false
+        try {
+            frame.image = TestImage()
+            publisher.updateAndPublish(frame)
+            publisher.updateAndPublish(frame)
+            assertSame(old, first.images.image(0))
+            publisher.releaseFrontLease(first)
+            firstReleased = true
+            assertSame(old, second.images.image(0), "Another reader still pins the retired image")
+        } finally {
+            if (!firstReleased) publisher.releaseFrontLease(first)
+            publisher.releaseFrontLease(second)
+        }
+        assertEquals(0, second.images.size)
+        assertSame(frame.image, publisher.current()?.images?.image(0))
+    }
+
+    @Test
+    fun `retired lease cleanup preserves a concurrent writer's image references`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        val frame = ImageFrame()
+        publisher.updateAndPublish(frame)
+        publisher.updateAndPublish(frame)
+        val pinned = checkNotNull(publisher.acquireFrontLease())
+        publisher.updateAndPublish(frame)
+        val copyEntered = CountDownLatch(1)
+        val releaseCopy = CountDownLatch(1)
+        frame.image = TestImage()
+        frame.afterImageCopy = {
+            copyEntered.countDown()
+            releaseCopy.await()
+        }
+        var leaseReleased = false
+        TestWorker { publisher.updateAndPublish(frame) }.use { writer ->
+            try {
+                assertTrue(copyEntered.await(10, TimeUnit.SECONDS), "writer did not copy its image")
+                publisher.releaseFrontLease(pinned)
+                leaseReleased = true
+                assertEquals(0, pinned.images.size)
+            } finally {
+                if (!leaseReleased) publisher.releaseFrontLease(pinned)
+                releaseCopy.countDown()
+            }
+            writer.await()
+        }
+        assertSame(frame.image, publisher.current()?.images?.image(0))
+    }
+
+    @Test
+    fun `failed publication releases staged images while preserving the current frame`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        val frame = ImageFrame()
+        publisher.updateAndPublish(frame)
+        val retired = checkNotNull(publisher.current())
+        publisher.updateAndPublish(frame)
+        publisher.updateAndPublish(frame)
+        val current = checkNotNull(publisher.current())
+        val currentImage = checkNotNull(frame.image)
+        frame.image = TestImage()
+        frame.failRead = true
+
+        assertThrows(IllegalStateException::class.java) { publisher.updateAndPublish(frame) }
+
+        assertEquals(0, retired.images.size, "A failed reader must not retain its completed staging copy")
+        assertSame(current, publisher.current())
+        assertSame(currentImage, current.images.image(0))
+        frame.failRead = false
+        publisher.updateAndPublish(frame)
+        assertSame(frame.image, publisher.current()?.images?.image(0))
+    }
+
+    @Test
     fun `non-local return and callback failure release all reader leases`() {
         val publisher = TerminalRenderPublisher(3, 1)
         publisher.updateAndPublish(MockFrame(3, 1, "abc"))
@@ -320,6 +419,36 @@ class TerminalRenderPublisherTest {
                 column++
             }
         }
+
+    private class TestImage : TerminalRenderImage {
+        override val width = 1
+        override val height = 1
+
+        override fun copyArgb(
+            destination: IntArray,
+            offset: Int,
+        ) {
+            destination[offset] = 0xffff0000.toInt()
+        }
+    }
+
+    private class ImageFrame : MockFrame(3, 1, "abc") {
+        var image: TerminalRenderImage? = TestImage()
+        var afterImageCopy: (() -> Unit)? = null
+        var failRead = false
+
+        override val graphicsGeneration = 1L
+
+        override fun copyImages(sink: TerminalRenderImageSink) {
+            image?.let { sink.accept(it, 0.0, 0.0, 1.0, 1.0, 0, 0, 1, 1, 0.0, 1.0, 0) }
+            afterImageCopy?.invoke()
+        }
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            super.readRenderFrame(consumer)
+            check(!failRead) { "reader failed after delivering its frame" }
+        }
+    }
 
     private open class MockFrame(
         override val columns: Int,

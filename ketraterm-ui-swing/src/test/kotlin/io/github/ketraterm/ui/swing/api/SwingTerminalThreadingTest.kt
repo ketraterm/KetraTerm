@@ -36,6 +36,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.*
@@ -63,13 +64,33 @@ import kotlin.concurrent.thread
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
     private val dispatcher = StandardTestDispatcher()
+    private val uiDispatches = AtomicInteger()
+
+    private fun controlledTerminal(
+        settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
+        hostServices: SwingHostServices = SwingHostServices(),
+    ): SwingTerminal {
+        val services =
+            hostServices.copy { draft ->
+                draft.uiDispatcher =
+                    TerminalUiDispatcher { task ->
+                        if (hostServices.uiDispatcher === TerminalUiDispatcher.SWING && SwingUtilities.isEventDispatchThread()) {
+                            task.run()
+                        } else {
+                            uiDispatches.incrementAndGet()
+                            hostServices.uiDispatcher.dispatch(task)
+                        }
+                    }
+            }
+        return SwingTerminal(settingsProvider, services, searchDispatcher = dispatcher, mutationDispatcher = dispatcher)
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `focus reports use the mode at each transition before outbound writes run`(temporary: Boolean) {
         val output = ByteArrayOutputStream()
         val session = focusSession(output)
-        val component = edtCall { SwingTerminal() }
+        val component = edtCall { controlledTerminal() }
         try {
             edtCall {
                 component.bind(session)
@@ -101,7 +122,7 @@ class SwingTerminalThreadingTest {
     fun `focus events after session closure produce no output`() {
         val output = ByteArrayOutputStream()
         val session = focusSession(output)
-        val component = edtCall { SwingTerminal() }
+        val component = edtCall { controlledTerminal() }
         try {
             val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
             session.onBytes(enable, 0, enable.size)
@@ -123,7 +144,7 @@ class SwingTerminalThreadingTest {
     fun `Swing focus transitions obey DEC1004 reporting mode`(mode: String) {
         val output = ByteArrayOutputStream()
         val session = focusSession(output)
-        val component = edtCall { SwingTerminal() }
+        val component = edtCall { controlledTerminal() }
         try {
             edtCall { component.bind(session) }
             val control =
@@ -151,7 +172,7 @@ class SwingTerminalThreadingTest {
     fun `unbound and disposed surfaces cannot report focus to their former session`(dispose: Boolean) {
         val output = ByteArrayOutputStream()
         val session = focusSession(output)
-        val component = edtCall { SwingTerminal() }
+        val component = edtCall { controlledTerminal() }
         try {
             val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
             session.onBytes(enable, 0, enable.size)
@@ -180,7 +201,7 @@ class SwingTerminalThreadingTest {
         val secondOutput = ByteArrayOutputStream()
         val first = focusSession(firstOutput)
         val second = focusSession(secondOutput)
-        val component = edtCall { SwingTerminal() }
+        val component = edtCall { controlledTerminal() }
         try {
             val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
             first.onBytes(enable, 0, enable.size)
@@ -235,7 +256,7 @@ class SwingTerminalThreadingTest {
                 ioDispatcher = dispatcher,
             )
         val component =
-            SwingTerminal(
+            controlledTerminal(
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.clipboardHandler =
@@ -291,7 +312,7 @@ class SwingTerminalThreadingTest {
             SwingSettings.create { draft ->
                 draft.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
             }
-        val component = SwingTerminal(settingsProvider = { settings })
+        val component = controlledTerminal(settingsProvider = { settings })
         val text = "A\u0001\tB\r\nC\nD\rE"
         try {
             session.start(columns = 3, rows = 1)
@@ -356,12 +377,13 @@ class SwingTerminalThreadingTest {
                         isDark = false,
                     )
             }
-        val component = SwingTerminal(settingsProvider = { settings })
+        val component = controlledTerminal(settingsProvider = { settings })
         val query = "\u001B[?996n".toByteArray(Charsets.US_ASCII)
         try {
             session.start(3, 1)
             edtCall {
                 component.bind(session)
+                dispatcher.scheduler.runCurrent()
                 session.onBytes(query, 0, query.size)
                 dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
@@ -370,6 +392,7 @@ class SwingTerminalThreadingTest {
                         draft.palette = TerminalTheme.NORD.createPalette()
                     }
                 component.reloadSettings()
+                dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
                 session.onBytes(query, 0, query.size)
                 dispatcher.scheduler.runCurrent()
@@ -388,7 +411,7 @@ class SwingTerminalThreadingTest {
         session.requestRender(0)
         dispatcher.scheduler.runCurrent()
         val component =
-            SwingTerminal(settingsProvider = {
+            controlledTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.columns = 3
                     draft.rows = 1
@@ -466,7 +489,7 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `dispose cancels the component coroutine scope`() {
-        val component = SwingTerminal()
+        val component = controlledTerminal()
 
         SwingUtilities.invokeAndWait {
             assertTrue(component.isCoroutineScopeActive)
@@ -487,7 +510,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(ByteArrayOutputStream())
         val component =
             edtCall {
-                SwingTerminal(settingsProvider = {
+                controlledTerminal(settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
                         draft.cursorBlinkMillis = 0
@@ -569,7 +592,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(ByteArrayOutputStream())
         component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -629,7 +652,7 @@ class SwingTerminalThreadingTest {
         val firstChanges = ArrayList<Pair<Boolean, Boolean>>()
         val laterChanges = ArrayList<Pair<Boolean, Boolean>>()
         val session = focusSession(ByteArrayOutputStream())
-        val component = edtCall { SwingTerminal(settingsProvider = { currentSettings }) }
+        val component = edtCall { controlledTerminal(settingsProvider = { currentSettings }) }
         val disposingListener =
             SwingShellSuggestionEligibilityListener { eligible ->
                 firstChanges += eligible to component.isAutomaticShellSuggestionEligible()
@@ -689,7 +712,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(ByteArrayOutputStream())
         val component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -764,7 +787,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(ByteArrayOutputStream())
         val component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -846,7 +869,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(ByteArrayOutputStream())
         val component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -923,7 +946,7 @@ class SwingTerminalThreadingTest {
             }
         terminal =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -977,7 +1000,7 @@ class SwingTerminalThreadingTest {
         val session = focusSession(output)
         val component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -1047,7 +1070,7 @@ class SwingTerminalThreadingTest {
             }
         val component =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = { currentSettings },
                     hostServices =
                         SwingHostServices.create { draft ->
@@ -1141,7 +1164,7 @@ class SwingTerminalThreadingTest {
             }
         terminalComponent =
             edtCall {
-                SwingTerminal(
+                controlledTerminal(
                     settingsProvider = { currentSettings },
                     hostServices =
                         SwingHostServices.create { draft ->
@@ -1221,7 +1244,7 @@ class SwingTerminalThreadingTest {
                 parser = NoOpParser,
                 inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             )
-        val component = SwingTerminal()
+        val component = controlledTerminal()
 
         component.bind(session)
         awaitRenderAfter(session, -1L)
@@ -1241,7 +1264,7 @@ class SwingTerminalThreadingTest {
         }
         val first = testSession(terminal = terminal)
         val second = testSession()
-        val component = SwingTerminal()
+        val component = controlledTerminal()
         edtCall {
             component.size = component.preferredGridSize(3, 1)
         }
@@ -1267,7 +1290,7 @@ class SwingTerminalThreadingTest {
     @Test
     fun `bind and unbind may be called from a background thread`() {
         val session = testSession()
-        val component = SwingTerminal()
+        val component = controlledTerminal()
 
         runOffEdt {
             component.bind(session)
@@ -1289,7 +1312,7 @@ class SwingTerminalThreadingTest {
         val session = testSession()
         val dispatcher = RecordingDispatcher()
         val component =
-            SwingTerminal(
+            controlledTerminal(
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.uiDispatcher = dispatcher
@@ -1312,7 +1335,7 @@ class SwingTerminalThreadingTest {
     @Test
     fun `bind called off EDT does not wait for EDT execution`() {
         val session = testSession()
-        val component = SwingTerminal()
+        val component = controlledTerminal()
         try {
             withEdtBlocked {
                 // Completion is observed while the EDT is still held, not inferred from elapsed time.
@@ -1332,7 +1355,7 @@ class SwingTerminalThreadingTest {
         val reloadCalledOnEdt = AtomicBoolean(false)
         val calls = AtomicInteger()
         val component =
-            SwingTerminal(settingsProvider = {
+            controlledTerminal(settingsProvider = {
                 if (calls.incrementAndGet() > 1) {
                     reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
                 }
@@ -1357,7 +1380,7 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `visibleGridSize called off EDT reads cached grid size without waiting for EDT`() {
-        val component = SwingTerminal()
+        val component = controlledTerminal()
         val expected =
             edtCall {
                 component.size = Dimension(160, 80)
@@ -1378,7 +1401,7 @@ class SwingTerminalThreadingTest {
     fun `bind resizes session to current visible grid when component has bounds`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        val component = SwingTerminal(settingsProvider = { SwingSettings.create { it.shellIntegrationDecorationGutterWidth = 0 } })
+        val component = controlledTerminal(settingsProvider = { SwingSettings.create { it.shellIntegrationDecorationGutterWidth = 0 } })
 
         val expected =
             edtCall {
@@ -1401,7 +1424,7 @@ class SwingTerminalThreadingTest {
     fun `bind applies ambiguous width setting to session core`() {
         val session = testSession()
         val component =
-            SwingTerminal(settingsProvider = {
+            controlledTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.treatAmbiguousAsWide = true
                 }
@@ -1419,7 +1442,7 @@ class SwingTerminalThreadingTest {
         val session = testSession()
         var ambiguousAsWide = false
         val component =
-            SwingTerminal(settingsProvider = {
+            controlledTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.treatAmbiguousAsWide = ambiguousAsWide
                 }
@@ -1441,12 +1464,13 @@ class SwingTerminalThreadingTest {
     fun `component resize updates session only when visible grid changes`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        val component = SwingTerminal()
+        val component = controlledTerminal()
 
         edtCall {
             component.size = Dimension(160, 80)
+            component.bind(session)
+            dispatcher.scheduler.runCurrent()
         }
-        component.bind(session)
         drainEdt()
         connector.reset()
 
@@ -1454,8 +1478,10 @@ class SwingTerminalThreadingTest {
             edtCall {
                 component.size = Dimension(320, 160)
                 component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+                dispatcher.scheduler.runCurrent()
                 component.visibleGridSize()
             }
+        drainEdt()
 
         assertAll(
             { assertEquals(expected.width, connector.lastColumns.get()) },
@@ -1465,6 +1491,7 @@ class SwingTerminalThreadingTest {
 
         edtCall {
             component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+            dispatcher.scheduler.runCurrent()
         }
 
         assertEquals(1, connector.resizeCount.get())
@@ -1479,11 +1506,12 @@ class SwingTerminalThreadingTest {
                 connector = NoOpConnector,
             )
         var settings = SwingSettings()
-        val component = SwingTerminal(settingsProvider = { settings })
+        val component = controlledTerminal(settingsProvider = { settings })
         try {
             edtCall {
                 component.bind(session)
                 // Apply application overrides through the same synchronization boundary as live output.
+                dispatcher.scheduler.runCurrent()
                 val output = "\u001B[6 q\u001B]4;1;rgb:12/34/56\u0007".toByteArray(Charsets.US_ASCII)
                 session.onBytes(output, 0, output.size)
 
@@ -1513,11 +1541,12 @@ class SwingTerminalThreadingTest {
                 connector = NoOpConnector,
             )
         var settings = SwingSettings()
-        val component = SwingTerminal(settingsProvider = { settings })
+        val component = controlledTerminal(settingsProvider = { settings })
         try {
             edtCall {
                 component.bind(session)
                 val output = "\u001B[6 q\u001B]4;1;rgb:12/34/56\u0007".toByteArray(Charsets.US_ASCII)
+                dispatcher.scheduler.runCurrent()
                 session.onBytes(output, 0, output.size)
                 session.readRenderFrame { frame ->
                     assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
@@ -1531,6 +1560,7 @@ class SwingTerminalThreadingTest {
 
                 component.reloadSettings()
 
+                dispatcher.scheduler.runCurrent()
                 session.readRenderFrame { frame ->
                     assertEquals(settings.cursorShape, frame.cursor.shape)
                     assertEquals(settings.palette, frame.palette)
@@ -1550,11 +1580,12 @@ class SwingTerminalThreadingTest {
             SwingSettings.create { draft ->
                 draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
             }
-        val component = SwingTerminal(settingsProvider = { settings })
+        val component = controlledTerminal(settingsProvider = { settings })
         try {
             edtCall {
                 component.size = Dimension(320, 160)
                 component.bind(session)
+                dispatcher.scheduler.runCurrent()
             }
             drainEdt()
             connector.reset()
@@ -1565,6 +1596,7 @@ class SwingTerminalThreadingTest {
                         draft.selectionBackground = 0xFF123456.toInt()
                     }
                 component.reloadSettings()
+                dispatcher.scheduler.runCurrent()
                 assertEquals(originalGrid, component.visibleGridSize())
                 assertEquals(0, connector.resizeCount.get())
 
@@ -1575,6 +1607,7 @@ class SwingTerminalThreadingTest {
                 component.reloadSettings()
                 assertTrue(component.visibleGridSize().width < originalGrid.width)
                 assertTrue(component.visibleGridSize().height < originalGrid.height)
+                dispatcher.scheduler.runCurrent()
                 assertEquals(1, connector.resizeCount.get())
             }
         } finally {
@@ -1665,6 +1698,14 @@ class SwingTerminalThreadingTest {
 
     private fun drainEdt() {
         edtCall { }
+        repeat(1000) {
+            val before = uiDispatches.get()
+            dispatcher.scheduler.runCurrent()
+            edtCall { }
+            // Installing a result can resume its worker and admit the next queued mutation.
+            if (uiDispatches.get() == before) return
+        }
+        error("Controlled Swing work did not settle after 1000 worker/EDT passes; UI dispatches=${uiDispatches.get()}")
     }
 
     private fun awaitRenderAfter(

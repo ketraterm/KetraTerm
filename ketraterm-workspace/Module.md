@@ -14,6 +14,7 @@ All types are in `io.github.ketraterm.workspace`.
 | Component | Responsibility |
 | --- | --- |
 | `TerminalWorkspace` | Register and select tabs, launch local sessions, observe closure, and clean up owned sessions. |
+| Internal `WorkspaceOperations` | Bound asynchronous admission, preserve FIFO order, and reserve tab/final cleanup until completion. |
 | `TerminalWorkspaceTab` | Session identity and live title, directory, color, and process-title preferences. |
 | `TerminalWorkspaceListener` | Host-neutral lifecycle, metadata, window-intent, and clipboard callbacks. |
 | `TerminalWorkspaceOpenOptions` | Validated immutable initial session options. |
@@ -35,6 +36,15 @@ the tab before session output starts; every open failure cleans up the prepared
 session. Removal and workspace shutdown attempt all required cleanup even when
 callbacks throw. See the [lifecycle contract](README.md#architectural-role).
 
+Asynchronous operations use a separate owned worker so accepted cleanup survives
+observer or view cancellation. Its default I/O dispatcher accommodates blocking
+startup and publication handoffs without occupying the CPU workers needed by
+host binding. Ordinary pending work is limited to 64 requests;
+each currently owned tab can reserve one cleanup operation, and final shutdown
+has one reserved slot. All entries preserve accepted order. Close completion
+waits for retained session closure, including when `requestClose` claimed
+termination before the workspace operation reached its worker.
+
 ## Dependency boundary
 
 `ketraterm-session` is the API dependency. PTY, shell integration, render API, and
@@ -44,6 +54,10 @@ views, completion services, preference persistence, and product commands stay in
 the launching host.
 
 ## Validation
+
+The ordinary test task includes `defaultDispatcherTest`, which runs its scheduler
+regression in a separate JVM with two CPU workers. Other tests retain their
+normal scheduler configuration.
 
 From the repository root, run `./gradlew :ketraterm-workspace:test` for the module
 suite. Tests cover profile discovery, tab selection, listener failures, cleanup,

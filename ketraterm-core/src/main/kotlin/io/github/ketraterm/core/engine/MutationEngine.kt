@@ -102,6 +102,17 @@ internal class MutationEngine(
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
 
+        state.graphics.scroll(
+            state.isAltScreenActive,
+            top,
+            bottom,
+            leftMargin,
+            rightMargin,
+            -n,
+            top == 0 && leftMargin == 0 && rightMargin == width - 1,
+            minOf(state.activeBuffer.maxHistory, state.historySize + n),
+            wholeViewport = top == 0 && bottom == height - 1 && leftMargin == 0 && rightMargin == width - 1,
+        )
         if (leftMargin != 0 || rightMargin != width - 1) {
             scrollHorizontalSlice(top, bottom, -n)
             return
@@ -147,6 +158,17 @@ internal class MutationEngine(
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
 
+        state.graphics.scroll(
+            state.isAltScreenActive,
+            top,
+            bottom,
+            leftMargin,
+            rightMargin,
+            n,
+            false,
+            state.historySize,
+            wholeViewport = top == 0 && bottom == height - 1 && leftMargin == 0 && rightMargin == width - 1,
+        )
         if (leftMargin != 0 || rightMargin != width - 1) {
             scrollHorizontalSlice(top, bottom, n)
             return
@@ -704,6 +726,7 @@ internal class MutationEngine(
      *
      * Returns immediately when the cursor is outside the region. The callback
      * receives resolved ring indices and a count already clamped to the region.
+     * IL/DL edit text only; ordinary image placements keep their physical coordinates.
      */
     private inline fun mutateLines(
         count: Int,
@@ -1607,6 +1630,7 @@ internal class MutationEngine(
     /** Clears scrollback (ED 3), retaining visible rows and allocated storage for reuse. */
     fun eraseScreenAndHistory() =
         structuralMutation {
+            state.graphics.clear(state.isAltScreenActive, viewport = false)
             state.activeBuffer.clearHistory(height)
             for (row in 0 until state.ring.size) {
                 state.markLineChanged(state.ring[row])
@@ -1615,6 +1639,8 @@ internal class MutationEngine(
         }
 
     private fun clearViewportInternal() {
+        state.graphics.clear(state.isAltScreenActive, history = false)
+        state.markVisualChanged()
         for (row in 0 until height.coerceAtMost(state.ring.size)) {
             val line = getLine(row)
             state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
@@ -1630,6 +1656,8 @@ internal class MutationEngine(
 
     /** Clears both the viewport and retained history on the active buffer. */
     private fun clearAllHistoryInternal() {
+        state.graphics.clear(state.isAltScreenActive, data = true)
+        state.graphics.invalidateTransfer()
         state.activeBuffer.clearGrid(blankAttr, blankExtendedAttr, height)
     }
 

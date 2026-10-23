@@ -63,6 +63,7 @@ class TerminalHostShellIntegrationTest {
                         MockConnector(),
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                         shellIntegration =
                             TerminalShellIntegrationFactory { context ->
                                 object : TerminalShellIntegration by factory.create(context) {
@@ -85,6 +86,7 @@ class TerminalHostShellIntegrationTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { assertFalse(it.promptMarkersExpected) }
         }
 
@@ -124,6 +126,7 @@ class TerminalHostShellIntegrationTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 assertNull(session.readPublishedFrame<Unit> { fail("No frame yet") })
@@ -221,6 +224,7 @@ class TerminalHostShellIntegrationTest {
                     hostEvents = host,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(40, 4)
                     connector.feedFromHost(
@@ -345,6 +349,7 @@ class TerminalHostShellIntegrationTest {
                     startupCommand = TerminalStartupCommand("echo ready"),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     runCurrent()
                     assertEquals("", connector.writtenBytes.decodeToString())
@@ -487,6 +492,7 @@ class TerminalHostShellIntegrationTest {
                 startupCommand = command?.let(::TerminalStartupCommand),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             )
 
         init {

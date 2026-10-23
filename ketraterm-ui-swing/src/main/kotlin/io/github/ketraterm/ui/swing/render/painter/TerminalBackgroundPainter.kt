@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderColorKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.SwingColors
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
@@ -52,6 +54,7 @@ internal class TerminalBackgroundPainter(
         metrics: SwingMetrics,
         row: Int,
         bidi: TerminalBidiLayout.Row? = null,
+        skipDefault: Boolean = false,
     ) {
         val attrWords = cache.attrWords
         val rowOffset = cache.rowOffset(row)
@@ -70,16 +73,22 @@ internal class TerminalBackgroundPainter(
         var column = 0
         while (column < cache.columns) {
             val background = SwingColors.background(palette, attrWords[rowOffset + (bidi?.logicalColumn(column) ?: column)])
+            val defaultBackground = skipDefault && isDefaultBackground(attrWords[rowOffset + (bidi?.logicalColumn(column) ?: column)])
             val start = column
 
             column++
             while (
                 column < cache.columns &&
-                SwingColors.background(palette, attrWords[rowOffset + (bidi?.logicalColumn(column) ?: column)]) == background
+                SwingColors.background(palette, attrWords[rowOffset + (bidi?.logicalColumn(column) ?: column)]) == background &&
+                (
+                    !skipDefault ||
+                        isDefaultBackground(attrWords[rowOffset + (bidi?.logicalColumn(column) ?: column)]) == defaultBackground
+                )
             ) {
                 column++
             }
 
+            if (skipDefault && defaultBackground) continue
             val left = start * metrics.cellWidth
             val right = column * metrics.cellWidth
             val x1 = kotlin.math.round(left * scaleX + transX).toInt()
@@ -95,6 +104,9 @@ internal class TerminalBackgroundPainter(
             }
         }
     }
+
+    private fun isDefaultBackground(word: Long): Boolean =
+        !TerminalRenderAttrs.isInverse(word) && TerminalRenderAttrs.backgroundKind(word) == TerminalRenderColorKind.DEFAULT
 
     private fun fill(
         g: Graphics2D,

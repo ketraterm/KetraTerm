@@ -18,8 +18,21 @@ package io.github.ketraterm.parser.ansi
 import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalGraphicsCommand
+import io.github.ketraterm.protocol.TerminalGraphicsResult
 
 internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
+    override val graphicsTransferGeneration: Long get() = 0L
+
+    override fun applyGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        data: ByteArray,
+        length: Int,
+        result: TerminalGraphicsResult,
+    ) {
+        events += "graphics:${command.valueOr('a', 't'.code.toLong())}:$length:$result"
+    }
+
     override var isAlternateScreenActive: Boolean = false
 
     override fun applyColorRequest(request: io.github.ketraterm.protocol.TerminalColorRequest) {

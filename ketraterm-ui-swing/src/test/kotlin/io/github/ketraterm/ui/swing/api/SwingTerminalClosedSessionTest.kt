@@ -81,9 +81,15 @@ class SwingTerminalClosedSessionTest {
         val session = session(connector)
         val component =
             edt {
-                SwingTerminal().also {
+                SwingTerminal(
+                    settingsProvider = { SwingSettings() },
+                    hostServices = SwingHostServices.create { it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER },
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                ).also {
                     it.size = it.preferredGridSize(10, 3)
                     it.bind(session)
+                    dispatcher.scheduler.runCurrent()
                 }
             }
         val boundColumns = edt { component.visibleGridSize().width }

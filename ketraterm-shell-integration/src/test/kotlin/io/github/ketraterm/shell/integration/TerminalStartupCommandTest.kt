@@ -173,25 +173,34 @@ class TerminalStartupCommandTest {
     }
 
     @Test
-    fun `write failure cannot retry a partially submitted command`() {
-        val delegate = MockConnector()
-        val connector =
-            object : TerminalConnector by delegate {
-                override fun write(
-                    bytes: ByteArray,
-                    offset: Int,
-                    length: Int,
-                ): Unit = throw IOException("write failed")
+    fun `write failure cannot retry a partially submitted command`() =
+        runTest {
+            val delegate = MockConnector()
+            val writeFailure = IOException("write failed")
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ): Unit = throw writeFailure
+                }
+            session(
+                connector,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                cleanupDispatcher = StandardTestDispatcher(testScheduler),
+            ).use { session ->
+                delegate.feedFromHost(PROMPT.toByteArray())
+                assertSame(writeFailure, session.failure)
+                assertTrue(session.isClosed)
+                assertEquals(0, delegate.closeCount)
+                session.onBytes(PROMPT.toByteArray(), 0, PROMPT.length)
+                runCurrent()
+                assertEquals(1, delegate.closeCount)
+                assertSame(writeFailure, session.failure)
+                assertEquals("", delegate.writtenBytes.decodeToString())
             }
-        session(connector).use { session ->
-            delegate.feedFromHost(PROMPT.toByteArray())
-            assertInstanceOf(IOException::class.java, session.failure)
-            assertTrue(session.isClosed)
-            assertEquals(1, delegate.closeCount)
-            session.onBytes(PROMPT.toByteArray(), 0, PROMPT.length)
-            assertEquals("", delegate.writtenBytes.decodeToString())
         }
-    }
 
     @Test
     fun queuedCommandAndEnterPrecedeLaterTyping() =
@@ -225,6 +234,7 @@ class TerminalStartupCommandTest {
         command: String = "echo ready",
         ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
         promptMarkersExpected: Boolean = false,
+        cleanupDispatcher: CoroutineDispatcher = StandardTestDispatcher(),
     ): TerminalSession =
         TerminalSession
             .create(
@@ -234,6 +244,7 @@ class TerminalStartupCommandTest {
                 shellIntegration = OscShellIntegration.configured(promptMarkersExpected),
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = ioDispatcher,
+                cleanupDispatcher = cleanupDispatcher,
             ).also { it.start(40, 4) }
 
     private companion object {

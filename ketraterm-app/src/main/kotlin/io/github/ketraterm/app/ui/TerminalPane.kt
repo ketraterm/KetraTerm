@@ -55,7 +55,7 @@ internal class TerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
-        tab.session.setHostPolicy(settings.createHostPolicy())
+        terminal.setHostPolicy(settings.createHostPolicy())
     }
 
     fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
@@ -120,6 +120,7 @@ internal class TerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
             completionProvider: SwingShellSuggestionProvider?,
+            onBound: (Throwable?) -> Unit,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
@@ -147,7 +148,7 @@ internal class TerminalPane private constructor(
 
                 ownedTerminal = terminal
                 terminal.setShellSuggestionProvider(completionProvider)
-                terminal.bind(tab.session)
+                terminal.bind(tab.session, onBound)
 
                 val searchBar =
                     SwingTerminalSearchBar(terminal).apply {

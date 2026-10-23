@@ -48,6 +48,43 @@ class TerminalSessionResizeAdmissionTest {
     private val dispatcher = StandardTestDispatcher()
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `accepted window resize maps synchronously before later output and reports`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(10, 3)
+            val connector = MockConnector()
+            lateinit var session: TerminalSession
+            val hostEvents =
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun resizeWindow(
+                        rows: Int,
+                        columns: Int,
+                    ) {
+                        session.resize(columns, rows)
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    terminal,
+                    connector,
+                    hostEvents = hostEvents,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                )
+            session.use {
+                session.start(10, 3)
+                connector.feedFromHost("\u001b[8;4;20t\u001b[4;20HX\u001b[18t".encodeToByteArray())
+                runCurrent()
+                assertEquals(listOf(10 to 3, 20 to 4), connector.resizeCalls)
+                assertEquals('X', terminal.getLineAsString(3)[19])
+                assertEquals("\u001b[8;4;20t", connector.writtenBytes.decodeToString())
+                assertSame(TerminalSessionState.Running, session.state.value)
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     @ParameterizedTest
     @CsvSource(
         "resize, false",
@@ -88,6 +125,7 @@ class TerminalSessionResizeAdmissionTest {
                 connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             ).use { session ->
                 session.start(10, 3)
                 session.requestRender(0)
@@ -146,6 +184,7 @@ class TerminalSessionResizeAdmissionTest {
                 TerminalParsers.create(HostCommandAdapter(terminal)),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             ).use { session ->
                 session.start(10, 3)
                 session.requestRender(0)
@@ -180,6 +219,7 @@ class TerminalSessionResizeAdmissionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     session.requestRender(0)
@@ -243,6 +283,7 @@ class TerminalSessionResizeAdmissionTest {
                     hostEvents = events,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(80, 3)
                     SessionTestThread("session-deccolm-after-close") {
@@ -319,6 +360,7 @@ class TerminalSessionResizeAdmissionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(80, 3)
                     recorded.feedFromHost("before".encodeToByteArray())
@@ -411,6 +453,7 @@ class TerminalSessionResizeAdmissionTest {
                 TerminalParsers.create(HostCommandAdapter(terminal)),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             )
         session.start(10, 3)
         gateResize = true
@@ -461,6 +504,7 @@ class TerminalSessionResizeAdmissionTest {
                 connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             )
         session.use {
             assertSame(failure, assertThrows(IllegalStateException::class.java) { session.tryResizeViewport(8, 2) })

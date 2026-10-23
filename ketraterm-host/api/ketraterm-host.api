@@ -7,6 +7,8 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZ)V
 	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun applyColorRequest (Lio/github/ketraterm/protocol/TerminalColorRequest;)V
+	public final fun applyDecodedGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;Lio/github/ketraterm/render/api/TerminalRenderImage;Lio/github/ketraterm/protocol/TerminalGraphicsResult;)V
+	public fun applyGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;[BILio/github/ketraterm/protocol/TerminalGraphicsResult;)V
 	public fun applyKittyKeyboardFlags (II)V
 	public fun backspace ()V
 	public fun bell ()V
@@ -40,6 +42,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public final fun getActiveHyperlinkId ()Ljava/lang/String;
 	public final fun getActiveHyperlinkUri ()Ljava/lang/String;
 	public final fun getCurrentPolicy ()Lio/github/ketraterm/host/HostPolicy;
+	public fun getGraphicsTransferGeneration ()J
 	public final fun getIconTitle ()Ljava/lang/String;
 	public final fun getPointerShape ()Lio/github/ketraterm/protocol/TerminalPointerShape;
 	public final fun getWindowTitle ()Ljava/lang/String;

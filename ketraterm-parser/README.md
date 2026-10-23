@@ -39,7 +39,7 @@ non-reentrant. The parser starts no threads or coroutines. Callbacks execute on
 the calling thread, so they should return promptly.
 
 `endOfInput` publishes pending printable text, replaces incomplete printable
-UTF-8, and discards unfinished OSC/DCS commands. `reset` discards parser-owned
+UTF-8, and discards unfinished OSC/DCS/APC commands and graphics uploads. `reset` discards parser-owned
 state without emitting a terminal reset. If a callback throws, the exception
 propagates; stop processing that stream because parser and sink state may no
 longer agree.
@@ -57,6 +57,10 @@ to receive semantic operations. Its contracts matter beyond individual commands:
 - `isAlternateScreenActive` must reflect the effective screen synchronously,
   including rejected or repeated mode requests. Parser-owned charset saves use
   this observation.
+- `graphicsTransferGeneration` invalidates incomplete uploads on reset or effective
+  screen switches. `applyGraphicsCommand` borrows controls and a decoded byte
+  prefix; consume them synchronously and honor transfer failures before admission.
+  See the [graphics collection contract](docs/ansi-fsm-specification.md#graphics-apc-collection).
 - [TerminalAsciiCommandSink](src/main/kotlin/io/github/ketraterm/parser/spi/TerminalAsciiCommandSink.kt)
   is an optional batching capability. Its ASCII slices are also borrowed;
   ordinary sinks continue to receive scalar callbacks.

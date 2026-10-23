@@ -23,6 +23,51 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalRenderCacheTest {
     @Test
+    fun `image versions survive copies while failed and reset caches release their references`() {
+        fun image(color: Int) =
+            object : TerminalRenderImage {
+                override val width = 1
+                override val height = 1
+
+                override fun copyArgb(
+                    destination: IntArray,
+                    offset: Int,
+                ) {
+                    destination[offset] = color
+                }
+            }
+        val old = image(0xffff0000.toInt())
+        var current = old
+        var failCopy = false
+        val frame =
+            object : TerminalRenderFrame by MutableFrame(4, 2) {
+                override fun copyImages(sink: TerminalRenderImageSink) {
+                    sink.accept(current, 0.0, 0.0, 1.0, 1.0, 0, 0, 1, 1, 0.0, 2.0, 0)
+                    if (failCopy) error("copy failed")
+                }
+            }
+        val first = TerminalRenderCache(4, 2)
+        first.accept(frame)
+        val copy = TerminalRenderCache(4, 2)
+        copy.updateFrom(first)
+        current = image(0xff00ff00.toInt())
+        first.accept(frame)
+        assertSame(old, copy.images.image(0))
+        assertSame(current, first.images.image(0))
+        failCopy = true
+        assertThrows(IllegalStateException::class.java) { first.accept(frame) }
+        assertFalse(first.hasFrame)
+        assertEquals(0, first.images.size)
+        failCopy = false
+        first.accept(frame)
+        assertEquals(1, first.images.size)
+        first.reset()
+        assertEquals(0, first.images.size)
+        copy.reset()
+        assertEquals(0, copy.images.size)
+    }
+
+    @Test
     fun `output boundary defaults to unknown and survives cache and range copies`() {
         val frame = MutableFrame(4, 5)
         assertEquals(Long.MAX_VALUE, frame.outputEndAbsoluteRow)

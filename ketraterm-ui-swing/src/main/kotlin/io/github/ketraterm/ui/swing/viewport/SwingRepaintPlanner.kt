@@ -41,6 +41,7 @@ internal class SwingRepaintPlanner {
     private var lastCursorBlinking: Boolean = false
     private var lastCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
     private var lastCursorGeneration: Long = UNINITIALIZED_GENERATION
+    private var lastGraphicsGeneration: Long = UNINITIALIZED_GENERATION
     private var lastColumns: Int = 0
     private var lastRows: Int = 0
     private var lastStructureGeneration: Long = UNINITIALIZED_GENERATION
@@ -61,6 +62,7 @@ internal class SwingRepaintPlanner {
         lastCursorBlinking = false
         lastCursorShape = TerminalRenderCursorShape.BLOCK
         lastCursorGeneration = UNINITIALIZED_GENERATION
+        lastGraphicsGeneration = UNINITIALIZED_GENERATION
         lastColumns = 0
         lastRows = 0
         lastStructureGeneration = UNINITIALIZED_GENERATION
@@ -403,7 +405,8 @@ internal class SwingRepaintPlanner {
             !lastSearchHighlights.rowMatches(row, searchHighlights)
 
     private fun requiresFullRepaint(cache: TerminalRenderCache): Boolean =
-        cache.shapeChangedOnLastUpdate ||
+        lastGraphicsGeneration != cache.graphicsGeneration ||
+            cache.shapeChangedOnLastUpdate ||
             lastColumns != cache.columns ||
             lastRows != cache.rows ||
             lastStructureGeneration != cache.structureGeneration ||
@@ -446,6 +449,7 @@ internal class SwingRepaintPlanner {
             row++
         }
 
+        lastGraphicsGeneration = cache.graphicsGeneration
         lastColumns = cache.columns
         lastRows = cache.rows
         lastStructureGeneration = cache.structureGeneration

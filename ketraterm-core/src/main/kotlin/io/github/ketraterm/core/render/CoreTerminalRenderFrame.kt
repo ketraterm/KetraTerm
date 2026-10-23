@@ -17,6 +17,7 @@ package io.github.ketraterm.core.render
 
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
+import io.github.ketraterm.render.api.TerminalRenderImageSink
 
 /**
  * Adapter from core state to the stable public render frame ABI.
@@ -24,6 +25,23 @@ import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 internal class CoreTerminalRenderFrame(
     @PublishedApi internal val state: TerminalState,
 ) : io.github.ketraterm.render.api.TerminalRenderFrame {
+    override val graphicsGeneration: Long get() {
+        checkValid()
+        return state.graphics.generation
+    }
+
+    override fun copyImages(sink: TerminalRenderImageSink) {
+        checkValid()
+        state.graphics.copy(
+            state.isAltScreenActive,
+            resolvedScrollbackOffset,
+            resolvedRows,
+            state.windowPixelWidth / state.dimensions.width,
+            state.windowPixelHeight / state.dimensions.height,
+            sink,
+        )
+    }
+
     private val attrTranslator = RenderAttrTranslator()
     private val clusterScratch = IntArray(MAX_CLUSTER_CODEPOINTS)
 

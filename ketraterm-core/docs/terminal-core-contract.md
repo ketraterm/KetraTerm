@@ -21,6 +21,7 @@ state. Headless implementations may implement `TerminalBuffer` alone.
 | `TerminalModeController` | Durable modes, palette, and screen switching |
 | `TerminalModeReader` / `TerminalInputState` | Typed or packed mode snapshots |
 | `TerminalResponseChannel` | State-dependent query replies and queued bytes |
+| `TerminalGraphics` | Complete image-command admission, placements and transfer invalidation |
 | `TerminalReader` | Borrowed lines, palette, grid/cursor dimensions, and metadata |
 | `TerminalInspector` | Allocating text and attribute inspection |
 
@@ -56,6 +57,7 @@ across overflow; include source and active-buffer identity in retained cache key
 | `structureGeneration` | Terminal shape or row mapping changes |
 | `lineGeneration(row)` | That rendered row, including global reverse-video interpretation |
 | `historyContentGeneration` | Per-buffer retained-history replacement, clear, or resize/reflow |
+| `graphicsGeneration` | Image resources, placements and image geometry; text-row generations need not change |
 
 Ordinary history admission and eviction preserve `historyContentGeneration`;
 track row identities and `discardedCount` for those changes. Caller-requested
@@ -342,6 +344,22 @@ serialization held for either read path. Render frames expose primitive public
 attributes and cell flags; `getAttrAt` offers allocating unpacked inspection.
 Raw storage handles and internal arrays are not public APIs.
 
+### Image state
+
+`TerminalGraphics` consumes complete borrowed commands and decoded byte ranges on
+the serialized mutation thread. Uploads are validated before replacing retained
+resources; queries do not store images or move the cursor. Placement requires
+known cell-pixel geometry. Images have separate primary/alternate namespaces and
+share the limits in `TerminalGraphicsLimits`; they do not occupy text cells.
+`IL`/`DL` preserve ordinary image placements; actual screen scrolling moves them
+subject to scrolling-region containment and clipping.
+
+Render frames expose immutable resources through `copyImages`. Those resources
+may outlive a callback; placement metadata remains borrowed. See the
+[render lifetime contract](../../ketraterm-render-api/docs/render-frame-lifecycle.md#critical-lifespan-rule)
+for consumer ownership and the [graphics contract](../../docs/development/kitty-graphics-contract.md#placement-and-screen-ownership)
+for geometry, cursor, scrolling and deletion rules.
+
 ## Buffer lifecycle contract
 
 ### Primary and alternate screens
@@ -362,6 +380,11 @@ and preserve this presentation snapshot. Alternate content survives non-clearing
 switches until a clearing entry or effective resize discards it. Resize and soft
 reset while alternate is active preserve the primary presentation snapshot; RIS
 restores configured default presentation.
+
+Image namespaces follow screen selection and clearing entry. Pending graphics
+transfers are invalidated by a screen switch. Visible clearing removes visible
+placements; history clearing removes their retained-history portions. Ordinary
+partial text erasure leaves image placements intact.
 
 ### Resize
 
@@ -395,6 +418,11 @@ An effective resize:
 The returned pair is `(newScrollbackOffset, newHistorySize)` for the active
 screen. Alternate returns `(0, 0)` while primary is resized in the background.
 
+Primary image placements retain physical cell coordinates on width reflow;
+height-only resize shifts them with the retained viewport boundary. Effective
+resize clears alternate images. Cell-pixel changes recompute image geometry and
+may advance graphics/frame generations without changing text-row generations.
+
 ### Soft reset
 
 `softReset` implements DECSTR (`CSI ! p`). It preserves visible content,
@@ -407,7 +435,8 @@ normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
 tracking, synchronized output, color-scheme/resize reporting, and Kitty keyboard state reset; both xterm
 resource families return to defaults. Ambiguous-width policy, mouse encoding,
 the DECCOLM selection, and alternate-scroll/Shift-capture preferences survive.
-Palette and content are preserved.
+Palette, cell content and retained images are preserved. Incomplete graphics
+transfers are invalidated.
 
 ### Hard reset
 
@@ -418,7 +447,8 @@ default cursor presentation, and restores the host theme palette.
 
 Retained alternate cells are not cleared by RIS. A later non-clearing mode `47`
 entry can revisit them; clearing alternate entry or an effective resize discards
-that content.
+that content. Graphics differ: RIS releases images and placements on both
+screens and invalidates incomplete transfers.
 
 ### `DECCOLM`
 

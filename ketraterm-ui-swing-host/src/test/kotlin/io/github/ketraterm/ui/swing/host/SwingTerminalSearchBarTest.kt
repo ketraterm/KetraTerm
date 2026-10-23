@@ -336,8 +336,10 @@ class SwingTerminalSearchBarTest {
                 terminal = SwingTerminal()
                 bar = SwingTerminalSearchBar(terminal, SwingHostMessages.forLocale(Locale.US))
                 terminal.size = terminal.preferredSize
-                terminal.bind(session)
-                dispatcher.scheduler.runCurrent()
+            }
+            bindAndAwait(terminal, session)
+            dispatcher.scheduler.runCurrent()
+            SwingUtilities.invokeAndWait {
                 bar.open()
                 counter = descendants(bar.component).filterIsInstance<JLabel>().single()
                 descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
@@ -387,14 +389,17 @@ class SwingTerminalSearchBarTest {
             terminal = SwingTerminal()
             bar = SwingTerminalSearchBar(terminal, messages)
             terminal.size = terminal.preferredSize
-            terminal.bind(session)
+        }
+        bindAndAwait(terminal, session)
+        if (publishBeforeQuery) dispatcher.scheduler.runCurrent()
+        SwingUtilities.invokeAndWait {
             bar.open()
-            if (publishBeforeQuery) dispatcher.scheduler.runCurrent()
             val controls = descendants(bar.component)
             field = controls.filterIsInstance<JTextField>().single()
             counter = controls.filterIsInstance<JLabel>().single()
             toggles = controls.filterIsInstance<JToggleButton>()
             assertEquals(3, toggles.size)
+            if (!publishBeforeQuery) assertEquals(-1L, session.renderGeneration.value)
             field.text = "cat"
             if (!publishBeforeQuery) dispatcher.scheduler.runCurrent()
             // All buttons fit inside the field without overlapping the editable text.
@@ -470,8 +475,10 @@ class SwingTerminalSearchBarTest {
             terminal = SwingTerminal()
             bar = SwingTerminalSearchBar(terminal, messages)
             terminal.size = terminal.preferredSize
-            terminal.bind(session)
-            dispatcher.scheduler.runCurrent()
+        }
+        bindAndAwait(terminal, session)
+        dispatcher.scheduler.runCurrent()
+        SwingUtilities.invokeAndWait {
             bar.open()
             counter = descendants(bar.component).filterIsInstance<JLabel>().single()
             descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
@@ -499,6 +506,19 @@ class SwingTerminalSearchBarTest {
             session.close()
             dispatcher.scheduler.runCurrent()
         }
+    }
+
+    private fun bindAndAwait(
+        terminal: SwingTerminal,
+        session: TerminalSession,
+    ) {
+        val bound = CompletableFuture<Unit>()
+        SwingUtilities.invokeAndWait {
+            terminal.bind(session) { failure ->
+                if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
+            }
+        }
+        bound.get(10, TimeUnit.SECONDS)
     }
 
     private fun awaitCounter(

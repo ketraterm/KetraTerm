@@ -22,7 +22,9 @@ failure or closure, throws `IllegalStateException` without replacing the first
 listener or starting more workers. There is no restart operation.
 
 Install the listener before workers can deliver bytes. Callbacks may occur before
-`start` returns, and the API does not promise a particular callback thread.
+`start` returns. Byte callbacks must run off UI threads because processing may
+include bounded image decoding. A connector delivering bytes directly from
+`start` therefore requires an off-UI startup caller.
 Connectors own any reader, watcher, or writer workers; callers must not assume
 that `start` starts a specific number of threads.
 
@@ -36,7 +38,9 @@ Remote closure and local shutdown are distinct:
 - `onError(error)` is terminal for the session. A listener may close the connector
   from this callback to release resources.
 - `close()` requests local shutdown. It is idempotent and may be called before
-  startup or from a lifecycle callback. It does not promise a remote-close event
+  startup, concurrently with startup/output, or from a lifecycle callback.
+  Resource release must not wait for an active byte callback to return.
+  It does not promise a remote-close event
   or delivery of bytes still buffered in the transport.
 
 Do not use observation of process exit as a substitute for output completion.

@@ -24,6 +24,7 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.event.KeyEvent
@@ -44,7 +46,21 @@ import javax.swing.SwingUtilities
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalShellSuggestionTest {
+    private val mutationDispatcher = StandardTestDispatcher()
+
+    private fun newTerminal(
+        settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
+        hostServices: SwingHostServices = SwingHostServices(),
+    ): SwingTerminal =
+        SwingTerminal(
+            settingsProvider,
+            hostServices,
+            searchDispatcher = Dispatchers.Default,
+            mutationDispatcher = mutationDispatcher,
+        )
+
     @Test
     fun `request captured while hiding an older view supersedes the outer begin`() {
         SwingUtilities.invokeAndWait {
@@ -74,7 +90,7 @@ class SwingTerminalShellSuggestionTest {
                     }
                 }
             terminal =
-                SwingTerminal(
+                newTerminal(
                     settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
                     hostServices =
                         SwingHostServices.create { draft ->
@@ -144,7 +160,7 @@ class SwingTerminalShellSuggestionTest {
                 }
             }
             terminal =
-                SwingTerminal(
+                newTerminal(
                     settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
                     hostServices =
                         SwingHostServices.create { draft ->
@@ -181,7 +197,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             val editTarget: SwingShellSuggestionEditTarget = { SwingShellSuggestionHandler.NONE }
             val terminal =
-                SwingTerminal(
+                newTerminal(
                     settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
                 )
             try {
@@ -208,7 +224,7 @@ class SwingTerminalShellSuggestionTest {
             val provider = SwingShellSuggestionProvider { error("Disabled provider was invoked") }
             val editTarget: SwingShellSuggestionEditTarget = { SwingShellSuggestionHandler { error("Disabled suggestion was accepted") } }
             val component =
-                SwingTerminal(
+                newTerminal(
                     hostServices =
                         SwingHostServices.create { draft ->
                             draft.shellSuggestionViewFactory = SwingShellSuggestionViewFactory { error("Disabled view was constructed") }
@@ -216,6 +232,7 @@ class SwingTerminalShellSuggestionTest {
                 ).withSuggestionProvider(provider)
             try {
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 component.requestShellSuggestions("git s", 5, 5, 0, editTarget = editTarget)
                 component.requestActiveShellSuggestions()
                 component.showSuggestions(request(), suggestions(), editTarget = editTarget)
@@ -251,12 +268,13 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = { settings },
             ).withSuggestionProvider(provider)
         try {
             SwingUtilities.invokeAndWait {
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 component.requestActiveShellSuggestions()
             }
             runBlocking { withTimeout(2_000.milliseconds) { started.await() } }
@@ -285,7 +303,7 @@ class SwingTerminalShellSuggestionTest {
                     override fun update(snapshot: SwingShellSuggestionViewSnapshot) = Unit
                 }
             val terminal =
-                SwingTerminal(
+                newTerminal(
                     settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.smartSuggestionsEnabled = true
@@ -337,7 +355,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -386,7 +404,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -436,7 +454,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -469,7 +487,7 @@ class SwingTerminalShellSuggestionTest {
     @Test
     fun `shell input hides popup before invalidation listeners run`() {
         val component =
-            SwingTerminal(settingsProvider = {
+            newTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.smartSuggestionsEnabled = true
                     draft.padding = SwingPadding(0, 0, 0, 0)
@@ -495,7 +513,7 @@ class SwingTerminalShellSuggestionTest {
     fun `clear screen hides popup before command bytes are submitted`() {
         val session = activeSuggestionSession(RecordingConnector())
         val component =
-            SwingTerminal(settingsProvider = {
+            newTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.smartSuggestionsEnabled = true
                     draft.padding = SwingPadding(0, 0, 0, 0)
@@ -505,6 +523,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.addShellSuggestionInvalidationListener {
                 visibleDuringInvalidation += component.currentShellSuggestionState().visible
             }
@@ -532,7 +551,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -575,7 +594,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -645,7 +664,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -661,6 +680,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.requestShellSuggestions(
                 commandText = "git s",
                 cursorOffset = 5,
@@ -696,7 +716,7 @@ class SwingTerminalShellSuggestionTest {
         val view = RecordingSuggestionView()
         val provider: SwingShellSuggestionProvider = { emissions.receiveAsFlow() }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -755,7 +775,7 @@ class SwingTerminalShellSuggestionTest {
         val view = RecordingSuggestionView()
         val provider: SwingShellSuggestionProvider = { emissions.receiveAsFlow() }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -816,7 +836,7 @@ class SwingTerminalShellSuggestionTest {
             flowOf(suggestions(request.commandText))
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -832,6 +852,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.requestActiveShellSuggestions(editTarget = SwingShellSuggestionEditTarget.NONE)
         }
         view.awaitVisibleUpdate()
@@ -864,7 +885,7 @@ class SwingTerminalShellSuggestionTest {
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s\u001B]133;C\u0007".utf8())
         val provider: SwingShellSuggestionProvider = { request -> flowOf(suggestions(request.commandText)) }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -876,6 +897,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.showSuggestions(request(), suggestions())
             assertTrue(component.currentShellSuggestionState().visible)
 
@@ -891,7 +913,7 @@ class SwingTerminalShellSuggestionTest {
     fun `disabled automatic suggestions setting ignores automatic provider requests`() {
         val provider: SwingShellSuggestionProvider = { flowOf(suggestions(it.commandText)) }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -919,7 +941,7 @@ class SwingTerminalShellSuggestionTest {
             flowOf(suggestions(request.commandText))
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.smartSuggestionsEnabled = true
@@ -935,6 +957,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.requestActiveShellSuggestions()
         }
         view.awaitVisibleUpdate()
@@ -968,7 +991,7 @@ class SwingTerminalShellSuggestionTest {
             }
         }
         val component =
-            SwingTerminal(
+            newTerminal(
                 settingsProvider = { currentSettings },
             ).withSuggestionProvider(provider)
 
@@ -1010,7 +1033,7 @@ class SwingTerminalShellSuggestionTest {
         runBlocking { withTimeout(1_000.milliseconds) { session.renderGeneration.first { it >= 0L } } }
         val visibleDuringCallback = ArrayList<Boolean>()
         val component =
-            SwingTerminal(settingsProvider = {
+            newTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.smartSuggestionsEnabled = true
                     draft.padding = SwingPadding(0, 0, 0, 0)
@@ -1020,6 +1043,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.addShellSuggestionEligibilityListener {
                 visibleDuringCallback += component.currentShellSuggestionState().visible
             }
@@ -1040,7 +1064,7 @@ class SwingTerminalShellSuggestionTest {
     @Test
     fun `shown shell suggestion state exposes selected item`() {
         val component =
-            SwingTerminal(settingsProvider = {
+            newTerminal(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.smartSuggestionsEnabled = true
                     draft.padding = SwingPadding(0, 0, 0, 0)

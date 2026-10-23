@@ -25,16 +25,18 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Font
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TerminalWindowResizeControllerTest {
     @Test
@@ -167,17 +169,23 @@ class TerminalWindowResizeControllerTest {
     @Test
     fun `rejected queued resize restores the session to its actual visible grid`() {
         withWindow { window, terminal, session, controller, updates ->
+            val restored = CompletableFuture<Unit>()
+            val visible = onEdt { terminal.visibleGridSize() }
             onEdt {
-                val visible = terminal.visibleGridSize()
-                assertTrue(controller.request(session, 10, 132))
+                assertTrue(
+                    controller.request(session, 10, 132, onComplete = { failure ->
+                        if (failure == null) restored.complete(Unit) else restored.completeExceptionally(failure)
+                    }),
+                )
                 session.resize(132, 10)
                 window.geometry = null
                 updates.removeFirst().invoke()
                 assertTrue(window.bounds.isEmpty())
-                session.readRenderFrame { frame ->
-                    assertEquals(visible.width, frame.columns)
-                    assertEquals(visible.height, frame.rows)
-                }
+            }
+            restored.get(10, TimeUnit.SECONDS)
+            session.readRenderFrame { frame ->
+                assertEquals(visible.width, frame.columns)
+                assertEquals(visible.height, frame.rows)
             }
         }
     }
@@ -195,6 +203,29 @@ class TerminalWindowResizeControllerTest {
                     assertEquals(132, frame.columns)
                     assertEquals(10, frame.rows)
                 }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `throwing immediate fallback completion is delivered once`(unbind: Boolean) {
+        withWindow { window, terminal, session, controller, updates ->
+            onEdt {
+                val expected = IllegalStateException("completion failed")
+                var completions = 0
+                assertTrue(
+                    controller.request(session, 10, 132, onComplete = { failure ->
+                        completions++
+                        assertTrue(failure is CancellationException)
+                        throw expected
+                    }),
+                )
+                controller.clearTarget()
+                if (unbind) terminal.unbind() else terminal.setSize(0, 0)
+                assertSame(expected, assertFailsWith<IllegalStateException> { updates.removeFirst().invoke() })
+                assertEquals(1, completions)
+                assertTrue(window.bounds.isEmpty())
             }
         }
     }
@@ -241,6 +272,7 @@ class TerminalWindowResizeControllerTest {
         val updates = ArrayDeque<() -> Unit>()
         var ownedTerminal: SwingTerminal? = null
         var ownedController: TerminalWindowResizeController? = null
+        val bound = CompletableFuture<Unit>()
         try {
             onEdt {
                 val terminal =
@@ -250,12 +282,15 @@ class TerminalWindowResizeControllerTest {
                         }
                     })
                 ownedTerminal = terminal
-                terminal.bind(session)
                 terminal.setSize(640, 160)
+                terminal.bind(session) { failure ->
+                    if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
+                }
                 val controller = TerminalWindowResizeController(window, updates::addLast)
                 ownedController = controller
                 controller.setTarget(session, terminal)
             }
+            bound.get(10, TimeUnit.SECONDS)
             action(window, requireNotNull(ownedTerminal), session, requireNotNull(ownedController), updates)
         } finally {
             onEdt {

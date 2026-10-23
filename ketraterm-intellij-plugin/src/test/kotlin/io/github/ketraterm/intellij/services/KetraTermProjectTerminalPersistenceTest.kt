@@ -25,18 +25,32 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import com.intellij.ui.content.ContentManagerListener
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
+import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.transport.TerminalConnector
+import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.workspace.TerminalProfile
+import io.github.ketraterm.workspace.TerminalWorkspace
+import io.github.ketraterm.workspace.TerminalWorkspaceListener
+import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import java.awt.event.ContainerAdapter
+import java.awt.event.ContainerEvent
 import java.lang.reflect.Proxy
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Verifies restart metadata through the project service without showing terminal panes or creating PTYs. */
+/** Verifies restart metadata and startup lifecycle through real product panes without creating PTYs. */
 class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
     fun testDisposalFinishesWhenPersistenceListenerRemovalThrows() {
         storage.loadState(TerminalTabsState(listOf(TerminalTabState(customTitle = "Pending")), 0))
@@ -267,7 +281,7 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
         val original = projectSettings.state
         val profiles = CopyOnWriteArrayList<TerminalProfile>()
         val service =
-            KetraTermProjectTerminalService(project) { _, profile, _ ->
+            KetraTermProjectTerminalService(project) { profile ->
                 profiles += profile
                 throw IllegalStateException("PTY startup is disabled in this fixture")
             }.also { Disposer.register(lifetime, it) }
@@ -311,8 +325,174 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
         }
     }
 
+    fun testPermissionRevocationDuringBindingSurvivesStartupCompletion() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        settings.loadState(settings.state.copy(titlePermission = "allow", smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+        val releaseAdmission = CountDownLatch(1)
+        val gateTask = CompletableFuture<FutureTask<Unit>>()
+        val paneInstalled = CompletableFuture<Unit>()
+        val started = CompletableFuture<Unit>()
+        val titles = CopyOnWriteArrayList<String>()
+        val service =
+            KetraTermProjectTerminalService(
+                project,
+                workspaceFactory = { listener ->
+                    workspace(listener) { options ->
+                        val session =
+                            TerminalSession.create(
+                                TerminalBuffers.create(options.columns, options.rows),
+                                connector(onStart = { output ->
+                                    check(paneInstalled.isDone) { "Output started before pane installation" }
+                                    val bytes = "\u001B]2;revoked-title\u0007".encodeToByteArray()
+                                    output.onBytes(bytes, 0, bytes.size)
+                                    started.complete(Unit)
+                                }),
+                                hostEvents =
+                                    object : HostEventSink by HostEventSink.NONE {
+                                        override fun windowTitleChanged(title: String) {
+                                            titles += title
+                                        }
+                                    },
+                                hostPolicy = options.hostPolicy,
+                            )
+                        val entered = CountDownLatch(1)
+                        val gate =
+                            FutureTask {
+                                session.withMutationAdmission({ true }) {
+                                    entered.countDown()
+                                    check(releaseAdmission.await(10, TimeUnit.SECONDS)) { "Admission gate was not released" }
+                                }
+                                Unit
+                            }
+                        gateTask.complete(gate)
+                        Thread
+                            .ofPlatform()
+                            .daemon()
+                            .name("intellij-startup-admission")
+                            .start(gate)
+                        check(entered.await(10, TimeUnit.SECONDS)) { "Admission gate was not entered" }
+                        session
+                    }
+                },
+                prepareStartup = {},
+            ).also { Disposer.register(lifetime, it) }
+        try {
+            val content = service.openProfileTab(toolWindow(contentManager()), TerminalProfile("startup", "Startup", listOf("unused")))
+            observePaneInstallation(service, content, paneInstalled)
+            PlatformTestUtil.waitWithEventsDispatching("Pane was not installed", { paneInstalled.isDone }, 10)
+            settings.replaceState(settings.state.copy(titlePermission = "deny"))
+            // replaceState invokes the service listener synchronously; its queued reload precedes this marker.
+            val settingsReloaded = CompletableFuture<Unit>()
+            ApplicationManager.getApplication().invokeLater { settingsReloaded.complete(Unit) }
+            PlatformTestUtil.waitWithEventsDispatching("Queued settings reload did not run", { settingsReloaded.isDone }, 10)
+            assertFalse("Startup must await initial binding", started.isDone)
+            releaseAdmission.countDown()
+            gateTask.get(10, TimeUnit.SECONDS).get(10, TimeUnit.SECONDS)
+            PlatformTestUtil.waitWithEventsDispatching("Connector was not started", { started.isDone }, 10)
+            assertEquals("Binding completion must not restore the startup permission snapshot", emptyList<String>(), titles)
+        } finally {
+            releaseAdmission.countDown()
+            if (gateTask.isDone) gateTask.get(10, TimeUnit.SECONDS).get(10, TimeUnit.SECONDS)
+            Disposer.dispose(service)
+        }
+    }
+
+    fun testClosingStartupFailureAfterBindingRemovesThePendingTab() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        settings.loadState(settings.state.copy(smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+        val paneInstalled = CompletableFuture<Unit>()
+        val startedAfterBinding = AtomicBoolean()
+        val connectorCloses = AtomicInteger()
+        val createdSession = CompletableFuture<TerminalSession>()
+        val service =
+            KetraTermProjectTerminalService(
+                project,
+                workspaceFactory = { listener ->
+                    workspace(listener) { options ->
+                        TerminalSession
+                            .create(
+                                TerminalBuffers.create(options.columns, options.rows),
+                                connector(
+                                    onStart = {
+                                        startedAfterBinding.set(paneInstalled.isDone)
+                                        throw IllegalStateException("Connector startup failed after pane binding")
+                                    },
+                                    onClose = { connectorCloses.incrementAndGet() },
+                                ),
+                                hostPolicy = options.hostPolicy,
+                            ).also(createdSession::complete)
+                    }
+                },
+                prepareStartup = {},
+            ).also { Disposer.register(lifetime, it) }
+        val manager = contentManager()
+        val content = service.openProfileTab(toolWindow(manager), TerminalProfile("startup", "Startup", listOf("unused")))
+        observePaneInstallation(service, content, paneInstalled)
+        PlatformTestUtil.waitWithEventsDispatching("Startup failure was not published", { content.displayName == "Failed: Startup" }, 10)
+        assertTrue("The connector must fail after the actual pane was installed", startedAfterBinding.get())
+        assertTrue(createdSession.get(10, TimeUnit.SECONDS).isClosed)
+        assertEquals(1, connectorCloses.get())
+        assertTrue(service.hasOpenTabs())
+
+        manager.removeContent(content, true)
+
+        assertEquals(0, manager.contentCount)
+        assertFalse("Closing failed startup content must release its pending tab", service.hasOpenTabs())
+    }
+
+    private fun observePaneInstallation(
+        service: KetraTermProjectTerminalService,
+        content: Content,
+        installed: CompletableFuture<Unit>,
+    ) {
+        content.component.addContainerListener(
+            object : ContainerAdapter() {
+                override fun componentAdded(event: ContainerEvent) {
+                    if (service.paneForComponent(event.child) != null) installed.complete(Unit)
+                }
+            },
+        )
+        if (content.component.components.any { service.paneForComponent(it) != null }) installed.complete(Unit)
+    }
+
+    private fun connector(
+        onStart: (TerminalConnectorListener) -> Unit,
+        onClose: () -> Unit = {},
+    ): TerminalConnector =
+        object : TerminalConnector {
+            override fun start(listener: TerminalConnectorListener) = onStart(listener)
+
+            override fun resize(
+                columns: Int,
+                rows: Int,
+            ) = Unit
+
+            override fun write(
+                bytes: ByteArray,
+                offset: Int,
+                length: Int,
+            ) = Unit
+
+            override fun close() = onClose()
+        }
+
+    private fun workspace(
+        listener: TerminalWorkspaceListener,
+        createSession: (TerminalWorkspaceOpenOptions) -> TerminalSession,
+    ): TerminalWorkspace {
+        val factoryType = Class.forName("io.github.ketraterm.workspace.TerminalWorkspaceSessionFactory")
+        val factory =
+            Proxy.newProxyInstance(factoryType.classLoader, arrayOf(factoryType)) { _, method, args ->
+                check(method.name == "create") { "Unexpected session factory call: ${method.name}" }
+                createSession(requireNotNull(args)[1] as TerminalWorkspaceOpenOptions)
+            }
+        return TerminalWorkspace::class.java
+            .getDeclaredConstructor(TerminalWorkspaceListener::class.java, factoryType, CoroutineDispatcher::class.java)
+            .newInstance(listener, factory, Dispatchers.Default) as TerminalWorkspace
+    }
+
     private fun service(onStart: () -> Unit = {}): KetraTermProjectTerminalService =
-        KetraTermProjectTerminalService(project) { _, _, _ ->
+        KetraTermProjectTerminalService(project) { _ ->
             onStart()
             throw IllegalStateException("PTY startup is disabled in this fixture")
         }.also { Disposer.register(lifetime, it) }
@@ -335,6 +515,7 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
                     manager
                 }
                 "toString" -> "KetraTerm persistence test tool window"
+                "isActive" -> false
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.get(0)
                 else -> error("Unexpected tool-window call: ${method.name}")

@@ -55,6 +55,7 @@ class TerminalMetadataEventsTest {
                 sink,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             ).use { session ->
                 SessionTestThread("hyperlink-registration") {
                     val bytes = "\u001B]8;id=a;https://a\u0007".encodeToByteArray()
@@ -126,6 +127,7 @@ class TerminalMetadataEventsTest {
                     hostPolicy = HostPolicy(maxHyperlinkEntries = 1),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     assertTrue(events.isEmpty())

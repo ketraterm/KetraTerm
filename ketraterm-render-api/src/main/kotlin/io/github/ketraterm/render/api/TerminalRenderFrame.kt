@@ -26,6 +26,24 @@ private val defaultFramePalette = TerminalColorPalette()
  */
 public interface TerminalRenderFrame {
     /**
+     * Image-resource, placement or image-geometry invalidation token, local to this
+     * source. Compare for inequality and include source, viewport, active buffer and
+     * structure in cache keys. Providers implementing [copyImages] must advance this
+     * token and [frameGeneration] when their image presentation changes; text-row
+     * generations need not change. The default describes a provider without images.
+     */
+    public val graphicsGeneration: Long get() = 0L
+
+    /**
+     * Delivers visible image placements synchronously in back-to-front stacking order.
+     * Placement metadata must be copied during this frame's callback; immutable
+     * [TerminalRenderImage] resources may be retained. The default supplies no images.
+     *
+     * @param sink synchronous receiver of placements intersecting this viewport.
+     */
+    public fun copyImages(sink: TerminalRenderImageSink) {}
+
+    /**
      * Number of visible columns in each render row.
      */
     public val columns: Int

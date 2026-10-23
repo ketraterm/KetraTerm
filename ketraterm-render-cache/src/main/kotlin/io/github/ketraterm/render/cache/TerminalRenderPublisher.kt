@@ -29,6 +29,8 @@ import kotlin.concurrent.withLock
  *
  * Writer and UI never touch the same buffer simultaneously when UI consumers
  * access the front buffer through [readCurrent].
+ * Retired buffers release their image references after their last reader leaves;
+ * primitive row storage remains reusable for later publications.
  *
  * The public inline reader avoids a callback allocation; non-inline operations own
  * lease acquisition and release. Only cache-reference acquisition/release is part of
@@ -110,8 +112,10 @@ public class TerminalRenderPublisher(
 
             publishLock.withLock {
                 writerOwned[writeIndex] = false
+                val retiredIndex = frontIndex
                 frontIndex = writeIndex
                 frontRef.set(buffers[frontIndex])
+                if (retiredIndex != NO_FRONT) clearRetiredImages(retiredIndex)
                 published = true
                 bufferAvailable.signalAll()
             }
@@ -204,6 +208,7 @@ public class TerminalRenderPublisher(
             require(index >= 0) { "Cache does not belong to this publisher" }
             check(readerCounts[index] > 0) { "Render cache has no reader lease" }
             readerCounts[index]--
+            clearRetiredImages(index)
             bufferAvailable.signalAll()
         }
     }
@@ -214,7 +219,15 @@ public class TerminalRenderPublisher(
                 "TerminalRenderPublisher writer lease underflow for buffer $index"
             }
             writerOwned[index] = false
+            clearRetiredImages(index)
             bufferAvailable.signalAll()
+        }
+    }
+
+    /** Called under [publishLock]; pinned readers and an in-progress writer retain their resources. */
+    private fun clearRetiredImages(index: Int) {
+        if (index != frontIndex && readerCounts[index] == 0 && !writerOwned[index]) {
+            buffers[index].images.clear()
         }
     }
 

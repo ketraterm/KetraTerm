@@ -74,9 +74,10 @@ defines event and encoding behavior.
 | Window actions | Minimize, restore, move, raise/lower, resize, and maximize requests where the host permits them. |
 | Status queries | Operating status, cursor position, primary/secondary device attributes, and supported mode status. |
 | Capability queries | DECRQSS and XTGETTCAP through explicit allowlists. |
-| Window reports | Minimized state, window pixel dimensions, grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
+| Window reports | Minimized state, text-area and character-cell pixel dimensions (`CSI 14 t` / `CSI 16 t`), grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
 | Color scheme | One-shot light/dark query and mode 2031 subscriptions to host theme changes, including palette changes within the same light/dark preference. |
 | In-band resize | Mode 2048 reports text-area rows, columns, and pixel dimensions on enable and after size changes; unavailable pixel dimensions are zero. |
+| Kitty graphics | Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. [Real application verification](../../tools/kitty-graphics/README.md#real-application-smoke-tests). [Windows backend caveats](../../ketraterm-pty/docs/pty4j-backend-limitations.md#windows-graphics-cursor-desynchronization). [Remaining extensions](../terminal-feature-gap-map.md#optional-protocol-work). |
 | Custom OSC | Ordered callbacks for unsupported numeric OSC commands. |
 | Host policy | Independent controls for clipboard, titles, links, notifications, window actions, colors, and terminal replies. |
 

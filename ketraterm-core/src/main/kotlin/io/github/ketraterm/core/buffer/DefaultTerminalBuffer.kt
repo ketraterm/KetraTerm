@@ -21,9 +21,12 @@ import io.github.ketraterm.core.buffer.impl.*
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.engine.MutationEngine
 import io.github.ketraterm.core.engine.TerminalResizer
+import io.github.ketraterm.core.graphics.GraphicsEngine
 import io.github.ketraterm.core.model.SavedCursorState
 import io.github.ketraterm.core.render.CoreTerminalRenderFrame
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.TerminalGraphicsCommand
+import io.github.ketraterm.protocol.TerminalGraphicsResult
 
 /**
  * Concrete facade for the terminal-buffer core.
@@ -49,6 +52,24 @@ internal class DefaultTerminalBuffer private constructor(
     private val state: TerminalState
         get() = components.state
     private val renderFrame = CoreTerminalRenderFrame(components.state)
+    private val graphicsEngine =
+        GraphicsEngine(components.state, components.mutationEngine)
+    override val graphicsTransferGeneration: Long get() = state.graphics.transferGeneration
+
+    override fun applyGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        data: ByteArray,
+        length: Int,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+    ) = graphicsEngine.applyGraphicsCommand(command, data, length, result, allowReplies)
+
+    override fun applyDecodedGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        image: io.github.ketraterm.render.api.TerminalRenderImage?,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+    ) = graphicsEngine.applyDecodedGraphicsCommand(command, image, result, allowReplies)
 
     constructor(initialWidth: Int, initialHeight: Int, maxHistory: Int = 1000) : this(
         createComponents(initialWidth, initialHeight, maxHistory),
@@ -131,6 +152,9 @@ internal class DefaultTerminalBuffer private constructor(
             return Pair(state.clampScrollbackOffset(oldScrollbackOffset), state.historySize)
         }
 
+        // Height resize starts a new discarded-row epoch. Compare its emitted rows
+        // with the old ring's local top, excluding evictions from earlier operations.
+        val oldPrimaryTop = state.primaryBuffer.ring.size - oldHeight
         val newScrollbackOffset =
             TerminalResizer.resizeBuffer(
                 buffer = state.primaryBuffer,
@@ -141,6 +165,17 @@ internal class DefaultTerminalBuffer private constructor(
                 lineIdProvider = state::allocateLineId,
                 oldScrollbackOffset = oldScrollbackOffset,
             )
+        val newPrimaryTop = state.primaryBuffer.ring.discardedCount + state.primaryBuffer.ring.size - newHeight
+        state.graphics.resizePrimary(
+            if (newWidth ==
+                oldWidth
+            ) {
+                (newPrimaryTop - oldPrimaryTop).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+            } else {
+                0
+            },
+            state.primaryBuffer.ring.size - newHeight,
+        )
         state.altBuffer.replaceStorage(newWidth, newHeight, state.pen.blankAttr, state.pen.blankExtendedAttr)
 
         state.dimensions.width = newWidth
@@ -168,6 +203,9 @@ internal class DefaultTerminalBuffer private constructor(
     }
 
     override fun reset() {
+        state.graphics.invalidateTransfer()
+        state.graphics.clear(false, data = true)
+        state.graphics.clear(true, data = true)
         val wasReverseVideo = state.modes.isReverseVideo
         if (state.isAltScreenActive) {
             this.exitAltBuffer()
@@ -192,6 +230,7 @@ internal class DefaultTerminalBuffer private constructor(
     }
 
     override fun softReset() {
+        state.graphics.invalidateTransfer()
         val wasReverseVideo = state.modes.isReverseVideo
         state.pen.reset()
         state.isAttributeChangeExtentRectangle = false

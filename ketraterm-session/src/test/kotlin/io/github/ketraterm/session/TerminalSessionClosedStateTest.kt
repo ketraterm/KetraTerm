@@ -77,6 +77,7 @@ class TerminalSessionClosedStateTest {
                     hostCommandAdapter = adapter,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             if (closure != "unstarted") session.start(10, 3)
             if (closure == "remote") connector.simulateClosed(0) else session.close()

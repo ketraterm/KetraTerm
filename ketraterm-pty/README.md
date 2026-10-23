@@ -125,6 +125,8 @@ descendant heuristic and does not inspect applications inside SSH or WSL.
 
 ## Sub-Documentation
 
+- [Backend limitations](docs/pty4j-backend-limitations.md): native pixel dimensions,
+  Windows graphics cursor desynchronization, and verified upstream evidence.
 - [Process lifecycle](docs/pty4j-process-lifecycle.md): output ordering, worker
   threads, failure, shutdown, resizing, and native test requirements.
 - [Module ownership](Module.md): implementation components and dependencies.

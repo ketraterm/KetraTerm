@@ -24,7 +24,7 @@ package io.github.ketraterm.parser.ansi
  * - The command dispatcher owns semantic handoff to the sink.
  * - This matrix handles the ASCII/control domain plus the top-level UTF-8 ingress lane.
  * - Non-ASCII bytes are only printable in [AnsiState.GROUND] by default.
- * - DCS is structurally present, but Milestone A keeps it in bounded ignore/passthrough mode.
+ * - DCS prefix recognition and bounded collection belong to the action engine and collection policy.
  *
  * Entry encoding:
  * - high bits: next state
@@ -49,6 +49,7 @@ internal object AnsiStateMachine {
         buildDcs()
         buildStringEscapeStates()
         buildIgnoredStrings()
+        buildApc()
     }
 
     @JvmStatic
@@ -80,7 +81,7 @@ internal object AnsiStateMachine {
      *
      * Important:
      * - UTF8_PAYLOAD does NOT default to printable ingress everywhere.
-     * - Only [GROUND] treats UTF8_PAYLOAD as printable text by default.
+     * - Only [AnsiState.GROUND] treats UTF8_PAYLOAD as printable text by default.
      * - Active control-sequence states drop/abort on UTF8_PAYLOAD instead of leaking it into text.
      */
     private fun buildAnywhereRules() {
@@ -100,7 +101,7 @@ internal object AnsiStateMachine {
         set(AnsiState.DCS_PASSTHROUGH, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_UTF8)
 
         // Ignored string-like states stay ignored.
-        set(AnsiState.SOS_PM_APC_STRING, ByteClass.UTF8_PAYLOAD, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_STRING, ByteClass.UTF8_PAYLOAD, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
         set(AnsiState.IGNORE_UNTIL_ST, ByteClass.UTF8_PAYLOAD, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
 
         // Non-ASCII bytes are invalid inside active 7-bit control grammar states.
@@ -111,7 +112,7 @@ internal object AnsiStateMachine {
         set(AnsiState.CSI_INTERMEDIATE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
         set(AnsiState.CSI_IGNORE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
 
-        // Milestone A: DCS is present structurally, but we drop straight into passthrough/ignore.
+        // The collection policy rejects unsupported DCS prefixes, including non-ASCII starts.
         set(AnsiState.DCS_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
     }
 
@@ -127,7 +128,8 @@ internal object AnsiStateMachine {
         set(s, ByteClass.CSI_INTRO, s, FsmAction.PRINT_ASCII)
         set(s, ByteClass.ST_INTRO, s, FsmAction.PRINT_ASCII)
         set(s, ByteClass.OSC_INTRO, s, FsmAction.PRINT_ASCII)
-        set(s, ByteClass.SOS_PM_APC_INTRO, s, FsmAction.PRINT_ASCII)
+        set(s, ByteClass.SOS_PM_INTRO, s, FsmAction.PRINT_ASCII)
+        set(s, ByteClass.APC_INTRO, s, FsmAction.PRINT_ASCII)
         set(s, ByteClass.FINAL_BYTE, s, FsmAction.PRINT_ASCII)
     }
 
@@ -143,7 +145,8 @@ internal object AnsiStateMachine {
         set(s, ByteClass.CSI_INTRO, AnsiState.CSI_ENTRY, FsmAction.CLEAR_SEQUENCE)
         set(s, ByteClass.OSC_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_START)
         set(s, ByteClass.DCS_INTRO, AnsiState.DCS_ENTRY, FsmAction.CLEAR_SEQUENCE)
-        set(s, ByteClass.SOS_PM_APC_INTRO, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
+        set(s, ByteClass.SOS_PM_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(s, ByteClass.APC_INTRO, AnsiState.APC_STRING, FsmAction.APC_START)
 
         // ESC \ acts as ST in string termination contexts, but plain ESC dispatch in normal ESC flow.
         set(s, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
@@ -171,7 +174,8 @@ internal object AnsiStateMachine {
         set(s, ByteClass.CSI_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
         set(s, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
         set(s, ByteClass.OSC_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
-        set(s, ByteClass.SOS_PM_APC_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
+        set(s, ByteClass.SOS_PM_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
+        set(s, ByteClass.APC_INTRO, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
         set(s, ByteClass.FINAL_BYTE, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
     }
 
@@ -193,7 +197,8 @@ internal object AnsiStateMachine {
         set(AnsiState.CSI_ENTRY, ByteClass.CSI_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_ENTRY, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_ENTRY, ByteClass.OSC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
-        set(AnsiState.CSI_ENTRY, ByteClass.SOS_PM_APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_ENTRY, ByteClass.SOS_PM_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_ENTRY, ByteClass.APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_ENTRY, ByteClass.FINAL_BYTE, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
 
         // CSI_PARAM
@@ -206,7 +211,8 @@ internal object AnsiStateMachine {
         set(AnsiState.CSI_PARAM, ByteClass.CSI_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_PARAM, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_PARAM, ByteClass.OSC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
-        set(AnsiState.CSI_PARAM, ByteClass.SOS_PM_APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_PARAM, ByteClass.SOS_PM_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_PARAM, ByteClass.APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_PARAM, ByteClass.FINAL_BYTE, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
 
         // CSI_INTERMEDIATE
@@ -219,7 +225,8 @@ internal object AnsiStateMachine {
         set(AnsiState.CSI_INTERMEDIATE, ByteClass.CSI_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_INTERMEDIATE, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_INTERMEDIATE, ByteClass.OSC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
-        set(AnsiState.CSI_INTERMEDIATE, ByteClass.SOS_PM_APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_INTERMEDIATE, ByteClass.SOS_PM_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
+        set(AnsiState.CSI_INTERMEDIATE, ByteClass.APC_INTRO, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
         set(AnsiState.CSI_INTERMEDIATE, ByteClass.FINAL_BYTE, AnsiState.GROUND, FsmAction.CSI_DISPATCH)
 
         // CSI_IGNORE
@@ -232,7 +239,8 @@ internal object AnsiStateMachine {
         set(AnsiState.CSI_IGNORE, ByteClass.CSI_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
         set(AnsiState.CSI_IGNORE, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
         set(AnsiState.CSI_IGNORE, ByteClass.OSC_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
-        set(AnsiState.CSI_IGNORE, ByteClass.SOS_PM_APC_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
+        set(AnsiState.CSI_IGNORE, ByteClass.SOS_PM_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
+        set(AnsiState.CSI_IGNORE, ByteClass.APC_INTRO, AnsiState.GROUND, FsmAction.IGNORE)
         set(AnsiState.CSI_IGNORE, ByteClass.FINAL_BYTE, AnsiState.GROUND, FsmAction.IGNORE)
     }
 
@@ -248,7 +256,8 @@ internal object AnsiStateMachine {
         set(s, ByteClass.CSI_INTRO, s, FsmAction.OSC_PUT_ASCII)
         set(s, ByteClass.ST_INTRO, s, FsmAction.OSC_PUT_ASCII)
         set(s, ByteClass.OSC_INTRO, s, FsmAction.OSC_PUT_ASCII)
-        set(s, ByteClass.SOS_PM_APC_INTRO, s, FsmAction.OSC_PUT_ASCII)
+        set(s, ByteClass.SOS_PM_INTRO, s, FsmAction.OSC_PUT_ASCII)
+        set(s, ByteClass.APC_INTRO, s, FsmAction.OSC_PUT_ASCII)
         set(s, ByteClass.FINAL_BYTE, s, FsmAction.OSC_PUT_ASCII)
 
         // BEL terminates OSC through EXECUTE handling.
@@ -256,7 +265,7 @@ internal object AnsiStateMachine {
     }
 
     private fun buildDcs() {
-        // Milestone A: enter passthrough/ignore immediately, regardless of introducer details.
+        // Collect the DCS envelope; prefix recognition does not require separate parameter states.
         set(AnsiState.DCS_ENTRY, ByteClass.EXECUTE, AnsiState.DCS_ENTRY, FsmAction.IGNORE)
         set(AnsiState.DCS_ENTRY, ByteClass.INTERMEDIATE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.PARAM_DIGIT, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
@@ -267,7 +276,8 @@ internal object AnsiStateMachine {
         set(AnsiState.DCS_ENTRY, ByteClass.CSI_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.ST_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.OSC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
-        set(AnsiState.DCS_ENTRY, ByteClass.SOS_PM_APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
+        set(AnsiState.DCS_ENTRY, ByteClass.SOS_PM_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
+        set(AnsiState.DCS_ENTRY, ByteClass.APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.FINAL_BYTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
 
@@ -281,7 +291,8 @@ internal object AnsiStateMachine {
         set(s, ByteClass.CSI_INTRO, s, FsmAction.DCS_PUT_ASCII)
         set(s, ByteClass.ST_INTRO, s, FsmAction.DCS_PUT_ASCII)
         set(s, ByteClass.OSC_INTRO, s, FsmAction.DCS_PUT_ASCII)
-        set(s, ByteClass.SOS_PM_APC_INTRO, s, FsmAction.DCS_PUT_ASCII)
+        set(s, ByteClass.SOS_PM_INTRO, s, FsmAction.DCS_PUT_ASCII)
+        set(s, ByteClass.APC_INTRO, s, FsmAction.DCS_PUT_ASCII)
         set(s, ByteClass.FINAL_BYTE, s, FsmAction.DCS_PUT_ASCII)
     }
 
@@ -326,27 +337,28 @@ internal object AnsiStateMachine {
         setDcsEscapeAsciiFallbacks()
 
         // ---------------------------------------------------------------------
-        // Ignored strings: SOS / PM / APC / generic ignore-until-ST
+        // Ignored strings: SOS / PM / generic ignore-until-ST
         // ---------------------------------------------------------------------
-        set(AnsiState.SOS_PM_APC_STRING, ByteClass.EXECUTE, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
-        set(AnsiState.SOS_PM_APC_STRING, ByteClass.ESC, AnsiState.SOS_PM_APC_ESCAPE, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_STRING, ByteClass.EXECUTE, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
+        set(AnsiState.SOS_PM_STRING, ByteClass.ESC, AnsiState.SOS_PM_ESCAPE, FsmAction.IGNORE)
 
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.EXECUTE, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.ESC, AnsiState.SOS_PM_APC_ESCAPE, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.UTF8_PAYLOAD, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.STRING_END)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.INTERMEDIATE, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.PARAM_DIGIT, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.COLON, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.PARAM_SEP, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.PRIVATE_MARKER, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.DCS_INTRO, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.CSI_INTRO, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.OSC_INTRO, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.SOS_PM_APC_INTRO, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
-        set(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.FINAL_BYTE, AnsiState.SOS_PM_APC_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.EXECUTE, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.ESC, AnsiState.SOS_PM_ESCAPE, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.UTF8_PAYLOAD, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.STRING_END)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.INTERMEDIATE, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.PARAM_DIGIT, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.COLON, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.PARAM_SEP, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.PRIVATE_MARKER, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.DCS_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.CSI_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.OSC_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.SOS_PM_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.APC_INTRO, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
+        set(AnsiState.SOS_PM_ESCAPE, ByteClass.FINAL_BYTE, AnsiState.SOS_PM_STRING, FsmAction.IGNORE)
 
         set(AnsiState.IGNORE_UNTIL_ST, ByteClass.EXECUTE, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
         set(AnsiState.IGNORE_UNTIL_ST, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
@@ -365,7 +377,8 @@ internal object AnsiStateMachine {
         set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.DCS_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
         set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.CSI_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
         set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.OSC_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
-        set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.SOS_PM_APC_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
+        set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.SOS_PM_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
+        set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.APC_INTRO, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
         set(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.FINAL_BYTE, AnsiState.IGNORE_UNTIL_ST, FsmAction.IGNORE)
     }
 
@@ -378,7 +391,8 @@ internal object AnsiStateMachine {
         set(AnsiState.OSC_ESCAPE, ByteClass.DCS_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
         set(AnsiState.OSC_ESCAPE, ByteClass.CSI_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
         set(AnsiState.OSC_ESCAPE, ByteClass.OSC_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
-        set(AnsiState.OSC_ESCAPE, ByteClass.SOS_PM_APC_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
+        set(AnsiState.OSC_ESCAPE, ByteClass.SOS_PM_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
+        set(AnsiState.OSC_ESCAPE, ByteClass.APC_INTRO, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
         set(AnsiState.OSC_ESCAPE, ByteClass.FINAL_BYTE, AnsiState.OSC_STRING, FsmAction.OSC_PUT_ASCII)
     }
 
@@ -391,12 +405,25 @@ internal object AnsiStateMachine {
         set(AnsiState.DCS_ESCAPE, ByteClass.DCS_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
         set(AnsiState.DCS_ESCAPE, ByteClass.CSI_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
         set(AnsiState.DCS_ESCAPE, ByteClass.OSC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
-        set(AnsiState.DCS_ESCAPE, ByteClass.SOS_PM_APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
+        set(AnsiState.DCS_ESCAPE, ByteClass.SOS_PM_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
+        set(AnsiState.DCS_ESCAPE, ByteClass.APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
         set(AnsiState.DCS_ESCAPE, ByteClass.FINAL_BYTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
     }
 
+    private fun buildApc() {
+        for (byteClass in 0 until ByteClass.ROUTING_COUNT) {
+            set(AnsiState.APC_STRING, byteClass, AnsiState.APC_STRING, FsmAction.APC_PUT)
+            set(AnsiState.APC_ESCAPE, byteClass, AnsiState.APC_STRING, FsmAction.APC_INVALID)
+        }
+        set(AnsiState.APC_STRING, ByteClass.ESC, AnsiState.APC_ESCAPE, FsmAction.IGNORE)
+        set(AnsiState.APC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.APC_ABORT)
+        set(AnsiState.APC_ESCAPE, ByteClass.ESC, AnsiState.APC_ESCAPE, FsmAction.APC_INVALID)
+        set(AnsiState.APC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.APC_ABORT)
+        set(AnsiState.APC_ESCAPE, ByteClass.ST_INTRO, AnsiState.GROUND, FsmAction.APC_END)
+    }
+
     private fun buildIgnoredStrings() {
-        setIgnoredStringFallbacks(AnsiState.SOS_PM_APC_STRING)
+        setIgnoredStringFallbacks(AnsiState.SOS_PM_STRING)
         setIgnoredStringFallbacks(AnsiState.IGNORE_UNTIL_ST)
     }
 
@@ -410,7 +437,8 @@ internal object AnsiStateMachine {
         set(state, ByteClass.CSI_INTRO, state, FsmAction.IGNORE)
         set(state, ByteClass.ST_INTRO, state, FsmAction.IGNORE)
         set(state, ByteClass.OSC_INTRO, state, FsmAction.IGNORE)
-        set(state, ByteClass.SOS_PM_APC_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.SOS_PM_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.APC_INTRO, state, FsmAction.IGNORE)
         set(state, ByteClass.FINAL_BYTE, state, FsmAction.IGNORE)
     }
 

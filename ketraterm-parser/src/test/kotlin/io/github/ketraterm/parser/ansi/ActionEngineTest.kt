@@ -19,6 +19,8 @@ import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalGraphicsCommand
+import io.github.ketraterm.protocol.TerminalGraphicsResult
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -191,6 +193,17 @@ class ActionEngineTest {
     }
 
     private class RecordingTerminalCommandSink : TerminalCommandSink {
+        override val graphicsTransferGeneration: Long get() = 0L
+
+        override fun applyGraphicsCommand(
+            command: TerminalGraphicsCommand,
+            data: ByteArray,
+            length: Int,
+            result: TerminalGraphicsResult,
+        ) {
+            sinkCalls += "graphics:${command.valueOr('a', 't'.code.toLong())}:$length:$result"
+        }
+
         override fun applyColorRequest(request: io.github.ketraterm.protocol.TerminalColorRequest) {
             sinkCalls += "applyColorRequest:${request.count}"
         }

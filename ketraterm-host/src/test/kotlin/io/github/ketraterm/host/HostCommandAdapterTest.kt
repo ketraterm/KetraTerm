@@ -1247,6 +1247,38 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `cell pixel reports survive every byte split and obey only terminal response permission`() {
+            val query = "\u001B[16t"
+            for (policy in HostControlPolicy.entries) {
+                for (split in 0..query.length) {
+                    val f =
+                        Fixture(
+                            terminal = TerminalBuffers.create(width = 100, height = 30),
+                            hostPolicy = HostPolicy(terminalResponsePolicy = policy, windowManipulationPolicy = HostControlPolicy.DENY),
+                        )
+                    f.terminal.resize(100, 30, 0, 800, 600)
+                    f.acceptAscii(query.take(split))
+                    f.acceptAscii(query.drop(split))
+                    f.end()
+                    assertEquals(if (policy == HostControlPolicy.ALLOW) "\u001B[6;20;8t" else "", f.drainResponses())
+                }
+            }
+        }
+
+        @Test
+        fun `malformed cell pixel queries are ignored and recover before the next report`() {
+            for (request in listOf("16;1t", "16;t", "16:1t", "?16t", "16 t", "99999999999999999999916t", "16\u0018", "16\u001a")) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 100, height = 30))
+                f.terminal.resize(100, 30, 0, 800, 600)
+                f.acceptAscii("\u001B[$request")
+                assertEquals("", f.drainResponses(), request)
+                f.acceptAscii("\u001B[16t\u001B[6n")
+                f.end()
+                assertEquals("\u001B[6;20;8t\u001B[1;1R", f.drainResponses(), request)
+            }
+        }
+
+        @Test
         fun `palette policy can deny palette query responses`() {
             val f = Fixture(hostPolicy = HostPolicy(palettePolicy = HostControlPolicy.DENY))
 

@@ -6,7 +6,7 @@ public final class io/github/ketraterm/core/TerminalBuffers {
 	public static synthetic fun create$default (IIIILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
 }
 
-public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io/github/ketraterm/core/api/TerminalCursor, io/github/ketraterm/core/api/TerminalInspector, io/github/ketraterm/core/api/TerminalModeController, io/github/ketraterm/core/api/TerminalModeReader, io/github/ketraterm/core/api/TerminalReader, io/github/ketraterm/core/api/TerminalResponseChannel, io/github/ketraterm/core/api/TerminalWriter {
+public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io/github/ketraterm/core/api/TerminalCursor, io/github/ketraterm/core/api/TerminalGraphics, io/github/ketraterm/core/api/TerminalInspector, io/github/ketraterm/core/api/TerminalModeController, io/github/ketraterm/core/api/TerminalModeReader, io/github/ketraterm/core/api/TerminalReader, io/github/ketraterm/core/api/TerminalResponseChannel, io/github/ketraterm/core/api/TerminalWriter {
 	public abstract fun executeDeccolm (I)V
 	public abstract fun reset ()V
 	public abstract fun resize (III)Lkotlin/Pair;
@@ -52,6 +52,12 @@ public final class io/github/ketraterm/core/api/TerminalCursor$DefaultImpls {
 	public static synthetic fun cursorLeft$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
 	public static synthetic fun cursorRight$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
 	public static synthetic fun cursorUp$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalGraphics {
+	public abstract fun applyDecodedGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;Lio/github/ketraterm/render/api/TerminalRenderImage;Lio/github/ketraterm/protocol/TerminalGraphicsResult;Z)V
+	public abstract fun applyGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;[BILio/github/ketraterm/protocol/TerminalGraphicsResult;Z)V
+	public abstract fun getGraphicsTransferGeneration ()J
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalHostResponseReader {
@@ -329,6 +335,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalResponseCha
 	public static final field DEVICE_ATTRIBUTES_PRIMARY I
 	public static final field DEVICE_ATTRIBUTES_SECONDARY I
 	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_CELL_PIXELS I
 	public static final field WINDOW_REPORT_GRID_CELLS I
 	public static final field WINDOW_REPORT_IN_BAND_SIZE I
 	public static final field WINDOW_REPORT_PIXELS I
@@ -358,6 +365,7 @@ public final class io/github/ketraterm/core/api/TerminalResponseChannel$Companio
 	public static final field DEVICE_ATTRIBUTES_PRIMARY I
 	public static final field DEVICE_ATTRIBUTES_SECONDARY I
 	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_CELL_PIXELS I
 	public static final field WINDOW_REPORT_GRID_CELLS I
 	public static final field WINDOW_REPORT_IN_BAND_SIZE I
 	public static final field WINDOW_REPORT_PIXELS I

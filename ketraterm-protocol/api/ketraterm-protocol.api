@@ -245,6 +245,47 @@ public final class io/github/ketraterm/protocol/TerminalColorRequest {
 public final class io/github/ketraterm/protocol/TerminalColorRequest$Companion {
 }
 
+public abstract interface class io/github/ketraterm/protocol/TerminalGraphicsCommand {
+	public static final field Companion Lio/github/ketraterm/protocol/TerminalGraphicsCommand$Companion;
+	public static final field OMITTED J
+	public abstract fun value (C)J
+	public fun valueOr (CJ)J
+}
+
+public final class io/github/ketraterm/protocol/TerminalGraphicsCommand$Companion {
+	public static final field OMITTED J
+}
+
+public final class io/github/ketraterm/protocol/TerminalGraphicsCommand$DefaultImpls {
+	public static fun valueOr (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;CJ)J
+}
+
+public final class io/github/ketraterm/protocol/TerminalGraphicsLimits {
+	public static final field CHUNK_BYTES I
+	public static final field DIMENSION I
+	public static final field ENCODED_BYTES I
+	public static final field HEADER_BYTES I
+	public static final field IMAGES I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalGraphicsLimits;
+	public static final field PIXELS I
+	public static final field PLACEMENTS I
+	public static final field RETAINED_BYTES I
+	public static final field TRANSFER_BYTES I
+}
+
+public final class io/github/ketraterm/protocol/TerminalGraphicsResult : java/lang/Enum {
+	public static final field INVALID Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static final field MISSING Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static final field NO_SPACE Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static final field OK Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static final field TOO_LARGE Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static final field UNSUPPORTED Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getReply ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+	public static fun values ()[Lio/github/ketraterm/protocol/TerminalGraphicsResult;
+}
+
 public final class io/github/ketraterm/protocol/TerminalHostModeCapability {
 	public static final field ALL I
 	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalHostModeCapability;

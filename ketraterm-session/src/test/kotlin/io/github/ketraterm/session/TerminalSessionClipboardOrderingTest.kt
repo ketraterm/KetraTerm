@@ -213,6 +213,7 @@ class TerminalSessionClipboardOrderingTest {
                         },
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                     clipboardReader = TerminalClipboardReader { TerminalClipboardReadResult.Text("x".repeat(65536)) },
                     clipboardReadTimeSource = testScheduler.timeSource,
                 )

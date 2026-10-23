@@ -189,7 +189,6 @@ public class PtyConnector internal constructor(
                         // Local close should remain best-effort and idempotent.
                     }
                 }
-                joinThreads()
             }
         }
     }
@@ -267,14 +266,6 @@ public class PtyConnector internal constructor(
         listenerOrThrow().onClosed(code)
     }
 
-    private fun joinThreads() {
-        // A callback may close on either worker; joining its peer can make
-        // the watcher wait for the reader that is currently performing close.
-        if (Thread.currentThread() === readerThread || Thread.currentThread() === watcherThread) return
-        joinThread(readerThread, CLOSE_JOIN_MILLIS)
-        joinThread(watcherThread, CLOSE_JOIN_MILLIS)
-    }
-
     private fun joinThread(
         thread: Thread?,
         timeoutMillis: Long,
@@ -297,6 +288,5 @@ public class PtyConnector internal constructor(
         const val DEFAULT_READ_BUFFER_SIZE: Int = 8192
         const val DEFAULT_READER_THREAD_NAME: String = "terminal-pty-reader"
         const val DEFAULT_WATCHER_THREAD_NAME: String = "terminal-pty-watcher"
-        const val CLOSE_JOIN_MILLIS: Long = 250
     }
 }

@@ -16,16 +16,16 @@
 package io.github.ketraterm.session
 
 /**
- * Immutable lifecycle event emitted when a [TerminalSession] stops accepting
- * host input.
+ * Immutable lifecycle event published after [TerminalSession] cleanup finishes.
  *
  * @property exitCode process exit code reported by the transport, or `null`
  *   when the process did not provide one or closure was local.
- * @property failure startup, transport, or outbound worker failure that closed the
- *   session, including unexpected writer cancellation; `null` for a normal remote
- *   exit or local close. Later cleanup failures are suppressed on this cause.
+ * @property failure startup, transport, outbound worker, or cleanup failure;
+ *   `null` for successful local cleanup or normal remote exit. Unexpected writer
+ *   cancellation retains its cause. Later cleanup failures are suppressed on the
+ *   first failure.
  * @property locallyRequested true when application code initiated closure via
- *   [TerminalSession.close].
+ *   [TerminalSession.close] or [TerminalSession.requestClose].
  */
 public data class TerminalSessionCloseEvent(
     val exitCode: Int?,

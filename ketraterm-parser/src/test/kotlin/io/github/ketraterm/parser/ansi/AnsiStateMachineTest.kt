@@ -51,7 +51,7 @@ class AnsiStateMachineTest {
             ByteClass.CSI_INTRO,
             ByteClass.ST_INTRO,
             ByteClass.OSC_INTRO,
-            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.SOS_PM_INTRO,
             ByteClass.FINAL_BYTE,
         )
 
@@ -74,7 +74,7 @@ class AnsiStateMachineTest {
             ByteClass.CSI_INTRO,
             ByteClass.ST_INTRO,
             ByteClass.OSC_INTRO,
-            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.SOS_PM_INTRO,
             ByteClass.FINAL_BYTE,
         )
 
@@ -84,7 +84,7 @@ class AnsiStateMachineTest {
             ByteClass.CSI_INTRO,
             ByteClass.ST_INTRO,
             ByteClass.OSC_INTRO,
-            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.SOS_PM_INTRO,
             ByteClass.FINAL_BYTE,
         )
 
@@ -99,7 +99,7 @@ class AnsiStateMachineTest {
             ByteClass.CSI_INTRO,
             ByteClass.ST_INTRO,
             ByteClass.OSC_INTRO,
-            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.SOS_PM_INTRO,
             ByteClass.FINAL_BYTE,
         )
 
@@ -173,7 +173,7 @@ class AnsiStateMachineTest {
             when (startState) {
                 AnsiState.OSC_STRING -> AnsiState.OSC_ESCAPE
                 AnsiState.DCS_PASSTHROUGH -> AnsiState.DCS_ESCAPE
-                AnsiState.SOS_PM_APC_STRING -> AnsiState.SOS_PM_APC_ESCAPE
+                AnsiState.SOS_PM_STRING -> AnsiState.SOS_PM_ESCAPE
                 AnsiState.IGNORE_UNTIL_ST -> AnsiState.IGNORE_UNTIL_ST_ESCAPE
                 else -> error("unsupported start state: $startState")
             }
@@ -181,7 +181,7 @@ class AnsiStateMachineTest {
             when (startState) {
                 AnsiState.OSC_STRING -> FsmAction.OSC_END
                 AnsiState.DCS_PASSTHROUGH -> FsmAction.DCS_END
-                AnsiState.SOS_PM_APC_STRING,
+                AnsiState.SOS_PM_STRING,
                 AnsiState.IGNORE_UNTIL_ST,
                 -> FsmAction.STRING_END
                 else -> error("unsupported start state: $startState")
@@ -380,9 +380,13 @@ class AnsiStateMachineTest {
         }
 
         @Test
-        fun `DEL is ignored without changing state`() {
+        fun `DEL is ignored outside graphics and invalidates graphics collection`() {
             for (state in states) {
-                assertTransition(state, ByteClass.DEL, state, FsmAction.IGNORE)
+                when (state) {
+                    AnsiState.APC_STRING -> assertTransition(state, ByteClass.DEL, state, FsmAction.APC_PUT)
+                    AnsiState.APC_ESCAPE -> assertTransition(state, ByteClass.DEL, AnsiState.APC_STRING, FsmAction.APC_INVALID)
+                    else -> assertTransition(state, ByteClass.DEL, state, FsmAction.IGNORE)
+                }
             }
         }
 
@@ -441,9 +445,9 @@ class AnsiStateMachineTest {
                 },
                 {
                     assertTransition(
-                        AnsiState.SOS_PM_APC_STRING,
+                        AnsiState.SOS_PM_STRING,
                         ByteClass.UTF8_PAYLOAD,
-                        AnsiState.SOS_PM_APC_STRING,
+                        AnsiState.SOS_PM_STRING,
                         FsmAction.IGNORE,
                     )
                 },
@@ -504,8 +508,8 @@ class AnsiStateMachineTest {
                 {
                     assertTransition(
                         AnsiState.ESCAPE,
-                        ByteClass.SOS_PM_APC_INTRO,
-                        AnsiState.SOS_PM_APC_STRING,
+                        ByteClass.SOS_PM_INTRO,
+                        AnsiState.SOS_PM_STRING,
                         FsmAction.IGNORE,
                     )
                 },
@@ -714,11 +718,11 @@ class AnsiStateMachineTest {
         }
 
         @Test
-        fun `SOS PM APC string ignores printable ASCII routing classes`() {
+        fun `SOS PM string ignores printable ASCII routing classes`() {
             assertClasses(
-                AnsiState.SOS_PM_APC_STRING,
+                AnsiState.SOS_PM_STRING,
                 stringAsciiPayloadClasses,
-                AnsiState.SOS_PM_APC_STRING,
+                AnsiState.SOS_PM_STRING,
                 FsmAction.IGNORE,
             )
         }
@@ -849,8 +853,8 @@ class AnsiStateMachineTest {
             assertAll(
                 {
                     assertAll(
-                        { assertEquals(AnsiState.SOS_PM_APC_STRING, sosNul.fromState) },
-                        { assertEquals(AnsiState.SOS_PM_APC_STRING, sosNul.nextState) },
+                        { assertEquals(AnsiState.SOS_PM_STRING, sosNul.fromState) },
+                        { assertEquals(AnsiState.SOS_PM_STRING, sosNul.nextState) },
                         { assertEquals(FsmAction.IGNORE, sosNul.action) },
                     )
                 },
@@ -918,7 +922,7 @@ class AnsiStateMachineTest {
         @Test
         fun `ignored string states terminate on ST with string context intact`() {
             assertAll(
-                { assertStTerminationNeedsStringContext(AnsiState.SOS_PM_APC_STRING) },
+                { assertStTerminationNeedsStringContext(AnsiState.SOS_PM_STRING) },
                 { assertStTerminationNeedsStringContext(AnsiState.IGNORE_UNTIL_ST) },
             )
         }
@@ -954,8 +958,8 @@ class AnsiStateMachineTest {
             assertAll(
                 {
                     assertStringEscapeState(
-                        escapeState = AnsiState.SOS_PM_APC_ESCAPE,
-                        bodyState = AnsiState.SOS_PM_APC_STRING,
+                        escapeState = AnsiState.SOS_PM_ESCAPE,
+                        bodyState = AnsiState.SOS_PM_STRING,
                         asciiAction = FsmAction.IGNORE,
                         executeAction = FsmAction.IGNORE,
                         utf8Action = FsmAction.IGNORE,
@@ -984,8 +988,8 @@ class AnsiStateMachineTest {
                 { assertTransition(AnsiState.OSC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.DCS_PASSTHROUGH, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.DCS_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
-                { assertTransition(AnsiState.SOS_PM_APC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
-                { assertTransition(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
+                { assertTransition(AnsiState.SOS_PM_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
+                { assertTransition(AnsiState.SOS_PM_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.IGNORE_UNTIL_ST, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
             )

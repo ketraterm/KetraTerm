@@ -122,6 +122,7 @@ class TerminalSessionConstructionTest {
                     inputEncoderFactory = factory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[5n\u001b[?2004h".toByteArray())
@@ -157,6 +158,7 @@ class TerminalSessionConstructionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("ok\u001b[5n".toByteArray())
@@ -247,6 +249,7 @@ class TerminalSessionConstructionTest {
                     inputEncoderFactory = factory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     assertSame(
@@ -286,6 +289,7 @@ class TerminalSessionConstructionTest {
                     inputEncoderFactory = factory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 ).use { session ->
                     session.start(10, 3)
                     session.encodeTextReplacement(TerminalTextReplacementEvent(Int.MAX_VALUE, Int.MAX_VALUE, "x"))
@@ -322,6 +326,7 @@ class TerminalSessionConstructionTest {
                     parserFactory = TerminalOutputParserFactory(TerminalParsers::create),
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 ).use { session ->
                     session.start(10, 3)
                     for (byte in stream) connector.feedFromHost(byteArrayOf(byte))
@@ -374,6 +379,7 @@ class TerminalSessionConstructionTest {
                     startupCommand = TerminalStartupCommand("hello"),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 session.start(10, 3)

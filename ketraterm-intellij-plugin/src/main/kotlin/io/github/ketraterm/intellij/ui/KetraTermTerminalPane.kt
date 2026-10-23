@@ -78,7 +78,7 @@ internal class KetraTermTerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors(searchColors())
-        tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy())
+        terminal.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy())
         reconcileCompletion()
     }
 
@@ -342,6 +342,7 @@ internal class KetraTermTerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             clipboard: TerminalClipboardHandler,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
+            onBound: (Throwable?) -> Unit = { failure -> if (failure != null) LOG.warn("Terminal binding failed", failure) },
         ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
@@ -391,7 +392,7 @@ internal class KetraTermTerminalPane private constructor(
             var pane: KetraTermTerminalPane? = null
             try {
                 scrollbarAdapter.attach(terminal)
-                terminal.bind(tab.session)
+                terminal.bind(tab.session, onBound)
                 searchBar =
                     SwingTerminalSearchBar(terminal, IntellijSwingHostMessages).apply {
                         refreshColors(searchColors())

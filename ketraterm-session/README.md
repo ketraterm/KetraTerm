@@ -84,10 +84,26 @@ and final-frame publication have been attempted. State flows do not complete on
 closure, so consumers own cancellation of their collectors. Calls to `close`
 are idempotent, but a concurrent close can return before the first close finishes.
 
+UI disposal can call `requestClose()`: it claims termination immediately and runs
+cleanup on `cleanupDispatcher`, independently of blocked connector writes.
+Its default is a shared elastic I/O view with a separate parallelism limit.
+Observe `Closed` for completion and cleanup failures. Custom dispatchers must run
+blocking work off the UI thread independently of connector writes. Tests using
+controlled dispatchers should inject this dispatcher as well as the worker and
+I/O dispatchers.
+
 Retained output remains readable after closure. See
 [closed-session presentation](docs/session-concurrency-locks.md#closed-session-presentation).
 
 ## Rendering and local operations
+
+Terminal settings, host policy, geometry and local `clearBuffer()` calls are
+synchronous and can wait for image decoding. Run them off UI threads through an
+ordered owner, then report completion to the UI. Use `withMutationAdmission` to
+recheck a captured binding/request token after the wait. Its callbacks must not
+access UI state or wait for UI work. Frame reads, ordinary input, and input/paste
+policy updates remain available during decode. Connectors must deliver output
+off UI threads, including output delivered synchronously during `start`.
 
 `readRenderFrame` borrows live terminal data under mutation serialization.
 `readPublishedFrame` borrows the latest copied cache and returns null before the

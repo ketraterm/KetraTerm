@@ -676,6 +676,44 @@ class PtyConnectorTest {
         assertTrue(process.destroyed)
     }
 
+    @Test
+    fun `local close releases process while a byte callback still owns its borrowed range`() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val returned = CountDownLatch(1)
+        val process = TestProcess(input = ByteArrayInputStream("image".ascii()), blockWaitFor = true)
+        val connector = createConnector(process)
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    entered.countDown()
+                    release.await()
+                    assertEquals("image", bytes.copyOfRange(offset, offset + length).asciiText())
+                    returned.countDown()
+                }
+            }
+        try {
+            connector.start(listener)
+            assertTrue(entered.await(10, TimeUnit.SECONDS), "Reader never entered byte delivery")
+            connector.close()
+            assertTrue(process.destroyed)
+            assertEquals(1L, returned.count)
+            release.countDown()
+            assertTrue(connector.joinReader(10_000), "Reader did not stop after callback completion")
+            assertTrue(connector.joinWatcher(10_000), "Watcher did not stop after callback completion")
+            assertEquals(0L, returned.count)
+            assertTrue(listener.errors.isEmpty())
+            assertTrue(listener.closed.isEmpty())
+        } finally {
+            release.countDown()
+            connector.close()
+        }
+    }
+
     private open class RecordingListener : TerminalConnectorListener {
         val byteEvents = mutableListOf<ByteArray>()
         val closed = mutableListOf<Int?>()

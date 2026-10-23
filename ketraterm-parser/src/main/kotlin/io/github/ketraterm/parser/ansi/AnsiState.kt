@@ -15,9 +15,6 @@
  */
 package io.github.ketraterm.parser.ansi
 
-import io.github.ketraterm.parser.ansi.AnsiState.ESCAPE
-import io.github.ketraterm.parser.ansi.AnsiState.GROUND
-
 /**
  * ANSI parser finite-state machine states.
  *
@@ -75,28 +72,27 @@ internal object AnsiState {
 
     /**
      * Collecting OSC payload bytes until BEL or ST.
-     * Parser may accumulate bounded payload or ignore, depending on milestone/features.
+     * Collection policy bounds retained bytes and drains unsupported envelopes.
      */
     const val OSC_STRING: Int = 7
 
     /**
      * Immediately after entering DCS.
-     * Present so DCS can later support params/intermediates cleanly without reshaping the FSM.
-     * In Milestone A, this can collapse quickly into ignore/passthrough behavior.
+     * The first payload byte starts collection; prefix recognition belongs to the collection policy.
      */
     const val DCS_ENTRY: Int = 8
 
     /**
      * DCS payload state.
-     * In Milestone A this is expected to behave as bounded ignore until ST.
+     * Retains an eligible bounded body or drains it until ST; CAN/SUB cancels it.
      */
     const val DCS_PASSTHROUGH: Int = 9
 
     /**
-     * Ignored string payload (SOS / PM / APC family).
+     * Ignored string payload (SOS / PM family).
      * Input is ignored until ST.
      */
-    const val SOS_PM_APC_STRING: Int = 10
+    const val SOS_PM_STRING: Int = 10
 
     /**
      * Generic ignore-until-ST state.
@@ -110,24 +106,32 @@ internal object AnsiState {
     /** ESC seen while inside DCS passthrough; awaiting ST terminator decision. */
     const val DCS_ESCAPE: Int = 13
 
-    /** ESC seen while inside SOS/PM/APC ignored string; awaiting ST terminator decision. */
-    const val SOS_PM_APC_ESCAPE: Int = 14
+    /** ESC seen while inside SOS/PM ignored string; awaiting ST terminator decision. */
+    const val SOS_PM_ESCAPE: Int = 14
 
     /** ESC seen while inside generic ignore-until-ST; awaiting ST terminator decision. */
     const val IGNORE_UNTIL_ST_ESCAPE: Int = 15
 
+    /** APC payload routed to the graphics collector or drained when unrecognized. */
+    const val APC_STRING: Int = 16
+
+    /** ESC seen inside APC; only ST terminates the collected command. */
+    const val APC_ESCAPE: Int = 17
+
     /** Total number of FSM states. */
-    const val COUNT: Int = 16
+    const val COUNT: Int = 18
 
     @JvmStatic
     fun isStringState(state: Int): Boolean {
         require(state in 0 until COUNT) { "state out of range: $state" }
-        return state == OSC_STRING ||
+        return state == APC_STRING ||
+            state == APC_ESCAPE ||
+            state == OSC_STRING ||
             state == OSC_ESCAPE ||
             state == DCS_PASSTHROUGH ||
             state == DCS_ESCAPE ||
-            state == SOS_PM_APC_STRING ||
-            state == SOS_PM_APC_ESCAPE ||
+            state == SOS_PM_STRING ||
+            state == SOS_PM_ESCAPE ||
             state == IGNORE_UNTIL_ST ||
             state == IGNORE_UNTIL_ST_ESCAPE
     }

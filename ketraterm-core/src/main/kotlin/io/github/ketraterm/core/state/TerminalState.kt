@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.core.state
 
+import io.github.ketraterm.core.graphics.GraphicsStore
 import io.github.ketraterm.core.model.*
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
@@ -42,6 +43,8 @@ internal class TerminalState(
     val tabStops = TabStops(initialWidth)
     val pen = Pen()
     val hostResponses = HostResponseQueue()
+    val graphics =
+        GraphicsStore()
 
     /** `false` for DECSACE stream extent (the terminal default), `true` for exact rectangle. */
     var isAttributeChangeExtentRectangle: Boolean = false
@@ -138,10 +141,12 @@ internal class TerminalState(
      */
     fun enterAltScreen(clearBeforeEnter: Boolean) {
         if (isAltScreenActive) return
+        graphics.invalidateTransfer()
         primaryCursorShape = cursorShape
         primaryCursorBlinking = modes.isCursorBlinking
         activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         if (clearBeforeEnter) {
+            graphics.clear(true, data = true)
             altBuffer.clearGrid(pen.blankAttr, pen.blankExtendedAttr, dimensions.height)
             altBuffer.resetScrollRegion(dimensions.height)
             altBuffer.resetLeftRightMargins(dimensions.width)
@@ -164,6 +169,7 @@ internal class TerminalState(
      */
     fun exitAltScreen() {
         if (!isAltScreenActive) return
+        graphics.invalidateTransfer()
         activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         activeBuffer = primaryBuffer
         modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags

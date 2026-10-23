@@ -13,19 +13,19 @@ normal byte routing resumes, including bounded replay of a non-continuation byte
 The ANSI route separates three responsibilities:
 
 1. [ByteClass](../src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt)
-   maps `0x00..0x7f` into 15 control/ASCII classes and `0x80..0xff` into the
+   maps `0x00..0x7f` into 16 control/ASCII classes and `0x80..0xff` into the
    `UTF8_PAYLOAD` routing class. Raw C1 bytes are not 8-bit control introducers.
 2. [AnsiStateMachine](../src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt)
    performs a flat `IntArray` lookup for the current state and routing class.
    Each entry packs an action in the low eight bits and the next state above it.
-   There are 16 states and 32 reserved columns per state, with 16 active routing
+   There are 18 states and 32 reserved columns per state, with 17 active routing
    classes. Lookup uses `(state shl 5) or byteClass`.
 3. [ActionEngine](../src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt)
    updates reusable sequence state and delegates semantic operations to the
    dispatchers or printable processor.
 
 Non-ASCII bytes are printable ingress only in `GROUND`. OSC/DCS bodies collect
-them as opaque bytes; ignored strings discard them. In active ESC/CSI grammar,
+them as opaque bytes; graphics APC rejects them and ignored strings discard them. In active ESC/CSI grammar,
 they terminate the incomplete sequence without dispatching a stale final byte.
 
 The matrix lookup does fixed work per byte. That does not make an entire parser
@@ -69,9 +69,10 @@ a structural operation.
 
 ## 4. Parser Recovery and Security Safeguards
 
-OSC ends with BEL or `ESC \`; DCS ends with `ESC \`. CAN/SUB cancel collected
+OSC ends with BEL or `ESC \`; DCS and APC end with `ESC \`. CAN/SUB cancel collected
 strings without dispatch. Ordinary C0 controls are ignored in OSC; in a DCS
-body they are retained as payload rather than executed. DEL is ignored. String
+body they are retained as payload rather than executed. DEL is ignored in OSC/DCS.
+Graphics APC rejects ordinary C0 and DEL as invalid header or Base64 data. String
 escape states handle a split `ESC \` without confusing it with a standalone ESC
 command.
 
@@ -96,13 +97,29 @@ cancellation, overflow, reset, EOF, and custom callback failure.
 
 Collection limits do not authorize clipboard changes or terminal replies. The
 sink's owning layers validate complete requests and apply current permissions.
-`endOfInput` discards unfinished OSC/DCS commands. `reset` discards parser-owned
+`endOfInput` discards unfinished OSC/DCS/APC commands and chunked graphics uploads. `reset` discards parser-owned
 state without emitting sink commands.
+
+### Graphics APC collection
+
+`APC_STRING` and `APC_ESCAPE` route `ESC _` strings separately from ignored
+SOS/PM. The first payload byte selects graphics (`G`) or draining. A lazy
+`GraphicsParser` owns the bounded header, incremental Base64 state and one upload
+spanning several APC strings. Its header/chunk/transfer limits are separate from
+`ControlStringPolicy`; see [TerminalGraphicsLimits](../../ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalGraphicsLimits.kt).
+
+`APC_END` validates a chunk at ST; `APC_ABORT` cancels on CAN/SUB. An unexpected
+escape suffix uses `APC_INVALID` to reject and drain the current string rather
+than execute its tail as terminal input. The sink's invalidation token prevents
+an incomplete upload from surviving a reset or effective screen switch. Completed
+controls and decoded bytes are borrowed synchronously to `applyGraphicsCommand`.
+See the [graphics contract](../../docs/development/kitty-graphics-contract.md#command-and-transfer-semantics)
+for continuation and reply semantics.
 
 ## Validation
 
 `AnsiStateMachineTest` checks routing, and `ActionEngineTest` checks collection and
 mutation invariants. `ControlStringPayloadPolicyTest`, `CustomOscHandlerTest`,
-`CustomOscLimitTest`, and `TerminalParserTest` cover exact bounds, chunking,
+`CustomOscLimitTest`, `GraphicsParserTest`, and `TerminalParserTest` cover exact bounds, chunking,
 cancellation, ordering, and recovery. Run `./gradlew :ketraterm-parser:test` from
 the repository root; semantic changes also require the affected host tests.

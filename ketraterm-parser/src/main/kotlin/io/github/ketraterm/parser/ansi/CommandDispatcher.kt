@@ -532,6 +532,11 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                 }
             }
             11, 14, 18, 19 -> sink.requestWindowReport(modeParam(state, 0))
+            16 -> {
+                if (state.paramCount == 1 && state.subParameterMask == 0 && !state.parameterValueSaturated) {
+                    sink.requestWindowReport(16)
+                }
+            }
             22 -> {
                 val scope = titleStackScopeParam(state)
                 if (scope in 0..2) sink.pushTitleStack(scope)

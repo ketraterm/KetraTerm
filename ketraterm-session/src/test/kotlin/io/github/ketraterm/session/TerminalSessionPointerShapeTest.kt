@@ -41,6 +41,7 @@ class TerminalSessionPointerShapeTest {
                     hostPolicy = HostPolicy(windowManipulationPolicy = HostControlPolicy.DENY),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 session.start(8, 2)

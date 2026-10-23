@@ -74,27 +74,42 @@ internal object FsmAction {
     /** Append one non-ASCII raw byte to the OSC payload buffer. */
     const val OSC_PUT_UTF8: Int = 15
 
-    /** Enter Milestone-A DCS bounded-ignore/passthrough mode. */
+    /** Start bounded DCS collection with the first payload byte; unsupported prefixes are drained. */
     const val DCS_IGNORE_START: Int = 16
 
-    /** Append one ASCII-domain byte to bounded DCS scratch storage; Milestone A drops it on DCS_END. */
+    /** Route one ASCII-domain byte through the DCS collection policy. */
     const val DCS_PUT_ASCII: Int = 17
 
-    /** Append one non-ASCII raw byte to bounded DCS scratch storage; Milestone A drops it on DCS_END. */
+    /** Route one non-ASCII raw byte through the DCS collection policy without UTF-8 decoding. */
     const val DCS_PUT_UTF8: Int = 18
 
     /** Execute a C0 byte while inside OSC. BEL terminates; ordinary C0 is ignored. */
     const val OSC_EXECUTE_CONTROL: Int = 19
 
-    /** Terminate OSC payload and dispatch bounded OSC payload. */
+    /** Finish OSC collection and dispatch an eligible complete payload. */
     const val OSC_END: Int = 20
 
-    /** Terminate DCS passthrough. Milestone A drops bounded payload. */
+    /** Finish DCS collection at ST and dispatch an eligible complete payload. */
     const val DCS_END: Int = 21
 
-    /** Terminate ignored string payload. */
+    /** Clear string state without dispatch; CAN/SUB also discards an incomplete graphics transfer. */
     const val STRING_END: Int = 22
 
+    /** Begin a fresh APC while preserving an eligible chunked graphics transfer. */
+    const val APC_START: Int = 23
+
+    /** Collect a graphics header or decode a Base64 byte; unknown and rejected APC bodies drain. */
+    const val APC_PUT: Int = 24
+
+    /** Finish APC at ST; retain a valid nonfinal chunk or deliver the complete graphics command. */
+    const val APC_END: Int = 25
+
+    /** Cancel APC and any staged graphics upload on CAN/SUB, then return to ground. */
+    const val APC_ABORT: Int = 26
+
+    /** Reject an invalid escape inside APC and drain to ST without dispatching its contents. */
+    const val APC_INVALID: Int = 27
+
     /** Total number of defined actions. */
-    const val COUNT: Int = 23
+    const val COUNT: Int = 28
 }

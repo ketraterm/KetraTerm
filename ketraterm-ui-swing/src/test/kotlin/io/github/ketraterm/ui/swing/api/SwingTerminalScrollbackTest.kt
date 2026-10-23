@@ -97,7 +97,10 @@ class SwingTerminalScrollbackTest {
             hostServices =
                 hostServices.copy { draft ->
                     draft.viewportListener = listener
+                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
                 },
+            searchDispatcher = dispatcher,
+            mutationDispatcher = dispatcher,
         ).also {
             components += it
             viewportUpdates[it] = updates
@@ -350,6 +353,7 @@ class SwingTerminalScrollbackTest {
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.viewportListener = listener
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
                     },
             )
 
@@ -705,6 +709,7 @@ class SwingTerminalScrollbackTest {
             assertEquals(columns, terminal.width)
             component.size = component.preferredGridSize(100, 4, TerminalRenderBufferKind.ALTERNATE)
             component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+            dispatcher.scheduler.runCurrent()
             assertEquals(100, terminal.width)
             assertEquals(4, terminal.height)
             assertEquals(100, connector.lastColumns.get())

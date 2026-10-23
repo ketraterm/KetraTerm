@@ -13,7 +13,8 @@ reader implementation owns synchronization; the interfaces do not provide a lock
 or a thread scheduler.
 
 The contract includes viewport dimensions, row identities and generations, cursor
-state, packed cell attributes, color palettes, and grapheme cluster callbacks.
+state, packed cell attributes, color palettes, grapheme cluster callbacks, and
+image placements referencing immutable pixel resources.
 Font selection, glyph shaping, painting, and blink timing belong to renderers.
 For a ready-made copied frame, use
 [`ketraterm-render-cache`](../ketraterm-render-cache/README.md).

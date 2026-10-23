@@ -21,6 +21,7 @@ dependencies and structure; its `docs/` directory holds detailed contracts.
 ## Reference
 
 - [Terminal protocols](reference/protocol.md): collection limits, replies, and streaming text behavior.
+- [Local PTY backend limitations](../ketraterm-pty/docs/pty4j-backend-limitations.md): native geometry and Windows graphics cursor constraints.
 - [Desktop notifications](reference/notifications.md): OSC forms and host handling.
 - [Persistent storage](reference/storage.md): file locations, completion learning, and privacy.
 - [Standalone configuration](../ketraterm-app/docs/profile-config-toml.md): TOML settings and path resolution.
@@ -30,5 +31,6 @@ dependencies and structure; its `docs/` directory holds detailed contracts.
 - [Contributing](../CONTRIBUTING.md): local setup, checks, and contribution workflow.
 - [Architecture](../ARCHITECTURE.md): module boundaries and data flow.
 - [Conformance testing](development/conformance-testing.md): campaigns and failure reproduction.
+- [Kitty graphics design](development/kitty-graphics-contract.md): protocol, resource, decoder and render-lifetime contract with pinned sender fixtures; current delivery scope is tracked in the gap map.
 - [Benchmarks](../ketraterm-benchmarks/README.md): workloads and measurement guidance.
 - [Library changelog](../CHANGELOG.md): consumer-visible changes.

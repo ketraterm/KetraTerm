@@ -53,8 +53,9 @@ pointer. See [Ghostty's basic command](https://ghostty.org/docs/vt/osc/22), the
 
 ## Payload limits
 
-Limits count collected bytes, including family headers/separators and excluding
-introducers, terminators, and ignored control bytes.
+OSC/DCS limits count collected bytes, including family headers/separators and
+excluding introducers, terminators, and ignored control bytes. Graphics APC uses
+separate header and payload budgets.
 
 | Family | Collection limit |
 | --- | --- |
@@ -66,11 +67,17 @@ introducers, terminators, and ignored control bytes.
 | XTGETTCAP | 4,096 bytes. |
 | Custom OSC | 4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit. |
 | OSC 52 | Ordinary 4,096-byte limit; eligible writes use a budget derived from the active decoded-text limit. |
+| Graphics APC | Separate header, encoded-chunk and decoded-transfer bounds; see [graphics collection](../../ketraterm-parser/docs/ansi-fsm-specification.md#graphics-apc-collection) and [resource limits](../development/kitty-graphics-contract.md#resource-limits). |
 
 Overflow stops collection and consumes through termination/cancellation without
 dispatching a truncated prefix. An oversized OSC 8 ends active link context;
 other rejected commands preserve prior metadata. Oversized DCS queries receive
 no reply. DCS terminates with ST, not BEL.
+
+Graphics APC drains rejected payloads through ST. Unknown/malformed headers are
+discarded; identified transfer-limit failures can produce fixed failure replies
+subject to quiet flags and response permission. Its per-chunk accounting excludes
+the APC header, separator and terminator.
 
 Session-integrated clipboard writes permit up to 1 MiB of decoded text by default.
 Standalone parsers without that integration retain the ordinary collection limit.
@@ -83,8 +90,10 @@ Permissions and decoded-size limits are checked again before execution.
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
 | XTGETTCAP | Terminal name (`TN`/`name`), color count (`Co`/`colors`), and true-color support (`RGB`/`Tc`). |
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
+| Kitty graphics (APC G) | Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed `ENOTSUP` errors. Queries require nonzero `i`. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
 | Cursor position | One-based coordinates, relative to active origin/margins when origin mode is enabled. |
+| Window geometry | `CSI 14 t` reports text-area pixels and `CSI 16 t` reports cell pixels as `CSI 6;height;width t`; pixel reports require known positive dimensions. Cell dimensions use integer text-area pixels divided by grid dimensions, independently of margins. `CSI 18 t` and `CSI 19 t` report the terminal grid. These queries require terminal-response permission, not window-manipulation permission. |
 | Mode status | ANSI/DEC DECRQM replies for the [listed modes](#mode-status-reports), including permanently enabled grapheme mode 2027. Unknown modes report `0`. |
 | Color scheme | `CSI ?996n` reports dark/light host preference; mode 2031 permits automatic reports for host theme changes. Application color overrides and resets do not change that preference or emit change reports. |
 | In-band resize | Mode 2048 permits `CSI 48;rows;columns;heightPixels;widthPixels t` reports on enable and after text-area size changes. |

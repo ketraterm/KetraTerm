@@ -66,9 +66,22 @@ Builders are mutable construction drafts; `build`, `create`, and `copy` freeze
 detached snapshots.
 
 Access Swing state on the EDT unless a method explicitly documents another
-threading contract. `bind`, `unbind`, `dispose`, and `reloadSettings` execute
-immediately on the EDT and dispatch asynchronously when called elsewhere. An
-off-EDT call does not mean that the operation has completed.
+threading contract. `bind`, `unbind`, `dispose`, and `reloadSettings` update view
+state on the EDT and dispatch there when called elsewhere. Captured session
+settings, geometry, and window state run on an ordered worker so session admission
+cannot stall the EDT. Paste policy keeps its immediate input-admission behavior.
+Use `bind(session, onComplete)` when startup depends on initial settings and
+geometry; its EDT callback receives `null` after application or the failure.
+
+Call `setHostPolicy(policy, onComplete)` on the view to preserve ordering with
+view settings. `resizeSessionToVisibleGrid(onComplete)` reconciles externally
+changed session dimensions with captured component bounds. Both report completion
+on the EDT; acceptance is not application. Superseded geometry or an obsolete
+binding reports cancellation. The bounded queue rejects overflow synchronously;
+retrying `reloadSettings` with the same snapshot submits changes not yet accepted,
+including geometry, without resetting already accepted palette/cursor settings.
+Default completion handlers log operational failures. Session closure remains
+the host's responsibility and must run off the EDT.
 
 Use one controlling view per session. Settings, dimensions, and the published
 viewport belong to the session; multiple components cannot scroll or configure

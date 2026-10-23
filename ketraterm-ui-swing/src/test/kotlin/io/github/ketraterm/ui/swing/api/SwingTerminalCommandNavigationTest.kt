@@ -32,11 +32,13 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -48,19 +50,32 @@ import javax.swing.JComponent
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCommandNavigationTest {
+    private val mutationDispatcher = StandardTestDispatcher()
+    private val components = ArrayList<SwingTerminal>()
+
+    @AfterEach
+    fun disposeComponents() {
+        SwingUtilities.invokeAndWait {
+            components.forEach(SwingTerminal::dispose)
+            mutationDispatcher.scheduler.runCurrent()
+        }
+    }
+
     @Test
     fun `closed command navigation uses presentation rows and retains older output after growth`() {
         val session = commandSession(CommandFrameReader())
         session.close()
         SwingUtilities.invokeAndWait {
             val component =
-                SwingTerminal(settingsProvider = {
+                createComponent(settingsProvider = {
                     SwingSettings.create { it.padding = SwingPadding(0, 0, 0, 0) }
                 })
             try {
                 component.size = component.preferredGridSize(12, 1)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 component.scrollToPreviousCommand()
                 assertEquals(2, component.viewportState().renderOffset)
                 val latest = session.shellIntegrationState.latestCommandRecordId()
@@ -178,7 +193,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -187,6 +202,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToPreviousCommand()
         }
         SwingUtilities.invokeAndWait {}
@@ -200,7 +216,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -209,6 +225,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(4)
             component.scrollToNextCommand()
         }
@@ -223,7 +240,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -232,6 +249,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(2)
             component.scrollToPreviousCommand()
         }
@@ -252,7 +270,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -261,6 +279,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(6)
             component.scrollToPreviousCommand()
         }
@@ -281,7 +300,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader, capacity = 1)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -290,6 +309,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(4)
             component.scrollToPreviousCommand()
         }
@@ -309,7 +329,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -320,6 +340,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
 
             assertEquals(secondCommandId, component.commandRecordAt(0, 0))
             assertEquals(secondCommandId, component.commandRecordAt(0, component.height - 1))
@@ -341,7 +362,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -351,6 +372,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
 
             assertEquals(true, component.selectCommandOutput(firstCommandId))
             assertEquals(3, component.viewportState().renderOffset)
@@ -365,7 +387,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -375,6 +397,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
 
             assertEquals(true, component.selectCommandOutput(secondCommandId))
             assertEquals(0, component.viewportState().renderOffset)
@@ -389,7 +412,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -398,6 +421,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(2)
 
             assertEquals(false, component.selectCommandOutputAt(0, 0))
@@ -413,7 +437,7 @@ class SwingTerminalCommandNavigationTest {
         val session = commandSession(reader, firstCommandHasOutput = false)
         val padding = SwingPadding(8, 12, 8, 8)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = padding
                 }
@@ -422,6 +446,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(HISTORY_SIZE)
             val click =
                 MouseEvent(
@@ -451,7 +476,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader, capacity = 1)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -461,6 +486,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
 
             assertEquals(false, component.selectCommandOutput(evictedCommandId))
             assertEquals(null, component.currentSelection())
@@ -474,7 +500,7 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
@@ -484,6 +510,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             assertEquals("row6        row7", component.commandOutputText(secondCommandId))
         }
 
@@ -496,7 +523,7 @@ class SwingTerminalCommandNavigationTest {
         val session = commandSession(reader)
         var clipboardText: String? = null
         val component =
-            SwingTerminal(
+            createComponent(
                 settingsProvider = {
                     SwingSettings.create { draft ->
                         draft.padding = SwingPadding()
@@ -519,6 +546,7 @@ class SwingTerminalCommandNavigationTest {
             SwingUtilities.invokeAndWait {
                 component.size = component.preferredGridSize(12, 2)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 component.scrollToScrollbackOffset(HISTORY_SIZE)
                 assertEquals(HISTORY_SIZE, component.viewportState().renderOffset)
 
@@ -542,7 +570,7 @@ class SwingTerminalCommandNavigationTest {
         val session = commandSession(reader)
         val padding = SwingPadding(8, 12, 8, 8)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = padding
                 }
@@ -551,6 +579,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(1)
             val click =
                 MouseEvent(
@@ -579,7 +608,7 @@ class SwingTerminalCommandNavigationTest {
         val session = commandSession(reader)
         val padding = SwingPadding(8, 12, 8, 8)
         val component =
-            SwingTerminal(settingsProvider = {
+            createComponent(settingsProvider = {
                 SwingSettings.create { draft ->
                     draft.padding = padding
                 }
@@ -588,6 +617,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.scrollToScrollbackOffset(1)
 
             component.dispatchEvent(
@@ -635,6 +665,20 @@ class SwingTerminalCommandNavigationTest {
 
         session.close()
     }
+
+    private fun createComponent(
+        settingsProvider: SwingSettingsProvider,
+        hostServices: SwingHostServices = SwingHostServices(),
+    ): SwingTerminal =
+        SwingTerminal(
+            settingsProvider = settingsProvider,
+            hostServices =
+                hostServices.copy { draft ->
+                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                },
+            searchDispatcher = mutationDispatcher,
+            mutationDispatcher = mutationDispatcher,
+        ).also(components::add)
 
     private fun commandSession(
         renderReader: TerminalRenderFrameReader,
@@ -712,6 +756,8 @@ class SwingTerminalCommandNavigationTest {
                                 override fun readText(): String? = clipboard
                             }
                     },
+                searchDispatcher = worker,
+                mutationDispatcher = worker,
             )
 
         init {

@@ -81,6 +81,14 @@ public class TerminalRenderRangeCopy(
 
                     override fun lineId(row: Int) = frame.lineId(offset + row)
 
+                    override fun copyImages(sink: TerminalRenderImageSink) {
+                        frame.copyImages { image, column, row, width, height, sx, sy, sw, sh, top, bottom, z ->
+                            if (bottom > offset && top < offset + rows) {
+                                sink.accept(image, column, row - offset, width, height, sx, sy, sw, sh, top - offset, bottom - offset, z)
+                            }
+                        }
+                    }
+
                     override fun lineGeneration(row: Int) = frame.lineGeneration(offset + row)
 
                     override fun lineWrapped(row: Int) = frame.lineWrapped(offset + row)

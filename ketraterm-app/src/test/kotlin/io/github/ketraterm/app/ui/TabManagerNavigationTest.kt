@@ -28,6 +28,7 @@ import java.awt.KeyboardFocusManager
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import javax.swing.JFrame
@@ -52,60 +53,87 @@ class TabManagerNavigationTest {
         val profile = TerminalProfile("navigation", "Navigation", command, workingDirectory = directory)
         val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
         configManager.save(KetraTermConfig(cursorBlinkMillis = 0, showForegroundProcessName = false))
-        val task =
-            FutureTask {
-                val previousFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
-                val focusManager = NavigationFocusManager()
-                KeyboardFocusManager.setCurrentKeyboardFocusManager(focusManager)
-                val frame = JFrame()
-                var manager: TabManager? = null
+        val previousFocusManager = onEdt { KeyboardFocusManager.getCurrentKeyboardFocusManager() }
+        val focusManager = NavigationFocusManager()
+        val frame = onEdt { JFrame() }
+        var manager: TabManager? = null
+        try {
+            val tabBar = onEdt { TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }) }
+            val current =
+                onEdt {
+                    KeyboardFocusManager.setCurrentKeyboardFocusManager(focusManager)
+                    TabManager(frame, tabBar, JPanel(CardLayout()), KetraTermSettings(configManager), { profile }, { true })
+                }
+            manager = current
+            // Multiple hash buckets distinguish displayed order from incidental map iteration.
+            val ids =
+                List(9) {
+                    val opened = CompletableFuture<String>()
+                    onEdt {
+                        assertTrue(
+                            current.openTab(profile) { success ->
+                                if (success) {
+                                    opened.complete(requireNotNull(tabBar.selectedId()))
+                                } else {
+                                    opened.completeExceptionally(AssertionError("Terminal startup failed"))
+                                }
+                            },
+                        )
+                    }
+                    opened.get(30, TimeUnit.SECONDS)
+                }
+            onEdt {
+                fun press(
+                    expected: String?,
+                    backwards: Boolean = false,
+                ) {
+                    assertTrue(focusManager.press(frame, backwards))
+                    assertEquals(expected, tabBar.selectedId())
+                    assertEquals(expected, current.selectedPane?.tab?.id)
+                }
+
+                fun cycle(order: List<String>) {
+                    current.selectTab(order.first())
+                    for (id in order.drop(1) + order.first()) press(id)
+                    for (id in order.drop(1).reversed() + order.first()) press(id, backwards = true)
+                }
+                cycle(ids)
+                assertTrue(current.closeTab(ids[1]))
+                cycle(ids.filter { it != ids[1] })
+                assertTrue(current.closeTab(ids[0]))
+                cycle(ids.drop(2))
+                for (id in ids.drop(3)) assertTrue(current.closeTab(id))
+                press(ids[2])
+                press(ids[2], backwards = true)
+                assertTrue(current.closeTab(ids[2]))
+                press(null)
+                press(null, backwards = true)
+            }
+        } finally {
+            val closed = CompletableFuture<Unit>()
+            onEdt {
                 try {
-                    val tabBar = TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> })
-                    val current = TabManager(frame, tabBar, JPanel(CardLayout()), KetraTermSettings(configManager), { profile }, { true })
-                    manager = current
-                    val ids =
-                        // Multiple hash buckets are needed: the first few generated IDs can coincide cyclically with display order.
-                        List(9) {
-                            assertTrue(current.openTab(profile))
-                            requireNotNull(tabBar.selectedId())
+                    val current = manager
+                    if (current == null) {
+                        closed.complete(Unit)
+                    } else {
+                        current.closeAllTabsWithoutConfirmation { result ->
+                            result.fold(closed::complete, closed::completeExceptionally)
                         }
-
-                    fun press(
-                        expected: String?,
-                        backwards: Boolean = false,
-                    ) {
-                        assertTrue(focusManager.press(frame, backwards))
-                        assertEquals(expected, tabBar.selectedId())
-                        assertEquals(expected, current.selectedPane?.tab?.id)
                     }
-
-                    fun cycle(order: List<String>) {
-                        current.selectTab(order.first())
-                        for (id in order.drop(1) + order.first()) press(id)
-                        for (id in order.drop(1).reversed() + order.first()) press(id, backwards = true)
-                    }
-                    cycle(ids)
-                    assertTrue(current.closeTab(ids[1]))
-                    cycle(ids.filter { it != ids[1] })
-                    assertTrue(current.closeTab(ids[0]))
-                    cycle(ids.drop(2))
-                    for (id in ids.drop(3)) assertTrue(current.closeTab(id))
-                    press(ids[2])
-                    press(ids[2], backwards = true)
-                    assertTrue(current.closeTab(ids[2]))
-                    press(null)
-                    press(null, backwards = true)
                 } finally {
-                    try {
-                        manager?.closeAllTabsWithoutConfirmation()
-                    } finally {
-                        frame.dispose()
-                        KeyboardFocusManager.setCurrentKeyboardFocusManager(previousFocusManager)
-                    }
+                    frame.dispose()
+                    KeyboardFocusManager.setCurrentKeyboardFocusManager(previousFocusManager)
                 }
             }
+            closed.get(30, TimeUnit.SECONDS)
+        }
+    }
+
+    private fun <T> onEdt(action: () -> T): T {
+        val task = FutureTask(action)
         SwingUtilities.invokeLater(task)
-        task.get(30, TimeUnit.SECONDS)
+        return task.get(30, TimeUnit.SECONDS)
     }
 
     private class NavigationFocusManager : DefaultKeyboardFocusManager() {

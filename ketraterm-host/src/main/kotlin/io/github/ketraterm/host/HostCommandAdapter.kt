@@ -71,6 +71,45 @@ public class HostCommandAdapter
         private val modeReportCapabilities: Int = 0,
         @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
     ) : TerminalAsciiCommandSink {
+        /** Core upload-invalidation token, read under the terminal's usual caller serialization. */
+        override val graphicsTransferGeneration: Long get() = terminal.graphicsTransferGeneration
+
+        /**
+         * Applies graphics controls under the current terminal-response policy.
+         * Denying replies does not suppress image admission or placement. Controls
+         * and payload are borrowed and consumed synchronously by the terminal.
+         *
+         * @param command controls of the completed command or rejected transfer.
+         * @param data Base64-decoded payload whose used prefix starts at zero.
+         * @param length used payload bytes, in `0..data.size`.
+         * @param result transfer validation outcome, independent of response permission.
+         * @throws IllegalArgumentException if [length] is outside `0..data.size`.
+         */
+        override fun applyGraphicsCommand(
+            command: TerminalGraphicsCommand,
+            data: ByteArray,
+            length: Int,
+            result: TerminalGraphicsResult,
+        ) {
+            terminal.applyGraphicsCommand(command, data, length, result, hostPolicy.terminalResponsePolicy.isAllowed)
+        }
+
+        /**
+         * Commits a session-decoded image under the current response permission.
+         * Caller serialization must cover decoding admission through this commit.
+         *
+         * @param command original borrowed upload or query controls.
+         * @param image immutable normalized pixels, or null on decoder failure.
+         * @param result decoder validation outcome; failure prevents mutation.
+         */
+        public fun applyDecodedGraphicsCommand(
+            command: TerminalGraphicsCommand,
+            image: io.github.ketraterm.render.api.TerminalRenderImage?,
+            result: TerminalGraphicsResult,
+        ) {
+            terminal.applyDecodedGraphicsCommand(command, image, result, hostPolicy.terminalResponsePolicy.isAllowed)
+        }
+
         init {
             require(
                 modeReportCapabilities and

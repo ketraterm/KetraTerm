@@ -53,6 +53,9 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Input encoding and session output through transport completion | `TerminalInputBenchmark`, `TerminalPasteBenchmark`, `TerminalSessionOutputBenchmark` |
 | OSC 22 parsing and pointer metadata reads | `TerminalPointerShapeBenchmark`; parsing is per request, three per invocation. Excludes Swing/native cursor updates. |
 | Published-frame access and viewport projection | `TerminalRenderLeaseBenchmark`, `RetainedFrameViewportBenchmark` |
+| Warmed image placement publication and copying | `TerminalGraphicsFrameBenchmark`; `placements=0,1,4096` share one pixel resource. Upload and capacity growth occur in setup; Java2D painting is excluded. |
+| Warmed image raster reuse and software painting | `TerminalGraphicsPaintBenchmark`; opaque/translucent native and scaled images, prompt dividers, and dense shared-resource placements. The `opaque-scroll`/`translucent-scroll` workloads also copy alternating live/history viewports, completely hiding and revealing the existing image each invocation. Includes Java2D scaling/clipping allocation, excluding upload, publication, and Swing dispatch. |
+| Allocation-permitted image replacement | `TerminalGraphicsReplacementBenchmark`; alternating raw RGBA uploads replace one image ID, publish/copy the new frame and construct a new Swing raster. Includes Base64 parsing, transfer staging, canonical pixels and cache-pressure eviction; excludes fixture encoding, PNG/zlib decoding and painting. `side=64,512` selects the source dimensions. |
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
 | Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchScanBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |
 

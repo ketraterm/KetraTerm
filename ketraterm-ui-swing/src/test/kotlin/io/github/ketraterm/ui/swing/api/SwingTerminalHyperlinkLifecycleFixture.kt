@@ -64,6 +64,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
             hostPolicy = hostPolicy,
             workerDispatcher = worker,
             ioDispatcher = worker,
+            cleanupDispatcher = worker,
             shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(shellState),
         )
     private val container = onEdt { JPanel() }
@@ -127,6 +128,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                     },
                 searchDispatcher = worker,
                 hyperlinkDispatcher = worker,
+                mutationDispatcher = worker,
                 pointerPosition = { pointer },
             ).apply {
                 size = preferredGridSize(40, 2)

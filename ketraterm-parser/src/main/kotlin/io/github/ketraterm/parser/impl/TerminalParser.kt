@@ -17,7 +17,7 @@ package io.github.ketraterm.parser.impl
 
 import io.github.ketraterm.parser.ansi.*
 import io.github.ketraterm.parser.api.TerminalCustomOscHandler
-import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalGraphicsOutputParser
 import io.github.ketraterm.parser.charset.CharsetMapper
 import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
@@ -26,6 +26,7 @@ import io.github.ketraterm.parser.text.PrintableProcessor
 import io.github.ketraterm.parser.text.PrintableProcessorActionSink
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult
 import io.github.ketraterm.parser.utf8.Utf8Decoder
+import io.github.ketraterm.protocol.TerminalGraphicsCommand
 
 /**
  * Top-level terminal output parser.
@@ -51,8 +52,22 @@ internal class TerminalParser(
     clipboardWriteLimitBytes: () -> Int = { 0 },
     customOscHandler: TerminalCustomOscHandler? = null,
     customOscPayloadLimitBytes: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
-) : TerminalOutputParser {
+) : TerminalGraphicsOutputParser {
     private var inCustomOscCallback = false
+    private var consumingGraphics = false
+    private var accepting = false
+    override val hasPendingGraphics: Boolean get() = actionEngine.hasPendingGraphics
+
+    override fun consumePendingGraphics(consumer: (TerminalGraphicsCommand, ByteArray, Int) -> Unit) {
+        checkReentry()
+        consumingGraphics = true
+        try {
+            actionEngine.consumePendingGraphics(consumer)
+        } finally {
+            consumingGraphics = false
+        }
+    }
+
     private val utf8Decoder = Utf8Decoder()
     private val supportsAsciiRuns = sink is TerminalAsciiCommandSink
     private val printableProcessor = PrintableProcessor(sink)
@@ -91,7 +106,23 @@ internal class TerminalParser(
         offset: Int,
         length: Int,
     ) {
-        checkCustomOscReentry()
+        acceptRange(bytes, offset, length, false)
+    }
+
+    override fun acceptUntilGraphics(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Int = acceptRange(bytes, offset, length, true)
+
+    private fun acceptRange(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+        yieldGraphics: Boolean,
+    ): Int {
+        checkReentry()
+        check(!hasPendingGraphics) { "Consume pending graphics before supplying more input" }
         require(offset >= 0) { "offset must be non-negative: $offset" }
         require(length >= 0) { "length must be non-negative: $length" }
         require(offset <= bytes.size) { "offset out of range: $offset" }
@@ -101,22 +132,31 @@ internal class TerminalParser(
 
         val end = offset + length
         var index = offset
-        while (index < end) {
-            if (supportsAsciiRuns &&
-                state.fsmState == AnsiState.GROUND &&
-                !utf8Decoder.hasPendingSequence() &&
-                CharsetMapper.isAsciiActive(state) &&
-                bytes[index].toInt() in 0x20..0x7e
-            ) {
-                val start = index++
-                while (index < end && bytes[index].toInt() in 0x20..0x7e) index++
-                printableProcessor.acceptAsciiRun(state, bytes, start, index - start)
-                continue
+        accepting = true
+        actionEngine.yieldGraphics = yieldGraphics
+        try {
+            while (index < end) {
+                if (supportsAsciiRuns &&
+                    state.fsmState == AnsiState.GROUND &&
+                    !utf8Decoder.hasPendingSequence() &&
+                    CharsetMapper.isAsciiActive(state) &&
+                    bytes[index].toInt() in 0x20..0x7e
+                ) {
+                    val start = index++
+                    while (index < end && bytes[index].toInt() in 0x20..0x7e) index++
+                    printableProcessor.acceptAsciiRun(state, bytes, start, index - start)
+                    continue
+                }
+                acceptByteInternal(bytes[index].toInt() and 0xff)
+                index++
+                if (hasPendingGraphics) break
             }
-            acceptByteInternal(bytes[index].toInt() and 0xff)
-            index++
+            flushPrintableForRender()
+            return index - offset
+        } finally {
+            accepting = false
+            actionEngine.yieldGraphics = false
         }
-        flushPrintableForRender()
     }
 
     /**
@@ -125,14 +165,21 @@ internal class TerminalParser(
      * Exposed for tests and for adapters that already chunk at byte granularity.
      */
     override fun acceptByte(byteValue: Int) {
-        checkCustomOscReentry()
+        checkReentry()
+        check(!hasPendingGraphics) { "Consume pending graphics before supplying more input" }
         require(byteValue in 0..255) { "byteValue out of range: $byteValue" }
-        acceptByteInternal(byteValue)
-        flushPrintableForRender()
+        accepting = true
+        try {
+            acceptByteInternal(byteValue)
+            flushPrintableForRender()
+        } finally {
+            accepting = false
+        }
     }
 
-    private fun checkCustomOscReentry() {
+    private fun checkReentry() {
         check(!inCustomOscCallback) { "Parser operations cannot reenter a custom OSC callback" }
+        check(!consumingGraphics && !accepting) { "Parser operations cannot be reentered" }
     }
 
     private fun acceptByteInternal(byteValue: Int) {
@@ -151,11 +198,13 @@ internal class TerminalParser(
      * force pending printable state out.
      */
     override fun endOfInput() {
-        checkCustomOscReentry()
+        checkReentry()
+        actionEngine.cancelGraphics()
         val utf8Result = utf8Decoder.flushEndOfInput()
         emitUtf8Output(utf8Result)
         printableProcessor.flush(state)
         when (state.fsmState) {
+            AnsiState.APC_STRING, AnsiState.APC_ESCAPE,
             AnsiState.OSC_STRING, AnsiState.OSC_ESCAPE,
             AnsiState.DCS_ENTRY, AnsiState.DCS_PASSTHROUGH, AnsiState.DCS_ESCAPE,
             -> {
@@ -173,7 +222,8 @@ internal class TerminalParser(
      * command sequence such as RIS/DECSTR.
      */
     override fun reset() {
-        checkCustomOscReentry()
+        checkReentry()
+        actionEngine.cancelGraphics()
         utf8Decoder.reset()
         printableProcessor.reset(state)
         state.resetAll()

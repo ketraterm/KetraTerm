@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.parser.ansi
 
-import io.github.ketraterm.parser.ansi.ByteClass.UTF8_PAYLOAD
 import io.github.ketraterm.protocol.ControlCode
 
 /**
@@ -55,12 +54,14 @@ internal object ByteClass {
     const val CSI_INTRO: Int = 9 // '[' 0x5B
     const val ST_INTRO: Int = 10 // '\\' 0x5C (used in ESC \\ => ST)
     const val OSC_INTRO: Int = 11 // ']' 0x5D
-    const val SOS_PM_APC_INTRO: Int = 12 // 'X', '^', '_'
+    const val SOS_PM_INTRO: Int = 12 // 'X', '^'
     const val FINAL_BYTE: Int = 13 // 0x40..0x7E excluding structural introducers
     const val DEL: Int = 14 // 0x7F
 
+    const val APC_INTRO: Int = 15 // '_' 0x5F; distinct from ignored SOS/PM strings
+
     /** Total number of active classes in the ASCII/control domain. */
-    const val COUNT: Int = 15
+    const val COUNT: Int = 16
 
     /**
      * ASCII/control-domain lookup table.
@@ -102,22 +103,22 @@ internal object ByteClass {
 
             // --- Structural introducer overrides -------------------------------
             map['P'.code] = DCS_INTRO.toByte()
-            map['X'.code] = SOS_PM_APC_INTRO.toByte()
+            map['X'.code] = SOS_PM_INTRO.toByte()
             map['['.code] = CSI_INTRO.toByte()
             map['\\'.code] = ST_INTRO.toByte()
             map[']'.code] = OSC_INTRO.toByte()
-            map['^'.code] = SOS_PM_APC_INTRO.toByte()
-            map['_'.code] = SOS_PM_APC_INTRO.toByte()
+            map['^'.code] = SOS_PM_INTRO.toByte()
+            map['_'.code] = APC_INTRO.toByte()
         }
 
     /**
      * Sentinel for bytes that are outside the ASCII/control routing domain.
      * In the default parser configuration, callers must send these bytes to the UTF-8 decoder.
      */
-    const val UTF8_PAYLOAD: Int = 15
+    const val UTF8_PAYLOAD: Int = 16
 
     /** Total number of byte classes routable through the ANSI state matrix. */
-    const val ROUTING_COUNT: Int = 16
+    const val ROUTING_COUNT: Int = 17
 
     /**
      * Returns the byte class for ASCII/control-domain bytes, or [UTF8_PAYLOAD] for 0x80..0xFF.

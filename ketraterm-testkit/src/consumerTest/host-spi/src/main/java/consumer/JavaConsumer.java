@@ -32,6 +32,9 @@ public final class JavaConsumer {
     // Deliberately concrete: a new required parser callback must fail this retained implementation.
     // Commands outside this fixture's supported slice fail instead of silently disappearing.
     public static final class Sink implements TerminalCommandSink {
+        @Override public long getGraphicsTransferGeneration() { return 0L; }
+        @Override public void applyGraphicsCommand(io.github.ketraterm.protocol.TerminalGraphicsCommand command, byte[] data, int length, io.github.ketraterm.protocol.TerminalGraphicsResult result) {}
+
         public final StringBuilder text = new StringBuilder();
         public int bells;
         public int colorRequests;

@@ -23,6 +23,8 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(transport)` | A built-in SSH connector, remote-session lifecycle, permissions, and appropriate paste defaults. Running `ssh` inside a local shell does not provide this integration. |
+| `TODO(session/transport)` | Propagate viewport pixels through session/connector resize to native PTYs once backend support is available. In-band size queries work; ioctl-only clients can still lack pixels. The [backend reference](../ketraterm-pty/docs/pty4j-backend-limitations.md#native-pixel-dimensions) records pty4j's discarded pixel arguments, Windows/WSL constraints, and the explicit-size workaround. |
+| `TODO(transport)` | Update the bundled Windows ConPTY backend to include Microsoft's graphics cursor synchronization fix. pty4j 0.14.0's bundled backend can leave PowerShell input above its visible prompt after Kitty graphics and resize. The [native reproduction and upstream fix](../ketraterm-pty/docs/pty4j-backend-limitations.md#windows-graphics-cursor-desynchronization) are recorded for the deferred upstream change; no backend update is shipped yet. |
 | `TODO(host/profile)` | Opt-in SSH shell helpers for terminal-environment forwarding and remote terminfo setup. These helpers are separate from a built-in SSH connector and must handle unavailable remote tools and rejected environment forwarding. |
 | `TODO(host/profile)` | WSL-aware directory, JDK, and startup-command mapping. Existing explicit-shell hooks do not provide guest filesystem completion or remote process metadata; see [shell support](features/shells.md). |
 | `TODO(host/profile)` | Dev Container launch contexts and container-aware host services; no built-in container-session integration exists. |
@@ -58,7 +60,8 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(parser/core/render/ui/policy)` | Sixel and Kitty graphics: decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. Kitty graphics requires APC dispatch. |
+| `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |
+| `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |
 | `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. |
 | `TODO(parser/core/policy)` | xterm color-stack commands XTPUSHCOLORS, XTPOPCOLORS, and XTREPORTCOLORS. Kitty OSC 30001/30101 save/restore already works. |
 | `TODO(parser/session/ui/policy)` | Additional OSC 22 shapes and Kitty stack/query extensions beyond the [implemented subset](features/terminal.md#appearance). |

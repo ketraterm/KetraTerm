@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalModifiers
@@ -22,11 +23,10 @@ import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalPointerShape
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.session.TerminalInputAdmission
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.session.*
+import io.github.ketraterm.ui.swing.SessionMutationQueue
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.preserveSwingFailure
@@ -93,6 +93,7 @@ public class SwingTerminal
             if (it.isShowing && !GraphicsEnvironment.isHeadless()) it.mousePosition else null
         },
         private val suggestionDispatcher: CoroutineDispatcher? = null,
+        mutationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) : JComponent(),
         SwingScrollbarScroller {
         @JvmOverloads
@@ -103,10 +104,30 @@ public class SwingTerminal
 
         private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
-        private var bindingIdentity: Any = Any()
+        private var bindingIdentity = AtomicBoolean(false)
+
+        // The lock protects the worker's pending flag/latest captured anchor and short EDT frame reads.
+        // Resize, decode and EDT dispatch never run while the worker holds it.
+        private val resizePublicationLock = Any()
+        private var resizeResultPending = false
+
+        // Publication watermark and interaction revision belong to the EDT.
+        private var resizePublicationSession: TerminalSession? = null
+        private var resizePublicationGeneration = 0L
+        private var viewportInteractionRevision = 0L
+        private var resizeAnchorBinding: AtomicBoolean? = null
+        private var resizeAnchorOffset = 0
+        private var resizeAnchorLineId = 0L
+        private var resizeAnchorRevision = 0L
+
+        // Reused only by EDT scroll capture; the worker consumes its primitive result under the lock.
+        private val resizeAnchorConsumer = TerminalRenderFrameConsumer { frame -> resizeAnchorLineId = frame.lineId(0) }
         private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
+
+        // Queue acceptance may lag behind the component snapshot after a rejected reload.
+        private var acceptedSessionSettings: SwingSettings? = null
         private var metrics: SwingMetrics = buildMetrics(settings)
         private var terminalFocused: Boolean = false
         internal var cursorBlinkVisible: Boolean = true
@@ -114,6 +135,9 @@ public class SwingTerminal
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
         private var lastResizedPixelWidth: Int = NO_RESIZE_DIMENSION
         private var lastResizedPixelHeight: Int = NO_RESIZE_DIMENSION
+
+        // EDT-owned outstanding requests prevent cached-size checks from losing a resize back to the installed size.
+        private var pendingGeometryRequests = 0
         private val unbindRunnable = Runnable { unbindOnEdt() }
         private val componentJob = SupervisorJob()
         private val uiCoroutineDispatcher =
@@ -129,6 +153,8 @@ public class SwingTerminal
             }
         private val componentScope =
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
+        private val mutationFailureHandler: (Throwable?) -> Unit = ::reportSessionMutationFailure
+        private val sessionMutations = SessionMutationQueue(componentScope, mutationDispatcher, uiCoroutineDispatcher)
         private var bindingJob: Job? = null
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
@@ -634,15 +660,30 @@ public class SwingTerminal
         private val windowStateListener =
             WindowStateListener { event ->
                 val iconified = (event.newState and Frame.ICONIFIED) != 0
-                session?.setWindowMinimized(iconified)
+                updateWindowMinimizedOnEdt(iconified)
             }
 
-        private fun updateMinimizedStateFromAncestor() {
+        private fun updateMinimizedStateFromAncestor(onComplete: (Throwable?) -> Unit = mutationFailureHandler) {
             val window = ancestorWindow ?: SwingUtilities.getWindowAncestor(this)
             if (window is Frame) {
                 val iconified = (window.extendedState and Frame.ICONIFIED) != 0
-                session?.setWindowMinimized(iconified)
+                updateWindowMinimizedOnEdt(iconified, onComplete)
+            } else {
+                onComplete(null)
             }
+        }
+
+        internal fun updateWindowMinimizedOnEdt(
+            minimized: Boolean,
+            onComplete: (Throwable?) -> Unit = mutationFailureHandler,
+        ) {
+            check(SwingUtilities.isEventDispatchThread()) { "Window state must be captured on the EDT" }
+            val boundSession = session ?: return
+            val binding = bindingIdentity
+            sessionMutations.submit(boundSession, binding::get, apply = {
+                boundSession.setWindowMinimized(minimized)
+                null
+            }, complete = onComplete)
         }
 
         private fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean {
@@ -758,17 +799,29 @@ public class SwingTerminal
          * its grid and connector. Scrolling controls the session's single published
          * viewport. Prior session settings are not restored when unbinding.
          *
-         * Rebinding cancels the previous view's observation and suggestion work;
-         * it does not close either session. Calls on the EDT take effect immediately;
-         * calls from other threads dispatch asynchronously to the EDT.
+         * Rebinding cancels the previous view's observation and pending mutations;
+         * it does not close either session. View binding takes effect on the EDT;
+         * captured session settings and geometry are applied in order on a worker.
+         * Calls from other threads dispatch asynchronously to the EDT.
          *
          * @param session terminal session to display.
+         * @param onComplete receives `null` after initial session settings and geometry
+         * have applied, or their failure. Runs once on the EDT; rebinding or disposal
+         * before admission reports [CancellationException].
+         * @throws IllegalStateException if the bounded session mutation queue is full.
          */
-        public fun bind(session: TerminalSession) {
+        @JvmOverloads
+        public fun bind(
+            session: TerminalSession,
+            onComplete: (Throwable?) -> Unit = mutationFailureHandler,
+        ) {
             runOnEdt(
                 Runnable {
-                    if (disposed) return@Runnable
-                    bindOnEdt(session)
+                    if (disposed) {
+                        onComplete(CancellationException("Terminal view disposed"))
+                        return@Runnable
+                    }
+                    bindOnEdt(session, onComplete)
                 },
             )
         }
@@ -807,8 +860,13 @@ public class SwingTerminal
          *
          * Changed session-affecting settings are applied to the bound session;
          * unchanged palette and cursor settings preserve application-controlled values.
-         * Geometry changes may resize its grid and connector. Calls on the EDT take
-         * effect immediately; other calls dispatch asynchronously to the EDT.
+         * Geometry changes may resize its grid and connector. Component settings
+         * take effect on the EDT; captured session changes are applied in order on
+         * a worker. After queue overflow, retrying the same snapshot submits the
+         * remaining session changes and geometry. Other calls dispatch asynchronously
+         * to the EDT.
+         *
+         * @throws IllegalStateException if the bounded session mutation queue is full.
          */
         public fun reloadSettings() {
             runOnEdt(
@@ -817,6 +875,51 @@ public class SwingTerminal
                     reloadSettingsOnEdt()
                 },
             )
+        }
+
+        /**
+         * Applies [policy] after previously accepted view settings and geometry changes.
+         *
+         * Call on the EDT. Session admission runs on a worker. [onComplete] runs on
+         * the EDT after application, with `null` on success or the failure otherwise.
+         * Rebinding, disposal, or session closure cancels obsolete work and reports
+         * [CancellationException]. The default completion logs operational failures.
+         *
+         * @param policy immutable host security policy to apply to the bound session.
+         * @param onComplete completion callback, invoked once for an accepted request.
+         * @throws IllegalStateException if called off the EDT, no session is bound,
+         * or the bounded mutation queue is full.
+         */
+        @JvmOverloads
+        public fun setHostPolicy(
+            policy: HostPolicy,
+            onComplete: (Throwable?) -> Unit = mutationFailureHandler,
+        ) {
+            check(SwingUtilities.isEventDispatchThread()) { "Host policy must be captured on the EDT" }
+            val boundSession = checkNotNull(session) { "No terminal session is bound" }
+            val binding = bindingIdentity
+            sessionMutations.submit(boundSession, binding::get, apply = {
+                boundSession.setHostPolicy(policy)
+                null
+            }, complete = onComplete)
+        }
+
+        /**
+         * Schedules the current visible cell and pixel dimensions for the bound session.
+         *
+         * Call on the EDT after laying out the component. This also reconciles an
+         * externally resized grid even when the component bounds did not change.
+         * Geometry admission shares the ordered settings worker; newer geometry
+         * may supersede this request. [onComplete] runs on the EDT after installation.
+         *
+         * @param onComplete receives `null` on completion or an operational failure;
+         * superseded, unbound, closed, or disposed requests report [CancellationException].
+         * @throws IllegalStateException if called off the EDT or the bounded queue is full.
+         */
+        @JvmOverloads
+        public fun resizeSessionToVisibleGrid(onComplete: (Throwable?) -> Unit = mutationFailureHandler) {
+            check(SwingUtilities.isEventDispatchThread()) { "Viewport geometry must be captured on the EDT" }
+            resizeSessionToVisibleGridOnEdt(force = true, onComplete = onComplete)
         }
 
         /**
@@ -1209,102 +1312,116 @@ public class SwingTerminal
             }
         }
 
-        private fun bindOnEdt(session: TerminalSession) =
-            selectionController.deferChanges {
-                if (disposed) return@deferChanges
-                bindingIdentity = Any()
-                suggestionScheduler?.stop()
-                bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
-                mouseController.resetInput()
-                this.session = session
-                chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
-                retainedViewport = null
-                resetRenderCaches()
-                updateMinimizedStateFromAncestor()
-                applySettingsToSession(session, settings)
-                resetScrollbackState()
-                selectionController.resetBinding()
-                searchController.reset(renderCache.rows)
-                cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
-                shellIntegrationDecorations.reset()
-                if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-                visualGeometry.reset()
-                selectionController.stopSelectionDrag()
-                visualBellController.stop()
-                lastResizedColumns = NO_RESIZE_DIMENSION
-                lastResizedRows = NO_RESIZE_DIMENSION
-                lastResizedPixelWidth = NO_RESIZE_DIMENSION
-                lastResizedPixelHeight = NO_RESIZE_DIMENSION
-                renderFrameController.reset()
-                clearPointerHover()
-                hyperlinkDiscoveryController.reset()
-                resizeSessionToVisibleGridOnEdt()
-                bindingJob =
-                    componentScope.launch {
-                        launch {
-                            session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
-                                if (this@SwingTerminal.session === session) {
-                                    suggestionScheduler?.stop()
-                                    cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
-                                    mouseController.resetInput()
-                                    renderFrameController.handlePublishedFrame()
-                                }
+        private fun bindOnEdt(
+            session: TerminalSession,
+            onComplete: (Throwable?) -> Unit,
+        ) = selectionController.deferChanges {
+            if (disposed) return@deferChanges
+            bindingIdentity.set(false)
+            bindingIdentity = AtomicBoolean(true)
+            synchronized(resizePublicationLock) { resizeResultPending = false }
+            resizePublicationSession = null
+            suggestionScheduler?.stop()
+            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
+            mouseController.resetInput()
+            this.session = session
+            acceptedSessionSettings = null
+            chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
+            retainedViewport = null
+            resetRenderCaches()
+            var remaining = 3
+            var initializationFailure: Throwable? = null
+            val initialized: (Throwable?) -> Unit = { failure ->
+                if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                remaining--
+                if (remaining == 0) onComplete(initializationFailure)
+            }
+            updateMinimizedStateFromAncestor(initialized)
+            applySettingsToSession(session, settings, onComplete = initialized)
+            resetScrollbackState()
+            selectionController.resetBinding()
+            searchController.reset(renderCache.rows)
+            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+            shellIntegrationDecorations.reset()
+            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
+            visualGeometry.reset()
+            selectionController.stopSelectionDrag()
+            visualBellController.stop()
+            lastResizedColumns = NO_RESIZE_DIMENSION
+            lastResizedRows = NO_RESIZE_DIMENSION
+            lastResizedPixelWidth = NO_RESIZE_DIMENSION
+            lastResizedPixelHeight = NO_RESIZE_DIMENSION
+            renderFrameController.reset()
+            clearPointerHover()
+            hyperlinkDiscoveryController.reset()
+            resizeSessionToVisibleGridOnEdt(initialBinding = true, onComplete = initialized)
+            bindingJob =
+                componentScope.launch {
+                    launch {
+                        session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
+                            if (this@SwingTerminal.session === session) {
+                                suggestionScheduler?.stop()
+                                cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
+                                mouseController.resetInput()
+                                handlePublishedFrameOnEdt()
                             }
                         }
-                        launch {
-                            session.renderGeneration
-                                .filter { it >= 0L }
-                                .collect {
-                                    if (this@SwingTerminal.session === session) {
-                                        renderFrameController.handlePublishedFrame()
-                                    }
-                                }
-                        }
-                        combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
-                            .takeWhile { it !is TerminalSessionState.Closed }
+                    }
+                    launch {
+                        session.renderGeneration
+                            .filter { it >= 0L }
                             .collect {
-                                // Host metadata can be published inside a borrowed frame callback.
-                                // Defer source reads or gutter-triggered resize until the borrowed frame is released.
-                                if (settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
-                                    !chrome.promptDecorationsAvailable &&
-                                    session.shellIntegrationState.recordCount() > 0
-                                ) {
-                                    yield()
-                                }
-                                if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
-                                if (refreshShellIntegrationDecorations(session)) {
-                                    if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
-                                        !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
-                                    ) {
-                                        updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
-                                    }
-                                    if (renderCache.scrollbackOffset !=
-                                        viewportController.requestedOffset
-                                    ) {
-                                        requestRenderFromSession(session)
-                                    }
-                                    publishViewportState(renderCache.historySize)
-                                    renderFrameController.repaintFrame(forceFullRepaint = true)
+                                if (this@SwingTerminal.session === session) {
+                                    handlePublishedFrameOnEdt()
                                 }
                             }
                     }
-                var publishedFrameAvailable = false
-                session.readPublishedFrame {
-                    publishedFrameAvailable = true
+                    combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
+                        .takeWhile { it !is TerminalSessionState.Closed }
+                        .collect {
+                            // Host metadata can be published inside a borrowed frame callback.
+                            // Defer source reads or gutter-triggered resize until the borrowed frame is released.
+                            if (settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                                !chrome.promptDecorationsAvailable &&
+                                session.shellIntegrationState.recordCount() > 0
+                            ) {
+                                yield()
+                            }
+                            if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
+                            if (refreshShellIntegrationDecorations(session)) {
+                                if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
+                                    !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
+                                ) {
+                                    updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                                }
+                                if (renderCache.scrollbackOffset !=
+                                    viewportController.requestedOffset
+                                ) {
+                                    requestRenderFromSession(session)
+                                }
+                                publishViewportState(renderCache.historySize)
+                                renderFrameController.repaintFrame(forceFullRepaint = true)
+                            }
+                        }
                 }
-                if (publishedFrameAvailable) {
-                    renderFrameController.handlePublishedFrame()
-                }
-                requestRenderFromSession(session)
-                reconcileHyperlinksOnEdt()
-                publishViewportState(renderCache.historySize)
-                reconcileSuggestionSchedulerOnEdt()
-                repaint()
+            var publishedFrameAvailable = false
+            session.readPublishedFrame {
+                publishedFrameAvailable = true
             }
+            if (publishedFrameAvailable) {
+                handlePublishedFrameOnEdt()
+            }
+            requestRenderFromSession(session)
+            reconcileHyperlinksOnEdt()
+            publishViewportState(renderCache.historySize)
+            reconcileSuggestionSchedulerOnEdt()
+            repaint()
+        }
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
-                bindingIdentity = Any()
+                bindingIdentity.set(false)
+                bindingIdentity = AtomicBoolean(false)
                 cleanupSwingResources(
                     { suggestionScheduler?.stop() },
                     {
@@ -1316,6 +1433,11 @@ public class SwingTerminal
                     { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
                     {
                         session = null
+                        resizePublicationSession = null
+                        synchronized(resizePublicationLock) {
+                            resizeAnchorBinding = null
+                            resizeResultPending = false
+                        }
                         chrome.promptDecorationsAvailable = true
                         retainedViewport = null
                         resetRenderCaches()
@@ -1370,6 +1492,7 @@ public class SwingTerminal
                     shellSuggestionController = null
                     controller?.close()
                 },
+                sessionMutations::close,
                 { componentScope.cancel(CancellationException("Swing terminal disposed")) },
             )
         }
@@ -1378,66 +1501,72 @@ public class SwingTerminal
             if (disposed) return
             val previous = settings
             val next = settingsProvider.currentSettings()
-            if (next == previous) return
-
-            val nextMetrics =
-                if (next.font != previous.font || next.lineHeight != previous.lineHeight || next.columnSpacing != previous.columnSpacing) {
-                    buildMetrics(next)
-                } else {
-                    metrics
+            if (next != previous) {
+                val nextMetrics =
+                    if (next.font != previous.font ||
+                        next.lineHeight != previous.lineHeight ||
+                        next.columnSpacing != previous.columnSpacing
+                    ) {
+                        buildMetrics(next)
+                    } else {
+                        metrics
+                    }
+                if (nextMetrics != metrics) {
+                    gridPixelExtent(renderCache.columns, nextMetrics.cellWidth, 0)
                 }
-            if (nextMetrics != metrics) {
-                gridPixelExtent(renderCache.columns, nextMetrics.cellWidth, 0)
+                val geometryChanged =
+                    nextMetrics != metrics ||
+                        next.padding != previous.padding ||
+                        next.alternateScreenPadding != previous.alternateScreenPadding ||
+                        next.shellIntegrationDecorationGutterWidth != previous.shellIntegrationDecorationGutterWidth ||
+                        next.promptDecoration != previous.promptDecoration
+                if (geometryChanged) viewportController.finishScroll()
+                settings = next
+                if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
+                    next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
+                ) {
+                    mouseController.resetWheelInput()
+                }
+                metrics = nextMetrics
+                if (next.font != previous.font) font = next.font
+                if (next.palette != previous.palette) {
+                    background = Color(next.palette.defaultBackground, true)
+                    foreground = Color(next.palette.defaultForeground, true)
+                }
+                if (next.cursorBlinkMillis != previous.cursorBlinkMillis) configureCursorTimerOnEdt()
+                if (next.visualBellEnabled != previous.visualBellEnabled ||
+                    next.visualBellColor != previous.visualBellColor ||
+                    next.visualBellDurationMillis != previous.visualBellDurationMillis ||
+                    next.visualBellEdgeThicknessPixels != previous.visualBellEdgeThicknessPixels
+                ) {
+                    configureVisualBellOnEdt()
+                }
+                if (geometryChanged) {
+                    session?.let { refreshShellIntegrationDecorations(it) }
+                    searchController.updateViewportHighlights()
+                    clearPointerHover()
+                    hyperlinkDiscoveryController.reconcile()
+                    session?.let { requestRenderFromSession(it) }
+                }
+                if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
+                    preferredSize = preferredGridSize(next.columns, next.rows)
+                    revalidate()
+                }
+                updateAutomaticSuggestionEligibilityOnEdt()
+                reconcileSuggestionSchedulerOnEdt()
+                if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                    next.mouseReportingEnabled != previous.mouseReportingEnabled ||
+                    next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
+                ) {
+                    reconcileHyperlinksOnEdt()
+                }
+                repaint()
             }
-            val geometryChanged =
-                nextMetrics != metrics ||
-                    next.padding != previous.padding ||
-                    next.alternateScreenPadding != previous.alternateScreenPadding ||
-                    next.shellIntegrationDecorationGutterWidth != previous.shellIntegrationDecorationGutterWidth ||
-                    next.promptDecoration != previous.promptDecoration
-            if (geometryChanged) viewportController.finishScroll()
-            settings = next
-            if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
-                next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
-            ) {
-                mouseController.resetWheelInput()
+            session?.let {
+                // Settings listeners can synchronously publish a newer snapshot.
+                applySettingsToSession(it, settings)
+                resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
             }
-            metrics = nextMetrics
-            if (next.font != previous.font) font = next.font
-            if (next.palette != previous.palette) {
-                background = Color(next.palette.defaultBackground, true)
-                foreground = Color(next.palette.defaultForeground, true)
-            }
-            if (next.cursorBlinkMillis != previous.cursorBlinkMillis) configureCursorTimerOnEdt()
-            if (next.visualBellEnabled != previous.visualBellEnabled ||
-                next.visualBellColor != previous.visualBellColor ||
-                next.visualBellDurationMillis != previous.visualBellDurationMillis ||
-                next.visualBellEdgeThicknessPixels != previous.visualBellEdgeThicknessPixels
-            ) {
-                configureVisualBellOnEdt()
-            }
-            session?.let { applySettingsToSession(it, next, previous) }
-            if (geometryChanged) {
-                session?.let { refreshShellIntegrationDecorations(it) }
-                resizeSessionToVisibleGridOnEdt()
-                searchController.updateViewportHighlights()
-                clearPointerHover()
-                hyperlinkDiscoveryController.reconcile()
-                session?.let { requestRenderFromSession(it) }
-            }
-            if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
-                preferredSize = preferredGridSize(next.columns, next.rows)
-                revalidate()
-            }
-            updateAutomaticSuggestionEligibilityOnEdt()
-            reconcileSuggestionSchedulerOnEdt()
-            if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
-                next.mouseReportingEnabled != previous.mouseReportingEnabled ||
-                next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
-            ) {
-                reconcileHyperlinksOnEdt()
-            }
-            repaint()
         }
 
         /**
@@ -2235,16 +2364,34 @@ public class SwingTerminal
         private fun applySettingsToSession(
             session: TerminalSession,
             settings: SwingSettings,
-            previous: SwingSettings? = null,
+            onComplete: (Throwable?) -> Unit = mutationFailureHandler,
         ) {
-            if (settings.treatAmbiguousAsWide != previous?.treatAmbiguousAsWide) {
-                session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
+            val previous = acceptedSessionSettings
+            // Input policy admission remains independent of a blocked graphics decode.
+            session.setPasteControlPolicy(settings.pasteControlPolicy)
+            if (settings.treatAmbiguousAsWide == previous?.treatAmbiguousAsWide &&
+                settings.palette == previous.palette &&
+                settings.cursorShape == previous.cursorShape
+            ) {
+                acceptedSessionSettings = settings
+                onComplete(null)
+                return
             }
-            if (settings.palette != previous?.palette) session.setThemePalette(settings.palette)
-            if (settings.cursorShape != previous?.cursorShape) session.setCursorShape(settings.cursorShape)
-            if (settings.pasteControlPolicy != previous?.pasteControlPolicy) {
-                session.setPasteControlPolicy(settings.pasteControlPolicy)
-            }
+            val binding = bindingIdentity
+            sessionMutations.submit(session, binding::get, apply = {
+                if (settings.treatAmbiguousAsWide != previous?.treatAmbiguousAsWide) {
+                    session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
+                }
+                if (settings.palette != previous?.palette) session.setThemePalette(settings.palette)
+                if (settings.cursorShape != previous?.cursorShape) session.setCursorShape(settings.cursorShape)
+                null
+            }, complete = onComplete)
+            acceptedSessionSettings = settings
+        }
+
+        private fun reportSessionMutationFailure(failure: Throwable?) {
+            if (failure == null || failure is CancellationException) return
+            System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal view mutation failed", failure)
         }
 
         private fun handleScrollbarOverlayPressed(event: MouseEvent): Boolean {
@@ -2694,7 +2841,18 @@ public class SwingTerminal
             renderMappingChanged: Boolean,
             scrollComplete: Boolean,
         ) {
+            viewportInteractionRevision++
             val boundSession = session
+            if (boundSession != null && pendingGeometryRequests > 0) {
+                viewportController.finishScroll()
+                synchronized(resizePublicationLock) {
+                    resizeAnchorBinding = bindingIdentity
+                    resizeAnchorOffset = viewportController.requestedOffset
+                    resizeAnchorLineId = 0L
+                    resizeAnchorRevision = viewportInteractionRevision
+                    if (resizeAnchorOffset > 0) boundSession.readRenderFrame(resizeAnchorOffset, 1, resizeAnchorConsumer)
+                }
+            }
             if (boundSession != null && renderMappingChanged) {
                 requestRenderFromSession(boundSession)
             }
@@ -2870,7 +3028,12 @@ public class SwingTerminal
                 gridPixelExtent(rows, metrics.cellHeight, chrome.verticalInset(settings, activeBuffer)),
             )
 
-        private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
+        private fun resizeSessionToVisibleGridOnEdt(
+            publishWhenUnchanged: Boolean = true,
+            force: Boolean = false,
+            initialBinding: Boolean = false,
+            onComplete: (Throwable?) -> Unit = mutationFailureHandler,
+        ): Boolean {
             val visibleGridSize =
                 viewportController.visibleGridSizeOnEdt(
                     settings,
@@ -2882,6 +3045,7 @@ public class SwingTerminal
             val boundSession = session
             if (boundSession == null || width <= 0 || height <= 0) {
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
+                onComplete(if (boundSession == null || force) CancellationException("No visible terminal grid is bound") else null)
                 return false
             }
 
@@ -2890,15 +3054,14 @@ public class SwingTerminal
             val pixelWidth = gridPixelExtent(columns, metrics.cellWidth, 0)
             val pixelHeight = gridPixelExtent(rows, metrics.cellHeight, 0)
             val gridChanged = columns != lastResizedColumns || rows != lastResizedRows
-            if (!gridChanged && pixelWidth == lastResizedPixelWidth && pixelHeight == lastResizedPixelHeight) {
+            if (!force &&
+                pendingGeometryRequests == 0 &&
+                !gridChanged &&
+                pixelWidth == lastResizedPixelWidth &&
+                pixelHeight == lastResizedPixelHeight
+            ) {
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
-                return false
-            }
-
-            if (!gridChanged && boundSession.tryUpdateViewportPixels(columns, rows, pixelWidth, pixelHeight)) {
-                lastResizedPixelWidth = pixelWidth
-                lastResizedPixelHeight = pixelHeight
-                if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
+                onComplete(null)
                 return false
             }
 
@@ -2916,20 +3079,143 @@ public class SwingTerminal
                     0L
                 }
 
-            val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset, pixelWidth, pixelHeight) ?: return true
-            lastResizedColumns = columns
-            lastResizedRows = rows
-            lastResizedPixelWidth = pixelWidth
-            lastResizedPixelHeight = pixelHeight
-            selectionController.clearSelection(notify = false)
-            viewportController.anchorAfterResize(
-                resizedViewport.scrollbackOffset,
-                resizedViewport.historySize,
-                resizedViewport.discardedCount,
-                anchorLineId = anchorLineId,
-            )
-            selectionController.publishChange()
+            val binding = bindingIdentity
+            synchronized(resizePublicationLock) {
+                if (resizeAnchorBinding !== binding || pendingGeometryRequests == 0 && !isResizePublicationPending()) {
+                    resizeAnchorBinding = binding
+                    resizeAnchorOffset = oldOffset
+                    resizeAnchorLineId = anchorLineId
+                    resizeAnchorRevision = viewportInteractionRevision
+                }
+            }
+            var resizedGrid = false
+            var anchoring = false
+            var completionTransferred = false
+            pendingGeometryRequests++
+            try {
+                sessionMutations.submit(
+                    boundSession,
+                    binding::get,
+                    geometry = !initialBinding,
+                    apply = {
+                        var requestedOffset = oldOffset
+                        var requestedAnchorLineId = anchorLineId
+                        var requestedRevision = 0L
+                        synchronized(resizePublicationLock) {
+                            if (resizeAnchorBinding === binding) {
+                                requestedOffset = resizeAnchorOffset
+                                requestedAnchorLineId = resizeAnchorLineId
+                                requestedRevision = resizeAnchorRevision
+                            }
+                        }
+                        val pixelsUpdated = !initialBinding && boundSession.tryUpdateViewportPixels(columns, rows, pixelWidth, pixelHeight)
+                        synchronized(resizePublicationLock) {
+                            anchoring = !pixelsUpdated || resizeResultPending
+                            if (anchoring) resizeResultPending = true
+                        }
+                        resizedGrid = !pixelsUpdated
+                        val resizedViewport =
+                            if (!anchoring) {
+                                null
+                            } else {
+                                val currentOffset = resolveResizeOffset(boundSession, requestedOffset, requestedAnchorLineId)
+                                if (pixelsUpdated) {
+                                    var anchor: TerminalViewportResizeResult? = null
+                                    boundSession.readRenderFrame(currentOffset) { frame ->
+                                        anchor =
+                                            TerminalViewportResizeResult(frame.scrollbackOffset, frame.historySize, frame.discardedCount)
+                                    }
+                                    anchor
+                                } else {
+                                    boundSession.tryResizeViewport(columns, rows, currentOffset, pixelWidth, pixelHeight)
+                                }
+                            }
+                        if (anchoring && resizedViewport == null) {
+                            throw CancellationException("Terminal session closed before resize")
+                        }
+                        val install: () -> Unit = install@{
+                            lastResizedColumns = columns
+                            lastResizedRows = rows
+                            lastResizedPixelWidth = pixelWidth
+                            lastResizedPixelHeight = pixelHeight
+                            if (resizedViewport != null) {
+                                if (resizedGrid) selectionController.clearSelection(notify = false)
+                                if (requestedRevision == viewportInteractionRevision) {
+                                    viewportController.anchorAfterResize(
+                                        resizedViewport.scrollbackOffset,
+                                        resizedViewport.historySize,
+                                        resizedViewport.discardedCount,
+                                        anchorLineId = requestedAnchorLineId,
+                                    )
+                                }
+                                if (resizedGrid) selectionController.publishChange()
+                            }
+                            if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
+                            if (resizedViewport != null && requestedRevision != viewportInteractionRevision) {
+                                if (!binding.get() || session !== boundSession || width <= 0 || height <= 0) {
+                                    throw CancellationException("Terminal binding changed before resize anchoring")
+                                }
+                                // Transfer completion only after notifications succeed and the retry is accepted.
+                                resizeSessionToVisibleGridOnEdt(force = true, onComplete = onComplete)
+                                completionTransferred = true
+                                return@install
+                            }
+                            requestRenderFromSession(boundSession)
+                        }
+                        install
+                    },
+                    complete = complete@{ failure ->
+                        pendingGeometryRequests--
+                        if (completionTransferred) return@complete
+                        var completionFailure = failure
+                        try {
+                            val abandonedAnchor =
+                                pendingGeometryRequests == 0 &&
+                                    failure != null &&
+                                    synchronized(resizePublicationLock) { resizeResultPending }
+                            if (abandonedAnchor || anchoring) {
+                                synchronized(resizePublicationLock) { resizeResultPending = false }
+                                // A rebind may have deferred its own first frame while this result was pending.
+                                if (!disposed) {
+                                    session?.let { currentSession ->
+                                        resizePublicationSession = currentSession
+                                        resizePublicationGeneration = currentSession.renderGeneration.value
+                                        requestRenderFromSession(currentSession)
+                                    }
+                                }
+                            }
+                        } catch (next: Exception) {
+                            completionFailure = preserveSwingFailure(completionFailure, next)
+                        }
+                        onComplete(completionFailure)
+                    },
+                )
+            } catch (failure: Exception) {
+                pendingGeometryRequests--
+                throw failure
+            }
             return true
+        }
+
+        // Earlier admitted resizes can reflow history after this request captured its viewport.
+        private fun resolveResizeOffset(
+            session: TerminalSession,
+            capturedOffset: Int,
+            anchorLineId: Long,
+        ): Int {
+            if (anchorLineId == 0L) return capturedOffset
+            var offset = capturedOffset
+            session.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE) { frame ->
+                var row = 0
+                while (row < frame.rows) {
+                    if (frame.lineId(row) == anchorLineId) {
+                        offset = (frame.scrollbackOffset - row).coerceAtLeast(0)
+                        break
+                    }
+                    row++
+                }
+            }
+            return offset
         }
 
         private fun visibleGridRows(): Int = viewportController.visibleGridRows(settings, metrics, height, renderCache.activeBuffer)
@@ -2953,46 +3239,70 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            painter.clearImages()
             renderCache.reset()
             searchCache.reset()
         }
 
-        private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            val closed = session.state.value is TerminalSessionState.Closed
-            scrollbarOverlay.retainedOutput = closed
-            if (closed &&
-                settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
-                renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE
-            ) {
-                retainedViewport = null
-                updatePromptDividers(session)
-                renderCache.updateFrom(session, viewportController.requestedOffset, requestedRenderRows())
-            } else if (closed) {
-                val hadRetainedViewport = retainedViewport != null
-                val viewport = retainedViewport ?: RetainedFrameViewport(session).also { retainedViewport = it }
-                viewport.visibleRows = visibleGridRows()
-                val previousHistory = renderCache.historySize
-                renderCache.updateFrom(viewport, viewportController.requestedOffset, requestedRenderRows())
-                if (hadRetainedViewport && previousHistory != renderCache.historySize) {
-                    val offset =
-                        if (viewportController.requestedOffset == 0) {
-                            0
-                        } else {
-                            (viewportController.requestedOffset.toLong() + renderCache.historySize - previousHistory)
-                                .coerceIn(0L, renderCache.historySize.toLong())
-                                .toInt()
-                        }
-                    viewportController.anchorAfterResize(offset, renderCache.historySize, renderCache.discardedCount)
-                    renderCache.updateFrom(viewport, offset, requestedRenderRows())
-                }
-            } else {
-                session.readPublishedFrame { published ->
-                    renderCache.updateFrom(published)
-                } ?: return
+        private fun handlePublishedFrameOnEdt() =
+            synchronized(resizePublicationLock) {
+                if (!isResizePublicationPending()) renderFrameController.handlePublishedFrame()
             }
-            selectionController.updateFrame(renderCache)
-            hyperlinkDiscoveryController.scheduleForFrame()
-            selectionController.publishChange()
+
+        // A pre-resize publication must not replace the newly installed history baseline.
+        private fun isResizePublicationPending(): Boolean {
+            if (session?.state?.value is TerminalSessionState.Closed) {
+                resizeResultPending = false
+                resizePublicationSession = null
+                return false
+            }
+            if (resizeResultPending) return true
+            val pending = resizePublicationSession ?: return false
+            if (pending === session && !pending.isClosed && pending.renderGeneration.value == resizePublicationGeneration) return true
+            resizePublicationSession = null
+            return false
+        }
+
+        private fun refreshRenderCacheFromSession(session: TerminalSession) {
+            synchronized(resizePublicationLock) {
+                if (isResizePublicationPending()) return
+                val closed = session.state.value is TerminalSessionState.Closed
+                scrollbarOverlay.retainedOutput = closed
+                if (closed &&
+                    settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
+                    renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE
+                ) {
+                    retainedViewport = null
+                    updatePromptDividers(session)
+                    renderCache.updateFrom(session, viewportController.requestedOffset, requestedRenderRows())
+                } else if (closed) {
+                    val hadRetainedViewport = retainedViewport != null
+                    val viewport = retainedViewport ?: RetainedFrameViewport(session).also { retainedViewport = it }
+                    viewport.visibleRows = visibleGridRows()
+                    val previousHistory = renderCache.historySize
+                    renderCache.updateFrom(viewport, viewportController.requestedOffset, requestedRenderRows())
+                    if (hadRetainedViewport && previousHistory != renderCache.historySize) {
+                        val offset =
+                            if (viewportController.requestedOffset == 0) {
+                                0
+                            } else {
+                                (viewportController.requestedOffset.toLong() + renderCache.historySize - previousHistory)
+                                    .coerceIn(0L, renderCache.historySize.toLong())
+                                    .toInt()
+                            }
+                        viewportController.anchorAfterResize(offset, renderCache.historySize, renderCache.discardedCount)
+                        renderCache.updateFrom(viewport, offset, requestedRenderRows())
+                    }
+                } else {
+                    session.readPublishedFrame { published ->
+                        renderCache.updateFrom(published)
+                    } ?: return
+                }
+                painter.prepareImages(renderCache)
+                selectionController.updateFrame(renderCache)
+                hyperlinkDiscoveryController.scheduleForFrame()
+                selectionController.publishChange()
+            }
         }
 
         private fun reconcileHyperlinksOnEdt() {
@@ -3025,37 +3335,43 @@ public class SwingTerminal
         }
 
         private fun requestRenderFromSession(session: TerminalSession) {
-            if (session.state.value is TerminalSessionState.Closed) {
-                refreshRenderCacheFromSession(session)
-                refreshShellIntegrationDecorations(session)
-                searchController.updateViewportHighlights()
-                publishViewportState(renderCache.historySize)
-                repaint()
-                return
+            synchronized(resizePublicationLock) {
+                if (resizeResultPending) return
+                if (session.state.value is TerminalSessionState.Closed) {
+                    refreshRenderCacheFromSession(session)
+                    refreshShellIntegrationDecorations(session)
+                    searchController.updateViewportHighlights()
+                    publishViewportState(renderCache.historySize)
+                    repaint()
+                    return
+                }
+                session.requestRender(
+                    scrollbackOffset = viewportController.requestedOffset,
+                    viewportRows = requestedRenderRows(),
+                )
             }
-            session.requestRender(
-                scrollbackOffset = viewportController.requestedOffset,
-                viewportRows = requestedRenderRows(),
-            )
         }
 
         private fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean {
-            val decorationsChanged = shellIntegrationDecorations.updateFrom(session.shellIntegrationState, renderCache)
-            val gutterActivated =
-                !chrome.promptDecorationsAvailable && session.shellIntegrationState.recordCount() > 0 && canActivatePromptGutter()
-            if (gutterActivated) {
-                viewportController.finishScroll()
-                chrome.promptDecorationsAvailable = true
-                if (settings.promptDecoration == SwingPromptDecoration.GUTTER) {
-                    resizeSessionToVisibleGridOnEdt()
-                    preferredSize = preferredGridSize(settings.columns, settings.rows)
-                    revalidate()
-                    clearPointerHover()
-                    requestRenderFromSession(session)
+            synchronized(resizePublicationLock) {
+                if (isResizePublicationPending()) return false
+                val decorationsChanged = shellIntegrationDecorations.updateFrom(session.shellIntegrationState, renderCache)
+                val gutterActivated =
+                    !chrome.promptDecorationsAvailable && session.shellIntegrationState.recordCount() > 0 && canActivatePromptGutter()
+                if (gutterActivated) {
+                    viewportController.finishScroll()
+                    chrome.promptDecorationsAvailable = true
+                    if (settings.promptDecoration == SwingPromptDecoration.GUTTER) {
+                        resizeSessionToVisibleGridOnEdt()
+                        preferredSize = preferredGridSize(settings.columns, settings.rows)
+                        revalidate()
+                        clearPointerHover()
+                        requestRenderFromSession(session)
+                    }
                 }
+                val projectionChanged = updatePromptDividers(session)
+                return gutterActivated or decorationsChanged or projectionChanged or updateVisualViewportGeometry()
             }
-            val projectionChanged = updatePromptDividers(session)
-            return gutterActivated or decorationsChanged or projectionChanged or updateVisualViewportGeometry()
         }
 
         private fun canActivatePromptGutter(): Boolean {

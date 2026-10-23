@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
     private val sessionFactory: TerminalWorkspaceSessionFactory,
-    workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    workerDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AutoCloseable {
     /**
      * Creates a workspace backed by local PTY sessions.
@@ -69,6 +69,7 @@ class TerminalWorkspace internal constructor(
     private val workspaceJob = SupervisorJob()
     private val workspaceScope =
         CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
+    private val operations = WorkspaceOperations(workerDispatcher)
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
     private var selectionRevision = 0L
@@ -95,10 +96,121 @@ class TerminalWorkspace internal constructor(
     fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
 
     /**
+     * Queues session creation and startup on the workspace worker, in accepted operation order.
+     * The queue holds at most 64 pending ordinary operations. Completion runs on that worker and must
+     * dispatch to the host UI before accessing widgets; it is called exactly once for accepted work.
+     * Closing a view does not cancel accepted work. A host that no longer needs a successfully
+     * opened tab must close it, or close the workspace.
+     *
+     * @param profile launch preparation performed on the worker; capture UI-affine settings before
+     * submitting, and do not access UI state from this function.
+     * @param options initial session dimensions and terminal policy.
+     * @param onComplete receives the opened tab or startup failure, after rollback completes.
+     * @return `true` when accepted; `false` when full or shutting down, without invoking [onComplete].
+     */
+    fun openTabAsync(
+        profile: () -> TerminalProfile,
+        options: TerminalWorkspaceOpenOptions,
+        onComplete: (Result<TerminalWorkspaceTab>) -> Unit,
+    ): Boolean =
+        operations.submit {
+            var createdSession: TerminalSession? = null
+            val result = runCatching { openTab(profile(), options) { createdSession = it } }
+            val failure = result.exceptionOrNull()
+            val session = createdSession
+            if (failure != null && session != null) awaitSessionCleanup(session, failure)
+            onComplete(result)
+        }
+
+    /**
+     * Queues tab cleanup after earlier accepted workspace operations, without waiting on the caller.
+     * Completion runs on the workspace worker exactly once for accepted work, even after view disposal.
+     * Owned tabs reserve cleanup independently of ordinary queue capacity. Duplicate pending
+     * cleanup is rejected instead of retaining unbounded completion callbacks. Completion waits
+     * for session cleanup even when another owner already called [TerminalSession.requestClose].
+     *
+     * @param id tab id; unknown tabs complete successfully without changes.
+     * @param onComplete receives cleanup success or the first failure with later failures suppressed.
+     * @return `true` when accepted; `false` when already queued or shutting down (or the ordinary
+     * queue is full for an unknown tab), without invoking [onComplete].
+     */
+    fun closeTabAsync(
+        id: String,
+        onComplete: (Result<Unit>) -> Unit,
+    ): Boolean = closeTabsAsync(listOf(id), onComplete)
+
+    /**
+     * Queues one host container's tab cleanup atomically, so capacity rejection cannot partially
+     * accept a split-pane close. Every tab is attempted; failures are combined as in [close].
+     * Completion runs on the workspace worker exactly once for accepted work.
+     *
+     * @param ids ids copied at admission; unknown tabs are ignored.
+     * @param onComplete receives success or the first cleanup failure with later failures suppressed.
+     * @return `true` when accepted; `false` when a target already has queued cleanup, shutdown has
+     * begun, or all ids are unknown and the ordinary queue is full. Rejection does not invoke [onComplete].
+     */
+    fun closeTabsAsync(
+        ids: List<String>,
+        onComplete: (Result<Unit>) -> Unit,
+    ): Boolean {
+        val captured = synchronized(stateLock) { tabs.filter { it.id in ids } }
+        val capturedIds = captured.map { it.id }
+        return operations.submitCleanup(capturedIds) {
+            var failure: Throwable? = null
+            for (id in capturedIds) failure = captureCleanupFailure(failure) { closeTab(id) }
+            for (tab in captured) failure = awaitSessionCleanup(tab.session, failure)
+            onComplete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
+        }
+    }
+
+    /**
+     * Queues palette and width changes on the same ordered worker as tab lifecycle operations.
+     * Completion runs on that worker exactly once for accepted work, after every targeted session
+     * has been updated or a failure has been reported.
+     *
+     * @param palette immutable terminal color palette.
+     * @param treatAmbiguousAsWide width policy for future writes.
+     * @param onComplete receives application success or failure; dispatch UI work explicitly.
+     * @return `true` when accepted; `false` when full or shutting down, without invoking [onComplete].
+     */
+    fun applySettingsAsync(
+        palette: TerminalColorPalette,
+        treatAmbiguousAsWide: Boolean,
+        onComplete: (Result<Unit>) -> Unit,
+    ): Boolean = operations.submit { onComplete(runCatching { applySettings(palette, treatAmbiguousAsWide) }) }
+
+    /**
+     * Seals asynchronous admission, drains accepted operations, and closes all owned sessions.
+     * Shutdown has a reserved slot, so a full queue cannot prevent cleanup. It survives cancellation
+     * of host views. Completion runs on the workspace worker after cleanup has been attempted.
+     *
+     * @param onComplete receives cleanup success or the first failure with later failures suppressed.
+     * @return `true` for the first shutdown request; `false` for an already sealed queue, without
+     * invoking [onComplete].
+     */
+    fun closeAsync(onComplete: (Result<Unit>) -> Unit): Boolean =
+        operations.finish {
+            val sessions = tabSnapshot().map { it.session }
+            var failure = captureCleanupFailure(null) { close() }
+            for (session in sessions) failure = awaitSessionCleanup(session, failure)
+            onComplete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
+        }
+
+    private suspend fun awaitSessionCleanup(
+        session: TerminalSession,
+        previous: Throwable?,
+    ): Throwable? {
+        val state = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+        val cleanupFailure = state.event.failure ?: return previous
+        return previous?.apply { if (this !== cleanupFailure) addSuppressed(cleanupFailure) } ?: cleanupFailure
+    }
+
+    /**
      * Opens a new local PTY-backed tab. Publishes it through
      * [TerminalWorkspaceListener.tabOpened] before starting output delivery.
      * Publication or startup failure closes the session and removes the tab.
      * A closed workspace rejects new tabs before creating a session.
+     * This synchronous method can block during startup and rollback; UI hosts use [openTabAsync].
      *
      * @param profile launch profile for the new process.
      * @param options initial session dimensions and terminal policy.
@@ -107,11 +219,18 @@ class TerminalWorkspace internal constructor(
     fun openTab(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
+    ): TerminalWorkspaceTab = openTab(profile, options, null)
+
+    private fun openTab(
+        profile: TerminalProfile,
+        options: TerminalWorkspaceOpenOptions,
+        onSessionCreated: ((TerminalSession) -> Unit)?,
     ): TerminalWorkspaceTab {
         synchronized(stateLock) { check(!closed) { "workspace is closed" } }
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
         val session = sessionFactory.create(profile, options, tabEventListener(id))
         try {
+            onSessionCreated?.invoke(session)
             check(session.state.value === TerminalSessionState.Created) { "Workspace factory must return an unstarted session" }
             val tab =
                 TerminalWorkspaceTab(
@@ -227,6 +346,7 @@ class TerminalWorkspace internal constructor(
      * Attempts session cleanup and every close/selection notification even when
      * a callback throws. Rethrows the first failure with later failures suppressed.
      * Reentrant selection or closure supersedes this call's pending selection notification.
+     * This synchronous method can wait for in-progress graphics decoding; UI hosts use [closeTabAsync].
      *
      * @param id tab id.
      */
@@ -258,6 +378,7 @@ class TerminalWorkspace internal constructor(
 
     /**
      * Applies host settings that are shared across all open sessions.
+     * This synchronous method can wait for in-progress graphics decoding; UI hosts use [applySettingsAsync].
      *
      * @param palette terminal color palette.
      * @param treatAmbiguousAsWide width policy for future writes.
@@ -267,8 +388,10 @@ class TerminalWorkspace internal constructor(
         treatAmbiguousAsWide: Boolean,
     ) {
         for (tab in tabSnapshot()) {
-            tab.session.setThemePalette(palette)
-            tab.session.setTreatAmbiguousAsWide(treatAmbiguousAsWide)
+            tab.session.withMutationAdmission({ tabBySession(tab.session) === tab }) {
+                tab.session.setThemePalette(palette)
+                tab.session.setTreatAmbiguousAsWide(treatAmbiguousAsWide)
+            }
         }
     }
 
@@ -276,12 +399,14 @@ class TerminalWorkspace internal constructor(
      * Rejects new tabs, attempts every tab cleanup, and cancels the workspace scope.
      * Rethrows the first failure with later failures suppressed. Repeated or
      * reentrant calls are no-ops; they do not wait for an active close to finish.
+     * This synchronous method can wait for in-progress graphics decoding; UI hosts use [closeAsync].
      */
     override fun close() {
         synchronized(stateLock) {
             if (closed) return
             closed = true
         }
+        operations.finish {}
         var failure: Throwable? = null
         try {
             while (true) {

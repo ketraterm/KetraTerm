@@ -141,6 +141,7 @@ public final class io/github/ketraterm/render/api/TerminalRenderExtraAttrs {
 
 public abstract interface class io/github/ketraterm/render/api/TerminalRenderFrame {
 	public fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
+	public fun copyImages (Lio/github/ketraterm/render/api/TerminalRenderImageSink;)V
 	public abstract fun copyLine (I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
 	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public fun copyTextLine (I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
@@ -151,6 +152,7 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderFra
 	public abstract fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
 	public fun getDiscardedCount ()J
 	public abstract fun getFrameGeneration ()J
+	public fun getGraphicsGeneration ()J
 	public fun getHistoryContentGeneration ()J
 	public fun getHistorySize ()I
 	public fun getOutputEndAbsoluteRow ()J
@@ -165,11 +167,13 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderFra
 
 public final class io/github/ketraterm/render/api/TerminalRenderFrame$DefaultImpls {
 	public static fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderFrame;Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
+	public static fun copyImages (Lio/github/ketraterm/render/api/TerminalRenderFrame;Lio/github/ketraterm/render/api/TerminalRenderImageSink;)V
 	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public static fun copyTextLine (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
 	public static synthetic fun copyTextLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public static fun getContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getDiscardedCount (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getGraphicsGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getHistoryContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getHistorySize (Lio/github/ketraterm/render/api/TerminalRenderFrame;)I
 	public static fun getOutputEndAbsoluteRow (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
@@ -193,6 +197,23 @@ public final class io/github/ketraterm/render/api/TerminalRenderFrameReader$Defa
 	public static fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderImage {
+	public abstract fun copyArgb ([II)V
+	public static synthetic fun copyArgb$default (Lio/github/ketraterm/render/api/TerminalRenderImage;[IIILjava/lang/Object;)V
+	public abstract fun getHeight ()I
+	public abstract fun getWidth ()I
+	public fun isRetainedBySource ()Z
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderImage$DefaultImpls {
+	public static synthetic fun copyArgb$default (Lio/github/ketraterm/render/api/TerminalRenderImage;[IIILjava/lang/Object;)V
+	public static fun isRetainedBySource (Lio/github/ketraterm/render/api/TerminalRenderImage;)Z
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderImageSink {
+	public abstract fun accept (Lio/github/ketraterm/render/api/TerminalRenderImage;DDDDIIIIDDI)V
 }
 
 public final class io/github/ketraterm/render/api/TerminalRenderUnderline {

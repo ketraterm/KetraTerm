@@ -13,11 +13,14 @@ ordered connector writes on the I/O dispatcher.
 
 | Boundary | Protected work | Consumer obligation |
 | --- | --- | --- |
+| Mutation admission gate | Complete ingress batches, including decoding, and host/core mutations | Run synchronous setters, geometry and clear off UI threads; recheck request validity at admission. |
 | `mutationLock` | Parser/core mutation, resize, and live-frame reads | Copy borrowed frames inside the callback; do not reenter mutation. |
 | `outboundWriteLock` | Admission encoder scratch, input policy, startup state, and queue admission/draining | Admit a complete input operation or reply batch atomically. |
 | Publisher lease lock | Render-buffer ownership and recycling | Access published caches only through a scoped read. |
 
-When both session monitors are needed, acquire mutation before outbound.
+Acquire mutation admission before mutation, then outbound when all are needed.
+Frame reads and ordinary input do not acquire mutation admission. Input/paste
+policy setters retain outbound serialization only.
 Conditional editing acquires mutation, the producer revision guard, then
 outbound. A custom producer must never acquire terminal mutation while holding
 an independent revision guard.
@@ -27,8 +30,16 @@ ring bytes into its own scratch under outbound serialization, then releases the
 monitor before calling `write`. That scratch remains worker-owned until the
 synchronous connector call returns.
 
-There is no extra inbound monitor: `TerminalConnector` promises serial, ordered
-delivery of borrowed ranges, and `onBytes` consumes each range before returning.
+`TerminalConnector` promises serial, ordered delivery of borrowed ranges, and
+`onBytes` consumes each range before returning. At a graphics decode yield it
+retains mutation admission and the remaining borrowed range, releases mutation,
+decodes synchronously, then reacquires mutation to commit/reply before later bytes.
+No additional ingress copy, graphics queue or deferred placement is involved.
+`withMutationAdmission` rechecks a host owner's validity inside this same gate.
+An accepted protocol host callback may map synchronously back to a setter, such
+as applying a CSI 8 window resize: its ingress thread already owns admission and
+mutation. It must not reenter byte parsing or clear the buffer, wait for the EDT,
+or close the session.
 Monitor sections never suspend. Frame/cache callbacks must return promptly,
 retain no borrowed storage, and neither close the session nor reenter mutation
 or publication. Holding a published cache lease can delay recycling and closure.
@@ -77,6 +88,7 @@ per-key markers; bulk bytes themselves do not enter those counters.
 
 Capture `captureCommandEdit()` before requesting or calculating asynchronous
 suggestions. It returns null unless the session is running, the writer is idle,
+no output batch is in progress (including a graphics decode yield),
 an authoritative editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 `submitInput(expected, events)` using that same context.
@@ -195,7 +207,7 @@ the same mutation lock before updating pixel metadata. A mismatch leaves state
 untouched so presentation owners can perform a full resize and adopt its
 viewport/history anchor; matching pixel-only updates do not resize the connector.
 
-Close claims termination, calls the connector before taking cleanup monitors,
+Close claims termination, cancels the outbound worker, calls the connector before taking cleanup monitors,
 drops pending output, cancels session jobs, finalizes parser EOF, and attempts
 final publication. It does not join a writer blocked in a native call. Connectors
 must tolerate concurrent close; coroutine cancellation alone cannot interrupt
@@ -207,6 +219,18 @@ unwinds; active source ownership lasts until its callback returns.
 and final publication have been attempted. A repeated or concurrent close can
 return before that first shutdown completes. Session flows do not complete on
 closure; their collectors retain responsibility for their own lifetime.
+
+`requestClose` and failure-triggered closure perform cleanup asynchronously on
+`cleanupDispatcher`, independently of connector writes and session-worker cancellation.
+The dispatcher must run blocking work off UI threads.
+The default cleanup dispatcher is a shared elastic I/O view with its own parallelism
+limit, so blocked writes cannot exhaust its dispatch capacity. Custom cleanup
+dispatchers must preserve that independence. Cancellation stops queued output
+before cleanup gets scheduled; a native write already entered can finish.
+Cleanup failures are retained in `Closed.event.failure`, including local asynchronous
+shutdown. Synchronous local `close` also propagates them. Connector closure can
+interrupt startup's synchronous output; startup must tolerate that race and never
+publish `Running` afterward. Decoded images finishing after termination are discarded.
 
 ## Local buffer clear
 

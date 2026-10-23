@@ -78,7 +78,7 @@ class SwingTerminalSearchTest {
                             draft.shellIntegrationDecorationGutterWidth = 0
                             draft.cursorBlinkMillis = 0
                         }
-                    }, hostServices = SwingHostServices(), searchDispatcher = dispatcher)
+                    }, hostServices = inlineEdtServices(), searchDispatcher = dispatcher, mutationDispatcher = dispatcher)
                 try {
                     component.size = component.preferredGridSize(columns, 2)
                     component.bind(session)
@@ -220,16 +220,20 @@ class SwingTerminalSearchTest {
                         draft.cursorBlinkMillis = 0
                     }
                 val component =
-                    SwingTerminal(settingsProvider = { settings }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
+                    SwingTerminal(settingsProvider = {
+                        settings
+                    }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
                 try {
                     component.size = component.preferredGridSize(12, 1)
                     component.bind(first)
+                    searchDispatcher.scheduler.runCurrent()
                     component.search("alpha")
                     searchDispatcher.scheduler.runCurrent()
                     assertEquals(1, component.currentSearchState().resultCount)
 
                     if (unbindFirst) component.unbind()
                     component.bind(second)
+                    searchDispatcher.scheduler.runCurrent()
                     component.search("bravo")
                     searchDispatcher.scheduler.runCurrent()
                     assertEquals(1, component.currentSearchState().resultCount)
@@ -255,11 +259,12 @@ class SwingTerminalSearchTest {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
-            }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
+            }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
+            searchDispatcher.scheduler.runCurrent()
             component.search("needle")
             searchDispatcher.scheduler.runCurrent()
             component.clearSearch()
@@ -282,11 +287,12 @@ class SwingTerminalSearchTest {
                 SwingSettings.create { draft ->
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
-            }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
+            }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
+            searchDispatcher.scheduler.runCurrent()
             component.search("needle")
             searchDispatcher.scheduler.runCurrent()
 
@@ -298,6 +304,11 @@ class SwingTerminalSearchTest {
 
         session.close()
     }
+
+    private fun inlineEdtServices(): SwingHostServices =
+        SwingHostServices.create { draft ->
+            draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+        }
 
     private fun testSession(
         renderReader: TerminalRenderFrameReader,

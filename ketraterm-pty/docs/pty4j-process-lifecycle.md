@@ -42,9 +42,9 @@ remote `onClosed` callback; the session records its own local termination.
 Exceptions arriving after local close are teardown and do not become remote
 failures.
 
-Cleanup requests process destruction and closes both streams. A call outside
-the connector workers makes bounded joins of the reader and watcher. A worker
-does not join itself or its peer, which may be waiting for the current callback.
+Cleanup requests process destruction and closes both streams without waiting
+for an active byte callback. The reader retains its borrowed buffer until that
+callback returns, then stops delivery; the watcher exits after the reader.
 Close is idempotent, but native destruction and stream cleanup can block. Keep
 it off a UI thread.
 
@@ -67,6 +67,10 @@ library loading are owned by Pty4J; startup may fail when the local native
 environment or requested executable is unavailable. Initial dimensions are
 supplied during process creation and propagated again before session delivery
 starts.
+
+The pinned native backend has known pixel-size and graphics cursor constraints.
+See [backend limitations](pty4j-backend-limitations.md) for causes, reproduction
+evidence, and upstream references.
 
 Foreground-process lookup uses the Unix terminal's foreground process group
 when available. Windows selects the newest live descendant, which can be a

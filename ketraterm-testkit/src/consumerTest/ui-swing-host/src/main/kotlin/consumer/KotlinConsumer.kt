@@ -26,6 +26,8 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.awt.Color
+import java.util.concurrent.Callable
+import java.util.concurrent.FutureTask
 import javax.swing.SwingUtilities
 
 private class Connector : TerminalConnector {
@@ -88,16 +90,19 @@ fun main() =
         val buffer = TerminalBuffers.create(80, 3, 0)
         val connector = Connector()
         TerminalSession.create(buffer, buffer, connector).use { session ->
-            SwingUtilities.invokeAndWait {
-                val terminal = SwingTerminal()
-                val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
-                JavaConsumer.configureSearchHints(searchBar)
-                check(!searchBar.performAction(SwingTerminalSearchAction.CLOSE))
-                searchBar.open()
-                check(searchBar.performAction(SwingTerminalSearchAction.TOGGLE_REGEX))
-                check(searchBar.performAction(SwingTerminalSearchAction.CLOSE))
-                val target = JavaConsumer.NativeTarget()
-                try {
+            val (terminal, searchBar, target) =
+                onEdt {
+                    val terminal = SwingTerminal()
+                    val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
+                    JavaConsumer.configureSearchHints(searchBar)
+                    check(!searchBar.performAction(SwingTerminalSearchAction.CLOSE))
+                    searchBar.open()
+                    check(searchBar.performAction(SwingTerminalSearchAction.TOGGLE_REGEX))
+                    check(searchBar.performAction(SwingTerminalSearchAction.CLOSE))
+                    Triple(terminal, searchBar, JavaConsumer.NativeTarget())
+                }
+            try {
+                onEdt {
                     terminal.setShellSuggestionProvider(provider)
                     terminal.setShellSuggestionTarget(target)
                     check(terminal.hasShellSuggestionProvider)
@@ -112,7 +117,9 @@ fun main() =
                     )
                     searchBar.refreshColors()
                     check(searchBar.component.foreground == Color.WHITE)
-                    terminal.bind(session)
+                }
+                terminal.bindAndAwait(session)
+                onEdt {
                     SwingShellSuggestionInteraction(SwingShellSuggestionRequest("git st", 6)).use { interaction ->
                         target.requestSuggestions(interaction)
                         check(target.requested.request.commandText == "git st")
@@ -121,11 +128,15 @@ fun main() =
                     }
                     terminal.unbind()
                     check(terminal.hasShellSuggestionProvider && !connector.closed)
-                    terminal.bind(session)
+                }
+                terminal.bindAndAwait(session)
+                onEdt {
                     terminal.refreshShellSuggestions()
                     terminal.setShellSuggestionProvider(null)
                     check(!terminal.hasShellSuggestionProvider)
-                } finally {
+                }
+            } finally {
+                onEdt {
                     searchBar.close()
                     terminal.dispose()
                 }
@@ -133,3 +144,19 @@ fun main() =
         }
         check(connector.closed)
     }
+
+private suspend fun SwingTerminal.bindAndAwait(session: TerminalSession) {
+    val bound = CompletableDeferred<Unit>()
+    onEdt {
+        bind(session) { failure ->
+            if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
+        }
+    }
+    withTimeout(20_000) { bound.await() }
+}
+
+private fun <T> onEdt(action: () -> T): T {
+    val task = FutureTask(Callable(action))
+    SwingUtilities.invokeAndWait(task)
+    return task.get()
+}
