@@ -22,6 +22,8 @@ composes the public writer, cursor, mode, response, graphics, reader, and inspec
 through focused adapters. `MutationEngine` owns cell mutation;
 `CursorEngine` owns cursor mechanics; `TerminalResizer` handles primary retention
 and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.
+`BufferResponseChannel` queues terminal replies; `XtgettcapResponder` owns
+its immutable capability allowlist, batch validation, and reply-size preflight.
 
 `TerminalState` holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active `ScreenBuffer`. Each screen owns its cursor,

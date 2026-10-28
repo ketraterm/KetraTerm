@@ -88,7 +88,7 @@ Permissions and decoded-size limits are checked again before execution.
 | Query | Reply scope |
 | --- | --- |
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
-| XTGETTCAP | Terminal name (`TN`/`name`), color count (`Co`/`colors`), and true-color support (`RGB`/`Tc`). |
+| XTGETTCAP | Identity, colors, parameterized scrolling, paste delimiters, and underline capabilities from the [explicit allowlist](#xtgettcap). Each well-formed name receives its own success or failure frame. |
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
 | Kitty graphics (APC G) | Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed `ENOTSUP` errors. Queries require nonzero `i`. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
@@ -100,8 +100,57 @@ Permissions and decoded-size limits are checked again before execution.
 | Rectangle checksum | Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions. |
 
 Denying terminal responses suppresses success and failure replies alike.
-Unsupported queries with defined failure responses use those responses rather
-than echoing request text.
+Unsupported queries use their defined failure frames rather than replaying
+arbitrary request text.
+
+## XTGETTCAP
+
+Requests use `DCS +q hexName[;hexName...] ST`. Allowlisted names are case-sensitive
+ASCII. Each request token encodes bytes using two ASCII hex digits per byte;
+hex digits may use either case. The responder uses the following immutable allowlist:
+
+| Names | Type | Decoded value |
+| --- | --- | --- |
+| `TN`, `name` | String | `xterm-256color` |
+| `Co`, `colors` | Number | Decimal `256` |
+| `RGB`, `Tc` | Boolean | Present, without a value; preserves KetraTerm's existing truecolor contract. |
+| `indn` | String | `ESC [%p1%dS` |
+| `PS`, `PE` | String | `ESC [200~`, `ESC [201~`; paste delimiters used when mode 2004 is enabled. |
+| `Su` | Boolean | Styled and colored underlines. |
+| `Smulx` | String | `ESC [4:%p1%dm`; parameter 0–5 selects none, single, double, curly, dotted, or dashed. |
+| `Setulc` | String | `ESC [58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm`; parameter is packed 24-bit RGB. |
+
+Here `ESC` denotes the actual byte `1b`, and the following space is notation,
+not part of the value. Values contain terminfo parameter expressions literally;
+the application expands them. Numeric values are decimal ASCII before hex encoding.
+No local terminfo database is consulted.
+
+KetraTerm follows Kitty-style individual replies: each supported name produces
+`DCS 1+r hexName[=hexValue] ST`, and each unknown name produces
+`DCS 0+r hexName ST`. Boolean successes omit `=hexValue`. Order, duplicates,
+and the original hex spelling are preserved; an unknown name does not stop later
+names. Well-formed encodings of other bytes, including non-ASCII identifiers,
+also receive keyed failure replies. This differs from xterm's combined-response
+and stop-at-unknown behavior.
+Previously KetraTerm combined recognized entries and omitted unknown entries;
+clients consuming batched replies must accept the individual frames.
+
+An empty list/token, odd-length token, or character outside ASCII `0–9`, `a–f`,
+and `A–F` rejects the whole batch with `DCS 0+r ST`. Validation and encoded-size preflight
+finish before any replies from that batch are queued. A complete response larger
+than 64 KiB is rejected the same way, including through the direct core API.
+Earlier queued replies remain intact. The parser's 4,096-byte collection ceiling
+includes `+q`; overflow drains the string without dispatch or a partial reply.
+
+The existing terminal-response permission gates all frames, including failures.
+Window-manipulation and palette permissions do not gate capability discovery.
+Direct core callers enforce host permission themselves. Query handling neither
+executes advertised templates nor changes grid, cursor, modes, or attributes.
+
+Protocol references: [xterm](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html),
+[Kitty responder](https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py).
+The [ncurses fixtures](../../ketraterm-host/src/test/resources/xtgettcap/README.md)
+verify template expansion and resulting terminal behavior without native test dependencies.
 
 ## Kitty colors
 

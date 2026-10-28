@@ -50,6 +50,38 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `capability replies precede input and paste delimiters match actual encoding`(denied: Boolean) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    hostPolicy = HostPolicy(terminalResponsePolicy = if (denied) HostControlPolicy.DENY else HostControlPolicy.ALLOW),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    session.start()
+                    val bytes = "\u001B[?2004h\u001BP+q5053;5045;7878\u001B\\\u001B[6n".encodeToByteArray()
+                    session.onBytes(bytes, 0, bytes.size)
+                    session.encodePaste(TerminalPasteEvent("hello"))
+                    runCurrent()
+                    val replies =
+                        if (denied) {
+                            ""
+                        } else {
+                            "\u001BP1+r5053=1b5b3230307e\u001B\\" +
+                                "\u001BP1+r5045=1b5b3230317e\u001B\\" +
+                                "\u001BP0+r7878\u001B\\\u001B[1;1R"
+                        }
+                    assertEquals(replies + "\u001B[200~hello\u001B[201~", connector.writtenBytes.asciiText())
+                }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["current", "explicit"])
     fun `startup sizes core and connector consistently before first output`(geometry: String) =
         runTest {

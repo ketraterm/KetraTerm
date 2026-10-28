@@ -215,8 +215,11 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues the response for a DCS XTGETTCAP request.
      *
-     * Only allowlisted capability names from the shared terminal capability
-     * identity contract produce success responses.
+     * Each well-formed hex name receives its own success or failure frame, in
+     * request order. Only the core capability allowlist produces success.
+     * Malformed batches or batches whose complete response would exceed 64 KiB
+     * receive one empty failure frame without partial results.
+     * This direct core API does not enforce host response permission.
      *
      * @param rawPayload the raw payload containing semicolon-separated hex capability names.
      */
