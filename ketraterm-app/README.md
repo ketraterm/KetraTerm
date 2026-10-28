@@ -43,6 +43,9 @@ and terminal permissions. Settings are saved before publication to
 open panes. Initial process and buffer settings apply when a new terminal is
 created.
 
+The first window packs the configured grid. New tabs and split panes synchronize
+their installed viewport dimensions with the session before shell output starts.
+
 For manual edits, see the [configuration reference](docs/profile-config-toml.md)
 for file locations, recognized keys, defaults, and recovery behavior. Restart the
 application after editing the file directly. The IntelliJ plugin has its own

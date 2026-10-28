@@ -271,16 +271,7 @@ internal data class Window(
                     frame.isVisible = true
                     val pane = checkNotNull(tabManager.selectedPane)
                     pane.requestFocus()
-                    synchronizeInitialViewport(
-                        isCurrent = {
-                            frame.isDisplayable &&
-                                !pane.tab.session.isClosed &&
-                                pane.terminal.width > 0 &&
-                                pane.terminal.height > 0
-                        },
-                        resize = pane.terminal::resizeSessionToVisibleGrid,
-                        onComplete = complete,
-                    )
+                    complete(null)
                 },
                 onComplete = finish,
             )
@@ -291,6 +282,7 @@ internal data class Window(
 /**
  * Completes initial viewport installation despite ordinary geometry coalescing.
  * Calls and callbacks belong to the EDT; each attempt yields to queued window events.
+ * The pane must remain current through completion, including successful resizes.
  *
  * @param isCurrent whether the initial pane still has a live session and visible geometry.
  * @param resize submits current geometry and reports installation or cancellation on the EDT.
@@ -319,9 +311,14 @@ internal fun synchronizeInitialViewport(
                     finish(CancellationException("Initial terminal viewport is no longer available"))
                 } else {
                     resize { failure ->
-                        // A newer resize can supersede this request before admission. Capture its
-                        // current geometry on the next EDT turn; closure must never start a retry loop.
-                        if (failure is CancellationException && isCurrent()) attempt() else finish(failure)
+                        // Completion can arrive after disposal or a layout change. Revalidate
+                        // success too; only a still-current superseded request may retry.
+                        when {
+                            failure != null && failure !is CancellationException -> finish(failure)
+                            !isCurrent() -> finish(failure ?: CancellationException("Initial terminal viewport is no longer available"))
+                            failure != null -> attempt()
+                            else -> finish(null)
+                        }
                     }
                 }
             } catch (failure: Exception) {

@@ -24,6 +24,7 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceListener
@@ -55,6 +56,105 @@ import kotlin.test.assertTrue
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("native")
 class TabManagerStartupTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["first", "tab", "split"])
+    fun `installed panes use their laid out grid at first output`(
+        kind: String,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(
+            KetraTermConfig(
+                columns = 13,
+                rows = 10,
+                cursorBlinkMillis = 0,
+                smartSuggestionsEnabled = false,
+                showForegroundProcessName = false,
+            ),
+        )
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("startup", "Startup", listOf("unused"), workingDirectory = directory)
+        val firstOutput = CompletableFuture<Dimension>()
+        val opened = CompletableFuture<Boolean>()
+        val content = onEdt { JPanel(CardLayout()) }
+        // A packed peer supplies real content geometry; keep it hidden so the
+        // native window manager cannot choose the pane's validation order.
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    contentPane = content
+                    pack()
+                    setSize(800, 500)
+                    validate()
+                }
+            }
+        var manager: TabManager? = null
+        var baseView: SwingTerminal? = null
+        try {
+            manager =
+                onEdt {
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            var created = 0
+                            workspace(listener) { options ->
+                                val recordOutput = ++created == if (kind == "first") 1 else 2
+                                lateinit var session: TerminalSession
+                                session =
+                                    idleSession(options, onStart = {
+                                        if (recordOutput) {
+                                            session.readRenderFrame { firstOutput.complete(Dimension(it.columns, it.rows)) }
+                                        }
+                                    })
+                                session
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            if (kind != "first") {
+                val settled = CompletableFuture<Throwable?>()
+                onEdt {
+                    frame.validate()
+                    baseView = requireNotNull(manager.selectedPane).terminal
+                    synchronizeInitialViewport({ true }, requireNotNull(baseView)::resizeSessionToVisibleGrid, settled::complete)
+                }
+                assertEquals(null, settled.get(10, TimeUnit.SECONDS))
+                onEdt {
+                    if (kind ==
+                        "split"
+                    ) {
+                        manager.splitPane(requireNotNull(manager.selectedPane), isVertical = true)
+                    } else {
+                        assertTrue(manager.openTab(profile))
+                    }
+                }
+            }
+            val geometryAtFirstOutput = firstOutput.get(10, TimeUnit.SECONDS)
+            onEdt {
+                frame.validate()
+
+                fun terminalViews(container: Container): List<SwingTerminal> =
+                    container.components.flatMap {
+                        when (it) {
+                            is SwingTerminal -> listOf(it)
+                            is Container -> terminalViews(it)
+                            else -> emptyList()
+                        }
+                    }
+                val installed = terminalViews(content).single { it !== baseView }
+                assertEquals(installed.visibleGridSize(), geometryAtFirstOutput, "First output must observe the installed pane's grid")
+            }
+        } finally {
+            close(manager, frame)
+        }
+    }
+
     @Test
     fun `viewport submission failure releases startup and queued workspace shutdown`(
         @TempDir directory: Path,

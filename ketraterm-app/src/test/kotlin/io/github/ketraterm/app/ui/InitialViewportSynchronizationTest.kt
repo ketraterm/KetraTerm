@@ -24,12 +24,10 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.ComponentEvent
-import java.util.concurrent.CancellationException
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import javax.swing.SwingUtilities
 import kotlin.test.*
 
@@ -143,8 +141,9 @@ class InitialViewportSynchronizationTest {
         }
     }
 
-    @Test
-    fun `cancellation after the pane closes does not schedule a retry`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `completion after the pane closes cancels startup without a retry`(resizeSucceeded: Boolean) {
         val completed = CompletableFuture<Throwable?>()
         val submitted = CompletableFuture<(Throwable?) -> Unit>()
         var current = true
@@ -160,12 +159,13 @@ class InitialViewportSynchronizationTest {
             )
         }
         val complete = submitted.get(10, TimeUnit.SECONDS)
-        val cancellation = CancellationException("Pane closed")
+        val cancellation = if (resizeSucceeded) null else CancellationException("Pane closed")
         onEdt {
             current = false
             complete(cancellation)
         }
-        assertSame(cancellation, completed.get(10, TimeUnit.SECONDS))
+        val failure = assertIs<CancellationException>(completed.get(10, TimeUnit.SECONDS))
+        if (cancellation != null) assertSame(cancellation, failure)
         onEdt { assertEquals(1, attempts) }
     }
 

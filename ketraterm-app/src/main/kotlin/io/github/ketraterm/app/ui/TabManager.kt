@@ -234,8 +234,8 @@ internal class TabManager(
      *
      * @param profile shell profile for the new tab.
      * @param beforeStart EDT preparation after binding and policy installation,
-     *   before connector output starts. Report completion after initial geometry
-     *   reaches the session; a nonnull failure aborts startup.
+     *   before connector output starts. Report completion after host preparation;
+     *   the manager then installs the pane's laid out geometry. A nonnull failure aborts startup.
      * @param onComplete EDT callback after startup succeeds or fails.
      * @return whether startup was accepted; rejected requests do not invoke [onComplete].
      */
@@ -311,6 +311,46 @@ internal class TabManager(
                     val prepared = cli.prepare(profile).let { it.copy(startupCommand = it.startupCommand ?: startupCommand) }
                     publishStartingTab = { tab ->
                         val ready = CompletableFuture<Unit>()
+
+                        fun completeStartup(failure: Throwable?) {
+                            if (failure == null && !shutdownStarted.get() && startupIsCurrent()) {
+                                ready.complete(Unit)
+                            } else {
+                                ready.completeExceptionally(failure ?: CancellationException("Terminal startup was cancelled"))
+                            }
+                        }
+
+                        fun prepareViewport(
+                            pane: TerminalPane,
+                            failure: Throwable?,
+                        ) {
+                            try {
+                                if (failure != null || !frame.isDisplayable) {
+                                    // An unpacked host has only its configured launch geometry.
+                                    completeStartup(failure)
+                                } else {
+                                    // New cards and splits can still await Swing validation.
+                                    // Size this pane before any connector can produce output.
+                                    frame.validate()
+                                    val terminal = pane.terminal
+                                    synchronizeInitialViewport(
+                                        isCurrent = {
+                                            !shutdownStarted.get() &&
+                                                startupIsCurrent() &&
+                                                frame.isDisplayable &&
+                                                !tab.session.isClosed &&
+                                                terminal.width > 0 &&
+                                                terminal.height > 0
+                                        },
+                                        resize = terminal::resizeSessionToVisibleGrid,
+                                        onComplete = ::completeStartup,
+                                    )
+                                }
+                            } catch (failure: Throwable) {
+                                completeStartup(failure)
+                            }
+                        }
+
                         SwingUtilities.invokeLater {
                             try {
                                 check(!shutdownStarted.get() && isCurrent()) { "Terminal startup was cancelled" }
@@ -318,20 +358,12 @@ internal class TabManager(
                                 install(tab) { bindingFailure ->
                                     try {
                                         if (bindingFailure != null) throw bindingFailure
-                                        val terminal = checkNotNull(panes.firstOrNull { it.tab === tab }).terminal
-                                        terminal.setHostPolicy(settings.createHostPolicy()) { failure ->
+                                        val pane = checkNotNull(panes.firstOrNull { it.tab === tab })
+                                        pane.terminal.setHostPolicy(settings.createHostPolicy()) { failure ->
                                             try {
                                                 if (failure != null) throw failure
                                                 check(!shutdownStarted.get() && startupIsCurrent()) { "Terminal startup was cancelled" }
-                                                beforeStart { failure ->
-                                                    if (failure == null && !shutdownStarted.get() && startupIsCurrent()) {
-                                                        ready.complete(Unit)
-                                                    } else {
-                                                        ready.completeExceptionally(
-                                                            failure ?: CancellationException("Terminal startup was cancelled"),
-                                                        )
-                                                    }
-                                                }
+                                                beforeStart { failure -> prepareViewport(pane, failure) }
                                             } catch (failure: Throwable) {
                                                 ready.completeExceptionally(failure)
                                             }

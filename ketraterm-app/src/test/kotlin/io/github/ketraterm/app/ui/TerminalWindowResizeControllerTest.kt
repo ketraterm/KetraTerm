@@ -190,13 +190,14 @@ class TerminalWindowResizeControllerTest {
         }
     }
 
-    @Test
-    fun `cancelled window resize preserves a logical column switch`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `cancelled window resize preserves a logical column switch`(clearTarget: Boolean) {
         withWindow { window, _, session, controller, updates ->
             onEdt {
                 assertTrue(controller.request(session, 10, 132, preserveGrid = true))
                 session.resize(132, 10)
-                controller.clearTarget()
+                if (clearTarget) controller.clearTarget() else window.geometry = null
                 updates.removeFirst().invoke()
                 assertTrue(window.bounds.isEmpty())
                 session.readRenderFrame { frame ->
@@ -291,6 +292,16 @@ class TerminalWindowResizeControllerTest {
                 controller.setTarget(session, terminal)
             }
             bound.get(10, TimeUnit.SECONDS)
+            val viewportReady = CompletableFuture<Unit>()
+            onEdt {
+                // Binding completion covers its initial resize, but setSize also posts a
+                // component event that can queue another resize. Await the final geometry
+                // installation before a test changes the session's logical grid.
+                requireNotNull(ownedTerminal).resizeSessionToVisibleGrid { failure ->
+                    if (failure == null) viewportReady.complete(Unit) else viewportReady.completeExceptionally(failure)
+                }
+            }
+            viewportReady.get(10, TimeUnit.SECONDS)
             action(window, requireNotNull(ownedTerminal), session, requireNotNull(ownedController), updates)
         } finally {
             onEdt {
