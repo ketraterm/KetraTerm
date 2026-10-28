@@ -32,18 +32,18 @@ JMH core and its harness generator provide measurement infrastructure; Kotlin
 coroutines support asynchronous workloads. These are development dependencies,
 not part of the published terminal library.</p>
 <h2 id="source-sets-and-harness">Source sets and harness</h2>
-<p>Public-API benchmarks live in <a href="https://github.com/ketraterm/KetraTerm/tree/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark">src/jmh</a>.
+<p>Public-API benchmarks live in <a href="https://github.com/ketraterm/KetraTerm/tree/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark">src/jmh</a>.
 Benchmarks that need internal Swing helpers live in
-<a href="https://github.com/ketraterm/KetraTerm/tree/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-ui-swing/src/jmh/kotlin/io/github/ketraterm/benchmark">the Swing module&#39;s associated JMH compilation</a>.
+<a href="https://github.com/ketraterm/KetraTerm/tree/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-ui-swing/src/jmh/kotlin/io/github/ketraterm/benchmark">the Swing module&#39;s associated JMH compilation</a>.
 The central runner generates and packages both sets in one executable JAR without
 widening production visibility.</p>
 <p><code>swingBenchmarkClasses</code> consumes the Swing module&#39;s <code>benchmarkElements</code> variant
 without transitive dependencies. <code>jmhImplementation</code> extends this configuration,
 and <code>jmhRunBytecodeGenerator</code> consumes its classes to produce a shared benchmark
 list and JAR.</p>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-benchmarks/build.gradle.kts">build script</a> defines suite defaults; individual benchmark
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-benchmarks/build.gradle.kts">build script</a> defines suite defaults; individual benchmark
 annotations define workload parameters and direct-JAR defaults.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-benchmarks/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-benchmarks/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

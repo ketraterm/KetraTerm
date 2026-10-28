@@ -207,6 +207,12 @@ returns successfully. Synchronous startup output is parsed and replies are queue
 but the writer has not started. <code>Running</code> is then published before writer startup;
 reentrant observers can admit input behind already queued replies. Failure or
 closure during startup discards pending work and does not publish <code>Running</code>.</p>
+<p>The no-argument <code>start()</code> preserves the current grid and pixel metadata;
+<code>start(columns, rows)</code> explicitly applies the supplied cell dimensions. Both
+size the connector under mutation serialization before allowing startup output.
+An admitted viewport resize therefore cannot be overwritten by a stale size
+captured before startup acquired mutation admission. The mutation boundary is
+released before <code>connector.start</code>, allowing synchronous output and graphics decoding.</p>
 <p>Initial response denial, or denial while still <code>Created</code>, discards core replies
 queued before session ownership. Replies already admitted under an allowed
 runtime policy retain their ordinary output order.</p>
@@ -408,7 +414,7 @@ An eager I/O dispatcher is suitable for byte fixtures, but scheduling tests need
 one controlled scheduler or explicit entered/release/completed handshakes.
 Submission return and fake-process exit do not prove queued output was written.
 PTY reply tests must keep the child alive until expected output completes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

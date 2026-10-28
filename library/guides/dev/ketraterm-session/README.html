@@ -58,7 +58,7 @@ suspend fun runTerminal(
         }
     }
     try {
-        session.start(columns = 80, rows = 24)
+        session.start()
         session.requestRender(scrollbackOffset = 0)
         session.state.filterIsInstance&lt;TerminalSessionState.Closed&gt;().first().event
     } finally {
@@ -71,6 +71,9 @@ suspend fun runTerminal(
 from another producer. <code>start</code> is synchronous and permits one attempt; it may
 block in the connector. Input is accepted only after connector startup succeeds.
 Startup failure closes the session and rethrows the failure.</p>
+<p><code>start()</code> uses the current grid, preserving viewport dimensions and pixel geometry
+installed before startup. Use <code>start(columns, rows)</code> when startup should explicitly
+replace the cell dimensions.</p>
 <p>Successful construction transfers exclusive runtime access to the mutable
 terminal and connector. Configure the core before assembly; afterward, use
 session APIs for input, settings, and frame reads. A failed <code>create</code> leaves the
@@ -201,7 +204,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
