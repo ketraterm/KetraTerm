@@ -680,6 +680,20 @@ public class TerminalSession private constructor(
         }
 
     /**
+     * Starts the connector with the session's current cell dimensions, preserving
+     * text-area pixels and geometry accepted before startup. Geometry capture and
+     * connector sizing share mutation serialization with viewport resizes.
+     *
+     * Startup, output ordering, and cleanup follow [start] with explicit dimensions.
+     * Call off UI threads; startup can block and synchronously decode output.
+     *
+     * @throws IllegalStateException if startup was already attempted or closure has begun.
+     */
+    public fun start() {
+        startWithGeometry {}
+    }
+
+    /**
      * Starts the connector after resizing core and transport to [columns] x
      * [rows]. This synchronous call permits one attempt. Concurrent or reentrant
      * attempts throw [IllegalStateException], as does starting a closed session.
@@ -696,6 +710,8 @@ public class TerminalSession private constructor(
      *
      * @param columns initial terminal width; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows initial terminal height count.
+     * @throws IllegalArgumentException if either dimension is invalid.
+     * @throws IllegalStateException if startup was already attempted or closure has begun.
      */
     public fun start(
         columns: Int,
@@ -703,6 +719,10 @@ public class TerminalSession private constructor(
     ) {
         require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
+        startWithGeometry { terminal.resize(columns, rows) }
+    }
+
+    private fun startWithGeometry(updateGeometry: () -> Unit) {
         synchronized(connectorLifecycleLock) {
             check(!isSessionClosed() && !startAttempted) {
                 "session already started or closed"
@@ -713,17 +733,16 @@ public class TerminalSession private constructor(
                 if (isSessionClosed()) return
                 mutate {
                     if (isSessionClosed()) return
-                    terminal.resize(columns, rows)
+                    updateGeometry()
+                    // Reading dimensions outside mutation could let a concurrent resize
+                    // install newer geometry before startup reapplies a stale connector size.
+                    resizeConnector(terminal.width, terminal.height)
+                    if (!isSessionClosed()) completeResizeReporting()
                 }
-                if (isSessionClosed()) return
-                resizeConnector(columns, rows)
+                if (!isSessionClosed()) connector.start(this)
                 if (!isSessionClosed()) {
-                    mutate { if (!isSessionClosed()) completeResizeReporting() }
-                    if (!isSessionClosed()) connector.start(this)
-                    if (!isSessionClosed()) {
-                        drainResponses()
-                        mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)
-                    }
+                    drainResponses()
+                    mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)
                 }
             } catch (failure: Throwable) {
                 transitionToClosed(TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false))

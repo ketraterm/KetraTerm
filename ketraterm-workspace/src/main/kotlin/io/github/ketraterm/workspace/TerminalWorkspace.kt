@@ -263,7 +263,9 @@ class TerminalWorkspace internal constructor(
             selectTab(id)
             listener.tabOpened(tab)
             session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
-            session.start(options.columns, options.rows)
+            // tabOpened may have installed the actual viewport. The session owns
+            // the current geometry; the launch options are no longer authoritative.
+            session.start()
 
             val stateJob =
                 workspaceScope.launch {

@@ -72,12 +72,16 @@ settings, geometry, and window state run on an ordered worker so session admissi
 cannot stall the EDT. Paste policy keeps its immediate input-admission behavior.
 Use `bind(session, onComplete)` when startup depends on initial settings and
 geometry; its EDT callback receives `null` after application or the failure.
+Binding completion does not cover later component events. After initial layout,
+await `resizeSessionToVisibleGrid(onComplete)` before starting session output.
 
 Call `setHostPolicy(policy, onComplete)` on the view to preserve ordering with
 view settings. `resizeSessionToVisibleGrid(onComplete)` reconciles externally
 changed session dimensions with captured component bounds. Both report completion
-on the EDT; acceptance is not application. Superseded geometry or an obsolete
-binding reports cancellation. The bounded queue rejects overflow synchronously;
+on the EDT; acceptance is not application. Resize success confirms current cell
+and pixel geometry with no later geometry request pending. Superseded geometry
+or an obsolete binding reports cancellation, including a resize admitted before
+the view changed. The bounded queue rejects overflow synchronously;
 retrying `reloadSettings` with the same snapshot submits changes not yet accepted,
 including geometry, without resetting already accepted palette/cursor settings.
 Default completion handlers log operational failures. Session closure remains

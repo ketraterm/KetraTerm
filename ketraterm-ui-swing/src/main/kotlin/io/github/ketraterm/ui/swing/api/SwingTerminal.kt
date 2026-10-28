@@ -911,6 +911,9 @@ public class SwingTerminal
          * externally resized grid even when the component bounds did not change.
          * Geometry admission shares the ordered settings worker; newer geometry
          * may supersede this request. [onComplete] runs on the EDT after installation.
+         * Success confirms that its cell and pixel geometry is still current and
+         * no later geometry request is pending. An admitted resize still installs
+         * its viewport anchor before reporting that its completion became obsolete.
          *
          * @param onComplete receives `null` on completion or an operational failure;
          * superseded, unbound, closed, or disposed requests report [CancellationException].
@@ -1327,6 +1330,10 @@ public class SwingTerminal
             this.session = session
             acceptedSessionSettings = null
             chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
+            // Binding can remove the initial shell gutter reservation. Keep packing
+            // geometry consistent with the chrome used to calculate the visible grid.
+            preferredSize = preferredGridSize(settings.columns, settings.rows)
+            revalidate()
             retainedViewport = null
             resetRenderCaches()
             var remaining = 3
@@ -3182,6 +3189,22 @@ public class SwingTerminal
                                         resizePublicationGeneration = currentSession.renderGeneration.value
                                         requestRenderFromSession(currentSession)
                                     }
+                                }
+                            }
+                            if (force && completionFailure == null) {
+                                // Admission protects the resize itself, not readiness of a
+                                // host awaiting the latest viewport. Later geometry may be
+                                // queued, or changed bounds may not have emitted their event yet.
+                                val currentGrid = visibleGridSize()
+                                if (pendingGeometryRequests != 0 ||
+                                    width <= 0 ||
+                                    height <= 0 ||
+                                    currentGrid.width != columns ||
+                                    currentGrid.height != rows ||
+                                    gridPixelExtent(columns, metrics.cellWidth, 0) != pixelWidth ||
+                                    gridPixelExtent(rows, metrics.cellHeight, 0) != pixelHeight
+                                ) {
+                                    completionFailure = CancellationException("Viewport geometry changed before completion")
                                 }
                             }
                         } catch (next: Exception) {

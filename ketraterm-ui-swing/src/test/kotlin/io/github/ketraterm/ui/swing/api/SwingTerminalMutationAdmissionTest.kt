@@ -29,16 +29,91 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.ComponentEvent
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalMutationAdmissionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["queued", "bounds", "roundtrip"])
+    fun `admitted viewport resize cannot report current geometry after a later change`(change: String) {
+        val dispatcher = StandardTestDispatcher()
+        val ui = ConcurrentLinkedQueue<Runnable>()
+        val session = session(workerDispatcher = dispatcher)
+        val view =
+            edt {
+                SwingTerminal(
+                    { settings() },
+                    SwingHostServices.create { it.uiDispatcher = TerminalUiDispatcher { task -> ui.add(task) } },
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
+            }
+        val initialized = CompletableFuture<Throwable?>()
+        val first = CompletableFuture<Throwable?>()
+        val latest = CompletableFuture<Throwable?>()
+        try {
+            edt {
+                view.size = view.preferredGridSize(10, 2)
+                view.bind(session) { initialized.complete(it) }
+                dispatcher.scheduler.runCurrent()
+            }
+            assertNull(initialized.get(10, TimeUnit.SECONDS))
+            edt {
+                // Finish component-event geometry before staging the contested request.
+                view.resizeSessionToVisibleGrid()
+                dispatcher.scheduler.runCurrent()
+                view.size = view.preferredGridSize(12, 3)
+            }
+            edt {
+                // Its component event has captured geometry; this explicit request replaces it.
+                view.resizeSessionToVisibleGrid { first.complete(it) }
+            }
+            // Admit and apply on the worker, retaining its EDT installation in the explicit queue.
+            dispatcher.scheduler.runCurrent()
+            assertFalse(first.isDone)
+            assertFalse(ui.isEmpty())
+            edt {
+                view.size = view.preferredGridSize(14, 4)
+                if (change != "bounds") view.resizeSessionToVisibleGrid()
+                if (change == "roundtrip") {
+                    view.size = view.preferredGridSize(12, 3)
+                    view.resizeSessionToVisibleGrid()
+                }
+                // The bounds-only case changes geometry before its native component event runs.
+                while (true) (ui.poll() ?: break).run()
+                assertInstanceOf(CancellationException::class.java, first.getNow(null))
+                session.readRenderFrame {
+                    assertEquals(12, it.columns, "An admitted resize remains applied despite obsolete completion")
+                    assertEquals(3, it.rows)
+                }
+            }
+            edt {
+                view.resizeSessionToVisibleGrid { latest.complete(it) }
+                dispatcher.scheduler.runCurrent()
+            }
+            assertNull(latest.get(10, TimeUnit.SECONDS))
+            val columns = if (change == "roundtrip") 12 else 14
+            val rows = if (change == "roundtrip") 3 else 4
+            session.readRenderFrame {
+                assertEquals(columns, it.columns)
+                assertEquals(rows, it.rows)
+            }
+        } finally {
+            edt {
+                view.dispose()
+                while (true) (ui.poll() ?: break).run()
+                dispatcher.scheduler.runCurrent()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
     @Test
     fun `scrolling while resize awaits admission preserves the later viewport intent`() {
         val dispatcher = StandardTestDispatcher()

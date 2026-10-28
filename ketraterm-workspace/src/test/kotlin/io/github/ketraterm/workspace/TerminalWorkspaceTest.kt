@@ -37,6 +37,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.shell.integration.OscShellIntegration
+import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import kotlinx.coroutines.CoroutineDispatcher
@@ -51,6 +52,71 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
+    @Test
+    fun `first output observes the viewport accepted during tab publication`() = assertFirstOutputGeometry(resized = true)
+
+    @Test
+    fun `first output uses the initial geometry when publication does not resize`() = assertFirstOutputGeometry(resized = false)
+
+    private fun assertFirstOutputGeometry(resized: Boolean) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val recorded = MockConnector()
+            val columns = if (resized) 133 else 80
+            val rows = if (resized) 37 else 24
+            val pixelReport = if (resized) "\u001b[4;740;1330t" else ""
+            var publishedTab: TerminalWorkspaceTab? = null
+            var firstOutput = false
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: TerminalConnectorListener) {
+                        recorded.start(listener)
+                        val tab = assertNotNull(publishedTab)
+                        assertEquals(columns to rows, recorded.resizeCalls.last(), "Connector dimensions at first output")
+                        tab.session.readRenderFrame { frame ->
+                            assertEquals(columns, frame.columns, "Core columns at first output")
+                            assertEquals(rows, frame.rows, "Core rows at first output")
+                        }
+                        val bytes = "\u001b[18t\u001b[14tX".encodeToByteArray()
+                        listener.onBytes(bytes, 0, bytes.size)
+                        firstOutput = true
+                    }
+                }
+            val workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun tabOpened(tab: TerminalWorkspaceTab) {
+                                publishedTab = tab
+                                if (resized) {
+                                    // A provisional layout must not override the final viewport or its pixel metadata.
+                                    assertNotNull(tab.session.tryResizeViewport(110, 32, 0, 1100, 640))
+                                    assertNotNull(tab.session.tryResizeViewport(columns, rows, 0, 1330, 740))
+                                }
+                            }
+                        },
+                    sessionFactory = { _, options, _ ->
+                        TerminalSession.create(
+                            TerminalBuffers.create(options.columns, options.rows),
+                            connector,
+                            workerDispatcher = dispatcher,
+                            ioDispatcher = dispatcher,
+                            cleanupDispatcher = dispatcher,
+                        )
+                    },
+                    workerDispatcher = dispatcher,
+                )
+            workspace.use {
+                workspace.openTab(
+                    TerminalProfile("startup", "Startup", listOf("unused")),
+                    TerminalWorkspaceOpenOptions.create { it.showForegroundProcessName = false },
+                )
+                assertTrue(firstOutput)
+                runCurrent()
+                assertEquals("\u001b[8;$rows;${columns}t$pixelReport", recorded.writtenBytes.decodeToString())
+            }
+        }
+
     @Test
     fun `workspace geometry rejects widths below the terminal minimum at every construction boundary`() {
         val original = TerminalWorkspaceOpenOptions()

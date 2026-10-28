@@ -50,6 +50,19 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `binding preferred size matches the configured grid and actual shell gutter`(promptMarkersExpected: Boolean) =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER, OscShellIntegration.configured(promptMarkersExpected)).use { f ->
+                assertEquals(promptMarkersExpected, f.session.promptMarkersExpected)
+                assertEquals(f.component.preferredGridSize(f.settings.columns, f.settings.rows), f.component.preferredSize)
+                f.component.size = f.component.preferredSize
+                assertEquals(f.settings.columns, f.component.visibleGridSize().width)
+                assertEquals(f.settings.rows, f.component.visibleGridSize().height)
+            }
+        }
+
+    @ParameterizedTest
     @EnumSource(SwingPromptDecoration::class)
     fun `public cell hit tests reject prompt decorations and preserve logical cell identity`(mode: SwingPromptDecoration) =
         edt {

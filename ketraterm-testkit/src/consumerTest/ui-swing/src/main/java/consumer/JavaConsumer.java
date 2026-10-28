@@ -109,6 +109,7 @@ public final class JavaConsumer {
                 || session.submitInput(new TerminalPasteEvent("x")) != TerminalInputAdmission.NOT_RUNNING
                 || session.submitInput(java.util.List.of(new TerminalPasteEvent("x"))) != TerminalInputAdmission.NOT_RUNNING)
                 throw new AssertionError("Java admission overloads must reject before startup");
+            session.start();
             session.readRenderFrame(frame -> {
                 if (frame.getColumns() != 80 || frame.getRows() != 3) throw new AssertionError("Java render capability");
             });

@@ -54,7 +54,6 @@ private object KetraTermApp {
             io.github.ketraterm.app.ui
                 .WindowFactory(settings, profileRegistry)
         val window = windowFactory.createWindow()
-        val frame = window.frame
 
         // The initial profile carries the CLI shell command when args are given,
         // or defaults to the first available profile. Either way, stamp the
@@ -80,10 +79,6 @@ private object KetraTermApp {
                     workingDirectory = initialWorkingDirectory,
                 )
             }
-        window.tabManager.openTab(initialProfile)
-        frame.pack()
-        frame.setLocationRelativeTo(null)
-        frame.isVisible = true
-        window.tabManager.selectedPane?.requestFocus()
+        window.openInitialTab(initialProfile)
     }
 }
