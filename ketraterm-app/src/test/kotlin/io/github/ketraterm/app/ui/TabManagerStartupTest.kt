@@ -37,6 +37,8 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.CardLayout
+import java.awt.Component
+import java.awt.Container
 import java.awt.Dimension
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
@@ -246,9 +248,27 @@ class TabManagerStartupTest {
         val frame =
             onEdt {
                 object : JFrame() {
+                    private var packedSize: Dimension? = null
+
+                    override fun pack() {
+                        // Even hidden native Windows peers cap pack() to the desktop's tracking
+                        // bounds. Exercise pane installation and layout without creating a peer.
+                        contentPane.size = contentPane.preferredSize
+
+                        fun layoutTree(container: Container) {
+                            container.doLayout()
+                            container.components.filterIsInstance<Container>().forEach(::layoutTree)
+                        }
+                        layoutTree(contentPane)
+                        packedSize = preferredSize
+                    }
+
+                    override fun isDisplayable(): Boolean = packedSize != null
+
+                    override fun setLocationRelativeTo(component: Component?) = Unit
+
                     override fun setVisible(visible: Boolean) {
-                        // Capture the packed bounds without involving the native window manager.
-                        if (visible) shown.complete(size) else super.setVisible(false)
+                        if (visible) shown.complete(checkNotNull(packedSize)) else super.setVisible(false)
                     }
                 }.apply { minimumSize = Dimension(720, 420) }
             }
