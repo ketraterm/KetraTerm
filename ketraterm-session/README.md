@@ -40,7 +40,7 @@ suspend fun runTerminal(
         }
     }
     try {
-        session.start(columns = 80, rows = 24)
+        session.start()
         session.requestRender(scrollbackOffset = 0)
         session.state.filterIsInstance<TerminalSessionState.Closed>().first().event
     } finally {
@@ -54,6 +54,10 @@ The connector owns inbound delivery. Do not also feed bytes into the session
 from another producer. `start` is synchronous and permits one attempt; it may
 block in the connector. Input is accepted only after connector startup succeeds.
 Startup failure closes the session and rethrows the failure.
+
+`start()` uses the current grid, preserving viewport dimensions and pixel geometry
+installed before startup. Use `start(columns, rows)` when startup should explicitly
+replace the cell dimensions.
 
 Successful construction transfers exclusive runtime access to the mutable
 terminal and connector. Configure the core before assembly; afterward, use

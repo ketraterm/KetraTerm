@@ -23,7 +23,7 @@ fun main() {
     val connector = JavaConsumer.Connector()
     val buffer = TerminalBuffers.create(80, 3, 0)
     TerminalSession.create(buffer, buffer, connector, shellIntegration = JavaConsumer.factory()).use { session ->
-        session.start(80, 3)
+        session.start()
         val bytes = "\u001b]7;file:///tmp\u0007\u001b]133;A\u0007$ \u001b]133;B\u0007git status".encodeToByteArray()
         // Chunking crosses OSC terminators and printable ingress without relying on timers.
         for (index in bytes.indices) connector.listener.onBytes(bytes, index, 1)

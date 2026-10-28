@@ -155,6 +155,13 @@ but the writer has not started. `Running` is then published before writer startu
 reentrant observers can admit input behind already queued replies. Failure or
 closure during startup discards pending work and does not publish `Running`.
 
+The no-argument `start()` preserves the current grid and pixel metadata;
+`start(columns, rows)` explicitly applies the supplied cell dimensions. Both
+size the connector under mutation serialization before allowing startup output.
+An admitted viewport resize therefore cannot be overwritten by a stale size
+captured before startup acquired mutation admission. The mutation boundary is
+released before `connector.start`, allowing synchronous output and graphics decoding.
+
 Initial response denial, or denial while still `Created`, discards core replies
 queued before session ownership. Replies already admitted under an allowed
 runtime policy retain their ordinary output order.

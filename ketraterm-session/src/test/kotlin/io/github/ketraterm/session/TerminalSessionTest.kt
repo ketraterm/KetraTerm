@@ -50,6 +50,120 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["current", "explicit"])
+    fun `startup sizes core and connector consistently before first output`(geometry: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val recorded = MockConnector()
+            val columns = if (geometry == "current") 13 else 17
+            val rows = if (geometry == "current") 5 else 4
+            var firstOutput = false
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        assertEquals(columns to rows, recorded.resizeCalls.last())
+                        assertThrows(IllegalStateException::class.java) { session.start() }
+                        session.readRenderFrame { frame ->
+                            assertEquals(columns, frame.columns)
+                            assertEquals(rows, frame.rows)
+                        }
+                        val bytes = "\u001b[18t\u001b[14tX".encodeToByteArray()
+                        listener.onBytes(bytes, 0, bytes.size)
+                        firstOutput = true
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                )
+            session.use {
+                assertNotNull(session.tryResizeViewport(13, 5, 0, 130, 100))
+                if (geometry == "current") session.start() else session.start(columns, rows)
+                assertTrue(firstOutput)
+                runCurrent()
+                // Pixel queries have no reply when explicit cell resizing invalidates their metadata.
+                val pixelReport = if (geometry == "current") "\u001b[4;100;130t" else ""
+                assertEquals("\u001b[8;$rows;${columns}t$pixelReport", recorded.writtenBytes.asciiText())
+                assertThrows(IllegalStateException::class.java) { session.start() }
+                assertEquals(1, recorded.startCount)
+            }
+            assertThrows(IllegalStateException::class.java) { session.start() }
+        }
+
+    @Test
+    fun `current geometry startup waits for an admitted resize without restoring stale dimensions`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val recorded = MockConnector()
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            var holdResize = true
+            var firstOutput = false
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        recorded.resize(columns, rows)
+                        if (holdResize) {
+                            holdResize = false
+                            entered.countDown()
+                            check(release.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Resize was not released" }
+                        }
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        assertEquals(13 to 5, recorded.resizeCalls.last())
+                        session.readRenderFrame { frame ->
+                            assertEquals(13, frame.columns)
+                            assertEquals(5, frame.rows)
+                        }
+                        val bytes = "X".encodeToByteArray()
+                        listener.onBytes(bytes, 0, bytes.size)
+                        firstOutput = true
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                )
+            session.use {
+                SessionTestThread("pre-start-resize") { session.resizeViewport(13, 5) }.use { resizer ->
+                    try {
+                        assertTrue(entered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                        SessionTestThread("current-geometry-start") { session.start() }.use { starter ->
+                            try {
+                                starter.awaitBlockedBy(resizer)
+                                assertFalse(firstOutput)
+                            } finally {
+                                release.countDown()
+                            }
+                            resizer.awaitCompletion()
+                            starter.awaitCompletion()
+                        }
+                    } finally {
+                        release.countDown()
+                    }
+                }
+                assertTrue(firstOutput)
+                assertEquals(listOf(13 to 5, 13 to 5), recorded.resizeCalls)
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["start", "close"])
     fun `startup attempts serialize while close can interrupt connector startup`(operation: String) =
         runTest {

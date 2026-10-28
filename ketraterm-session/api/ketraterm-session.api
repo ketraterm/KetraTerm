@@ -137,6 +137,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
 	public final fun setTreatAmbiguousAsWide (Z)V
 	public final fun setWindowMinimized (Z)V
+	public final fun start ()V
 	public final fun start (II)V
 	public final fun submitBytes ([B)Lio/github/ketraterm/session/TerminalInputAdmission;
 	public final fun submitBytes ([BI)Lio/github/ketraterm/session/TerminalInputAdmission;

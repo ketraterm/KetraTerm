@@ -48,9 +48,10 @@ jobs. PTY process and stream mechanics remain in `ketraterm-pty`; terminal
 synchronization and input admission remain in `ketraterm-session`.
 
 Opening a tab registers and selects it, calls `tabOpened`, and then starts its
-session. Consequently, `tabSelected` may arrive before `tabOpened`. A listener
-or startup failure removes the prepared tab, closes its session, and propagates
-the failure with any cleanup failures suppressed.
+session with its current geometry. Viewport changes accepted during `tabOpened`
+are preserved through first output. Consequently, `tabSelected` may arrive before
+`tabOpened`. A listener or startup failure removes the prepared tab, closes its
+session, and propagates the failure with any cleanup failures suppressed.
 
 - `tabSnapshot()` copies the open-tab list; the tab objects remain live.
 - `selectTab(id)` rejects an unknown identity.
