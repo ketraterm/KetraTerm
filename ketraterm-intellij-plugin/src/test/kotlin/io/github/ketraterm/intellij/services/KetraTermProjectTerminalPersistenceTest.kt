@@ -397,6 +397,45 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
         }
     }
 
+    fun testPaneInstallationUsesProcessNamePreferenceChangedDuringSessionCreation() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        settings.loadState(settings.state.copy(showForegroundProcessName = true, smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+        val entered = CompletableFuture<Unit>()
+        val release = CompletableFuture<Unit>()
+        val started = CompletableFuture<Unit>()
+        val service =
+            KetraTermProjectTerminalService(
+                project,
+                workspaceFactory = { listener ->
+                    workspace(listener) { options ->
+                        entered.complete(Unit)
+                        release.get(10, TimeUnit.SECONDS)
+                        TerminalSession.create(
+                            TerminalBuffers.create(options.columns, options.rows),
+                            connector(onStart = { started.complete(Unit) }),
+                            hostPolicy = options.hostPolicy,
+                        )
+                    }
+                },
+                prepareStartup = {},
+            ).also { Disposer.register(lifetime, it) }
+        try {
+            val content = service.openProfileTab(toolWindow(contentManager()), TerminalProfile("startup", "Startup", listOf("unused")))
+            PlatformTestUtil.waitWithEventsDispatching("Session factory was not entered", { entered.isDone }, 10)
+            settings.replaceState(settings.state.copy(showForegroundProcessName = false))
+            val reloaded = CompletableFuture<Unit>()
+            ApplicationManager.getApplication().invokeLater { reloaded.complete(Unit) }
+            PlatformTestUtil.waitWithEventsDispatching("Settings reload did not finish", { reloaded.isDone }, 10)
+            release.complete(Unit)
+            PlatformTestUtil.waitWithEventsDispatching("Connector was not started", { started.isDone }, 10)
+            val pane = content.component.components.firstNotNullOf { service.paneForComponent(it) }
+            assertFalse("New panes must use the current preference", pane.tab.showForegroundProcessName)
+        } finally {
+            release.complete(Unit)
+            Disposer.dispose(service)
+        }
+    }
+
     fun testClosingStartupFailureAfterBindingRemovesThePendingTab() {
         val settings = KetraTermIntellijSettings.getInstance()
         settings.loadState(settings.state.copy(smartSuggestionsEnabled = false, cursorBlinkMillis = 0))

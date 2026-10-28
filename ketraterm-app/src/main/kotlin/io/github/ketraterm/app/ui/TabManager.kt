@@ -230,13 +230,25 @@ internal class TabManager(
     /**
      * Opens a new terminal tab backed by [profile].
      *
-     * Returns whether startup was accepted. [onComplete] runs on the EDT after pane publication
-     * or failure; an accepted request is not yet an open tab.
+     * An accepted request is not yet an open tab.
+     *
+     * @param profile shell profile for the new tab.
+     * @param beforeStart EDT preparation after binding and policy installation,
+     *   before connector output starts. Report completion after initial geometry
+     *   reaches the session; a nonnull failure aborts startup.
+     * @param onComplete EDT callback after startup succeeds or fails.
+     * @return whether startup was accepted; rejected requests do not invoke [onComplete].
      */
     fun openTab(
         profile: TerminalProfile,
+        beforeStart: ((Throwable?) -> Unit) -> Unit = { complete -> complete(null) },
         onComplete: (Boolean) -> Unit = {},
-    ): Boolean = startTab(profile, onComplete = onComplete) { workspaceTab, onBound -> installTab(workspaceTab, profile, onBound) }
+    ): Boolean =
+        startTab(
+            profile,
+            beforeStart = beforeStart,
+            onComplete = onComplete,
+        ) { workspaceTab, onBound -> installTab(workspaceTab, profile, onBound) }
 
     private fun installTab(
         workspaceTab: TerminalWorkspaceTab,
@@ -268,6 +280,7 @@ internal class TabManager(
     private fun startTab(
         profile: TerminalProfile,
         isCurrent: () -> Boolean = { true },
+        beforeStart: ((Throwable?) -> Unit) -> Unit = { complete -> complete(null) },
         onComplete: (Boolean) -> Unit = {},
         install: (TerminalWorkspaceTab, (Throwable?) -> Unit) -> Unit,
     ): Boolean {
@@ -287,6 +300,10 @@ internal class TabManager(
                 draft.modeReportCapabilities = modeReportCapabilities
             }
         var publishedTab: TerminalWorkspaceTab? = null
+        var installedPane: TerminalPane? = null
+
+        // A removed pane means intentional cancellation, whereas failed installation still needs an error.
+        fun startupIsCurrent(): Boolean = isCurrent() && (installedPane?.let { it in panes } ?: true)
         val accepted =
             workspace.openTabAsync(
                 profile = {
@@ -303,12 +320,27 @@ internal class TabManager(
                                         if (bindingFailure != null) throw bindingFailure
                                         val terminal = checkNotNull(panes.firstOrNull { it.tab === tab }).terminal
                                         terminal.setHostPolicy(settings.createHostPolicy()) { failure ->
-                                            if (failure == null) ready.complete(Unit) else ready.completeExceptionally(failure)
+                                            try {
+                                                if (failure != null) throw failure
+                                                check(!shutdownStarted.get() && startupIsCurrent()) { "Terminal startup was cancelled" }
+                                                beforeStart { failure ->
+                                                    if (failure == null && !shutdownStarted.get() && startupIsCurrent()) {
+                                                        ready.complete(Unit)
+                                                    } else {
+                                                        ready.completeExceptionally(
+                                                            failure ?: CancellationException("Terminal startup was cancelled"),
+                                                        )
+                                                    }
+                                                }
+                                            } catch (failure: Throwable) {
+                                                ready.completeExceptionally(failure)
+                                            }
                                         }
                                     } catch (failure: Throwable) {
                                         ready.completeExceptionally(failure)
                                     }
                                 }
+                                installedPane = checkNotNull(panes.firstOrNull { it.tab === tab })
                             } catch (failure: Throwable) {
                                 ready.completeExceptionally(failure)
                             }
@@ -326,7 +358,7 @@ internal class TabManager(
             ) { result ->
                 publishStartingTab = null
                 SwingUtilities.invokeLater {
-                    if (shutdownStarted.get() || !isCurrent()) {
+                    if (shutdownStarted.get() || !startupIsCurrent()) {
                         result.getOrNull()?.let(::retireUnpublishedTab)
                         onComplete(false)
                         return@invokeLater
@@ -577,6 +609,8 @@ internal class TabManager(
         onBound: (Throwable?) -> Unit,
     ): TerminalPane =
         try {
+            // Session creation may outlive a settings change before the pane exists to receive it.
+            workspaceTab.showForegroundProcessName = settings.config.showForegroundProcessName
             val registry = ensureCompletionRegistry()
             val completionProvider =
                 registry?.createProvider(

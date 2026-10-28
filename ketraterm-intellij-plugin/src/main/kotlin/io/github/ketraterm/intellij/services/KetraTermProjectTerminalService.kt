@@ -460,6 +460,8 @@ class KetraTermProjectTerminalService internal constructor(
         onBound: (Throwable?) -> Unit,
     ) {
         workspaceTab.customTitle = pendingTab.restoredState?.customTitle
+        // Pending sessions are not yet present when settings listeners reload installed panes.
+        workspaceTab.showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName
         val clipboardSession = checkNotNull(clipboardSessions[workspaceTab.id])
         val pane =
             KetraTermTerminalPane.create(

@@ -25,6 +25,7 @@ import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.nio.file.Path
+import java.util.concurrent.CancellationException
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 
@@ -232,8 +233,103 @@ internal class WindowFactory(
 
 /**
  * Standalone window and its terminal tab controller.
+ *
+ * @property frame top-level standalone window.
+ * @property tabManager owner of this window's tabs and workspace lifecycle.
  */
 internal data class Window(
     val frame: JFrame,
     val tabManager: TabManager,
-)
+) {
+    /**
+     * Opens the initial tab and shows its configured grid before shell output starts.
+     * Failed or cancelled startup releases the window and its workspace.
+     * Must be called on the EDT.
+     *
+     * @param profile shell profile for the initial terminal tab.
+     * @throws IllegalStateException if called outside the EDT.
+     */
+    fun openInitialTab(profile: TerminalProfile) {
+        check(SwingUtilities.isEventDispatchThread())
+        val finish: (Boolean) -> Unit = { success ->
+            if (!success) {
+                try {
+                    tabManager.closeAllTabsWithoutConfirmation()
+                } finally {
+                    frame.dispose()
+                }
+            }
+        }
+        val accepted =
+            tabManager.openTab(
+                profile,
+                beforeStart = { complete ->
+                    // Packing must see the installed pane, and output must see the
+                    // resulting viewport rather than an empty window's minimum size.
+                    frame.pack()
+                    frame.setLocationRelativeTo(null)
+                    frame.isVisible = true
+                    val pane = checkNotNull(tabManager.selectedPane)
+                    pane.requestFocus()
+                    synchronizeInitialViewport(
+                        isCurrent = {
+                            frame.isDisplayable &&
+                                !pane.tab.session.isClosed &&
+                                pane.terminal.width > 0 &&
+                                pane.terminal.height > 0
+                        },
+                        resize = pane.terminal::resizeSessionToVisibleGrid,
+                        onComplete = complete,
+                    )
+                },
+                onComplete = finish,
+            )
+        if (!accepted) finish(false)
+    }
+}
+
+/**
+ * Completes initial viewport installation despite ordinary geometry coalescing.
+ * Calls and callbacks belong to the EDT; each attempt yields to queued window events.
+ *
+ * @param isCurrent whether the initial pane still has a live session and visible geometry.
+ * @param resize submits current geometry and reports installation or cancellation on the EDT.
+ * @param onComplete receives success or failure once, including synchronous submission rejection.
+ * @throws IllegalStateException if called outside the EDT.
+ */
+internal fun synchronizeInitialViewport(
+    isCurrent: () -> Boolean,
+    resize: ((Throwable?) -> Unit) -> Unit,
+    onComplete: (Throwable?) -> Unit,
+) {
+    check(SwingUtilities.isEventDispatchThread())
+    var completed = false
+
+    fun finish(failure: Throwable?) {
+        if (completed) return
+        completed = true
+        onComplete(failure)
+    }
+
+    fun attempt() {
+        SwingUtilities.invokeLater {
+            if (completed) return@invokeLater
+            try {
+                if (!isCurrent()) {
+                    finish(CancellationException("Initial terminal viewport is no longer available"))
+                } else {
+                    resize { failure ->
+                        // A newer resize can supersede this request before admission. Capture its
+                        // current geometry on the next EDT turn; closure must never start a retry loop.
+                        if (failure is CancellationException && isCurrent()) attempt() else finish(failure)
+                    }
+                }
+            } catch (failure: Exception) {
+                if (completed) throw failure
+                // This runs after the caller's startup try/catch has returned. Never strand its gate.
+                finish(failure)
+            }
+        }
+    }
+    attempt()
+}
