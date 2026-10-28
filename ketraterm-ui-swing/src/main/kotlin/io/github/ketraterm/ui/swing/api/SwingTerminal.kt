@@ -1327,6 +1327,10 @@ public class SwingTerminal
             this.session = session
             acceptedSessionSettings = null
             chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
+            // Binding can remove the initial shell gutter reservation. Keep packing
+            // geometry consistent with the chrome used to calculate the visible grid.
+            preferredSize = preferredGridSize(settings.columns, settings.rows)
+            revalidate()
             retainedViewport = null
             resetRenderCaches()
             var remaining = 3
