@@ -24,6 +24,8 @@ through focused adapters. `MutationEngine` owns cell mutation;
 and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.
 `BufferResponseChannel` queues terminal replies; `XtgettcapResponder` owns
 its immutable capability allowlist, batch validation, and reply-size preflight.
+Keyboard queries use one mode snapshot and optional host Backspace metadata;
+fixed legacy sequences are shared with the input encoder through protocol vocabulary.
 
 `TerminalState` holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active `ScreenBuffer`. Each screen owns its cursor,

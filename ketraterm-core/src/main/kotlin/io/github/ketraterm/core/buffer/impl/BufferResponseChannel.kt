@@ -31,6 +31,10 @@ import io.github.ketraterm.render.api.TerminalColorBehavior
 internal class BufferResponseChannel(
     private val state: TerminalState,
 ) : TerminalResponseChannel {
+    // Host metadata is independent of DECBKM and survives RIS/DECSTR. Unknown
+    // defaults must not produce a fabricated Backspace capability for old wrappers.
+    private var terminfoBackspaceDefault: Boolean? = null
+
     override val pendingResponseBytes: Int
         get() = state.hostResponses.pendingByteCount
 
@@ -669,7 +673,11 @@ internal class BufferResponseChannel(
 
     /** Resolves the explicit capability allowlist without changing terminal state. */
     override fun queryTerminfo(rawPayload: String) {
-        XtgettcapResponder.respond(rawPayload, state.hostResponses)
+        XtgettcapResponder.respond(rawPayload, state.hostResponses, state.modes.getModeBitsSnapshot(), terminfoBackspaceDefault)
+    }
+
+    override fun setTerminfoBackspaceDefault(sendsBackspace: Boolean) {
+        terminfoBackspaceDefault = sendsBackspace
     }
 
     /** Writes each character of an ASCII string directly to the response queue. */

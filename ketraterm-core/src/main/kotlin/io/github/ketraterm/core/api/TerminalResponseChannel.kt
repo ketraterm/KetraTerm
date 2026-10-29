@@ -225,6 +225,22 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
      */
     public fun queryTerminfo(rawPayload: String)
 
+    /**
+     * Supplies host metadata used by XTGETTCAP Backspace discovery.
+     *
+     * This does not change input encoding or terminal modes. The standard response
+     * channel retains the default across terminal resets; explicit DECBKM takes
+     * precedence. Until a default is supplied, Backspace queries fail unless DECBKM
+     * makes the value known.
+     *
+     * Invoke under the same serialization as [queryTerminfo]. This optional hook
+     * is ignored by implementations without host-default support. Keeping metadata
+     * separate preserves the original query dispatch through Kotlin wrappers.
+     *
+     * @param sendsBackspace true for the host's BS default, false for DEL.
+     */
+    public fun setTerminfoBackspaceDefault(sendsBackspace: Boolean) {}
+
     public companion object {
         public const val DEVICE_ATTRIBUTES_PRIMARY: Int = 0
         public const val DEVICE_ATTRIBUTES_SECONDARY: Int = 1

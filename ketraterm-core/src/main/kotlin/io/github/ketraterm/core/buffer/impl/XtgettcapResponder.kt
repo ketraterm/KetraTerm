@@ -15,8 +15,12 @@
  */
 package io.github.ketraterm.core.buffer.impl
 
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.model.HostResponseQueue
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.protocol.keyboard.LegacyKeySequence
+import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 
 /** Owns the XTGETTCAP allowlist and bounded, per-capability reply encoding. */
 internal object XtgettcapResponder {
@@ -27,11 +31,16 @@ internal object XtgettcapResponder {
 
     private enum class Kind { BOOLEAN, NUMBER, STRING }
 
+    private enum class KeyMode { NONE, CURSOR, BACKSPACE, BACK_TAB }
+
     private class Capability(
         val names: Array<String>,
         val kind: Kind,
         val value: String = "",
         val available: Boolean = true,
+        val keyResource: Int = -1,
+        val keyMode: KeyMode = KeyMode.NONE,
+        val alternateValue: String = value,
     )
 
     // Values are decoded ASCII bytes, including real ESC bytes. Parameter expressions
@@ -45,6 +54,85 @@ internal object XtgettcapResponder {
             Capability(arrayOf("PS"), Kind.STRING, "\u001B[200~"),
             Capability(arrayOf("PE"), Kind.STRING, "\u001B[201~"),
             Capability(arrayOf("Su"), Kind.BOOLEAN),
+            Capability(
+                arrayOf("kcuu1", "ku"),
+                Kind.STRING,
+                LegacyKeySequence.CURSOR_UP_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.CURSOR_UP_APPLICATION,
+            ),
+            Capability(
+                arrayOf("kcud1", "kd"),
+                Kind.STRING,
+                LegacyKeySequence.CURSOR_DOWN_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.CURSOR_DOWN_APPLICATION,
+            ),
+            Capability(
+                arrayOf("kcuf1", "kr"),
+                Kind.STRING,
+                LegacyKeySequence.CURSOR_RIGHT_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.CURSOR_RIGHT_APPLICATION,
+            ),
+            Capability(
+                arrayOf("kcub1", "kl"),
+                Kind.STRING,
+                LegacyKeySequence.CURSOR_LEFT_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.CURSOR_LEFT_APPLICATION,
+            ),
+            Capability(
+                arrayOf("khome", "kh"),
+                Kind.STRING,
+                LegacyKeySequence.HOME_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.HOME_APPLICATION,
+            ),
+            Capability(
+                arrayOf("kend", "@7"),
+                Kind.STRING,
+                LegacyKeySequence.END_NORMAL,
+                keyResource = XtermKeyResource.CURSOR_KEYS,
+                keyMode = KeyMode.CURSOR,
+                alternateValue = LegacyKeySequence.END_APPLICATION,
+            ),
+            Capability(arrayOf("kich1", "kI"), Kind.STRING, LegacyKeySequence.INSERT, keyResource = XtermKeyResource.CURSOR_KEYS),
+            Capability(arrayOf("kdch1", "kD"), Kind.STRING, LegacyKeySequence.DELETE, keyResource = XtermKeyResource.CURSOR_KEYS),
+            Capability(arrayOf("kpp", "kP"), Kind.STRING, LegacyKeySequence.PAGE_UP, keyResource = XtermKeyResource.CURSOR_KEYS),
+            Capability(arrayOf("knp", "kN"), Kind.STRING, LegacyKeySequence.PAGE_DOWN, keyResource = XtermKeyResource.CURSOR_KEYS),
+            Capability(arrayOf("kf1", "k1"), Kind.STRING, LegacyKeySequence.F1, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf2", "k2"), Kind.STRING, LegacyKeySequence.F2, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf3", "k3"), Kind.STRING, LegacyKeySequence.F3, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf4", "k4"), Kind.STRING, LegacyKeySequence.F4, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf5", "k5"), Kind.STRING, LegacyKeySequence.F5, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf6", "k6"), Kind.STRING, LegacyKeySequence.F6, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf7", "k7"), Kind.STRING, LegacyKeySequence.F7, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf8", "k8"), Kind.STRING, LegacyKeySequence.F8, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf9", "k9"), Kind.STRING, LegacyKeySequence.F9, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf10", "k;"), Kind.STRING, LegacyKeySequence.F10, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf11", "F1"), Kind.STRING, LegacyKeySequence.F11, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(arrayOf("kf12", "F2"), Kind.STRING, LegacyKeySequence.F12, keyResource = XtermKeyResource.FUNCTION_KEYS),
+            Capability(
+                arrayOf("kbs", "kb"),
+                Kind.STRING,
+                "\u007f",
+                keyResource = XtermKeyResource.SPECIAL_KEYS,
+                keyMode = KeyMode.BACKSPACE,
+                alternateValue = "\b",
+            ),
+            Capability(
+                arrayOf("kcbt", "kB"),
+                Kind.STRING,
+                LegacyKeySequence.BACK_TAB,
+                keyResource = XtermKeyResource.SPECIAL_KEYS,
+                keyMode = KeyMode.BACK_TAB,
+            ),
             Capability(arrayOf("Smulx"), Kind.STRING, "\u001B[4:%p1%dm"),
             Capability(
                 arrayOf("Setulc"),
@@ -61,20 +149,22 @@ internal object XtgettcapResponder {
     fun respond(
         raw: String,
         queue: HostResponseQueue,
+        modeBits: Long,
+        defaultBackarrowSendsBackspace: Boolean?,
     ) {
-        if (!validate(raw)) {
+        if (!validate(raw, modeBits, defaultBackarrowSendsBackspace)) {
             append(queue, "\u001BP0+r\u001B\\")
             return
         }
         var start = 0
         while (start < raw.length) {
             val end = tokenEnd(raw, start)
-            val capability = lookup(raw, start, end)
+            val capability = lookup(raw, start, end, modeBits, defaultBackarrowSendsBackspace)
             append(queue, if (capability == null) "\u001BP0+r" else "\u001BP1+r")
             for (index in start until end) queue.enqueueByte(raw[index].code)
             if (capability != null && capability.kind != Kind.BOOLEAN) {
                 queue.enqueueByte('='.code)
-                for (char in capability.value) {
+                for (char in value(capability, modeBits, defaultBackarrowSendsBackspace == true)) {
                     queue.enqueueByte(HEX[char.code ushr 4].code)
                     queue.enqueueByte(HEX[char.code and 15].code)
                 }
@@ -84,7 +174,11 @@ internal object XtgettcapResponder {
         }
     }
 
-    private fun validate(raw: String): Boolean {
+    private fun validate(
+        raw: String,
+        modeBits: Long,
+        defaultBackarrowSendsBackspace: Boolean?,
+    ): Boolean {
         // Even unknown-name replies echo the validated hex key, so a longer input
         // cannot fit the reply budget. Check before scanning caller-owned strings.
         if (raw.isEmpty() || raw.length > MAX_RESPONSE_BYTES) return false
@@ -95,8 +189,15 @@ internal object XtgettcapResponder {
             val length = end - start
             if (length == 0 || length % 2 != 0) return false
             for (index in start until end) if (hexDigit(raw[index]) < 0) return false
-            val capability = lookup(raw, start, end)
-            val valueBytes = if (capability == null || capability.kind == Kind.BOOLEAN) 0 else 1 + 2 * capability.value.length
+            val capability = lookup(raw, start, end, modeBits, defaultBackarrowSendsBackspace)
+            val valueBytes =
+                if (capability == null ||
+                    capability.kind == Kind.BOOLEAN
+                ) {
+                    0
+                } else {
+                    1 + 2 * value(capability, modeBits, defaultBackarrowSendsBackspace == true).length
+                }
             val frameBytes = FRAME_BYTES + length + valueBytes
             if (frameBytes > MAX_RESPONSE_BYTES - responseBytes) return false
             responseBytes += frameBytes
@@ -114,9 +215,10 @@ internal object XtgettcapResponder {
         raw: String,
         start: Int,
         end: Int,
+        modeBits: Long,
+        defaultBackarrowSendsBackspace: Boolean?,
     ): Capability? {
         for (capability in capabilities) {
-            if (!capability.available) continue
             for (name in capability.names) {
                 if (end - start != name.length * 2) continue
                 var index = 0
@@ -126,11 +228,56 @@ internal object XtgettcapResponder {
                     if (decoded != name[index].code) break
                     index++
                 }
-                if (index == name.length) return capability
+                if (index == name.length) return if (isAvailable(capability, modeBits, defaultBackarrowSendsBackspace)) capability else null
             }
         }
         return null
     }
+
+    private fun isAvailable(
+        capability: Capability,
+        modeBits: Long,
+        defaultBackarrowSendsBackspace: Boolean?,
+    ): Boolean {
+        if (!capability.available) return false
+        if (capability.keyResource < 0) return true
+        // These entries describe legacy key presses. Do not promise those bytes
+        // while another protocol has taken over the corresponding encoder path.
+        if (TerminalInputState.kittyKeyboardFlags(modeBits) != 0 ||
+            TerminalInputState.keyModifierOption(modeBits, capability.keyResource) >= 4
+        ) {
+            return false
+        }
+        val otherKeys = TerminalInputState.modifyOtherKeysMode(modeBits)
+        return when (capability.keyMode) {
+            KeyMode.BACKSPACE ->
+                otherKeys != ModifyOtherKeysMode.MODE_3 &&
+                    (defaultBackarrowSendsBackspace != null || TerminalInputState.isBackarrowKeyModeExplicit(modeBits))
+            KeyMode.BACK_TAB -> otherKeys < ModifyOtherKeysMode.MODE_2
+            else -> true
+        }
+    }
+
+    private fun value(
+        capability: Capability,
+        modeBits: Long,
+        defaultBackarrowSendsBackspace: Boolean,
+    ): String =
+        when (capability.keyMode) {
+            KeyMode.CURSOR ->
+                if (TerminalInputState.isApplicationCursorKeys(modeBits)) capability.alternateValue else capability.value
+            KeyMode.BACKSPACE ->
+                if (TerminalInputState.backarrowSendsBackspace(
+                        modeBits,
+                        defaultBackarrowSendsBackspace,
+                    )
+                ) {
+                    capability.alternateValue
+                } else {
+                    capability.value
+                }
+            else -> capability.value
+        }
 
     private fun hexDigit(char: Char): Int =
         when (char) {

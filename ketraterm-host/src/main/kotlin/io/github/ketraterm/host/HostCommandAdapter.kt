@@ -1138,6 +1138,8 @@ public class HostCommandAdapter
 
         override fun queryTerminfo(rawPayload: String) {
             if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            // Preserve queryTerminfo(String) interception in existing Kotlin delegates.
+            terminal.setTerminfoBackspaceDefault(defaultBackarrowSendsBackspace)
             terminal.queryTerminfo(rawPayload)
         }
 

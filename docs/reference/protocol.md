@@ -88,7 +88,7 @@ Permissions and decoded-size limits are checked again before execution.
 | Query | Reply scope |
 | --- | --- |
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
-| XTGETTCAP | Identity, colors, parameterized scrolling, paste delimiters, and underline capabilities from the [explicit allowlist](#xtgettcap). Each well-formed name receives its own success or failure frame. |
+| XTGETTCAP | Identity, colors, parameterized scrolling, paste delimiters, underline capabilities and legacy keyboard names from the [explicit allowlist](#xtgettcap). Each well-formed name receives its own success or failure frame. |
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
 | Kitty graphics (APC G) | Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed `ENOTSUP` errors. Queries require nonzero `i`. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
@@ -125,6 +125,41 @@ not part of the value. Values contain terminfo parameter expressions literally;
 the application expands them. Numeric values are decimal ASCII before hex encoding.
 No local terminfo database is consulted.
 
+Keyboard entries are strings describing legacy key presses in the current mode:
+
+| Terminfo / termcap names | Decoded value |
+| --- | --- |
+| `kcuu1` / `ku`, `kcud1` / `kd`, `kcuf1` / `kr`, `kcub1` / `kl` | Normal cursor mode: `ESC [A/B/C/D`; application cursor mode: `ESC OA/OB/OC/OD`, respectively. |
+| `khome` / `kh`, `kend` / `@7` | Normal: `ESC [H/F`; application: `ESC OH/OF`. |
+| `kich1` / `kI`, `kdch1` / `kD`, `kpp` / `kP`, `knp` / `kN` | `ESC [2~/3~/5~/6~`, respectively. |
+| `kf1`–`kf9` / `k1`–`k9`; `kf10` / `k;`; `kf11` / `F1`; `kf12` / `F2` | F1–F4: `ESC OP/OQ/OR/OS`. F5–F12: `ESC [15~/17~/18~/19~/20~/21~/23~/24~`. |
+| `kbs` / `kb` | BS (`08`) or DEL (`7f`), according to DECBKM or the current host Backspace policy. |
+| `kcbt` / `kB` | Shift-Tab: `ESC [Z`. |
+
+Slash-separated sequences above denote alternatives, not literal slash bytes.
+One coherent mode snapshot is used for the whole request. Queries do not enable
+application modes or change input policy. Applications must query again if they
+need an answer for a different mode.
+
+These entries describe the legacy press vocabulary only. While any Kitty keyboard
+flags are active, keyboard names receive failure replies. Xterm resource level 4
+declines only that resource's keys (cursor/editing, function, or special keys).
+`modifyOtherKeys` level 2 additionally declines Shift-Tab; level 3 declines both
+Shift-Tab and Backspace. Other entries still reply normally, including output
+capabilities. Resetting the relevant mode restores discovery.
+
+The host adapter supplies its current Backspace default through the optional
+`setTerminfoBackspaceDefault` hook, then invokes the original
+`TerminalResponseChannel.queryTerminfo(String)` method. Existing Kotlin wrappers
+still intercept that method. The standard core retains supplied metadata across
+RIS/DECSTR; explicit DECBKM takes precedence. Direct core callers supply the
+default before querying Backspace.
+
+Without supplied metadata, `kb`/`kbs` fail unless DECBKM makes the answer known.
+This also applies to retained JVM wrappers that cannot forward the new hook.
+Other capability replies remain available. The hook has a default no-op for
+existing implementations and does not change input encoding or terminal modes.
+
 KetraTerm follows Kitty-style individual replies: each supported name produces
 `DCS 1+r hexName[=hexValue] ST`, and each unknown name produces
 `DCS 0+r hexName ST`. Boolean successes omit `=hexValue`. Order, duplicates,
@@ -151,6 +186,8 @@ Protocol references: [xterm](https://invisible-island.net/xterm/ctlseqs/ctlseqs.
 [Kitty responder](https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py).
 The [ncurses fixtures](../../ketraterm-host/src/test/resources/xtgettcap/README.md)
 verify template expansion and resulting terminal behavior without native test dependencies.
+The [keyboard fixtures](../../ketraterm-session/src/test/resources/xtgettcap/README.md)
+pin Vim's query list and verify advertised values against actual input encoder output.
 
 ## Kitty colors
 
