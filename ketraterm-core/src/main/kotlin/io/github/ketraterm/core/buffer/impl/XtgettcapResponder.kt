@@ -41,6 +41,7 @@ internal object XtgettcapResponder {
         val keyResource: Int = -1,
         val keyMode: KeyMode = KeyMode.NONE,
         val alternateValue: String = value,
+        val shiftedValues: Array<String>? = null,
     )
 
     // Values are decoded ASCII bytes, including real ESC bytes. Parameter expressions
@@ -106,6 +107,10 @@ internal object XtgettcapResponder {
             Capability(arrayOf("kdch1", "kD"), Kind.STRING, LegacyKeySequence.DELETE, keyResource = XtermKeyResource.CURSOR_KEYS),
             Capability(arrayOf("kpp", "kP"), Kind.STRING, LegacyKeySequence.PAGE_UP, keyResource = XtermKeyResource.CURSOR_KEYS),
             Capability(arrayOf("knp", "kN"), Kind.STRING, LegacyKeySequence.PAGE_DOWN, keyResource = XtermKeyResource.CURSOR_KEYS),
+            shiftedCursor(arrayOf("kHOM", "#2"), LegacyKeySequence.HOME_NORMAL, LegacyKeySequence.HOME_APPLICATION),
+            shiftedCursor(arrayOf("kLFT", "#4"), LegacyKeySequence.CURSOR_LEFT_NORMAL, LegacyKeySequence.CURSOR_LEFT_APPLICATION),
+            shiftedCursor(arrayOf("kRIT", "%i"), LegacyKeySequence.CURSOR_RIGHT_NORMAL, LegacyKeySequence.CURSOR_RIGHT_APPLICATION),
+            shiftedCursor(arrayOf("kEND", "*7"), LegacyKeySequence.END_NORMAL, LegacyKeySequence.END_APPLICATION),
             Capability(arrayOf("kf1", "k1"), Kind.STRING, LegacyKeySequence.F1, keyResource = XtermKeyResource.FUNCTION_KEYS),
             Capability(arrayOf("kf2", "k2"), Kind.STRING, LegacyKeySequence.F2, keyResource = XtermKeyResource.FUNCTION_KEYS),
             Capability(arrayOf("kf3", "k3"), Kind.STRING, LegacyKeySequence.F3, keyResource = XtermKeyResource.FUNCTION_KEYS),
@@ -140,6 +145,27 @@ internal object XtgettcapResponder {
                 "\u001B[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm",
             ),
         )
+
+    private fun shiftedCursor(
+        names: Array<String>,
+        normal: String,
+        application: String,
+    ): Capability {
+        // Build only the four distinct Shift variants at initialization. Disabled
+        // modifiers reuse the existing unmodified values; replies allocate no strings.
+        // Slots 0/1 are level 0's normal/application forms (level 1 shares slot 0);
+        // slots 2/3 correspond directly to those cursor modifier levels.
+        val final = normal.last()
+        return Capability(
+            names,
+            Kind.STRING,
+            normal,
+            keyResource = XtermKeyResource.CURSOR_KEYS,
+            keyMode = KeyMode.CURSOR,
+            alternateValue = application,
+            shiftedValues = arrayOf("\u001b[2" + final, "\u001bO2" + final, "\u001b[1;2" + final, "\u001b[>1;2" + final),
+        )
+    }
 
     /**
      * Appends one frame per well-formed name, preserving order, duplicates and hex spelling.
@@ -264,8 +290,7 @@ internal object XtgettcapResponder {
         defaultBackarrowSendsBackspace: Boolean,
     ): String =
         when (capability.keyMode) {
-            KeyMode.CURSOR ->
-                if (TerminalInputState.isApplicationCursorKeys(modeBits)) capability.alternateValue else capability.value
+            KeyMode.CURSOR -> cursorValue(capability, modeBits)
             KeyMode.BACKSPACE ->
                 if (TerminalInputState.backarrowSendsBackspace(
                         modeBits,
@@ -278,6 +303,26 @@ internal object XtgettcapResponder {
                 }
             else -> capability.value
         }
+
+    private fun cursorValue(
+        capability: Capability,
+        modeBits: Long,
+    ): String {
+        val application = TerminalInputState.isApplicationCursorKeys(modeBits)
+        val level = TerminalInputState.keyModifierOption(modeBits, XtermKeyResource.CURSOR_KEYS)
+        val shifted = capability.shiftedValues
+        if (shifted != null && level >= 0) {
+            // isAvailable rejects extended level 4 before selecting a legacy value.
+            val variant =
+                when {
+                    level >= 2 -> level
+                    level == 0 && application -> 1
+                    else -> 0
+                }
+            return shifted[variant]
+        }
+        return if (application) capability.alternateValue else capability.value
+    }
 
     private fun hexDigit(char: Char): Int =
         when (char) {

@@ -135,11 +135,27 @@ Keyboard entries are strings describing legacy key presses in the current mode:
 | `kf1`–`kf9` / `k1`–`k9`; `kf10` / `k;`; `kf11` / `F1`; `kf12` / `F2` | F1–F4: `ESC OP/OQ/OR/OS`. F5–F12: `ESC [15~/17~/18~/19~/20~/21~/23~/24~`. |
 | `kbs` / `kb` | BS (`08`) or DEL (`7f`), according to DECBKM or the current host Backspace policy. |
 | `kcbt` / `kB` | Shift-Tab: `ESC [Z`. |
+| `kHOM` / `#2`, `kLFT` / `#4`, `kRIT` / `%i`, `kEND` / `*7` | Shift+Home/Left/Right/End. Default cursor modifier level 2: `ESC [1;2H/D/C/F`. |
 
 Slash-separated sequences above denote alternatives, not literal slash bytes.
 One coherent mode snapshot is used for the whole request. Queries do not enable
 application modes or change input policy. Applications must query again if they
 need an answer for a different mode.
+
+The four Shift cursor entries follow xterm's cursor modifier resource (1).
+Here `final` is `H`, `D`, `C` or `F`, respectively; `CSI` is `ESC [`
+and `SS3` is `ESC O`. Spaces below are notation, not transmitted bytes:
+
+| Cursor modifier level | Normal cursor mode | Application cursor mode |
+| --- | --- | --- |
+| Disabled (`-1`) | `CSI final` | `SS3 final` |
+| `0` | `CSI 2 final` | `SS3 2 final` |
+| `1` | `CSI 2 final` | `CSI 2 final` |
+| `2` | `CSI 1;2 final` | `CSI 1;2 final` |
+| `3` | `CSI >1;2 final` | `CSI >1;2 final` |
+
+Disabling cursor modifiers drops Shift, matching actual key encoding.
+Function, special and ordinary-key resource settings do not change these entries.
 
 These entries describe the legacy press vocabulary only. While any Kitty keyboard
 flags are active, keyboard names receive failure replies. Xterm resource level 4

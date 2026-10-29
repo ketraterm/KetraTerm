@@ -18,6 +18,7 @@ package io.github.ketraterm.core.buffer
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -27,6 +28,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TerminalTerminfoQueryTest {
+    @Test
+    fun `Shift aliases capture current modes and preserve original hex spelling`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.queryTerminfo("2332;6b484F4d")
+        buffer.setApplicationCursorKeys(true)
+        buffer.setKeyModifierOption(XtermKeyResource.CURSOR_KEYS, 0)
+        buffer.queryTerminfo("2332;6b484F4d")
+        buffer.setKeyModifierOption(XtermKeyResource.CURSOR_KEYS, -1)
+        buffer.queryTerminfo("2332;6b484F4d")
+        assertEquals(
+            reply(true, "2332", "1b5b313b3248") + reply(true, "6b484F4d", "1b5b313b3248") +
+                reply(true, "2332", "1b4f3248") + reply(true, "6b484F4d", "1b4f3248") +
+                reply(true, "2332", "1b4f48") + reply(true, "6b484F4d", "1b4f48"),
+            drain(buffer),
+        )
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `terminal reset clears DECBKM without inventing or discarding host metadata`(soft: Boolean) {
@@ -142,6 +160,12 @@ class TerminalTerminfoQueryTest {
             "Ms",
             "query-os-name",
             "KU",
+            "khom",
+            "kLft",
+            "kRit",
+            "kEnd",
+            "#3",
+            "*4",
             "kf13",
             "k0",
             "BE",

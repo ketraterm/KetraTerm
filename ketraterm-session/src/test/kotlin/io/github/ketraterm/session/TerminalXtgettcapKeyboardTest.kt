@@ -78,6 +78,7 @@ class TerminalXtgettcapKeyboardTest {
         runTest {
             fixture().use { f ->
                 val expected = StringBuilder()
+                val prefixes = resource("shift-cursor-prefixes.tsv").single { it[0].toInt() == modifierLevel }
                 for (application in listOf(false, true, false)) {
                     f.receive(
                         "\u001b[?1" + (if (application) "h" else "l") +
@@ -93,8 +94,16 @@ class TerminalXtgettcapKeyboardTest {
                     )
                     assertEquals(modifierLevel, TerminalInputState.keyModifierOption(f.session.getInputModeBits(), 1))
                     assertEquals(modifierLevel, TerminalInputState.keyModifierOption(f.session.getInputModeBits(), 2))
+                    val shiftedPrefix = unhex(prefixes[if (application) 2 else 1])
                     for (case in cases()) {
-                        val value = if (application) case.application else case.normal
+                        val value =
+                            if (case.modifiers == TerminalModifiers.SHIFT && case.key != TerminalKey.TAB) {
+                                shiftedPrefix + case.normal.last()
+                            } else if (application) {
+                                case.application
+                            } else {
+                                case.normal
+                            }
                         for (name in listOf(case.terminfo, case.termcap)) {
                             f.receive(query(name))
                             f.session.encodeKey(TerminalKeyEvent(key = case.key, modifiers = case.modifiers))
@@ -104,6 +113,29 @@ class TerminalXtgettcapKeyboardTest {
                     runCurrent()
                     assertEquals(expected.toString(), f.output(), "application=" + application)
                 }
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3])
+    fun `Shift cursor discovery ignores other keyboard resource formats`(otherKeysLevel: Int) =
+        runTest {
+            fixture().use { f ->
+                // Shift cursor keys belong to resource 1, independently of ordinary,
+                // function and special-key reporting settings.
+                f.receive("\u001b[>4;" + otherKeysLevel + "m\u001b[>2;4m\u001b[>7;4m")
+                val shifted = cases().filter { it.modifiers == TerminalModifiers.SHIFT && it.key != TerminalKey.TAB }
+                val expected = StringBuilder()
+                for (case in shifted) {
+                    for (name in listOf(case.terminfo, case.termcap)) {
+                        f.receive(query(name))
+                        f.session.encodeKey(TerminalKeyEvent(key = case.key, modifiers = case.modifiers))
+                        expected.append(reply(name, case.normal)).append(case.normal)
+                    }
+                }
+                runCurrent()
+                assertEquals(4, shifted.size)
+                assertEquals(expected.toString(), f.output())
             }
         }
 
@@ -312,7 +344,7 @@ class TerminalXtgettcapKeyboardTest {
                     unhex(f[4]),
                     unhex(f[5]),
                 )
-            }.also { assertEquals(24, it.size) }
+            }.also { assertEquals(28, it.size) }
 
     private fun resource(name: String): List<List<String>> =
         checkNotNull(javaClass.getResource("/xtgettcap/" + name))

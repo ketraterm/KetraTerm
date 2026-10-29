@@ -11,6 +11,11 @@ The fixture was derived from source, not captured from a running Vim.
 `keys.tsv` records independently reviewed expected legacy press bytes for the
 supported terminfo/termcap aliases. Columns are the two names, normalized input
 key, modifier, normal-mode hex bytes and application-cursor-mode hex bytes.
+These values use the default cursor modifier level 2.
+`shift-cursor-prefixes.tsv` records expected Shift cursor prefixes for levels
+-1 through 3 in both cursor modes. Tests combine those fixed prefixes with each
+key's final byte and compare the reply with actual encoder output. The four
+Shift aliases are also exercised by the pinned Vim query stream.
 F3 is SS3 R, not Kitty's CSI 13~. Backspace uses the host's default DEL here;
 tests separately cover BS policy, explicit DECBKM and reset. Kotlin forwarding
 wrappers retain their original query interception while forwarding host metadata.

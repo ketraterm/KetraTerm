@@ -73,7 +73,7 @@ defines event and encoding behavior.
 | Bell | BEL events and retained urgency/pop-on-bell modes for host handling. |
 | Window actions | Minimize, restore, move, raise/lower, resize, and maximize requests where the host permits them. |
 | Status queries | Operating status, cursor position, primary/secondary device attributes, and supported mode status. |
-| Capability queries | DECRQSS and [XTGETTCAP](../reference/protocol.md#xtgettcap) through explicit allowlists. XTGETTCAP discovers identity, colors, scrolling, paste delimiters, underline styles/colors and common legacy keyboard names/aliases, with per-capability replies. Keyboard answers follow current modes and host Backspace policy. |
+| Capability queries | DECRQSS and [XTGETTCAP](../reference/protocol.md#xtgettcap) through explicit allowlists. XTGETTCAP discovers identity, colors, scrolling, paste delimiters, underline styles/colors and common legacy keyboard names/aliases, including Shift+Home/Left/Right/End, with per-capability replies. Keyboard answers follow current modes, modifier levels and host Backspace policy. |
 | Window reports | Minimized state, text-area and character-cell pixel dimensions (`CSI 14 t` / `CSI 16 t`), grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
 | Color scheme | One-shot light/dark query and mode 2031 subscriptions to host theme changes, including palette changes within the same light/dark preference. |
 | In-band resize | Mode 2048 reports text-area rows, columns, and pixel dimensions on enable and after size changes; unavailable pixel dimensions are zero. |
