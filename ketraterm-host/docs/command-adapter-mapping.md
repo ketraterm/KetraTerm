@@ -68,7 +68,7 @@ Core-generated replies are queued in its response channel, then drained by
 session or a direct embedder. `HostEventSink` carries metadata and action
 requests rather than writing transport bytes or performing platform work.
 
-`terminalResponsePolicy` gates status, device, mode, keyboard, window,
+`terminalResponsePolicy` gates status, device, XTVERSION, mode, keyboard, window,
 rectangular-checksum, DECRQSS, and XTGETTCAP replies, including supported failure
 replies and subscribed color-scheme/resize reports. Adapter construction and
 policy replacement publish the automatic-report permission to core without

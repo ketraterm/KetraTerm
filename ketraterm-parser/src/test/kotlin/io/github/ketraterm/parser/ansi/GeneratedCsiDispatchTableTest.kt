@@ -87,6 +87,14 @@ class GeneratedCsiDispatchTableTest {
         }
 
         @Test
+        fun `XTVERSION requires a greater-than marker without intermediates`() {
+            assertEquals(CsiCommand.XTVERSION, lookup('q', privateMarker = '>'.code))
+            assertEquals(CsiCommand.UNKNOWN, lookup('q'))
+            assertEquals(CsiCommand.UNKNOWN, lookup('q', privateMarker = '?'.code))
+            assertEquals(CsiCommand.UNKNOWN, lookup('q', privateMarker = '>'.code, intermediates = ' '.code, intermediateCount = 1))
+        }
+
+        @Test
         fun `Kitty keyboard controls route by private marker`() {
             assertEquals(CsiCommand.KITTY_KEYBOARD_FLAGS, lookup('u', privateMarker = '='.code))
             assertEquals(CsiCommand.KITTY_KEYBOARD_PUSH, lookup('u', privateMarker = '>'.code))

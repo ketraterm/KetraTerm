@@ -18,6 +18,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io
 public final class io/github/ketraterm/core/api/TerminalBuffer$DefaultImpls {
 	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalBuffer;)J
+	public static fun requestTerminalVersion (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
 	public static fun setTerminfoBackspaceDefault (Lio/github/ketraterm/core/api/TerminalBuffer;Z)V
 	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalBuffer;[BII)V
@@ -328,6 +329,7 @@ public final class io/github/ketraterm/core/api/TerminalRenderBuffer$DefaultImpl
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/core/api/TerminalRenderBuffer;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun requestTerminalVersion (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)V
 	public static fun setTerminfoBackspaceDefault (Lio/github/ketraterm/core/api/TerminalRenderBuffer;Z)V
 	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalRenderBuffer;[BII)V
 }
@@ -357,6 +359,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalResponseCha
 	public abstract fun requestModeStatus (IZIZ)V
 	public static synthetic fun requestModeStatus$default (Lio/github/ketraterm/core/api/TerminalResponseChannel;IZIZILjava/lang/Object;)V
 	public abstract fun requestRectangleChecksum (IIIIII)V
+	public fun requestTerminalVersion ()V
 	public abstract fun requestWindowReport (I)V
 	public abstract fun setChangeNotificationsAllowed (Z)V
 	public fun setTerminfoBackspaceDefault (Z)V
@@ -378,6 +381,7 @@ public final class io/github/ketraterm/core/api/TerminalResponseChannel$Companio
 
 public final class io/github/ketraterm/core/api/TerminalResponseChannel$DefaultImpls {
 	public static synthetic fun requestModeStatus$default (Lio/github/ketraterm/core/api/TerminalResponseChannel;IZIZILjava/lang/Object;)V
+	public static fun requestTerminalVersion (Lio/github/ketraterm/core/api/TerminalResponseChannel;)V
 	public static fun setTerminfoBackspaceDefault (Lio/github/ketraterm/core/api/TerminalResponseChannel;Z)V
 }
 

@@ -715,6 +715,14 @@ public interface TerminalCommandSink {
     public fun requestKittyKeyboardFlags()
 
     /**
+     * Requests product/build identity for XTVERSION (`CSI > q` or `CSI > 0 q`).
+     *
+     * The host owns terminal-response permission. The default leaves optional query
+     * support to implementations; XTVERSION defines no failure response.
+     */
+    public fun requestTerminalVersion() {}
+
+    /**
      * Safe xterm window report request.
      *
      * Supported modes are owned by the sink/core. Window manipulation requests

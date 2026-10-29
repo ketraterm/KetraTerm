@@ -748,6 +748,11 @@ public class HostCommandAdapter
             terminal.requestKittyKeyboardFlags()
         }
 
+        override fun requestTerminalVersion() {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestTerminalVersion()
+        }
+
         override fun requestWindowReport(mode: Int) {
             if (!hostPolicy.terminalResponsePolicy.isAllowed) return
             terminal.requestWindowReport(mode)

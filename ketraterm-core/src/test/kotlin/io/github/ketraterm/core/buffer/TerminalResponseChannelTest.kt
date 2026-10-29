@@ -29,6 +29,23 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalResponseChannelTest {
+    @Test
+    fun `XTVERSION uses the shared identity and preserves cursor and input modes`() {
+        val buffer = TerminalBuffers.create(10, 5)
+        buffer.positionCursor(4, 2)
+        buffer.setApplicationCursorKeys(true)
+        val modes = buffer.getInputModeBits()
+        buffer.requestTerminalVersion()
+        buffer.requestDeviceStatusReport(6, false)
+        buffer.requestTerminalVersion()
+        val version = "\u001bP>|" + TerminalCapabilityIdentity.XTVERSION_TEXT + "\u001b\\"
+        assertEquals(version + "\u001b[3;5R" + version, drain(buffer))
+        assertEquals(0, buffer.pendingResponseBytes)
+        assertEquals(4, buffer.cursorCol)
+        assertEquals(2, buffer.cursorRow)
+        assertEquals(modes, buffer.getInputModeBits())
+    }
+
     @ParameterizedTest
     @CsvSource("false,false", "false,true", "true,false", "true,true")
     fun `cursor reports use the same origin as cursor positioning`(

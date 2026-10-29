@@ -23,6 +23,14 @@ import org.junit.jupiter.api.Test
 @DisplayName("TerminalCapabilityIdentity")
 class TerminalCapabilityIdentityTest {
     @Test
+    fun `XTVERSION identifies this build with bounded printable ASCII`() {
+        val text = TerminalCapabilityIdentity.XTVERSION_TEXT
+        assertEquals("KetraTerm ($TERMINAL_BUILD_VERSION)", text)
+        assertTrue(text.length <= 76)
+        assertTrue(text.all { it.code in 0x20..0x7e })
+    }
+
+    @Test
     fun `advertises conservative terminal identity values`() {
         assertAll(
             { assertEquals("xterm-256color", TerminalCapabilityIdentity.TERM_NAME) },

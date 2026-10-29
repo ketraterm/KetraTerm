@@ -24,6 +24,7 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -65,7 +66,7 @@ class TerminalSessionTest {
                     cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start()
-                    val bytes = "\u001B[?2004h\u001BP+q5053;5045;7878\u001B\\\u001B[6n".encodeToByteArray()
+                    val bytes = "\u001B[?2004h\u001BP+q5053;5045;7878\u001B\\\u001B[>q\u001B[6n".encodeToByteArray()
                     session.onBytes(bytes, 0, bytes.size)
                     session.encodePaste(TerminalPasteEvent("hello"))
                     runCurrent()
@@ -75,7 +76,8 @@ class TerminalSessionTest {
                         } else {
                             "\u001BP1+r5053=1b5b3230307e\u001B\\" +
                                 "\u001BP1+r5045=1b5b3230317e\u001B\\" +
-                                "\u001BP0+r7878\u001B\\\u001B[1;1R"
+                                "\u001BP0+r7878\u001B\\\u001BP>|" + TerminalCapabilityIdentity.XTVERSION_TEXT +
+                                "\u001B\\\u001B[1;1R"
                         }
                     assertEquals(replies + "\u001B[200~hello\u001B[201~", connector.writtenBytes.asciiText())
                 }

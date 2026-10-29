@@ -92,6 +92,7 @@ Permissions and decoded-size limits are checked again before execution.
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
 | Kitty graphics (APC G) | Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed `ENOTSUP` errors. Queries require nonzero `i`. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
+| XTVERSION | Product/build identity from `CSI > q` or `CSI > 0 q`; see the [reply contract](#xtversion). |
 | Cursor position | One-based coordinates, relative to active origin/margins when origin mode is enabled. |
 | Window geometry | `CSI 14 t` reports text-area pixels and `CSI 16 t` reports cell pixels as `CSI 6;height;width t`; pixel reports require known positive dimensions. Cell dimensions use integer text-area pixels divided by grid dimensions, independently of margins. `CSI 18 t` and `CSI 19 t` report the terminal grid. These queries require terminal-response permission, not window-manipulation permission. |
 | Mode status | ANSI/DEC DECRQM replies for the [listed modes](#mode-status-reports), including permanently enabled grapheme mode 2027. Unknown modes report `0`. |
@@ -102,6 +103,18 @@ Permissions and decoded-size limits are checked again before execution.
 Denying terminal responses suppresses success and failure replies alike.
 Unsupported queries use their defined failure frames rather than replaying
 arbitrary request text.
+
+## XTVERSION
+
+`CSI > q` and `CSI > 0 q` return `DCS > | KetraTerm (version) ST`, using the
+library build version, including `-SNAPSHOT` for development builds. The identity
+is at most 76 printable ASCII characters.
+Existing DA identity and `$TERM` values remain unchanged.
+
+Terminal-response permission gates the entire reply. Nonzero, extra, colon or
+overflowing parameters are ignored. XTVERSION defines no failure reply. Custom
+parser sinks and response channels may leave the optional `requestTerminalVersion()`
+default unimplemented; those integrations stay silent.
 
 ## XTGETTCAP
 

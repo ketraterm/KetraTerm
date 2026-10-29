@@ -22,9 +22,9 @@ import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
  *
  * These values are shared vocabulary for launch environments and
  * terminal-to-host query responses. They are intentionally conservative:
- * advertise compatibility that contemporary shells and TUIs need, avoid stable
- * product/version fingerprints, and do not claim query families whose response
- * policy is not implemented.
+ * advertise compatibility that contemporary shells and TUIs need and do not
+ * claim query families whose response policy is not implemented. XTVERSION
+ * separately identifies the product build through terminal-response permission.
  */
 public object TerminalCapabilityIdentity {
     /**
@@ -36,6 +36,15 @@ public object TerminalCapabilityIdentity {
      * `COLORTERM` value used by local process launchers to advertise truecolor.
      */
     public const val COLOR_TERM_TRUECOLOR: String = "truecolor"
+
+    /**
+     * Printable ASCII product/build identity returned by XTVERSION, without DCS framing.
+     *
+     * Generated from the Gradle project version; snapshot builds retain their suffix.
+     * This runtime property avoids inlining a dependency's build version into consumers.
+     * At most 76 characters; contains no control-string delimiters or terminal controls.
+     */
+    public val XTVERSION_TEXT: String = "KetraTerm ($TERMINAL_BUILD_VERSION)"
 
     /** Primary DA terminal class. `64` identifies VT420-level DEC controls. */
     public const val PRIMARY_DA_TERMINAL_CLASS: Int = 64
@@ -58,7 +67,7 @@ public object TerminalCapabilityIdentity {
     public const val SECONDARY_DA_TERMINAL_ID: Int = 41
 
     /**
-     * Secondary DA firmware/version field. Zero avoids product version leakage.
+     * Secondary DA firmware/version field. Kept independent of the product's XTVERSION identity.
      */
     public const val SECONDARY_DA_VERSION: Int = 0
 

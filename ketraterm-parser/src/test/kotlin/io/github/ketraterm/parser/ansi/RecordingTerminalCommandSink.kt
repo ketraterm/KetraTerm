@@ -439,6 +439,10 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         events += "requestKittyKeyboardFlags"
     }
 
+    override fun requestTerminalVersion() {
+        events += "requestTerminalVersion"
+    }
+
     override fun requestWindowReport(mode: Int) {
         events += "requestWindowReport:$mode"
     }

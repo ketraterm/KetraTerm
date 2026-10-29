@@ -27,6 +27,32 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
 }
 
+// Compile the release/snapshot version into protocol identity, including IDE/class-directory runs.
+val terminalVersion = project.version.toString()
+val versionSources = layout.buildDirectory.dir("generated/sources/terminal-version")
+val generateTerminalVersion =
+    tasks.register("generateTerminalVersion") {
+        inputs.property("terminalVersion", terminalVersion)
+        outputs.dir(versionSources)
+        doLast {
+            val version = inputs.properties.getValue("terminalVersion") as String
+            // Keep both generated Kotlin and the control-string reply bounded and free of escapes.
+            require(version.matches(Regex("[0-9][0-9A-Za-z.+-]{0,63}"))) {
+                "Terminal version must be 1..64 ASCII version characters starting with a digit"
+            }
+            val source = outputs.files.singleFile.resolve("io/github/ketraterm/protocol/TerminalBuildVersion.kt")
+            source.parentFile.mkdirs()
+            source.writeText(
+                "package io.github.ketraterm.protocol\n\n" +
+                    "internal const val TERMINAL_BUILD_VERSION: String = \"$version\"\n",
+            )
+        }
+    }
+
+kotlin.sourceSets.named("main") {
+    kotlin.srcDir(files(versionSources).builtBy(generateTerminalVersion))
+}
+
 tasks.test {
     useJUnitPlatform()
 }
