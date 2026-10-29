@@ -24,12 +24,32 @@ import java.awt.GraphicsEnvironment
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.WindowEvent
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
+import java.lang.reflect.InvocationTargetException
 import javax.swing.*
 import kotlin.test.*
 
 class SwingMessageDialogsTest {
+    @Test
+    fun `owner cleanup completes before an EDT assertion failure reaches the caller`() {
+        assumeFalse(GraphicsEnvironment.isHeadless())
+        var createdOwner: JFrame? = null
+        val failure = AssertionError("EDT assertion failure")
+        assertSame(
+            failure,
+            assertFailsWith<AssertionError> {
+                withOwner { owner ->
+                    createdOwner = owner
+                    owner.pack()
+                    assertTrue(owner.isDisplayable)
+                    throw failure
+                }
+            },
+        )
+        SwingUtilities.invokeAndWait {
+            assertFalse(checkNotNull(createdOwner).isDisplayable)
+        }
+    }
+
     @Test
     fun `arrow keys cycle dialog choices skip disabled buttons and preserve Tab without accepting`() = assertChoiceNavigation(false)
 
@@ -210,8 +230,10 @@ class SwingMessageDialogsTest {
 
     private fun withOwner(test: (JFrame) -> Unit) {
         assumeFalse(GraphicsEnvironment.isHeadless())
-        val task =
-            FutureTask {
+        try {
+            // Join the whole EDT operation, including native dialog startup and cleanup.
+            // A timed FutureTask wait could leave that operation running into the next test.
+            SwingUtilities.invokeAndWait {
                 val owner = JFrame()
                 try {
                     test(owner)
@@ -219,7 +241,8 @@ class SwingMessageDialogsTest {
                     owner.dispose()
                 }
             }
-        SwingUtilities.invokeLater(task)
-        task.get(10, TimeUnit.SECONDS)
+        } catch (failure: InvocationTargetException) {
+            throw failure.targetException
+        }
     }
 }
