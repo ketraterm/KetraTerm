@@ -17,9 +17,20 @@ package consumer;
 
 import io.github.ketraterm.core.api.TerminalLine;
 import io.github.ketraterm.core.api.TerminalReader;
+import io.github.ketraterm.core.api.TerminalResponseChannel;
+import io.github.ketraterm.protocol.TerminalCapabilityIdentity;
 import io.github.ketraterm.render.api.TerminalColorPalette;
 
 public final class JavaConsumer {
+    public static void verifyTerminalVersion(TerminalResponseChannel channel) {
+        channel.requestTerminalVersion();
+        byte[] bytes = new byte[channel.getPendingResponseBytes()];
+        String expected = "\u001bP>|" + TerminalCapabilityIdentity.INSTANCE.getXTVERSION_TEXT() + "\u001b\\";
+        if (channel.readResponseBytes(bytes, 0, bytes.length) != bytes.length
+                || !new String(bytes, java.nio.charset.StandardCharsets.US_ASCII).equals(expected)) {
+            throw new AssertionError("Published XTVERSION response");
+        }
+    }
     public static final class Line implements TerminalLine {
         private final int value;
         public Line(int value) { this.value = value; }

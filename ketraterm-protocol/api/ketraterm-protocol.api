@@ -198,6 +198,7 @@ public final class io/github/ketraterm/protocol/TerminalCapabilityIdentity {
 	public static final field TERMINFO_TRUECOLOR_SUPPORTED Z
 	public static final field TERM_NAME Ljava/lang/String;
 	public static final field TERTIARY_DA_SUPPORTED Z
+	public final fun getXTVERSION_TEXT ()Ljava/lang/String;
 }
 
 public final class io/github/ketraterm/protocol/TerminalClipboardSelection {

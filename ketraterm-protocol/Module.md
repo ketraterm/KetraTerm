@@ -20,6 +20,10 @@ represent their normalized values. Neither representation uses DEC mode numbers.
 Core input-state packing relies on the correspondence between enum ordinals
 and normalized values.
 
+`TerminalCapabilityIdentity` separates compatibility identifiers from the
+XTVERSION product identity. The latter uses a generated internal Kotlin constant
+from the Gradle project version, avoiding runtime resource or manifest discovery.
+
 See the [README](README.md) for integration, [mode reference](docs/protocol-modes.md)
 for mode values, and [keyboard reference](docs/input-protocols.md) for resource and
 flag definitions. Published API KDoc describes individual constants and helpers.

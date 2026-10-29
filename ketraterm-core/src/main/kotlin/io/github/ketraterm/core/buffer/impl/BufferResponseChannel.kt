@@ -194,6 +194,12 @@ internal class BufferResponseChannel(
         state.hostResponses.enqueueByte('u'.code)
     }
 
+    override fun requestTerminalVersion() {
+        enqueueAsciiString("\u001bP>|")
+        enqueueAsciiString(TerminalCapabilityIdentity.XTVERSION_TEXT)
+        enqueueStSuffix()
+    }
+
     override fun requestKeyModifierOption(resource: Int) {
         if (!XtermKeyResource.isSupported(resource)) return
         val value = TerminalInputState.keyModifierOption(state.modes.getInputModeBits(), resource)

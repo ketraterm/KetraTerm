@@ -109,6 +109,15 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     public fun requestKittyKeyboardFlags()
 
     /**
+     * Enqueues XTVERSION as `DCS > | text ST` using the shared product/build identity.
+     *
+     * Host adapters must enforce terminal-response permission before calling this API.
+     * The default leaves optional query support to implementations; XTVERSION defines
+     * no failure response.
+     */
+    public fun requestTerminalVersion() {}
+
+    /**
      * Enqueues an allowlisted xterm key-modifier option response.
      *
      * Unsupported resources produce no response; the protocol defines no failure reply.

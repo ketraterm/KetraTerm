@@ -39,6 +39,7 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalAsciiComm
 
 public final class io/github/ketraterm/parser/spi/TerminalAsciiCommandSink$DefaultImpls {
 	public static fun requestClipboard (Lio/github/ketraterm/parser/spi/TerminalAsciiCommandSink;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun requestTerminalVersion (Lio/github/ketraterm/parser/spi/TerminalAsciiCommandSink;)V
 }
 
 public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSink {
@@ -101,6 +102,7 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSi
 	public abstract fun requestKittyKeyboardFlags ()V
 	public abstract fun requestModeStatus (IZ)V
 	public abstract fun requestRectangleChecksum (IIIIII)V
+	public fun requestTerminalVersion ()V
 	public abstract fun requestWindowReport (I)V
 	public abstract fun resetAttributes ()V
 	public abstract fun resetDynamicColor (I)V
@@ -170,5 +172,6 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSi
 
 public final class io/github/ketraterm/parser/spi/TerminalCommandSink$DefaultImpls {
 	public static fun requestClipboard (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun requestTerminalVersion (Lio/github/ketraterm/parser/spi/TerminalCommandSink;)V
 }
 

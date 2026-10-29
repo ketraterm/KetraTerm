@@ -75,6 +75,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun requestKittyKeyboardFlags ()V
 	public fun requestModeStatus (IZ)V
 	public fun requestRectangleChecksum (IIIIII)V
+	public fun requestTerminalVersion ()V
 	public fun requestWindowReport (I)V
 	public fun resetAttributes ()V
 	public fun resetDynamicColor (I)V

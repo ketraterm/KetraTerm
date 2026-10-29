@@ -152,6 +152,15 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DA_PRIMARY -> sink.requestDeviceAttributes(kind = 0, parameter = modeParam(state, 0))
             CsiCommand.DA_SECONDARY -> sink.requestDeviceAttributes(kind = 1, parameter = modeParam(state, 0))
             CsiCommand.DA_TERTIARY -> sink.requestDeviceAttributes(kind = 2, parameter = modeParam(state, 0))
+            CsiCommand.XTVERSION -> {
+                if (state.paramCount <= 1 &&
+                    state.subParameterMask == 0 &&
+                    !state.parameterValueSaturated &&
+                    modeParam(state, 0) == 0
+                ) {
+                    sink.requestTerminalVersion()
+                }
+            }
             CsiCommand.CHA -> sink.setCursorColumn(oneBasedPositionParam(state, 0))
             CsiCommand.CUP ->
                 sink.setCursorAbsolute(

@@ -17,6 +17,7 @@ package consumer
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.*
+import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.render.api.TerminalColorPalette
 
 private class KotlinReader : TerminalReader {
@@ -52,6 +53,11 @@ fun main() {
     check(reader.getLine(Int.MAX_VALUE).width == 0 && reader.getLine(0).readCluster(0, IntArray(0)) == 0)
     check(reader.getLine(0).getClusterLength(0) == 0)
     val buffer = TerminalBuffers.create(2, 1, 0)
+    buffer.requestTerminalVersion()
+    val versionReply = ByteArray(buffer.pendingResponseBytes)
+    check(buffer.readResponseBytes(versionReply) == versionReply.size)
+    check(versionReply.decodeToString() == "\u001bP>|" + TerminalCapabilityIdentity.XTVERSION_TEXT + "\u001b\\")
+    JavaConsumer.verifyTerminalVersion(buffer)
     val expected = IntArray(32) { if (it == 0) 'e'.code else 0x0301 }
     buffer.writeCluster(expected, expected.size)
     val line = buffer.getLine(0)

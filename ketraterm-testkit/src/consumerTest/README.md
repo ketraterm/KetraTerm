@@ -44,8 +44,8 @@ just as release delivery does.
 
 Verification covers:
 
-- Parsed text, core reads, external parser sinks, host observers, render readers,
-  completion results, shell metadata, and host composition.
+- Parsed text, core reads, XTVERSION from Kotlin and Java, external parser sinks,
+  host observers, render readers, completion results, shell metadata, and host composition.
 - Swing construction and binding on the EDT, detector discovery and refresh,
   provider cancellation on unbind, and host ownership of session/transport.
 - PNG decoding through the published session, placement copying, and immutable
