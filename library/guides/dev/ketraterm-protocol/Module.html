@@ -56,10 +56,13 @@ host-bound byte sink; parsing and terminal behavior remain in their owning layer
 represent their normalized values. Neither representation uses DEC mode numbers.
 Core input-state packing relies on the correspondence between enum ordinals
 and normalized values.</p>
+<p><code>TerminalCapabilityIdentity</code> separates compatibility identifiers from the
+XTVERSION product identity. The latter uses a generated internal Kotlin constant
+from the Gradle project version, avoiding runtime resource or manifest discovery.</p>
 <p>See the <a href="README.html">README</a> for integration, <a href="docs/protocol-modes.html">mode reference</a>
 for mode values, and <a href="docs/input-protocols.html">keyboard reference</a> for resource and
 flag definitions. Published API KDoc describes individual constants and helpers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-protocol/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b66d8405209970733eabdd77bcab1b965ac9ada5/ketraterm-protocol/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

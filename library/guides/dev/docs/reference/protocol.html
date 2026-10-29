@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -178,6 +178,10 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <td><code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, VT420-class primary DA, and secondary DA. No DA3 unique identity.</td>
 </tr>
 <tr>
+<td>XTVERSION</td>
+<td>Product/build identity from <code>CSI &gt; q</code> or <code>CSI &gt; 0 q</code>; see the <a href="#xtversion">reply contract</a>.</td>
+</tr>
+<tr>
 <td>Cursor position</td>
 <td>One-based coordinates, relative to active origin/margins when origin mode is enabled.</td>
 </tr>
@@ -205,6 +209,15 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <p>Denying terminal responses suppresses success and failure replies alike.
 Unsupported queries use their defined failure frames rather than replaying
 arbitrary request text.</p>
+<h2 id="xtversion">XTVERSION</h2>
+<p><code>CSI &gt; q</code> and <code>CSI &gt; 0 q</code> return <code>DCS &gt; | KetraTerm (version) ST</code>, using the
+library build version, including <code>-SNAPSHOT</code> for development builds. The identity
+is at most 76 printable ASCII characters.
+Existing DA identity and <code>$TERM</code> values remain unchanged.</p>
+<p>Terminal-response permission gates the entire reply. Nonzero, extra, colon or
+overflowing parameters are ignored. XTVERSION defines no failure reply. Custom
+parser sinks and response channels may leave the optional <code>requestTerminalVersion()</code>
+default unimplemented; those integrations stay silent.</p>
 <h2 id="xtgettcap">XTGETTCAP</h2>
 <p>Requests use <code>DCS +q hexName[;hexName...] ST</code>. Allowlisted names are case-sensitive
 ASCII. Each request token encodes bytes using two ASCII hex digits per byte;
@@ -392,9 +405,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/b66d8405209970733eabdd77bcab1b965ac9ada5/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/b66d8405209970733eabdd77bcab1b965ac9ada5/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -528,7 +541,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b66d8405209970733eabdd77bcab1b965ac9ada5/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
