@@ -138,6 +138,10 @@ until terminal reset. Enter normally sends CR; with LNM active it adds LF unless
 represent these keys independently of their legacy byte choices.</p>
 <p>PF1-PF4 are distinct from physical F1-F4. Application cursor mode affects
 unmodified cursor keys; application keypad mode affects normalized keypad keys.
+For legacy numeric-keypad events, a supplied <code>TerminalModifiers.NUM_LOCK</code> bit
+selects normal numeric output without changing application keypad mode. Alt/Meta
+and newline policies still apply. Extended xterm keypad reports retain their
+format, and Kitty reports retain the supplied lock modifier.
 The <a href="keyboard-mouse-encoding.html">wire reference</a> gives representative sequences.</p>
 <p><code>TerminalKeyEvent.text(...)</code> emits its entire associated text as UTF-8 for press
 and repeat in legacy modes and Kitty modes without report-all flag <code>8</code>. Modifiers
@@ -385,7 +389,7 @@ discard. Close clears retained payload storage; subsequent writes throw
 <code>IllegalStateException</code>. Closing must not race a writer. This cleanup cannot
 erase JVM strings or platform clipboard data. Session owns authorization,
 deadlines, and transport commitment; input does not read the clipboard.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

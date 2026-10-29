@@ -29,7 +29,7 @@ wrapping, and cursor effects. This document describes that text handoff; the
 <a href="../../docs/terminal-feature-map.html">feature map</a> and
 <a href="../../docs/terminal-feature-gap-map.html">gap map</a> define supported scope.</p>
 <h2 id="1-streaming-utf-8-decoder-utf8decoder">1. Streaming UTF-8 Decoder (<code>Utf8Decoder</code>)</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder.kt">Utf8Decoder</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder.kt">Utf8Decoder</a>
 stores incomplete scalar state in primitive fields and returns a packed integer
 containing output/replay flags and the scalar. It rejects invalid leading bytes,
 overlong encodings, surrogates, and values above <code>U+10FFFF</code>.</p>
@@ -44,9 +44,9 @@ bytes, with decoding or validation performed when a complete command dispatches.
 Custom OSC handlers receive undecoded bytes. Raw C1 bytes are not treated as
 8-bit control introducers by the UTF-8 parser.</p>
 <h2 id="2-grapheme-segmentation-unicode-uax-29">2. Grapheme Segmentation (Unicode UAX #29)</h2>
-<p>After charset mapping, <a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/UnicodeClass.kt">UnicodeClass</a>
+<p>After charset mapping, <a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/UnicodeClass.kt">UnicodeClass</a>
 returns packed grapheme-break and <code>Extended_Pictographic</code> properties.
-<a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt">GraphemeSegmenter</a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt">GraphemeSegmenter</a>
 uses these properties plus bounded context for controls, combining marks,
 spacing marks, prepend characters, Hangul, regional-indicator pairs, and emoji
 ZWJ continuations. Ordinary adjacent bases take a short boundary path.</p>
@@ -64,7 +64,7 @@ does not rewrite this oracle. <code>GraphemeSegmenterTest</code> checks implemen
 rules separately from property classification.</p>
 <p><a id="3-the-grapheme-assembler-optimization-graphemeassembler"></a></p>
 <h2 id="3-grapheme-publication">3. Grapheme publication</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt">GraphemeAssembler</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt">GraphemeAssembler</a>
 publishes decoded text promptly without waiting for the next grapheme boundary:</p>
 <ol>
 <li>The first publication uses <code>writeCodepoint</code> for one scalar or <code>writeCluster</code>
@@ -116,7 +116,7 @@ should be paired with parser reset to keep parser-owned state aligned.</p>
 classification. <code>TerminalParserTest</code> exercises publication, retained-prefix
 updates, charset saves, overflow, and chunk boundaries through byte streams.
 Cross-layer placement and storage behavior are verified in core/host tests.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-parser/docs/grapheme-segmentation.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-parser/docs/grapheme-segmentation.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

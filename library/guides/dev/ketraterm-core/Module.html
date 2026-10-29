@@ -39,7 +39,11 @@ thread scheduling, font measurement, and painting remain outside core.</p>
 composes the public writer, cursor, mode, response, graphics, reader, and inspector roles
 through focused adapters. <code>MutationEngine</code> owns cell mutation;
 <code>CursorEngine</code> owns cursor mechanics; <code>TerminalResizer</code> handles primary retention
-and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.</p>
+and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.
+<code>BufferResponseChannel</code> queues terminal replies; <code>XtgettcapResponder</code> owns
+its immutable capability allowlist, batch validation, and reply-size preflight.
+Keyboard queries use one mode snapshot and optional host Backspace metadata;
+fixed legacy sequences are shared with the input encoder through protocol vocabulary.</p>
 <p><code>TerminalState</code> holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active <code>ScreenBuffer</code>. Each screen owns its cursor,
 margins, saved cursor, Kitty keyboard stack, <code>HistoryRing</code>, and self-contained rows with lazy cluster payload storage.
@@ -67,7 +71,7 @@ frames expose immutable resources and borrowed placement metadata through
 The <a href="docs/terminal-core-contract.html#image-state">core contract</a> defines serialized
 access and lifecycle; the <a href="../ketraterm-render-api/docs/render-frame-lifecycle.html#critical-lifespan-rule">render contract</a>
 defines the resource lifetime exception.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

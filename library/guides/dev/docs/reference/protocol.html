@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -163,7 +163,7 @@ Permissions and decoded-size limits are checked again before execution.</p>
 </tr>
 <tr>
 <td>XTGETTCAP</td>
-<td>Terminal name (<code>TN</code>/<code>name</code>), color count (<code>Co</code>/<code>colors</code>), and true-color support (<code>RGB</code>/<code>Tc</code>).</td>
+<td>Identity, colors, parameterized scrolling, paste delimiters, underline capabilities and legacy keyboard names from the <a href="#xtgettcap">explicit allowlist</a>. Each well-formed name receives its own success or failure frame.</td>
 </tr>
 <tr>
 <td>Kitty colors (OSC 21)</td>
@@ -203,8 +203,199 @@ Permissions and decoded-size limits are checked again before execution.</p>
 </tr>
 </tbody></table></div>
 <p>Denying terminal responses suppresses success and failure replies alike.
-Unsupported queries with defined failure responses use those responses rather
-than echoing request text.</p>
+Unsupported queries use their defined failure frames rather than replaying
+arbitrary request text.</p>
+<h2 id="xtgettcap">XTGETTCAP</h2>
+<p>Requests use <code>DCS +q hexName[;hexName...] ST</code>. Allowlisted names are case-sensitive
+ASCII. Each request token encodes bytes using two ASCII hex digits per byte;
+hex digits may use either case. The responder uses the following immutable allowlist:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Names</th>
+<th>Type</th>
+<th>Decoded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TN</code>, <code>name</code></td>
+<td>String</td>
+<td><code>xterm-256color</code></td>
+</tr>
+<tr>
+<td><code>Co</code>, <code>colors</code></td>
+<td>Number</td>
+<td>Decimal <code>256</code></td>
+</tr>
+<tr>
+<td><code>RGB</code>, <code>Tc</code></td>
+<td>Boolean</td>
+<td>Present, without a value; preserves KetraTerm&#39;s existing truecolor contract.</td>
+</tr>
+<tr>
+<td><code>indn</code></td>
+<td>String</td>
+<td><code>ESC [%p1%dS</code></td>
+</tr>
+<tr>
+<td><code>PS</code>, <code>PE</code></td>
+<td>String</td>
+<td><code>ESC [200~</code>, <code>ESC [201~</code>; paste delimiters used when mode 2004 is enabled.</td>
+</tr>
+<tr>
+<td><code>Su</code></td>
+<td>Boolean</td>
+<td>Styled and colored underlines.</td>
+</tr>
+<tr>
+<td><code>Smulx</code></td>
+<td>String</td>
+<td><code>ESC [4:%p1%dm</code>; parameter 0–5 selects none, single, double, curly, dotted, or dashed.</td>
+</tr>
+<tr>
+<td><code>Setulc</code></td>
+<td>String</td>
+<td><code>ESC [58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&amp;%d:%p1%{255}%&amp;%dm</code>; parameter is packed 24-bit RGB.</td>
+</tr>
+</tbody></table></div>
+<p>Here <code>ESC</code> denotes the actual byte <code>1b</code>, and the following space is notation,
+not part of the value. Values contain terminfo parameter expressions literally;
+the application expands them. Numeric values are decimal ASCII before hex encoding.
+No local terminfo database is consulted.</p>
+<p>Keyboard entries are strings describing legacy key presses in the current mode:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Terminfo / termcap names</th>
+<th>Decoded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kcuu1</code> / <code>ku</code>, <code>kcud1</code> / <code>kd</code>, <code>kcuf1</code> / <code>kr</code>, <code>kcub1</code> / <code>kl</code></td>
+<td>Normal cursor mode: <code>ESC [A/B/C/D</code>; application cursor mode: <code>ESC OA/OB/OC/OD</code>, respectively.</td>
+</tr>
+<tr>
+<td><code>khome</code> / <code>kh</code>, <code>kend</code> / <code>@7</code></td>
+<td>Normal: <code>ESC [H/F</code>; application: <code>ESC OH/OF</code>.</td>
+</tr>
+<tr>
+<td><code>kich1</code> / <code>kI</code>, <code>kdch1</code> / <code>kD</code>, <code>kpp</code> / <code>kP</code>, <code>knp</code> / <code>kN</code></td>
+<td><code>ESC [2~/3~/5~/6~</code>, respectively.</td>
+</tr>
+<tr>
+<td><code>kf1</code>–<code>kf9</code> / <code>k1</code>–<code>k9</code>; <code>kf10</code> / <code>k;</code>; <code>kf11</code> / <code>F1</code>; <code>kf12</code> / <code>F2</code></td>
+<td>F1–F4: <code>ESC OP/OQ/OR/OS</code>. F5–F12: <code>ESC [15~/17~/18~/19~/20~/21~/23~/24~</code>.</td>
+</tr>
+<tr>
+<td><code>kbs</code> / <code>kb</code></td>
+<td>BS (<code>08</code>) or DEL (<code>7f</code>), according to DECBKM or the current host Backspace policy.</td>
+</tr>
+<tr>
+<td><code>kcbt</code> / <code>kB</code></td>
+<td>Shift-Tab: <code>ESC [Z</code>.</td>
+</tr>
+<tr>
+<td><code>kHOM</code> / <code>#2</code>, <code>kLFT</code> / <code>#4</code>, <code>kRIT</code> / <code>%i</code>, <code>kEND</code> / <code>*7</code></td>
+<td>Shift+Home/Left/Right/End. Default cursor modifier level 2: <code>ESC [1;2H/D/C/F</code>.</td>
+</tr>
+<tr>
+<td><code>ka1</code> / <code>K1</code>, <code>ka3</code> / <code>K3</code>, <code>kc1</code> / <code>K4</code>, <code>kc3</code> / <code>K5</code></td>
+<td>Application keypad corners: numeric keypad 7/9/1/3 send <code>ESC Ow/Oy/Oq/Os</code>. Numeric keypad mode receives failure replies.</td>
+</tr>
+</tbody></table></div>
+<p>Slash-separated sequences above denote alternatives, not literal slash bytes.
+One coherent mode snapshot is used for the whole request. Queries do not enable
+application modes or change input policy. Applications must query again if they
+need an answer for a different mode.</p>
+<p>The four Shift cursor entries follow xterm&#39;s cursor modifier resource (1).
+Here <code>final</code> is <code>H</code>, <code>D</code>, <code>C</code> or <code>F</code>, respectively; <code>CSI</code> is <code>ESC [</code>
+and <code>SS3</code> is <code>ESC O</code>. Spaces below are notation, not transmitted bytes:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Cursor modifier level</th>
+<th>Normal cursor mode</th>
+<th>Application cursor mode</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Disabled (<code>-1</code>)</td>
+<td><code>CSI final</code></td>
+<td><code>SS3 final</code></td>
+</tr>
+<tr>
+<td><code>0</code></td>
+<td><code>CSI 2 final</code></td>
+<td><code>SS3 2 final</code></td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td><code>CSI 2 final</code></td>
+<td><code>CSI 2 final</code></td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td><code>CSI 1;2 final</code></td>
+<td><code>CSI 1;2 final</code></td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td><code>CSI &gt;1;2 final</code></td>
+<td><code>CSI &gt;1;2 final</code></td>
+</tr>
+</tbody></table></div>
+<p>Disabling cursor modifiers drops Shift, matching actual key encoding.
+Function, special and ordinary-key resource settings do not change these entries.</p>
+<p>Keypad corner discovery requires application keypad mode (DECKPAM, <code>ESC =</code>);
+DECKPNM (<code>ESC &gt;</code>) restores numeric mode. These controls share the state selected
+by DECSET/DECRST 66. It is independent of the application cursor
+mode and follows the keypad modifier resource (3). Numeric-mode digits are not
+advertised as function-key sequences, so consumers do not capture ordinary
+<code>7/9/1/3</code> input. These names describe numeric keypad identities, not the separate
+keypad Home/End/Page Up/Page Down identities or dedicated editing keys.
+Num Lock can override individual legacy keypad events; it does not change
+application mode or capability discovery.</p>
+<p>These entries describe the legacy press vocabulary only. While any Kitty keyboard
+flags are active, keyboard names receive failure replies. Xterm resource level 4
+declines only that resource&#39;s keys (cursor/editing, function, keypad, or special keys).
+<code>modifyOtherKeys</code> level 2 additionally declines Shift-Tab; level 3 declines both
+Shift-Tab and Backspace. Other entries still reply normally, including output
+capabilities. Resetting the relevant mode restores discovery.</p>
+<p>The host adapter supplies its current Backspace default through the optional
+<code>setTerminfoBackspaceDefault</code> hook, then invokes the original
+<code>TerminalResponseChannel.queryTerminfo(String)</code> method. Existing Kotlin wrappers
+still intercept that method. The standard core retains supplied metadata across
+RIS/DECSTR; explicit DECBKM takes precedence. Direct core callers supply the
+default before querying Backspace.</p>
+<p>Without supplied metadata, <code>kb</code>/<code>kbs</code> fail unless DECBKM makes the answer known.
+This also applies to retained JVM wrappers that cannot forward the new hook.
+Other capability replies remain available. The hook has a default no-op for
+existing implementations and does not change input encoding or terminal modes.</p>
+<p>KetraTerm follows Kitty-style individual replies: each supported name produces
+<code>DCS 1+r hexName[=hexValue] ST</code>, and each unknown name produces
+<code>DCS 0+r hexName ST</code>. Boolean successes omit <code>=hexValue</code>. Order, duplicates,
+and the original hex spelling are preserved; an unknown name does not stop later
+names. Well-formed encodings of other bytes, including non-ASCII identifiers,
+also receive keyed failure replies. This differs from xterm&#39;s combined-response
+and stop-at-unknown behavior.
+Previously KetraTerm combined recognized entries and omitted unknown entries;
+clients consuming batched replies must accept the individual frames.</p>
+<p>An empty list/token, odd-length token, or character outside ASCII <code>0–9</code>, <code>a–f</code>,
+and <code>A–F</code> rejects the whole batch with <code>DCS 0+r ST</code>. Validation and encoded-size preflight
+finish before any replies from that batch are queued. A complete response larger
+than 64 KiB is rejected the same way, including through the direct core API.
+Earlier queued replies remain intact. The parser&#39;s 4,096-byte collection ceiling
+includes <code>+q</code>; overflow drains the string without dispatch or a partial reply.</p>
+<p>The existing terminal-response permission gates all frames, including failures.
+Window-manipulation and palette permissions do not gate capability discovery.
+Direct core callers enforce host permission themselves. Query handling neither
+executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
+<p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
+<a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
+The <a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+verify template expansion and resulting terminal behavior without native test dependencies.
+The <a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
 into one reply. <code>key=?</code> queries, bare <code>key</code> restores the current host theme, and
@@ -337,7 +528,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -64,12 +64,14 @@ parses terminal output nor owns a connector.</p>
 <p>The module exports its <code>ketraterm-core</code> and <code>ketraterm-protocol</code> dependencies.
 Core supplies coherent input-mode reads; protocol supplies wire vocabulary and
 the synchronous byte-sink contract. Session supplies outbound admission,
-serialization, and transport lifetime.</p>
+serialization, and transport lifetime.
+<code>LegacyKeySequence</code> shares fixed keyboard bytes with core capability discovery;
+the input module retains its own preallocated byte arrays for event encoding.</p>
 <p>See the <a href="README.html">README</a> for construction and the
 <a href="docs/terminal-input-contract.html">input contract</a> for observable behavior.</p>
 <p>Input tests assert exact bytes, event validation, real core mode changes, scratch
 reuse, and write-failure recovery. Run <code>./gradlew :ketraterm-input:test</code> for this module&#39;s tests.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c5ccadb24df9fd1252edc3204b5efc59a9f2a1ab/ketraterm-input/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/24c9b808d675dfd14a3aebe23aa2c6b326f312a2/ketraterm-input/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
