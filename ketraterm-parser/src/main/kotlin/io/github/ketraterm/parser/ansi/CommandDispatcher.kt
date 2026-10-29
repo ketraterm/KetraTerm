@@ -20,6 +20,7 @@ import io.github.ketraterm.parser.charset.CharsetMapper
 import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.ControlCode
+import io.github.ketraterm.protocol.DecPrivateMode
 import io.github.ketraterm.protocol.DecRectangleAttribute
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
 import io.github.ketraterm.protocol.keyboard.XtermKeyResource
@@ -113,6 +114,9 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             'D'.code -> sink.lineFeed()
             'E'.code -> sink.nextLine()
             'H'.code -> sink.setTabStop()
+            // DECKPAM/DECKPNM share DEC mode 66 with CSI ? 66 h/l.
+            '='.code -> sink.setDecMode(DecPrivateMode.APPLICATION_KEYPAD, true)
+            '>'.code -> sink.setDecMode(DecPrivateMode.APPLICATION_KEYPAD, false)
             'M'.code -> sink.reverseIndex()
             'N'.code -> CharsetMapper.singleShiftG2(state)
             'O'.code -> CharsetMapper.singleShiftG3(state)

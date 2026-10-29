@@ -72,6 +72,18 @@ public object LegacyKeySequence {
     /** Page Down in the legacy keyboard protocol. */
     public const val PAGE_DOWN: String = "\u001b[6~"
 
+    /** Numeric keypad 7 (upper-left corner) in application keypad mode. */
+    public const val KEYPAD_7_APPLICATION: String = "\u001bOw"
+
+    /** Numeric keypad 9 (upper-right corner) in application keypad mode. */
+    public const val KEYPAD_9_APPLICATION: String = "\u001bOy"
+
+    /** Numeric keypad 1 (lower-left corner) in application keypad mode. */
+    public const val KEYPAD_1_APPLICATION: String = "\u001bOq"
+
+    /** Numeric keypad 3 (lower-right corner) in application keypad mode. */
+    public const val KEYPAD_3_APPLICATION: String = "\u001bOs"
+
     /** F1 in the legacy keyboard protocol. */
     public const val F1: String = "\u001bOP"
 

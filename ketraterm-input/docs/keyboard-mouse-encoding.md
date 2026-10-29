@@ -22,6 +22,7 @@ These examples assume unmodified presses, legacy keyboard mode, and LNM off.
 
 Application cursor mode (DECCKM) selects the cursor-key column. Application
 keypad mode, set by DECKPAM and cleared by DECKPNM, selects the keypad-key column.
+Num Lock overrides that selection for legacy numeric-keypad events.
 `HOME` and `END` are cursor keys; they are not keypad aliases. PF1-PF4 are separate
 key identities from physical F1-F4.
 

@@ -29,6 +29,35 @@ import kotlin.test.assertTrue
 
 class TerminalTerminfoQueryTest {
     @Test
+    fun `keypad discovery captures application mode and preserves duplicate hex spelling`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        val request = "4B31;6b6131;4b31"
+        val failure = reply(false, "4B31") + reply(false, "6b6131") + reply(false, "4b31")
+        val success = reply(true, "4B31", "1b4f77") + reply(true, "6b6131", "1b4f77") + reply(true, "4b31", "1b4f77")
+        buffer.queryTerminfo(request)
+        buffer.setApplicationKeypad(true)
+        buffer.queryTerminfo(request)
+        buffer.setApplicationKeypad(false)
+        buffer.queryTerminfo(request)
+        assertEquals(failure + success + failure, drain(buffer))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `terminal reset restores numeric keypad discovery failures`(soft: Boolean) {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.setApplicationKeypad(true)
+        buffer.queryTerminfo("4b33;4b34;4b35")
+        assertEquals(
+            reply(true, "4b33", "1b4f79") + reply(true, "4b34", "1b4f71") + reply(true, "4b35", "1b4f73"),
+            drain(buffer),
+        )
+        if (soft) buffer.softReset() else buffer.reset()
+        buffer.queryTerminfo("4b33;4b34;4b35")
+        assertEquals(reply(false, "4b33") + reply(false, "4b34") + reply(false, "4b35"), drain(buffer))
+    }
+
+    @Test
     fun `Shift aliases capture current modes and preserve original hex spelling`() {
         val buffer = TerminalBuffers.create(10, 3)
         buffer.queryTerminfo("2332;6b484F4d")
@@ -152,6 +181,7 @@ class TerminalTerminfoQueryTest {
     @Test
     fun `only exact allowlisted names can succeed`() {
         val buffer = TerminalBuffers.create(10, 3)
+        buffer.setApplicationKeypad(true)
         for (name in listOf(
             "smulx",
             "SetULc",
@@ -166,6 +196,12 @@ class TerminalTerminfoQueryTest {
             "kEnd",
             "#3",
             "*4",
+            "Ka1",
+            "ka2",
+            "kb2",
+            "K2",
+            "kc2",
+            "K6",
             "kf13",
             "k0",
             "BE",

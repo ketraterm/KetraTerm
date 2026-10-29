@@ -19,14 +19,62 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import java.awt.Canvas
+import java.awt.HeadlessException
 import java.awt.event.KeyEvent
+import javax.swing.SwingUtilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class SwingKeyMapperTest {
     private val source = Canvas()
-    private val mapper = SwingKeyMapper()
+    private val mapper = SwingKeyMapper(numLockState = { false })
+
+    @Test
+    fun `samples Num Lock for keypad lifecycle events without querying ordinary text`() =
+        SwingUtilities.invokeAndWait {
+            var enabled = false
+            var reads = 0
+            val mapper =
+                SwingKeyMapper(numLockState = {
+                    reads++
+                    enabled
+                })
+            mapper.keyPressed(pressed(KeyEvent.VK_UP))
+            mapper.keyTyped(typed('a'))
+            assertEquals(0, reads)
+
+            val press = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD7))
+            enabled = true
+            val repeat = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD7, modifiers = KeyEvent.ALT_DOWN_MASK))
+            val release = mapper.keyReleased(released(KeyEvent.VK_NUMPAD7))
+            assertEquals(TerminalModifiers.NONE, press?.modifiers)
+            assertEquals(TerminalModifiers.NUM_LOCK or TerminalModifiers.ALT, repeat?.modifiers)
+            assertEquals(TerminalModifiers.NUM_LOCK, release?.modifiers)
+            assertEquals(TerminalKeyEventType.REPEAT, repeat?.type)
+            assertEquals(TerminalKeyEventType.RELEASE, release?.type)
+            assertEquals(3, reads)
+        }
+
+    @Test
+    fun `unsupported and headless Num Lock queries disable sampling without inventing state`() =
+        SwingUtilities.invokeAndWait {
+            for (failure in listOf(UnsupportedOperationException(), HeadlessException())) {
+                var reads = 0
+                val mapper =
+                    SwingKeyMapper(numLockState = {
+                        reads++
+                        throw failure
+                    })
+                val press = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD7, modifiers = KeyEvent.SHIFT_DOWN_MASK))
+                val repeat = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD7))
+                val release = mapper.keyReleased(released(KeyEvent.VK_NUMPAD7))
+                assertEquals(TerminalModifiers.SHIFT, press?.modifiers)
+                assertEquals(TerminalModifiers.NONE, repeat?.modifiers)
+                assertEquals(TerminalModifiers.NONE, release?.modifiers)
+                assertEquals(1, reads)
+            }
+        }
 
     @Test
     fun mapsPrintableTypedCharacter() {
@@ -232,7 +280,7 @@ class SwingKeyMapperTest {
         KeyEvent(
             source,
             KeyEvent.KEY_TYPED,
-            System.currentTimeMillis(),
+            0L,
             modifiers,
             KeyEvent.VK_UNDEFINED,
             char,
@@ -246,7 +294,7 @@ class SwingKeyMapperTest {
         KeyEvent(
             source,
             KeyEvent.KEY_PRESSED,
-            System.currentTimeMillis(),
+            0L,
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
@@ -261,7 +309,7 @@ class SwingKeyMapperTest {
         KeyEvent(
             source,
             KeyEvent.KEY_RELEASED,
-            System.currentTimeMillis(),
+            0L,
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,

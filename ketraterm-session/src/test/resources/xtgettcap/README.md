@@ -16,6 +16,12 @@ These values use the default cursor modifier level 2.
 -1 through 3 in both cursor modes. Tests combine those fixed prefixes with each
 key's final byte and compare the reply with actual encoder output. The four
 Shift aliases are also exercised by the pinned Vim query stream.
+`keypad-corners.tsv` pins the numeric keypad 7/9/1/3 identities and their
+numeric/application bytes from the [DEC numeric keypad table](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-VT220-Style-Function-Keys).
+The [terminfo definitions](https://invisible-island.net/ncurses/man/terminfo.5.html)
+map `ka1/ka3/kc1/kc3` to `K1/K3/K4/K5`. Numeric bytes verify input encoding;
+discovery fails in numeric mode to avoid advertising digits as function keys.
+The Vim replay runs in both keypad modes, with replies allowed and denied.
 F3 is SS3 R, not Kitty's CSI 13~. Backspace uses the host's default DEL here;
 tests separately cover BS policy, explicit DECBKM and reset. Kotlin forwarding
 wrappers retain their original query interception while forwarding host metadata.

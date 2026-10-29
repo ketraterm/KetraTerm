@@ -31,7 +31,7 @@ internal object XtgettcapResponder {
 
     private enum class Kind { BOOLEAN, NUMBER, STRING }
 
-    private enum class KeyMode { NONE, CURSOR, BACKSPACE, BACK_TAB }
+    private enum class KeyMode { NONE, CURSOR, KEYPAD, BACKSPACE, BACK_TAB }
 
     private class Capability(
         val names: Array<String>,
@@ -111,6 +111,34 @@ internal object XtgettcapResponder {
             shiftedCursor(arrayOf("kLFT", "#4"), LegacyKeySequence.CURSOR_LEFT_NORMAL, LegacyKeySequence.CURSOR_LEFT_APPLICATION),
             shiftedCursor(arrayOf("kRIT", "%i"), LegacyKeySequence.CURSOR_RIGHT_NORMAL, LegacyKeySequence.CURSOR_RIGHT_APPLICATION),
             shiftedCursor(arrayOf("kEND", "*7"), LegacyKeySequence.END_NORMAL, LegacyKeySequence.END_APPLICATION),
+            Capability(
+                arrayOf("ka1", "K1"),
+                Kind.STRING,
+                LegacyKeySequence.KEYPAD_7_APPLICATION,
+                keyResource = XtermKeyResource.KEYPAD_KEYS,
+                keyMode = KeyMode.KEYPAD,
+            ),
+            Capability(
+                arrayOf("ka3", "K3"),
+                Kind.STRING,
+                LegacyKeySequence.KEYPAD_9_APPLICATION,
+                keyResource = XtermKeyResource.KEYPAD_KEYS,
+                keyMode = KeyMode.KEYPAD,
+            ),
+            Capability(
+                arrayOf("kc1", "K4"),
+                Kind.STRING,
+                LegacyKeySequence.KEYPAD_1_APPLICATION,
+                keyResource = XtermKeyResource.KEYPAD_KEYS,
+                keyMode = KeyMode.KEYPAD,
+            ),
+            Capability(
+                arrayOf("kc3", "K5"),
+                Kind.STRING,
+                LegacyKeySequence.KEYPAD_3_APPLICATION,
+                keyResource = XtermKeyResource.KEYPAD_KEYS,
+                keyMode = KeyMode.KEYPAD,
+            ),
             Capability(arrayOf("kf1", "k1"), Kind.STRING, LegacyKeySequence.F1, keyResource = XtermKeyResource.FUNCTION_KEYS),
             Capability(arrayOf("kf2", "k2"), Kind.STRING, LegacyKeySequence.F2, keyResource = XtermKeyResource.FUNCTION_KEYS),
             Capability(arrayOf("kf3", "k3"), Kind.STRING, LegacyKeySequence.F3, keyResource = XtermKeyResource.FUNCTION_KEYS),
@@ -276,6 +304,9 @@ internal object XtgettcapResponder {
         }
         val otherKeys = TerminalInputState.modifyOtherKeysMode(modeBits)
         return when (capability.keyMode) {
+            // Numeric mode emits printable digits, not distinct function-key sequences.
+            // Advertising those bytes could make consumers capture ordinary digit input.
+            KeyMode.KEYPAD -> TerminalInputState.isApplicationKeypad(modeBits)
             KeyMode.BACKSPACE ->
                 otherKeys != ModifyOtherKeysMode.MODE_3 &&
                     (defaultBackarrowSendsBackspace != null || TerminalInputState.isBackarrowKeyModeExplicit(modeBits))

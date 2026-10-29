@@ -136,6 +136,7 @@ Keyboard entries are strings describing legacy key presses in the current mode:
 | `kbs` / `kb` | BS (`08`) or DEL (`7f`), according to DECBKM or the current host Backspace policy. |
 | `kcbt` / `kB` | Shift-Tab: `ESC [Z`. |
 | `kHOM` / `#2`, `kLFT` / `#4`, `kRIT` / `%i`, `kEND` / `*7` | Shift+Home/Left/Right/End. Default cursor modifier level 2: `ESC [1;2H/D/C/F`. |
+| `ka1` / `K1`, `ka3` / `K3`, `kc1` / `K4`, `kc3` / `K5` | Application keypad corners: numeric keypad 7/9/1/3 send `ESC Ow/Oy/Oq/Os`. Numeric keypad mode receives failure replies. |
 
 Slash-separated sequences above denote alternatives, not literal slash bytes.
 One coherent mode snapshot is used for the whole request. Queries do not enable
@@ -157,9 +158,19 @@ and `SS3` is `ESC O`. Spaces below are notation, not transmitted bytes:
 Disabling cursor modifiers drops Shift, matching actual key encoding.
 Function, special and ordinary-key resource settings do not change these entries.
 
+Keypad corner discovery requires application keypad mode (DECKPAM, `ESC =`);
+DECKPNM (`ESC >`) restores numeric mode. These controls share the state selected
+by DECSET/DECRST 66. It is independent of the application cursor
+mode and follows the keypad modifier resource (3). Numeric-mode digits are not
+advertised as function-key sequences, so consumers do not capture ordinary
+`7/9/1/3` input. These names describe numeric keypad identities, not the separate
+keypad Home/End/Page Up/Page Down identities or dedicated editing keys.
+Num Lock can override individual legacy keypad events; it does not change
+application mode or capability discovery.
+
 These entries describe the legacy press vocabulary only. While any Kitty keyboard
 flags are active, keyboard names receive failure replies. Xterm resource level 4
-declines only that resource's keys (cursor/editing, function, or special keys).
+declines only that resource's keys (cursor/editing, function, keypad, or special keys).
 `modifyOtherKeys` level 2 additionally declines Shift-Tab; level 3 declines both
 Shift-Tab and Backspace. Other entries still reply normally, including output
 capabilities. Resetting the relevant mode restores discovery.

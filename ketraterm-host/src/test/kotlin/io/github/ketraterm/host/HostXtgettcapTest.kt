@@ -16,6 +16,7 @@
 package io.github.ketraterm.host
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.api.TerminalParsers
@@ -31,6 +32,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HostXtgettcapTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `keypad ESC controls switch discovery at every split independently of response permission`(denied: Boolean) {
+        val wire = "\u001b=\u001bP+q4b31\u001b\\\u001b>\u001bP+q4b31\u001b\\X".encodeToByteArray()
+        val expected = if (denied) "" else "\u001bP1+r4b31=1b4f77\u001b\\\u001bP0+r4b31\u001b\\"
+        for (split in -1..wire.size) {
+            val f = Fixture(HostPolicy(terminalResponsePolicy = if (denied) HostControlPolicy.DENY else HostControlPolicy.ALLOW))
+            if (split < 0) {
+                wire.forEach { f.parser.acceptByte(it.toInt() and 255) }
+            } else {
+                f.parser.accept(wire, 0, split)
+                f.parser.accept(wire, split, wire.size - split)
+            }
+            assertEquals(expected, f.drain(), "split=" + split)
+            assertEquals("X", f.buffer.getLineAsString(0))
+            assertEquals(false, TerminalInputState.isApplicationKeypad(f.buffer.getInputModeBits()))
+            f.write("\u001b=")
+            assertTrue(TerminalInputState.isApplicationKeypad(f.buffer.getInputModeBits()))
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [0, 255])
     fun `Su supports indexed underline colors without changing the active pen or cursor`(index: Int) {

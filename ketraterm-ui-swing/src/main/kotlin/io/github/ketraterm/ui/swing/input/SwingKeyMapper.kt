@@ -19,6 +19,7 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
+import java.awt.Toolkit
 import java.awt.event.KeyEvent
 
 /**
@@ -31,11 +32,18 @@ import java.awt.event.KeyEvent
  * Numeric keypad keys are emitted from `KEY_PRESSED` so application-keypad mode
  * can be applied by the input encoder; their follow-up `KEY_TYPED` event is
  * suppressed to avoid emitting the normal-mode character twice.
+ *
+ * @param numLockState current platform Num Lock state, sampled only for numeric
+ * keypad events. Unsupported queries disable sampling for this mapper; no lock
+ * state is inferred from a key code or a typed character.
  */
-internal class SwingKeyMapper {
+internal class SwingKeyMapper(
+    private val numLockState: () -> Boolean = { Toolkit.getDefaultToolkit().getLockingKeyState(KeyEvent.VK_NUM_LOCK) },
+) {
     private var pendingHighSurrogate: Char = NO_PENDING_SURROGATE
     private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
     private var suppressNextKeypadTyped: Boolean = false
+    private var numLockQueryAvailable: Boolean = true
     private val pressedPhysicalKeys = BooleanArray((KeyEvent.KEY_LAST + 1) * KEY_LOCATION_COUNT)
 
     /**
@@ -51,7 +59,7 @@ internal class SwingKeyMapper {
         val key = terminalKey(event)
         if (key != null) {
             suppressNextKeypadTyped = isPrintableKeypadKey(key)
-            return TerminalKeyEvent.key(key, modifiers, pressedType(event))
+            return TerminalKeyEvent.key(key, keypadModifiers(key, modifiers), pressedType(event))
         }
 
         suppressNextKeypadTyped = false
@@ -76,7 +84,7 @@ internal class SwingKeyMapper {
     fun keyReleased(event: KeyEvent): TerminalKeyEvent? {
         val key = terminalKey(event) ?: return null
         if (!releasePhysicalKey(event)) return null
-        return TerminalKeyEvent.key(key, modifiers(event), TerminalKeyEventType.RELEASE)
+        return TerminalKeyEvent.key(key, keypadModifiers(key, modifiers(event)), TerminalKeyEventType.RELEASE)
     }
 
     /**
@@ -133,6 +141,21 @@ internal class SwingKeyMapper {
         val modifiers = pendingHighSurrogateModifiers
         pendingHighSurrogateModifiers = TerminalModifiers.NONE
         return modifiers
+    }
+
+    private fun keypadModifiers(
+        key: TerminalKey,
+        modifiers: Int,
+    ): Int {
+        if (!numLockQueryAvailable || key.ordinal !in TerminalKey.NUMPAD_SPACE.ordinal..TerminalKey.NUMPAD_9.ordinal) return modifiers
+        return try {
+            if (numLockState()) modifiers or TerminalModifiers.NUM_LOCK else modifiers
+        } catch (_: UnsupportedOperationException) {
+            // HeadlessException also extends UnsupportedOperationException. Capability
+            // failure is stable for this toolkit; avoid throwing again on every key.
+            numLockQueryAvailable = false
+            modifiers
+        }
     }
 
     private fun modifiers(event: KeyEvent): Int {

@@ -428,6 +428,10 @@ public final class io/github/ketraterm/protocol/keyboard/LegacyKeySequence {
 	public static final field HOME_NORMAL Ljava/lang/String;
 	public static final field INSERT Ljava/lang/String;
 	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/LegacyKeySequence;
+	public static final field KEYPAD_1_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_3_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_7_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_9_APPLICATION Ljava/lang/String;
 	public static final field PAGE_DOWN Ljava/lang/String;
 	public static final field PAGE_UP Ljava/lang/String;
 }

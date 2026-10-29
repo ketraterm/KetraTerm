@@ -34,6 +34,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.util.*
 import kotlin.test.assertEquals
@@ -78,6 +79,7 @@ class TerminalXtgettcapKeyboardTest {
         runTest {
             fixture().use { f ->
                 val expected = StringBuilder()
+                assertEquals(28, cases().size)
                 val prefixes = resource("shift-cursor-prefixes.tsv").single { it[0].toInt() == modifierLevel }
                 for (application in listOf(false, true, false)) {
                     f.receive(
@@ -140,36 +142,39 @@ class TerminalXtgettcapKeyboardTest {
         }
 
     @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `pinned Vim queries replay in source order with allowed and denied replies`(denied: Boolean) =
-        runTest {
-            fixture(denied = denied).use { f ->
-                val keys = cases().associateBy { it.termcap }
-                val requests = resource("vim-queries.tsv")
-                val expected = StringBuilder()
-                f.receive("\u001b[?1h")
-                for (fields in requests) {
-                    val name = fields[0]
-                    // Replay the pinned producer bytes, not the test query helper.
-                    for (byte in HexFormat.of().parseHex(fields[1])) {
-                        f.session.onBytes(byteArrayOf(byte), 0, 1)
-                    }
-                    if (!denied) {
-                        val value =
-                            when (name) {
-                                "Co" -> "256"
-                                "PS" -> "\u001b[200~"
-                                "PE" -> "\u001b[201~"
-                                else -> keys[name]?.application
-                            }
-                        expected.append(reply(name, value))
-                    }
+    @CsvSource("false, false", "false, true", "true, false", "true, true")
+    fun `pinned Vim queries replay in source order with allowed and denied replies`(
+        denied: Boolean,
+        applicationKeypad: Boolean,
+    ) = runTest {
+        fixture(denied = denied).use { f ->
+            val keys = cases().associateBy { it.termcap }
+            val keypad = cases("keypad-corners.tsv").associateBy { it.termcap }
+            val requests = resource("vim-queries.tsv")
+            val expected = StringBuilder()
+            f.receive("\u001b[?1h" + if (applicationKeypad) "\u001b=" else "\u001b>")
+            for (fields in requests) {
+                val name = fields[0]
+                // Replay the pinned producer bytes, not the test query helper.
+                for (byte in HexFormat.of().parseHex(fields[1])) {
+                    f.session.onBytes(byteArrayOf(byte), 0, 1)
                 }
-                runCurrent()
-                assertEquals(37, requests.size)
-                assertEquals(expected.toString(), f.output())
+                if (!denied) {
+                    val value =
+                        when (name) {
+                            "Co" -> "256"
+                            "PS" -> "\u001b[200~"
+                            "PE" -> "\u001b[201~"
+                            else -> keys[name]?.application ?: if (applicationKeypad) keypad[name]?.application else null
+                        }
+                    expected.append(reply(name, value))
+                }
             }
+            runCurrent()
+            assertEquals(37, requests.size)
+            assertEquals(expected.toString(), f.output())
         }
+    }
 
     @Test
     fun `Backspace discovery follows policy updates DECBKM and reset`() =
@@ -275,16 +280,98 @@ class TerminalXtgettcapKeyboardTest {
         runTest {
             fixture().use { f ->
                 val expected = StringBuilder()
-                f.receive("\u001b[=" + flags + "u")
+                f.receive("\u001b=\u001b[=" + flags + "u")
                 assertEquals(flags, TerminalInputState.kittyKeyboardFlags(f.session.getInputModeBits()))
-                for (case in cases()) {
-                    f.receive(query(case.terminfo))
-                    expected.append(reply(case.terminfo, null))
+                val keypad = cases("keypad-corners.tsv")
+                for (case in cases() + keypad) {
+                    for (name in listOf(case.terminfo, case.termcap)) {
+                        f.receive(query(name))
+                        expected.append(reply(name, null))
+                    }
                 }
                 f.receive(query("Co") + "\u001b[=0u" + query("ku"))
                 expected.append(reply("Co", "256")).append(reply("ku", "\u001b[A"))
+                for (case in keypad) {
+                    for (name in listOf(case.terminfo, case.termcap)) {
+                        f.receive(query(name))
+                        f.session.encodeKey(TerminalKeyEvent(key = case.key))
+                        expected.append(reply(name, case.application)).append(case.application)
+                    }
+                }
                 runCurrent()
                 assertEquals(expected.toString(), f.output())
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [-1, 0, 1, 2, 3])
+    fun `keypad corner aliases match actual keys independently of cursor and modifier modes`(modifierLevel: Int) =
+        runTest {
+            fixture().use { f ->
+                val keypad = cases("keypad-corners.tsv")
+                assertEquals(4, keypad.size)
+                val expected = StringBuilder()
+                // Other resources must not suppress or reformat application keypad keys.
+                f.receive("\u001b[>1;4m\u001b[>2;4m\u001b[>7;4m\u001b[>4;3m")
+                f.receive(if (modifierLevel < 0) "\u001b[>3n" else "\u001b[>3;" + modifierLevel + "m")
+                assertEquals(modifierLevel, TerminalInputState.keyModifierOption(f.session.getInputModeBits(), 3))
+                for (applicationKeypad in listOf(false, true, false)) {
+                    f.receive(if (applicationKeypad) "\u001b=" else "\u001b>")
+                    for (applicationCursor in listOf(false, true)) {
+                        f.receive(if (applicationCursor) "\u001b[?1h" else "\u001b[?1l")
+                        for (case in keypad) {
+                            val value = if (applicationKeypad) case.application else null
+                            for (name in listOf(case.terminfo, case.termcap)) {
+                                f.receive(query(name))
+                                f.session.encodeKey(TerminalKeyEvent(key = case.key))
+                                expected.append(reply(name, value)).append(if (applicationKeypad) case.application else case.normal)
+                            }
+                        }
+                        runCurrent()
+                        assertEquals(expected.toString(), f.output(), "keypad=" + applicationKeypad + ", cursor=" + applicationCursor)
+                    }
+                }
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1])
+    fun `keypad extended formats decline corner aliases and recover independently`(format: Int) =
+        runTest {
+            fixture().use { f ->
+                val keypad = cases("keypad-corners.tsv")
+                val expected = StringBuilder()
+                for (application in listOf(false, true)) {
+                    f.receive(if (application) "\u001b=" else "\u001b>")
+                    // Format selection alone does not enable extended reports.
+                    f.receive("\u001b[>3;" + format + "f")
+                    for (case in keypad) {
+                        for (name in listOf(case.terminfo, case.termcap)) {
+                            f.receive(query(name))
+                            expected.append(reply(name, if (application) case.application else null))
+                        }
+                    }
+                    f.receive("\u001b[>3;4m")
+                    for (case in keypad) {
+                        for (name in listOf(case.terminfo, case.termcap)) {
+                            f.receive(query(name))
+                            expected.append(reply(name, null))
+                        }
+                    }
+                    f.receive(query("ku") + query("Co") + "\u001b[>3m")
+                    expected.append(reply("ku", "\u001b[A")).append(reply("Co", "256"))
+                    for (case in keypad) {
+                        for (name in listOf(case.terminfo, case.termcap)) {
+                            f.receive(query(name))
+                            f.session.encodeKey(TerminalKeyEvent(key = case.key))
+                            expected
+                                .append(reply(name, if (application) case.application else null))
+                                .append(if (application) case.application else case.normal)
+                        }
+                    }
+                    runCurrent()
+                    assertEquals(expected.toString(), f.output())
+                }
             }
         }
 
@@ -333,8 +420,8 @@ class TerminalXtgettcapKeyboardTest {
         val application: String,
     )
 
-    private fun cases(): List<Case> =
-        resource("keys.tsv")
+    private fun cases(resourceName: String = "keys.tsv"): List<Case> =
+        resource(resourceName)
             .map { f ->
                 Case(
                     f[0],
@@ -344,7 +431,7 @@ class TerminalXtgettcapKeyboardTest {
                     unhex(f[4]),
                     unhex(f[5]),
                 )
-            }.also { assertEquals(28, it.size) }
+            }
 
     private fun resource(name: String): List<List<String>> =
         checkNotNull(javaClass.getResource("/xtgettcap/" + name))
