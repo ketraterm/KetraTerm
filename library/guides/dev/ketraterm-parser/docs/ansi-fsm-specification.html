@@ -32,15 +32,15 @@ state machine. A pending printable UTF-8 scalar takes priority. Once resolved,
 normal byte routing resumes, including bounded replay of a non-continuation byte.</p>
 <p>The ANSI route separates three responsibilities:</p>
 <ol>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt">ByteClass</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt">ByteClass</a>
 maps <code>0x00..0x7f</code> into 16 control/ASCII classes and <code>0x80..0xff</code> into the
 <code>UTF8_PAYLOAD</code> routing class. Raw C1 bytes are not 8-bit control introducers.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt">AnsiStateMachine</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt">AnsiStateMachine</a>
 performs a flat <code>IntArray</code> lookup for the current state and routing class.
 Each entry packs an action in the low eight bits and the next state above it.
 There are 18 states and 32 reserved columns per state, with 17 active routing
 classes. Lookup uses <code>(state shl 5) or byteClass</code>.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt">ActionEngine</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt">ActionEngine</a>
 updates reusable sequence state and delegates semantic operations to the
 dispatchers or printable processor.</li>
 </ol>
@@ -52,7 +52,7 @@ call allocation-free: completed metadata commands may decode strings, and
 explicitly permitted larger OSC bodies may grow collection storage.</p>
 <h2 id="2-csi-command-signatures">2. CSI Command Signatures</h2>
 <p>CSI dispatch distinguishes the final byte, private marker, and ordered
-intermediates. <a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/CsiSignature.kt">CsiSignature</a>
+intermediates. <a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/CsiSignature.kt">CsiSignature</a>
 packs them into a primitive <code>Long</code>:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -90,7 +90,7 @@ for dispatchers that require exact values. The intermediate collector retains
 the first four bytes; additional intermediate bytes are dropped.</p>
 <p><a id="3-high-speed-dispatch-table"></a></p>
 <h2 id="3-dispatch-table">3. Dispatch table</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/GeneratedCsiDispatchTable.kt">GeneratedCsiDispatchTable</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/GeneratedCsiDispatchTable.kt">GeneratedCsiDispatchTable</a>
 stores sorted structural signatures in a <code>LongArray</code> and corresponding command
 IDs in an <code>IntArray</code>. Binary search selects the command; the dispatcher then
 interprets its parameters and emits semantic sink operations. An unmatched key
@@ -105,7 +105,7 @@ body they are retained as payload rather than executed. DEL is ignored in OSC/DC
 Graphics APC rejects ordinary C0 and DEL as invalid header or Base64 data. String
 escape states handle a split <code>ESC \</code> without confusing it with a standalone ESC
 command.</p>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ControlStringPolicy.kt">ControlStringPolicy</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ControlStringPolicy.kt">ControlStringPolicy</a>
 sets collection limits before decoding. Limits count stored bytes, including
 family headers and separators, excluding introducers, terminators, and controls
 ignored by that string&#39;s rules:</p>
@@ -151,7 +151,7 @@ state without emitting sink commands.</p>
 SOS/PM. The first payload byte selects graphics (<code>G</code>) or draining. A lazy
 <code>GraphicsParser</code> owns the bounded header, incremental Base64 state and one upload
 spanning several APC strings. Its header/chunk/transfer limits are separate from
-<code>ControlStringPolicy</code>; see <a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalGraphicsLimits.kt">TerminalGraphicsLimits</a>.</p>
+<code>ControlStringPolicy</code>; see <a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalGraphicsLimits.kt">TerminalGraphicsLimits</a>.</p>
 <p><code>APC_END</code> validates a chunk at ST; <code>APC_ABORT</code> cancels on CAN/SUB. An unexpected
 escape suffix uses <code>APC_INVALID</code> to reject and drain the current string rather
 than execute its tail as terminal input. The sink&#39;s invalidation token prevents
@@ -165,7 +165,7 @@ mutation invariants. <code>ControlStringPayloadPolicyTest</code>, <code>CustomOs
 <code>CustomOscLimitTest</code>, <code>GraphicsParserTest</code>, and <code>TerminalParserTest</code> cover exact bounds, chunking,
 cancellation, ordering, and recovery. Run <code>./gradlew :ketraterm-parser:test</code> from
 the repository root; semantic changes also require the affected host tests.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/292af42abbd5f15d4f864baa693ec5519aafbbbf/ketraterm-parser/docs/ansi-fsm-specification.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-parser/docs/ansi-fsm-specification.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
