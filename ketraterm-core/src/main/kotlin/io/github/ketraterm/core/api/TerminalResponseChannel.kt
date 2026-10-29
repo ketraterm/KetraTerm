@@ -215,12 +215,31 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues the response for a DCS XTGETTCAP request.
      *
-     * Only allowlisted capability names from the shared terminal capability
-     * identity contract produce success responses.
+     * Each well-formed hex name receives its own success or failure frame, in
+     * request order. Only the core capability allowlist produces success.
+     * Malformed batches or batches whose complete response would exceed 64 KiB
+     * receive one empty failure frame without partial results.
+     * This direct core API does not enforce host response permission.
      *
      * @param rawPayload the raw payload containing semicolon-separated hex capability names.
      */
     public fun queryTerminfo(rawPayload: String)
+
+    /**
+     * Supplies host metadata used by XTGETTCAP Backspace discovery.
+     *
+     * This does not change input encoding or terminal modes. The standard response
+     * channel retains the default across terminal resets; explicit DECBKM takes
+     * precedence. Until a default is supplied, Backspace queries fail unless DECBKM
+     * makes the value known.
+     *
+     * Invoke under the same serialization as [queryTerminfo]. This optional hook
+     * is ignored by implementations without host-default support. Keeping metadata
+     * separate preserves the original query dispatch through Kotlin wrappers.
+     *
+     * @param sendsBackspace true for the host's BS default, false for DEL.
+     */
+    public fun setTerminfoBackspaceDefault(sendsBackspace: Boolean) {}
 
     public companion object {
         public const val DEVICE_ATTRIBUTES_PRIMARY: Int = 0

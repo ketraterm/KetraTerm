@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.input.impl
 
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -640,6 +641,76 @@ class KeyboardEncoderTest {
             expected = esc("\u001bOq"),
             event = TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.ALT),
             modeBits = TerminalModeBits.APPLICATION_KEYPAD,
+        )
+    }
+
+    @Test
+    fun `Num Lock overrides legacy keypad digits for press and repeat without enabling releases`() {
+        for (bits in listOf(0L, TerminalModeBits.APPLICATION_KEYPAD)) {
+            for (digit in 0..9) {
+                val key = TerminalKey.entries[TerminalKey.NUMPAD_0.ordinal + digit]
+                val expected = ascii(digit.toString())
+                for (type in listOf(TerminalKeyEventType.PRESS, TerminalKeyEventType.REPEAT)) {
+                    assertBytes(expected, TerminalKeyEvent.key(key, TerminalModifiers.NUM_LOCK, type), bits)
+                }
+                assertBytes(bytes(), TerminalKeyEvent.key(key, TerminalModifiers.NUM_LOCK, TerminalKeyEventType.RELEASE), bits)
+            }
+        }
+        assertBytes(esc("Ow"), TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.CAPS_LOCK), TerminalModeBits.APPLICATION_KEYPAD)
+    }
+
+    @Test
+    fun `Num Lock uses normal keypad symbols and preserves newline policy`() {
+        val bits = TerminalModeBits.APPLICATION_KEYPAD
+        for ((key, value) in listOf(
+            TerminalKey.NUMPAD_DECIMAL to ".",
+            TerminalKey.NUMPAD_DIVIDE to "/",
+            TerminalKey.NUMPAD_MULTIPLY to "*",
+            TerminalKey.NUMPAD_SUBTRACT to "-",
+            TerminalKey.NUMPAD_ADD to "+",
+            TerminalKey.NUMPAD_COMMA to ",",
+            TerminalKey.NUMPAD_EQUALS to "=",
+            TerminalKey.NUMPAD_BEGIN to "5",
+            TerminalKey.NUMPAD_SPACE to " ",
+            TerminalKey.NUMPAD_TAB to "\t",
+        )) {
+            assertBytes(ascii(value), TerminalKeyEvent.key(key, TerminalModifiers.NUM_LOCK), bits)
+        }
+        val enter = TerminalKeyEvent.key(TerminalKey.NUMPAD_ENTER, TerminalModifiers.NUM_LOCK)
+        assertBytes(bytes(13), enter, bits)
+        assertBytes(bytes(13, 10), enter, bits or TerminalModeBits.NEW_LINE_MODE)
+        assertBytes(
+            bytes(13),
+            enter,
+            bits or TerminalModeBits.NEW_LINE_MODE,
+            TerminalInputPolicy(enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR),
+        )
+    }
+
+    @Test
+    fun `Num Lock preserves keypad Alt Control Shift and Meta policies`() {
+        val bits = TerminalModeBits.APPLICATION_KEYPAD
+        assertBytes(bytes(27, 55), TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.NUM_LOCK or TerminalModifiers.ALT), bits)
+        assertBytes(ascii("7"), TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.NUM_LOCK or TerminalModifiers.CTRL), bits)
+        assertBytes(ascii("7"), TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.NUM_LOCK or TerminalModifiers.SHIFT), bits)
+        assertBytes(
+            bytes(),
+            TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.NUM_LOCK or TerminalModifiers.META),
+            bits,
+            TerminalInputPolicy(metaKeyPolicy = MetaKeyPolicy.SUPPRESS_EVENT),
+        )
+    }
+
+    @Test
+    fun `Num Lock does not bypass extended keypad or Kitty reporting`() {
+        val key = TerminalKeyEvent.key(TerminalKey.NUMPAD_7, TerminalModifiers.NUM_LOCK)
+        val extended = TerminalInputState.withKeyModifierOption(TerminalModeBits.APPLICATION_KEYPAD, 3, 4)
+        assertBytes(esc("[27;1;58039~"), key, extended)
+        assertBytes(esc("[58039;1u"), key, TerminalInputState.withKeyFormatOption(extended, 3, 1))
+        assertBytes(
+            esc("[57406;129u"),
+            key,
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES) or TerminalModeBits.APPLICATION_KEYPAD,
         )
     }
 

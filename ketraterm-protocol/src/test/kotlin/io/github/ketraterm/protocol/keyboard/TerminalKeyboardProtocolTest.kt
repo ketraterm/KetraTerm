@@ -21,6 +21,16 @@ import org.junit.jupiter.api.Test
 
 class TerminalKeyboardProtocolTest {
     @Test
+    fun `application keypad corners expose DEC numeric keypad sequences`() {
+        assertAll(
+            { assertEquals("\u001bOw", LegacyKeySequence.KEYPAD_7_APPLICATION) },
+            { assertEquals("\u001bOy", LegacyKeySequence.KEYPAD_9_APPLICATION) },
+            { assertEquals("\u001bOq", LegacyKeySequence.KEYPAD_1_APPLICATION) },
+            { assertEquals("\u001bOs", LegacyKeySequence.KEYPAD_3_APPLICATION) },
+        )
+    }
+
+    @Test
     fun `modifyOtherKeys modes expose input and core shared vocabulary`() {
         assertAll(
             { assertEquals(0, ModifyOtherKeysMode.DISABLED) },

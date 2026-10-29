@@ -491,7 +491,7 @@ class TerminalResponseChannelTest {
 
         // Querying colors ("Co" -> hex 436f) and name ("TN" -> hex 544e)
         buffer.queryTerminfo("436f;544e")
-        assertEquals("\u001BP1+r436f=323536;544e=787465726d2d323536636f6c6f72\u001B\\", drain(buffer))
+        assertEquals("\u001BP1+r436f=323536\u001B\\\u001BP1+r544e=787465726d2d323536636f6c6f72\u001B\\", drain(buffer))
 
         // Querying boolean RGB ("RGB" -> hex 524742)
         buffer.queryTerminfo("524742")
@@ -510,7 +510,7 @@ class TerminalResponseChannelTest {
         buffer.queryTerminfo("636f6c6f7273;6e616d65;5463")
 
         assertEquals(
-            "\u001BP1+r636f6c6f7273=323536;6e616d65=787465726d2d323536636f6c6f72;5463\u001B\\",
+            "\u001BP1+r636f6c6f7273=323536\u001B\\\u001BP1+r6e616d65=787465726d2d323536636f6c6f72\u001B\\\u001BP1+r5463\u001B\\",
             drain(buffer),
         )
         assertEquals("256", TerminalCapabilityIdentity.TERMINFO_COLOR_COUNT)

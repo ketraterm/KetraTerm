@@ -399,6 +399,43 @@ public final class io/github/ketraterm/protocol/keyboard/KittyKeyboardProgressiv
 	public static final field REPORT_EVENT_TYPES I
 }
 
+public final class io/github/ketraterm/protocol/keyboard/LegacyKeySequence {
+	public static final field BACK_TAB Ljava/lang/String;
+	public static final field CURSOR_DOWN_APPLICATION Ljava/lang/String;
+	public static final field CURSOR_DOWN_NORMAL Ljava/lang/String;
+	public static final field CURSOR_LEFT_APPLICATION Ljava/lang/String;
+	public static final field CURSOR_LEFT_NORMAL Ljava/lang/String;
+	public static final field CURSOR_RIGHT_APPLICATION Ljava/lang/String;
+	public static final field CURSOR_RIGHT_NORMAL Ljava/lang/String;
+	public static final field CURSOR_UP_APPLICATION Ljava/lang/String;
+	public static final field CURSOR_UP_NORMAL Ljava/lang/String;
+	public static final field DELETE Ljava/lang/String;
+	public static final field END_APPLICATION Ljava/lang/String;
+	public static final field END_NORMAL Ljava/lang/String;
+	public static final field F1 Ljava/lang/String;
+	public static final field F10 Ljava/lang/String;
+	public static final field F11 Ljava/lang/String;
+	public static final field F12 Ljava/lang/String;
+	public static final field F2 Ljava/lang/String;
+	public static final field F3 Ljava/lang/String;
+	public static final field F4 Ljava/lang/String;
+	public static final field F5 Ljava/lang/String;
+	public static final field F6 Ljava/lang/String;
+	public static final field F7 Ljava/lang/String;
+	public static final field F8 Ljava/lang/String;
+	public static final field F9 Ljava/lang/String;
+	public static final field HOME_APPLICATION Ljava/lang/String;
+	public static final field HOME_NORMAL Ljava/lang/String;
+	public static final field INSERT Ljava/lang/String;
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/LegacyKeySequence;
+	public static final field KEYPAD_1_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_3_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_7_APPLICATION Ljava/lang/String;
+	public static final field KEYPAD_9_APPLICATION Ljava/lang/String;
+	public static final field PAGE_DOWN Ljava/lang/String;
+	public static final field PAGE_UP Ljava/lang/String;
+}
+
 public final class io/github/ketraterm/protocol/keyboard/ModifyOtherKeysMode {
 	public static final field DISABLED I
 	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/ModifyOtherKeysMode;

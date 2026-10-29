@@ -1,0 +1,5 @@
+# terminfo	termcap	key	modifiers	numeric_hex	application_hex
+ka1	K1	NUMPAD_7	NONE	37	1b4f77
+ka3	K3	NUMPAD_9	NONE	39	1b4f79
+kc1	K4	NUMPAD_1	NONE	31	1b4f71
+kc3	K5	NUMPAD_3	NONE	33	1b4f73

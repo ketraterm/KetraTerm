@@ -34,6 +34,32 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("Mode dispatcher")
 class ModeDispatchTest {
     @Test
+    fun `keypad ESC aliases and DEC mode 66 dispatch identically at every split`() {
+        val wire = "\u001b=\u001b[?66l\u001b[?66h\u001b>".encodeToByteArray()
+        for (split in 0..wire.size) {
+            val fixture = TerminalParserFixture()
+            fixture.parser.accept(wire, 0, split)
+            fixture.parser.accept(wire, split, wire.size - split)
+            assertEquals(
+                listOf(decEvent(66, true), decEvent(66, false), decEvent(66, true), decEvent(66, false)),
+                fixture.sink.events,
+                "split=" + split,
+            )
+        }
+    }
+
+    @Test
+    fun `keypad ESC controls reject intermediates and recover after cancellation`() {
+        val wire = "\u001b =\u001b#>\u001b(=\u001b\u0018=\u001b=".encodeToByteArray()
+        for (split in 0..wire.size) {
+            val fixture = TerminalParserFixture()
+            fixture.parser.accept(wire, 0, split)
+            fixture.parser.accept(wire, split, wire.size - split)
+            assertEquals(listOf("writeCodepoint:61", decEvent(66, true)), fixture.sink.events, "split=" + split)
+        }
+    }
+
+    @Test
     fun `XTSHIFTESCAPE does not overwrite the saved cursor charset slot`() {
         val fixture = TerminalParserFixture()
         fixture.acceptAscii("\u001B(0\u001B7\u001B(B")

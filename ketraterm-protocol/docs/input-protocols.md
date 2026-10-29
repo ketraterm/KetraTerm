@@ -6,6 +6,11 @@ covers values and representations; the
 [input contract](../../ketraterm-input/docs/terminal-input-contract.md#keyboard-contract)
 owns encoding behavior.
 
+`LegacyKeySequence` provides immutable ASCII strings for fixed cursor, editing,
+F1–F12 and Shift-Tab sequences. Core capability discovery and input's preallocated
+byte tables use the same vocabulary. Mode selection remains in the owning core
+and input layers; these constants do not encode events or consult state.
+
 ## 1. xterm `modifyOtherKeys` Mode
 
 `ModifyOtherKeysMode` defines the levels for ordinary keys:

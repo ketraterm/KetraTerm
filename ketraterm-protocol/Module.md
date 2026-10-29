@@ -11,7 +11,7 @@ host-bound byte sink; parsing and terminal behavior remain in their owning layer
 | Package | Responsibility |
 | :--- | :--- |
 | `io.github.ketraterm.protocol` | Control bytes, modes, identity, clipboard selectors, graphics command/result vocabulary and admission limits, and host metadata. |
-| `io.github.ketraterm.protocol.keyboard` | xterm key resources and Kitty keyboard values. |
+| `io.github.ketraterm.protocol.keyboard` | Fixed legacy key sequences, xterm key resources and Kitty keyboard values. |
 | `io.github.ketraterm.protocol.mouse` | Normalized integer mouse modes for packed input state. |
 | `io.github.ketraterm.protocol.host` | `TerminalHostOutput` synchronous byte-consumption contract. |
 

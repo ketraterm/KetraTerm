@@ -19,6 +19,7 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.impl.TerminalSequences
 import io.github.ketraterm.protocol.ControlCode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFunctionalKeyCode
+import io.github.ketraterm.protocol.keyboard.LegacyKeySequence
 
 /**
  * Data-oriented lookup tables for mapping [TerminalKey] values.
@@ -160,20 +161,20 @@ internal object KeyMappingTable {
             KITTY_PUA_CODES[TerminalKey.LEFT_SHIFT.ordinal + offset] = KittyKeyboardFunctionalKeyCode.LEFT_SHIFT + offset
         }
 
-        // Application Keypad Finals
+        // The SS3 writer needs only the final; corner entries share discovery's wire vocabulary.
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_SPACE.ordinal] = ' '.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_TAB.ordinal] = 'I'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_ENTER.ordinal] = 'M'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_0.ordinal] = 'p'.code
-        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_1.ordinal] = 'q'.code
+        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_1.ordinal] = LegacyKeySequence.KEYPAD_1_APPLICATION.last().code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_2.ordinal] = 'r'.code
-        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_3.ordinal] = 's'.code
+        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_3.ordinal] = LegacyKeySequence.KEYPAD_3_APPLICATION.last().code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_4.ordinal] = 't'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_5.ordinal] = 'u'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_6.ordinal] = 'v'.code
-        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_7.ordinal] = 'w'.code
+        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_7.ordinal] = LegacyKeySequence.KEYPAD_7_APPLICATION.last().code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_8.ordinal] = 'x'.code
-        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_9.ordinal] = 'y'.code
+        APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_9.ordinal] = LegacyKeySequence.KEYPAD_9_APPLICATION.last().code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_DECIMAL.ordinal] = 'n'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_DIVIDE.ordinal] = 'o'.code
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_MULTIPLY.ordinal] = 'j'.code

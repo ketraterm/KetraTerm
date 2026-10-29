@@ -23,6 +23,8 @@ The module exports its `ketraterm-core` and `ketraterm-protocol` dependencies.
 Core supplies coherent input-mode reads; protocol supplies wire vocabulary and
 the synchronous byte-sink contract. Session supplies outbound admission,
 serialization, and transport lifetime.
+`LegacyKeySequence` shares fixed keyboard bytes with core capability discovery;
+the input module retains its own preallocated byte arrays for event encoding.
 
 See the [README](README.md) for construction and the
 [input contract](docs/terminal-input-contract.md) for observable behavior.

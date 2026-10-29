@@ -110,6 +110,10 @@ represent these keys independently of their legacy byte choices.
 
 PF1-PF4 are distinct from physical F1-F4. Application cursor mode affects
 unmodified cursor keys; application keypad mode affects normalized keypad keys.
+For legacy numeric-keypad events, a supplied `TerminalModifiers.NUM_LOCK` bit
+selects normal numeric output without changing application keypad mode. Alt/Meta
+and newline policies still apply. Extended xterm keypad reports retain their
+format, and Kitty reports retain the supplied lock modifier.
 The [wire reference](keyboard-mouse-encoding.md) gives representative sequences.
 
 `TerminalKeyEvent.text(...)` emits its entire associated text as UTF-8 for press

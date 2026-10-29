@@ -3003,7 +3003,7 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001BP+q436f;544e\u001B\\")
             f.end()
             assertEquals(
-                "\u001BP1+r436f=323536;544e=787465726d2d323536636f6c6f72\u001B\\",
+                "\u001BP1+r436f=323536\u001B\\\u001BP1+r544e=787465726d2d323536636f6c6f72\u001B\\",
                 f.drainResponses(),
             )
         }
@@ -3014,7 +3014,7 @@ class HostCommandAdapterTest {
             // Query "xx" (hex 7878) — not in the allowlist
             f.acceptAscii("\u001BP+q7878\u001B\\")
             f.end()
-            assertEquals("\u001BP0+r\u001B\\", f.drainResponses())
+            assertEquals("\u001BP0+r7878\u001B\\", f.drainResponses())
         }
 
         @Test

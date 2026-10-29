@@ -225,6 +225,11 @@ painters or input controllers.
 | `shellSuggestionKeymap` / `shellSuggestionViewFactory` | Suggestion action mapping and embedded presentation |
 | `uiDispatcher` | UI scheduling; component work must still run on the EDT |
 
+Numeric-keypad events carry Num Lock state when AWT can report it, preserving
+numeric typing in application keypad mode. Unsupported or headless toolkits
+retain existing keypad behavior without inferring lock state or repeatedly
+querying an unavailable facility.
+
 `mouseReportingEnabled` controls application mouse reporting.
 `alternateScreenWheelToArrowEnabled` independently controls wheel-to-arrow input
 in the alternate screen. Both default to `true`; mode 1007 must also be enabled

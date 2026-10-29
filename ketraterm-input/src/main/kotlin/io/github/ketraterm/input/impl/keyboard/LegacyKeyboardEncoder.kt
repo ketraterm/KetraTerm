@@ -333,7 +333,9 @@ internal class LegacyKeyboardEncoder(
             if (!writeModifierPrefixOrSuppress(modifiers)) return
         }
 
-        if (TerminalInputState.isApplicationKeypad(modeBits)) {
+        // Num Lock overrides this event's legacy keypad encoding, not terminal mode.
+        // Extended xterm and Kitty reports retain their own earlier routing.
+        if (TerminalInputState.isApplicationKeypad(modeBits) && !TerminalModifiers.hasNumLock(modifiers)) {
             if (key == TerminalKey.NUMPAD_BEGIN) {
                 CsiWriter.writeCsiLetter(scratch, output, 'E'.code)
                 return

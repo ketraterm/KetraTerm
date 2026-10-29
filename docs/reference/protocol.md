@@ -88,7 +88,7 @@ Permissions and decoded-size limits are checked again before execution.
 | Query | Reply scope |
 | --- | --- |
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
-| XTGETTCAP | Terminal name (`TN`/`name`), color count (`Co`/`colors`), and true-color support (`RGB`/`Tc`). |
+| XTGETTCAP | Identity, colors, parameterized scrolling, paste delimiters, underline capabilities and legacy keyboard names from the [explicit allowlist](#xtgettcap). Each well-formed name receives its own success or failure frame. |
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
 | Kitty graphics (APC G) | Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed `ENOTSUP` errors. Queries require nonzero `i`. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
@@ -100,8 +100,121 @@ Permissions and decoded-size limits are checked again before execution.
 | Rectangle checksum | Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions. |
 
 Denying terminal responses suppresses success and failure replies alike.
-Unsupported queries with defined failure responses use those responses rather
-than echoing request text.
+Unsupported queries use their defined failure frames rather than replaying
+arbitrary request text.
+
+## XTGETTCAP
+
+Requests use `DCS +q hexName[;hexName...] ST`. Allowlisted names are case-sensitive
+ASCII. Each request token encodes bytes using two ASCII hex digits per byte;
+hex digits may use either case. The responder uses the following immutable allowlist:
+
+| Names | Type | Decoded value |
+| --- | --- | --- |
+| `TN`, `name` | String | `xterm-256color` |
+| `Co`, `colors` | Number | Decimal `256` |
+| `RGB`, `Tc` | Boolean | Present, without a value; preserves KetraTerm's existing truecolor contract. |
+| `indn` | String | `ESC [%p1%dS` |
+| `PS`, `PE` | String | `ESC [200~`, `ESC [201~`; paste delimiters used when mode 2004 is enabled. |
+| `Su` | Boolean | Styled and colored underlines. |
+| `Smulx` | String | `ESC [4:%p1%dm`; parameter 0–5 selects none, single, double, curly, dotted, or dashed. |
+| `Setulc` | String | `ESC [58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm`; parameter is packed 24-bit RGB. |
+
+Here `ESC` denotes the actual byte `1b`, and the following space is notation,
+not part of the value. Values contain terminfo parameter expressions literally;
+the application expands them. Numeric values are decimal ASCII before hex encoding.
+No local terminfo database is consulted.
+
+Keyboard entries are strings describing legacy key presses in the current mode:
+
+| Terminfo / termcap names | Decoded value |
+| --- | --- |
+| `kcuu1` / `ku`, `kcud1` / `kd`, `kcuf1` / `kr`, `kcub1` / `kl` | Normal cursor mode: `ESC [A/B/C/D`; application cursor mode: `ESC OA/OB/OC/OD`, respectively. |
+| `khome` / `kh`, `kend` / `@7` | Normal: `ESC [H/F`; application: `ESC OH/OF`. |
+| `kich1` / `kI`, `kdch1` / `kD`, `kpp` / `kP`, `knp` / `kN` | `ESC [2~/3~/5~/6~`, respectively. |
+| `kf1`–`kf9` / `k1`–`k9`; `kf10` / `k;`; `kf11` / `F1`; `kf12` / `F2` | F1–F4: `ESC OP/OQ/OR/OS`. F5–F12: `ESC [15~/17~/18~/19~/20~/21~/23~/24~`. |
+| `kbs` / `kb` | BS (`08`) or DEL (`7f`), according to DECBKM or the current host Backspace policy. |
+| `kcbt` / `kB` | Shift-Tab: `ESC [Z`. |
+| `kHOM` / `#2`, `kLFT` / `#4`, `kRIT` / `%i`, `kEND` / `*7` | Shift+Home/Left/Right/End. Default cursor modifier level 2: `ESC [1;2H/D/C/F`. |
+| `ka1` / `K1`, `ka3` / `K3`, `kc1` / `K4`, `kc3` / `K5` | Application keypad corners: numeric keypad 7/9/1/3 send `ESC Ow/Oy/Oq/Os`. Numeric keypad mode receives failure replies. |
+
+Slash-separated sequences above denote alternatives, not literal slash bytes.
+One coherent mode snapshot is used for the whole request. Queries do not enable
+application modes or change input policy. Applications must query again if they
+need an answer for a different mode.
+
+The four Shift cursor entries follow xterm's cursor modifier resource (1).
+Here `final` is `H`, `D`, `C` or `F`, respectively; `CSI` is `ESC [`
+and `SS3` is `ESC O`. Spaces below are notation, not transmitted bytes:
+
+| Cursor modifier level | Normal cursor mode | Application cursor mode |
+| --- | --- | --- |
+| Disabled (`-1`) | `CSI final` | `SS3 final` |
+| `0` | `CSI 2 final` | `SS3 2 final` |
+| `1` | `CSI 2 final` | `CSI 2 final` |
+| `2` | `CSI 1;2 final` | `CSI 1;2 final` |
+| `3` | `CSI >1;2 final` | `CSI >1;2 final` |
+
+Disabling cursor modifiers drops Shift, matching actual key encoding.
+Function, special and ordinary-key resource settings do not change these entries.
+
+Keypad corner discovery requires application keypad mode (DECKPAM, `ESC =`);
+DECKPNM (`ESC >`) restores numeric mode. These controls share the state selected
+by DECSET/DECRST 66. It is independent of the application cursor
+mode and follows the keypad modifier resource (3). Numeric-mode digits are not
+advertised as function-key sequences, so consumers do not capture ordinary
+`7/9/1/3` input. These names describe numeric keypad identities, not the separate
+keypad Home/End/Page Up/Page Down identities or dedicated editing keys.
+Num Lock can override individual legacy keypad events; it does not change
+application mode or capability discovery.
+
+These entries describe the legacy press vocabulary only. While any Kitty keyboard
+flags are active, keyboard names receive failure replies. Xterm resource level 4
+declines only that resource's keys (cursor/editing, function, keypad, or special keys).
+`modifyOtherKeys` level 2 additionally declines Shift-Tab; level 3 declines both
+Shift-Tab and Backspace. Other entries still reply normally, including output
+capabilities. Resetting the relevant mode restores discovery.
+
+The host adapter supplies its current Backspace default through the optional
+`setTerminfoBackspaceDefault` hook, then invokes the original
+`TerminalResponseChannel.queryTerminfo(String)` method. Existing Kotlin wrappers
+still intercept that method. The standard core retains supplied metadata across
+RIS/DECSTR; explicit DECBKM takes precedence. Direct core callers supply the
+default before querying Backspace.
+
+Without supplied metadata, `kb`/`kbs` fail unless DECBKM makes the answer known.
+This also applies to retained JVM wrappers that cannot forward the new hook.
+Other capability replies remain available. The hook has a default no-op for
+existing implementations and does not change input encoding or terminal modes.
+
+KetraTerm follows Kitty-style individual replies: each supported name produces
+`DCS 1+r hexName[=hexValue] ST`, and each unknown name produces
+`DCS 0+r hexName ST`. Boolean successes omit `=hexValue`. Order, duplicates,
+and the original hex spelling are preserved; an unknown name does not stop later
+names. Well-formed encodings of other bytes, including non-ASCII identifiers,
+also receive keyed failure replies. This differs from xterm's combined-response
+and stop-at-unknown behavior.
+Previously KetraTerm combined recognized entries and omitted unknown entries;
+clients consuming batched replies must accept the individual frames.
+
+An empty list/token, odd-length token, or character outside ASCII `0–9`, `a–f`,
+and `A–F` rejects the whole batch with `DCS 0+r ST`. Validation and encoded-size preflight
+finish before any replies from that batch are queued. A complete response larger
+than 64 KiB is rejected the same way, including through the direct core API.
+Earlier queued replies remain intact. The parser's 4,096-byte collection ceiling
+includes `+q`; overflow drains the string without dispatch or a partial reply.
+
+The existing terminal-response permission gates all frames, including failures.
+Window-manipulation and palette permissions do not gate capability discovery.
+Direct core callers enforce host permission themselves. Query handling neither
+executes advertised templates nor changes grid, cursor, modes, or attributes.
+
+Protocol references: [xterm](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html),
+[Kitty responder](https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py).
+The [ncurses fixtures](../../ketraterm-host/src/test/resources/xtgettcap/README.md)
+verify template expansion and resulting terminal behavior without native test dependencies.
+The [keyboard fixtures](../../ketraterm-session/src/test/resources/xtgettcap/README.md)
+pin Vim's query list and verify advertised values against actual input encoder output.
 
 ## Kitty colors
 
