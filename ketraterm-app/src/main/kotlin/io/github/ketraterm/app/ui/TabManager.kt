@@ -23,6 +23,7 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
@@ -41,6 +42,7 @@ import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
@@ -68,8 +70,11 @@ internal class TabManager(
     private val defaultProfileProvider: () -> TerminalProfile,
     private val closeConfirmation: TerminalCloseConfirmation = SwingTerminalCloseConfirmation(frame),
     workspaceFactory: (TerminalWorkspaceListener) -> TerminalWorkspace = ::TerminalWorkspace,
+    private val commandFinishedNotifier: (String, String, NotificationLevel) -> Unit = DesktopNotificationManager::showNotification,
+    private val focusOwner: () -> Component? = { KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner },
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
+    private val pendingCommandFinishedAlerts = ConcurrentHashMap.newKeySet<String>()
     private val workspace = workspaceFactory(StandaloneWorkspaceListener())
 
     // Used only by the serialized startup worker before session output starts.
@@ -1045,7 +1050,63 @@ internal class TabManager(
             tab: TerminalWorkspaceTab,
             metadata: TerminalShellIntegrationCommandMetadata,
         ) {
-            if (!settings.config.smartSuggestionsEnabled) return
+            val config = settings.config
+            val durationMillis =
+                if (config.commandFinishedAlertsEnabled) {
+                    tab.session.shellIntegrationState.commandDurationMillis(metadata.recordId)
+                } else {
+                    null
+                }
+            if (
+                TerminalCommandFinishedAlerts.shouldNotify(
+                    metadata,
+                    durationMillis,
+                    config.commandFinishedAlertsEnabled,
+                    config.commandFinishedAlertThresholdSeconds,
+                    focused = false,
+                    notificationsAllowed = config.desktopNotificationsEnabled,
+                ) &&
+                pendingCommandFinishedAlerts.add(tab.id)
+            ) {
+                SwingUtilities.invokeLater {
+                    try {
+                        if (shutdownStarted.get() || tab.session.isClosed || !frame.isDisplayable) return@invokeLater
+                        val pane = panes.firstOrNull { it.tab === tab } ?: return@invokeLater
+                        val focus = focusOwner()
+                        val paneComponent = pane.component
+                        val focusInsidePane = focus != null && SwingUtilities.isDescendingFrom(focus, paneComponent)
+                        val paneFocused = focus === paneComponent || focusInsidePane
+                        val current = settings.config
+                        if (
+                            !TerminalCommandFinishedAlerts.shouldNotify(
+                                metadata,
+                                durationMillis,
+                                current.commandFinishedAlertsEnabled,
+                                current.commandFinishedAlertThresholdSeconds,
+                                focused = paneFocused,
+                                notificationsAllowed = current.desktopNotificationsEnabled && tab.session.hostNotificationsAllowed,
+                            )
+                        ) {
+                            return@invokeLater
+                        }
+                        val exitCode = metadata.exitCode
+                        val body =
+                            when (exitCode) {
+                                null -> appMessages.text("commandAlert.unknown")
+                                0 -> appMessages.text("commandAlert.success")
+                                else -> appMessages.text("commandAlert.failure", exitCode)
+                            }
+                        commandFinishedNotifier(
+                            appMessages.text("commandAlert.title"),
+                            body,
+                            if (exitCode != null && exitCode != 0) NotificationLevel.WARNING else NotificationLevel.INFO,
+                        )
+                    } finally {
+                        pendingCommandFinishedAlerts.remove(tab.id)
+                    }
+                }
+            }
+            if (!config.smartSuggestionsEnabled) return
             metadata.commandText?.let { command ->
                 completionRegistry?.recordFinishedCommand(
                     commandLine = command,

@@ -1027,6 +1027,16 @@ public class TerminalSession private constructor(
     }
 
     /**
+     * Nonblocking snapshot of whether this session permits host notifications.
+     *
+     * Safe to read from any thread. Returns false once closure starts or when a
+     * caller-owned parser has no session-managed host adapter. This snapshot does
+     * not reserve permission: deferred notification delivery must recheck it.
+     */
+    public val hostNotificationsAllowed: Boolean
+        get() = !isClosed && hostCommandAdapter?.currentPolicy?.notificationPolicy == HostControlPolicy.ALLOW
+
+    /**
      * Updates the active host security policy dynamically.
      *
      * @param policy new security policy.

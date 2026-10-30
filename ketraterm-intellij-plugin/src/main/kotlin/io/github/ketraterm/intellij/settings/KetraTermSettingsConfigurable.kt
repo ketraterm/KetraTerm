@@ -29,6 +29,7 @@ import io.github.ketraterm.intellij.services.intellijTerminalProfileRegistry
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import io.github.ketraterm.workspace.TerminalProfile
 import java.awt.Component
 import java.util.*
@@ -101,6 +102,13 @@ class KetraTermSettingsConfigurable internal constructor(
     private val ambiguousWidthCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.ambiguousWidth"))
     private val systemFallbackFontsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.systemFallbackFonts"))
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
+    private val commandFinishedAlertsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.commandFinishedAlerts"))
+    private val commandFinishedAlertThresholdSpinner =
+        spinner(
+            TerminalCommandFinishedAlerts.DEFAULT_MINIMUM_DURATION_SECONDS,
+            TerminalCommandFinishedAlerts.MINIMUM_DURATION_SECONDS,
+            TerminalCommandFinishedAlerts.MAXIMUM_DURATION_SECONDS,
+        )
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
 
@@ -226,6 +234,13 @@ class KetraTermSettingsConfigurable internal constructor(
                         cell(visualBellCheckBox)
                     }
                     row {
+                        cell(commandFinishedAlertsCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.commandFinishedAlerts.comment"))
+                    }
+                    row(KetraTermBundle.message("settings.ketraterm.commandFinishedAlertThresholdSeconds")) {
+                        cell(commandFinishedAlertThresholdSpinner)
+                    }
+                    row {
                         cell(pasteOnMiddleClickCheckBox)
                     }
                     row {
@@ -316,6 +331,8 @@ class KetraTermSettingsConfigurable internal constructor(
         ambiguousWidthCheckBox.isSelected = state.treatAmbiguousAsWide
         systemFallbackFontsCheckBox.isSelected = state.useSystemFallbackFonts
         visualBellCheckBox.isSelected = state.visualBell
+        commandFinishedAlertsCheckBox.isSelected = state.commandFinishedAlertsEnabled
+        commandFinishedAlertThresholdSpinner.value = state.commandFinishedAlertThresholdSeconds
         pasteOnMiddleClickCheckBox.isSelected = state.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = state.overrideIdeShortcuts
         // TODO(host/profile): SUGGESTION_SETTINGS: Restore state loading with the controls.
@@ -348,6 +365,8 @@ class KetraTermSettingsConfigurable internal constructor(
                 (promptDecorationCombo.selectedItem as? PromptDecorationOption)?.id
                     ?: KetraTermIntellijSettings.DEFAULT_PROMPT_DECORATION,
             visualBell = visualBellCheckBox.isSelected,
+            commandFinishedAlertsEnabled = commandFinishedAlertsCheckBox.isSelected,
+            commandFinishedAlertThresholdSeconds = spinnerValue(commandFinishedAlertThresholdSpinner),
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
             // TODO(host/profile): SUGGESTION_SETTINGS: Restore with the controls; omitted fields preserve hidden preferences.

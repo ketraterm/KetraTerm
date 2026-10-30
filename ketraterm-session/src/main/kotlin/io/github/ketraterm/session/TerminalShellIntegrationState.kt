@@ -188,6 +188,17 @@ public class TerminalShellIntegrationState(
     private val maxCommandTextLength: Int = 4096,
     private val epochMillis: () -> Long = System::currentTimeMillis,
 ) : TerminalShellIntegrationView {
+    internal constructor(
+        capacity: Int,
+        maxCommandTextLength: Int,
+        epochMillis: () -> Long,
+        nanoTime: () -> Long,
+    ) : this(capacity, maxCommandTextLength, epochMillis) {
+        this.nanoTime = nanoTime
+    }
+
+    private var nanoTime: () -> Long = System::nanoTime
+
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
         require(maxCommandTextLength >= 0) { "maxCommandTextLength must be >= 0, was $maxCommandTextLength" }
@@ -204,6 +215,8 @@ public class TerminalShellIntegrationState(
     private val flags = IntArray(capacity)
     private val commandStartedAtEpochMillis = LongArray(capacity) { UNKNOWN_TIMESTAMP }
     private val commandFinishedAtEpochMillis = LongArray(capacity) { UNKNOWN_TIMESTAMP }
+    private val commandStartedAtNanos = LongArray(capacity)
+    private val commandDurationsMillis = LongArray(capacity) { UNKNOWN_DURATION_MILLIS }
     private val commandTexts = arrayOfNulls<String>(capacity)
     private val commandWorkingDirectoryUris = arrayOfNulls<String>(capacity)
 
@@ -333,6 +346,8 @@ public class TerminalShellIntegrationState(
                 commandWorkingDirectoryUris[index] = workingDirectoryUri
                 commandStartedAtEpochMillis[index] = epochMillis()
                 commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
+                commandStartedAtNanos[index] = nanoTime()
+                commandDurationsMillis[index] = UNKNOWN_DURATION_MILLIS
                 flags[index] =
                     if (includeLine) flags[index] or FLAG_COMMAND_START_INCLUSIVE else flags[index] and FLAG_COMMAND_START_INCLUSIVE.inv()
                 activeCommandIndex = index
@@ -368,6 +383,8 @@ public class TerminalShellIntegrationState(
                 exitCodes[index] = exitCode ?: TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
                 lifecycles[index] = lifecycleForExitCode(exitCode)
                 commandFinishedAtEpochMillis[index] = epochMillis()
+                val elapsedNanos = nanoTime() - commandStartedAtNanos[index]
+                commandDurationsMillis[index] = if (elapsedNanos >= 0) elapsedNanos / NANOS_PER_MILLISECOND else UNKNOWN_DURATION_MILLIS
                 if (commandFinishedListeners.isNotEmpty()) {
                     metadata = commandMetadataLocked(index)
                     listeners = commandFinishedListeners.iterator()
@@ -439,6 +456,14 @@ public class TerminalShellIntegrationState(
             if (index == NO_INDEX || !isCommandRecordLocked(index)) return null
             if (commandStartedAtEpochMillis[index] == UNKNOWN_TIMESTAMP) return null
             return commandMetadataLocked(index)
+        }
+    }
+
+    public override fun commandDurationMillis(recordId: Int): Long? {
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
+        return synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandDurationsMillis[index].takeUnless { it == UNKNOWN_DURATION_MILLIS }
         }
     }
 
@@ -834,6 +859,8 @@ public class TerminalShellIntegrationState(
         flags[index] = 0
         commandStartedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
         commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
+        commandStartedAtNanos[index] = 0
+        commandDurationsMillis[index] = UNKNOWN_DURATION_MILLIS
         commandTexts[index] = null
         commandWorkingDirectoryUris[index] = null
         return index
@@ -858,6 +885,8 @@ public class TerminalShellIntegrationState(
         flags.copyInto(flags, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandStartedAtEpochMillis.copyInto(commandStartedAtEpochMillis, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandFinishedAtEpochMillis.copyInto(commandFinishedAtEpochMillis, destinationOffset = 0, startIndex = 1, endIndex = count)
+        commandStartedAtNanos.copyInto(commandStartedAtNanos, destinationOffset = 0, startIndex = 1, endIndex = count)
+        commandDurationsMillis.copyInto(commandDurationsMillis, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandTexts.copyInto(commandTexts, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandWorkingDirectoryUris.copyInto(
             commandWorkingDirectoryUris,
@@ -1162,6 +1191,8 @@ public class TerminalShellIntegrationState(
         private const val NO_INDEX = -1
         private const val NO_LINE_ID = 0L
         private const val UNKNOWN_TIMESTAMP = Long.MIN_VALUE
+        private const val UNKNOWN_DURATION_MILLIS = -1L
+        private const val NANOS_PER_MILLISECOND = 1_000_000L
         private const val FLAG_COMMAND_START_INCLUSIVE = 1 shl 0
 
         private fun clearViewport(

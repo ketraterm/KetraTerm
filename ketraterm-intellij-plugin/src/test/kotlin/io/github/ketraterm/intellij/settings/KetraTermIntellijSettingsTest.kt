@@ -38,6 +38,38 @@ import java.util.concurrent.CancellationException
  */
 class KetraTermIntellijSettingsTest {
     @Test
+    fun `command alerts default off and preferences survive XML restart`() {
+        val service = KetraTermIntellijSettings()
+        val legacy = Element("State").deserialize(KetraTermIntellijSettings.State::class.java)
+        assertFalse(service.state.commandFinishedAlertsEnabled)
+        assertFalse(legacy.commandFinishedAlertsEnabled)
+        assertEquals(10, service.state.commandFinishedAlertThresholdSeconds)
+        assertEquals(10, legacy.commandFinishedAlertThresholdSeconds)
+        service.replaceState(
+            service.state.copy(
+                commandFinishedAlertsEnabled = true,
+                commandFinishedAlertThresholdSeconds = 86_400,
+            ),
+        )
+        val restored = KetraTermIntellijSettings()
+        restored.loadState(requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals(service.state, restored.state)
+        assertTrue(restored.state.commandFinishedAlertsEnabled)
+        assertEquals(86_400, restored.state.commandFinishedAlertThresholdSeconds)
+    }
+
+    @Test
+    fun `command alert threshold normalizes at both preference publication boundaries`() {
+        for ((input, expected) in listOf(Int.MIN_VALUE to 1, 0 to 1, 1 to 1, 86_400 to 86_400, Int.MAX_VALUE to 86_400)) {
+            val service = KetraTermIntellijSettings()
+            service.loadState(service.state.copy(commandFinishedAlertThresholdSeconds = input))
+            assertEquals(expected, service.state.commandFinishedAlertThresholdSeconds)
+            service.replaceState(service.state.copy(commandFinishedAlertThresholdSeconds = input))
+            assertEquals(expected, service.state.commandFinishedAlertThresholdSeconds)
+        }
+    }
+
+    @Test
     fun `prompt styles normalize persist and reach rendering settings`() {
         val service = KetraTermIntellijSettings()
         assertEquals("gutter", Element("State").deserialize(KetraTermIntellijSettings.State::class.java).promptDecoration)

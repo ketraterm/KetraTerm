@@ -128,6 +128,15 @@ internal class KetraTermConfigManager(
                 behavior["shell_request_window_manipulation"]?.toBooleanStrictOrNull() ?: default.shellRequestWindowManipulation
             val desktopNotificationsEnabled =
                 behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
+            val commandFinishedAlertsEnabled =
+                behavior["command_finished_alerts_enabled"]?.toBooleanStrictOrNull() ?: default.commandFinishedAlertsEnabled
+            val commandFinishedAlertThresholdSeconds =
+                parseIntSetting(
+                    raw = behavior["command_finished_alert_threshold_seconds"],
+                    defaultValue = default.commandFinishedAlertThresholdSeconds,
+                    min = KetraTermConfig.COMMAND_FINISHED_ALERT_THRESHOLD_MIN,
+                    max = KetraTermConfig.COMMAND_FINISHED_ALERT_THRESHOLD_MAX,
+                )
             val shellSuggestionsEnabled =
                 behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
             val acceptSelectedSuggestionWithEnter =
@@ -200,6 +209,8 @@ internal class KetraTermConfigManager(
                 shellRequestResizeWindow = shellRequestResizeWindow,
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
+                commandFinishedAlertsEnabled = commandFinishedAlertsEnabled,
+                commandFinishedAlertThresholdSeconds = commandFinishedAlertThresholdSeconds,
                 smartSuggestionsEnabled = behavior["smart_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.smartSuggestionsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
                 acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
@@ -320,8 +331,12 @@ internal class KetraTermConfigManager(
         shell_request_resize_window = ${config.shellRequestResizeWindow}
         # Whether terminal window manipulation (move, minimize, maximize, raise, lower) is allowed from the shell
         shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
-        # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
+        # Master permission for OSC 9/777 notifications and command-finished alerts
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
+        # Notify when a command finishes in an unfocused pane; requires shell integration
+        command_finished_alerts_enabled = ${config.commandFinishedAlertsEnabled}
+        # Inclusive minimum observed command duration in seconds (1..86400)
+        command_finished_alert_threshold_seconds = ${config.commandFinishedAlertThresholdSeconds}
         # Whether host-provided shell suggestions may appear in the terminal UI
         smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}

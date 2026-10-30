@@ -29,11 +29,17 @@ import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import com.intellij.ui.content.ContentManagerListener
+import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandLineState
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.session.TerminalShellIntegrationView
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -43,12 +49,14 @@ import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.awt.Component
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
 import java.lang.reflect.Proxy
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.SwingUtilities
 
 /** Verifies restart metadata and startup lifecycle through real product panes without creating PTYs. */
 class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
@@ -477,6 +485,98 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
 
         assertEquals(0, manager.contentCount)
         assertFalse("Closing failed startup content must release its pending tab", service.hasOpenTabs())
+    }
+
+    fun testQueuedCommandAlertsCoalesceAndRecheckFocusSettingsPolicyAndDisposal() =
+        onEdt {
+            val settings = KetraTermIntellijSettings.getInstance()
+            settings.replaceState(
+                settings.state.copy(
+                    commandFinishedAlertsEnabled = true,
+                    smartSuggestionsEnabled = false,
+                    cursorBlinkMillis = 0,
+                ),
+            )
+            val model = TerminalShellIntegrationState()
+            val view =
+                object : TerminalShellIntegrationView by model {
+                    override fun commandDurationMillis(recordId: Int): Long = 10_000L
+                }
+            val started = CompletableFuture<Unit>()
+            val createdSession = CompletableFuture<TerminalSession>()
+            var focusOwner: Component? = null
+            var notifications = 0
+            val service =
+                KetraTermProjectTerminalService(
+                    project,
+                    workspaceFactory = { listener ->
+                        workspace(listener) { options ->
+                            TerminalSession
+                                .create(
+                                    TerminalBuffers.create(options.columns, options.rows),
+                                    connector(onStart = { started.complete(Unit) }),
+                                    hostPolicy = options.hostPolicy,
+                                    shellIntegration =
+                                        TerminalShellIntegrationFactory.host(
+                                            view,
+                                            TerminalShellCommandLineState(),
+                                        ),
+                                ).also { createdSession.complete(it) }
+                        }
+                    },
+                    commandAlertFocusOwner = { focusOwner },
+                    commandAlertNotifier = { _, _, _ -> notifications++ },
+                    prepareStartup = {},
+                ).also { Disposer.register(lifetime, it) }
+            try {
+                val profile = TerminalProfile("alerts", "Alerts", listOf("unused"))
+                val content = service.openProfileTab(toolWindow(contentManager()), profile)
+                PlatformTestUtil.waitWithEventsDispatching("Alert test session was not started", { started.isDone }, 10)
+                val pane = content.component.components.firstNotNullOf { service.paneForComponent(it) }
+                val session = createdSession.get(10, TimeUnit.SECONDS)
+
+                fun completeCommand() {
+                    model.recordCommandStart(1L, includeLine = true, commandText = "private command")
+                    model.recordCommandFinished(1L, 0)
+                }
+
+                repeat(50) { completeCommand() }
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Only one automatic alert may wait for the EDT per tab", 1, notifications)
+                completeCommand()
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Delivery must release the tab's pending slot", 2, notifications)
+
+                completeCommand()
+                focusOwner = pane.component
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Focus must be checked when the queued alert is delivered", 2, notifications)
+                focusOwner = null
+
+                completeCommand()
+                settings.replaceState(settings.state.copy(commandFinishedAlertsEnabled = false))
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Disabling alerts must invalidate an already queued alert", 2, notifications)
+                settings.replaceState(settings.state.copy(commandFinishedAlertsEnabled = true))
+                UIUtil.dispatchAllInvocationEvents()
+
+                completeCommand()
+                session.setHostPolicy(settings.createHostPolicy().copy(notificationPolicy = HostControlPolicy.DENY))
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Revoked session permission must invalidate an already queued alert", 2, notifications)
+                session.setHostPolicy(settings.createHostPolicy())
+
+                completeCommand()
+                service.dispose()
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Disposal must invalidate an already queued alert", 2, notifications)
+            } finally {
+                Disposer.dispose(service)
+            }
+        }
+
+    private fun onEdt(action: () -> Unit) {
+        if (SwingUtilities.isEventDispatchThread()) action() else SwingUtilities.invokeAndWait { action() }
     }
 
     private fun observePaneInstallation(

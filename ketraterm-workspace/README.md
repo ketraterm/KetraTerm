@@ -119,7 +119,11 @@ Startup commands are submitted through the session after shell readiness;
 
 Directory and command-finished notifications come from the session's selected
 shell model. `commandFinished` carries each completion's captured metadata,
-without replay or conflation. The tab retains its last observed directory after
+without replay or conflation. Hosts can capture `commandDurationMillis(recordId)`
+from the selected shell view during this callback. `TerminalCommandFinishedAlerts`
+shares the products' inclusive duration and permission/focus eligibility policy;
+products own preferences, UI dispatch, live focus/lifecycle checks, and delivery.
+The tab retains its last observed directory after
 session closure. Registrations end on removal or session closure; an already
 dispatched callback may finish.
 

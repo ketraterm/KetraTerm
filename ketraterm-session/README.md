@@ -65,6 +65,11 @@ session APIs for input, settings, and frame reads. A failed `create` leaves the
 connector with its caller. Session closure cancels session workers but does not
 close the supplied dispatchers or cancel consumer collection scopes.
 
+`hostNotificationsAllowed` reads the active session notification permission
+without waiting for terminal mutation. It becomes false when closure starts and
+is false for caller-owned parsers without a session-managed host adapter. Recheck
+this snapshot immediately before deferred notification delivery.
+
 ## Input and lifecycle
 
 Use `submitInput` with semantic key, mouse, focus, paste, or text-replacement
@@ -177,6 +182,10 @@ fun createHostSession(
 ```
 
 Use a distinct projection per session and publish metadata in output order.
+`commandDurationMillis(recordId)` reports monotonic elapsed time for explicitly
+completed commands, independently of metadata wall-clock timestamps. Capture it
+in a command-finished listener before later bounded eviction. Custom shell views
+may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 `captureCommandEdit()` and submit with `submitInput(expected, events)` so stale
 edits are rejected. See [conditional edits](docs/session-concurrency-locks.md#conditional-command-edits)

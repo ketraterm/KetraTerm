@@ -150,6 +150,18 @@ internal class SettingsDialog(
         }
     private val audibleBellCheckbox = JCheckBox(appMessages.text("settings.audibleBell"), settings.config.audibleBell)
     private val visualBellCheckbox = JCheckBox(appMessages.text("settings.visualBell"), settings.config.visualBell)
+    private val desktopNotificationsCheckbox =
+        JCheckBox(appMessages.text("settings.desktopNotifications"), settings.config.desktopNotificationsEnabled)
+    private val commandFinishedAlertsCheckbox =
+        JCheckBox(appMessages.text("settings.commandFinishedAlerts"), settings.config.commandFinishedAlertsEnabled)
+    private val commandFinishedAlertThresholdSpinner =
+        createSpinner(
+            settings.config.commandFinishedAlertThresholdSeconds,
+            KetraTermConfig.COMMAND_FINISHED_ALERT_THRESHOLD_MIN,
+            KetraTermConfig.COMMAND_FINISHED_ALERT_THRESHOLD_MAX,
+            1,
+            80,
+        ).apply { name = "commandFinishedAlertThresholdSeconds" }
 
     // Form Controls - Appearance
     private val fontFamilyCombo =
@@ -316,6 +328,9 @@ internal class SettingsDialog(
         registerChangeListener(startupCommandField, updateApplyState)
         registerChangeListener(audibleBellCheckbox, updateApplyState)
         registerChangeListener(visualBellCheckbox, updateApplyState)
+        registerChangeListener(desktopNotificationsCheckbox, updateApplyState)
+        registerChangeListener(commandFinishedAlertsCheckbox, updateApplyState)
+        registerChangeListener(commandFinishedAlertThresholdSpinner, updateApplyState)
         registerChangeListener(fontFamilyCombo, updateApplyState)
         registerChangeListener(fontSizeSpinner, updateApplyState)
         registerChangeListener(lineHeightSpinner, updateApplyState)
@@ -481,6 +496,18 @@ internal class SettingsDialog(
             appMessages.text("settings.visualBell.description"),
         )
         panel.add(appSection)
+
+        panel.add(SectionHeader(appMessages.text("settings.notifications")))
+        val notificationSection = createSectionPanel()
+        addCheckboxRow(notificationSection, 0, desktopNotificationsCheckbox, appMessages.text("settings.desktopNotifications.description"))
+        addCheckboxRow(
+            notificationSection,
+            2,
+            commandFinishedAlertsCheckbox,
+            appMessages.text("settings.commandFinishedAlerts.description"),
+        )
+        addFormRow(notificationSection, 4, appMessages.text("settings.commandFinishedAlertThreshold"), commandFinishedAlertThresholdSpinner)
+        panel.add(notificationSection)
 
         return panel
     }
@@ -808,6 +835,9 @@ internal class SettingsDialog(
         startupCommandField.text = ""
         audibleBellCheckbox.isSelected = KetraTermConfig.DEFAULT_AUDIBLE_BELL
         visualBellCheckbox.isSelected = KetraTermConfig.DEFAULT_VISUAL_BELL
+        desktopNotificationsCheckbox.isSelected = KetraTermConfig.DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED
+        commandFinishedAlertsCheckbox.isSelected = KetraTermConfig.DEFAULT_COMMAND_FINISHED_ALERTS_ENABLED
+        commandFinishedAlertThresholdSpinner.value = KetraTermConfig.DEFAULT_COMMAND_FINISHED_ALERT_THRESHOLD_SECONDS
 
         fontFamilyCombo.selectedItem = KetraTermConfig.DEFAULT_FONT_FAMILY
         fontSizeSpinner.value = KetraTermConfig.DEFAULT_FONT_SIZE
@@ -952,6 +982,9 @@ internal class SettingsDialog(
             startupCommand = startupCommandField.text,
             audibleBell = audibleBellCheckbox.isSelected,
             visualBell = visualBellCheckbox.isSelected,
+            desktopNotificationsEnabled = desktopNotificationsCheckbox.isSelected,
+            commandFinishedAlertsEnabled = commandFinishedAlertsCheckbox.isSelected,
+            commandFinishedAlertThresholdSeconds = commandFinishedAlertThresholdSpinner.value as Int,
             pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected,
             pasteControlPolicy =
                 (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.policy

@@ -35,7 +35,6 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | --- | --- |
 | `TODO(host/profile)` | Automatic Nushell and Elvish integration for prompt/command markers and working-directory context. Nushell discovery and configurable shell executables do not install these hooks; see [shell support](features/shells.md). |
 | `TODO(parser/session/input/ui/host/profile)` | Click-to-move within an editable shell prompt using OSC 133 `cl=line` and compatible `click-events` metadata. Existing command markers and completion edit authority do not implement pointer-driven cursor placement. |
-| `TODO(host/profile)` | Configurable command-finished alerts based on shell metadata, duration, and focus state. Command-finished listeners and terminal-requested OSC notifications already exist; neither product turns completion of a long-running command into an automatic alert. |
 
 <a id="input-module-gaps"></a>
 <a id="deferred-kitty-keyboard-protocol-scope"></a>
@@ -124,3 +123,9 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 - `TODO(policy)`: feature needs an explicit security or compatibility policy before implementation.
 
 Combined labels name every owner needed to close one gap; `host/profile` means product-host integration rather than the parser-to-core adapter. A policy or test limitation alone does not imply missing parser behavior.
+
+## Resolved audit findings
+
+| Owner | Historical finding | Resolution |
+| --- | --- | --- |
+| `TODO(host/profile)` | Configurable command-finished alerts based on shell metadata, duration, and focus state. Command-finished listeners and terminal-requested OSC notifications already exist; neither product turns completion of a long-running command into an automatic alert. | **Resolved 2026-10-29.** Both products now provide opt-in duration/focus alerts with live session permission and lifecycle checks. See the [contract](reference/notifications.md#command-finished-alerts) and [verification record](development/command-finished-alerts.md). |

@@ -51,6 +51,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.KeyboardFocusManager
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -75,6 +76,10 @@ import javax.swing.SwingUtilities
 class KetraTermProjectTerminalService internal constructor(
     private val project: Project,
     workspaceFactory: (TerminalWorkspaceListener) -> TerminalWorkspace = ::TerminalWorkspace,
+    private val commandAlertFocusOwner: () -> Component? = { KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner },
+    private val commandAlertNotifier: (String, String, NotificationLevel) -> Unit = { title, body, level ->
+        KetraTermIntellijNotifier.showNotification(project, title, body, level)
+    },
     private val prepareStartup: (TerminalProfile) -> Unit,
 ) : Disposable {
     /** Creates the project owner using IntelliJ's bundled PTY runtime. */
@@ -84,6 +89,7 @@ class KetraTermProjectTerminalService internal constructor(
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
     private val clipboardSessions = ConcurrentHashMap<String, IntellijClipboardSession>()
+    private val pendingCommandAlerts = ConcurrentHashMap.newKeySet<String>()
     private val clipboardReader = SwingClipboardReader()
 
     // Only accessed during serialized workspace creation and its synchronous tabOpened callback.
@@ -342,6 +348,7 @@ class KetraTermProjectTerminalService internal constructor(
     override fun dispose() {
         if (disposed) return
         disposed = true
+        pendingCommandAlerts.clear()
 
         val panes = panesByTabId.values.toList()
         val closeRegistrations = closeListenersByTabId.values.toList()
@@ -676,8 +683,47 @@ class KetraTermProjectTerminalService internal constructor(
             tab: TerminalWorkspaceTab,
             metadata: TerminalShellIntegrationCommandMetadata,
         ) {
-            if (!KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled) return
-            KetraTermCompletionService.getInstanceIfCreated()?.recordFinishedCommand(tab, metadata)
+            val settings = KetraTermIntellijSettings.getInstance()
+            val snapshot = settings.state
+            val durationMillis = tab.session.shellIntegrationState.commandDurationMillis(metadata.recordId)
+            if (!disposed &&
+                !closing &&
+                TerminalCommandFinishedAlerts.shouldNotify(
+                    metadata = metadata,
+                    durationMillis = durationMillis,
+                    enabled = snapshot.commandFinishedAlertsEnabled,
+                    minimumDurationSeconds = snapshot.commandFinishedAlertThresholdSeconds,
+                    focused = false,
+                    notificationsAllowed = tab.session.hostNotificationsAllowed,
+                ) &&
+                pendingCommandAlerts.add(tab.id)
+            ) {
+                try {
+                    ApplicationManager.getApplication().invokeLater {
+                        try {
+                            if (disposed || closing || project.isDisposed) return@invokeLater
+                            showCommandFinishedAlert(
+                                metadata = metadata,
+                                durationMillis = durationMillis,
+                                settings = settings.state,
+                                pane = panesByTabId[tab.id]?.component,
+                                focusOwner = commandAlertFocusOwner(),
+                                sessionClosed = tab.session.isClosed,
+                                notificationsAllowed = tab.session.hostNotificationsAllowed,
+                                publish = commandAlertNotifier,
+                            )
+                        } finally {
+                            pendingCommandAlerts.remove(tab.id)
+                        }
+                    }
+                } catch (failure: Exception) {
+                    pendingCommandAlerts.remove(tab.id)
+                    throw failure
+                }
+            }
+            if (snapshot.smartSuggestionsEnabled) {
+                KetraTermCompletionService.getInstanceIfCreated()?.recordFinishedCommand(tab, metadata)
+            }
         }
 
         override fun bell(tab: TerminalWorkspaceTab) {
@@ -841,3 +887,42 @@ internal inline fun captureCleanupFailure(
     } catch (failure: Throwable) {
         previous?.apply { if (this !== failure) addSuppressed(failure) } ?: failure
     }
+
+/** EDT delivery boundary: reads current host state before requesting an IDE notification. */
+internal fun showCommandFinishedAlert(
+    metadata: TerminalShellIntegrationCommandMetadata,
+    durationMillis: Long?,
+    settings: KetraTermIntellijSettings.State,
+    pane: Component?,
+    focusOwner: Component?,
+    sessionClosed: Boolean,
+    notificationsAllowed: Boolean = true,
+    publish: (String, String, NotificationLevel) -> Unit,
+) {
+    check(SwingUtilities.isEventDispatchThread()) { "Command alerts must be delivered on the EDT" }
+    if (sessionClosed || pane == null) return
+    val focused = focusOwner != null && (focusOwner === pane || SwingUtilities.isDescendingFrom(focusOwner, pane))
+    if (!TerminalCommandFinishedAlerts.shouldNotify(
+            metadata = metadata,
+            durationMillis = durationMillis,
+            enabled = settings.commandFinishedAlertsEnabled,
+            minimumDurationSeconds = settings.commandFinishedAlertThresholdSeconds,
+            focused = focused,
+            notificationsAllowed = notificationsAllowed,
+        )
+    ) {
+        return
+    }
+    val exitCode = metadata.exitCode
+    val body =
+        when (exitCode) {
+            0 -> KetraTermBundle.message("terminal.commandFinished.success")
+            null -> KetraTermBundle.message("terminal.commandFinished.unknown")
+            else -> KetraTermBundle.message("terminal.commandFinished.failure", exitCode)
+        }
+    publish(
+        KetraTermBundle.message("terminal.commandFinished.title"),
+        body,
+        if (exitCode == null || exitCode == 0) NotificationLevel.INFO else NotificationLevel.WARNING,
+    )
+}
