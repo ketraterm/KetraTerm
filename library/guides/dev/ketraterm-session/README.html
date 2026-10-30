@@ -79,6 +79,10 @@ terminal and connector. Configure the core before assembly; afterward, use
 session APIs for input, settings, and frame reads. A failed <code>create</code> leaves the
 connector with its caller. Session closure cancels session workers but does not
 close the supplied dispatchers or cancel consumer collection scopes.</p>
+<p><code>hostNotificationsAllowed</code> reads the active session notification permission
+without waiting for terminal mutation. It becomes false when closure starts and
+is false for caller-owned parsers without a session-managed host adapter. Recheck
+this snapshot immediately before deferred notification delivery.</p>
 <h2 id="input-and-lifecycle">Input and lifecycle</h2>
 <p>Use <code>submitInput</code> with semantic key, mouse, focus, paste, or text-replacement
 events. A list of events is admitted as one operation whose bytes cannot
@@ -176,6 +180,10 @@ fun createHostSession(
 )
 </code></pre>
 <p>Use a distinct projection per session and publish metadata in output order.
+<code>commandDurationMillis(recordId)</code> reports monotonic elapsed time for explicitly
+completed commands, independently of metadata wall-clock timestamps. Capture it
+in a command-finished listener before later bounded eviction. Custom shell views
+may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 <code>captureCommandEdit()</code> and submit with <code>submitInput(expected, events)</code> so stale
 edits are rejected. See <a href="docs/session-concurrency-locks.html#conditional-command-edits">conditional edits</a>
@@ -204,7 +212,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

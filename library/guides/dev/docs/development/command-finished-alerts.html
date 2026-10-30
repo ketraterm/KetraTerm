@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Command-finished alert verification · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Command-finished alert verification</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><div class="article-content"><div class="prose"><h1 id="command-finished-alert-verification">Command-finished alert verification</h1>
+<p>Baseline: <code>1bfaaf9eb</code>, 2026-10-29. The original scoped root suites passed before
+production edits. New focused regressions first failed compilation because the
+elapsed-duration query, alert settings, and eligibility policy were absent.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Suite</th>
+<th align="right">Baseline tests</th>
+<th align="right">Verified tests</th>
+<th align="right">Failures</th>
+<th align="right">Skipped</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Session, including default dispatcher</td>
+<td align="right">497</td>
+<td align="right">509</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Shell integration</td>
+<td align="right">73</td>
+<td align="right">73</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Workspace, including default dispatcher</td>
+<td align="right">126</td>
+<td align="right">130</td>
+<td align="right">0</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td>Standalone</td>
+<td align="right">212</td>
+<td align="right">235</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>IntelliJ plugin</td>
+<td align="right">See below</td>
+<td align="right">267</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Retained compiled clients</td>
+<td align="right">—</td>
+<td align="right">46</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+</tbody></table></div>
+<p>The six native PTY cases retain their existing opt-in guard. This change does not
+alter shell hooks or PTY behavior. The first plugin baseline stopped from native
+JVM memory exhaustion before assertions. Final plugin verification used full
+JetBrains JDK 25 for Gradle and instrumentation. A fresh compilation removed ten
+stale constructor-linkage failures in the unchanged profile/restore tests;
+all 267 tests then passed without disabling tests or changing their assertions.</p>
+<p>Focused evidence:</p>
+<ul>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalShellIntegrationDurationTest.kt">Duration regressions</a>: clock rollback, nanosecond wrap, bounds, abandonment, eviction, and synchronous capture.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalSessionTest.kt">Session regressions</a>: initial/live notification permission, closure, and unavailable policy ownership.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-workspace/src/test/kotlin/io/github/ketraterm/workspace/TerminalCommandFinishedAlertsTest.kt">Shared policy regressions</a>: defaults, inclusive thresholds, overflow, unknown duration, lifecycle, focus, and denial.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerStartupTest.kt">Standalone callbacks</a> and <a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt">IDE callbacks</a>: real workspace routing, focus changes, live preferences, revoked session permission, coalescing, slot release, and disposal.</li>
+</ul>
+<p>Configuration tests cover legacy defaults, persistence, malformed/overflowing
+standalone values, normalized IDE bounds, and settings controls. Existing shell
+marker ordering, malformed/chunked input, duplicate completions, and cleanup
+regressions remain in the owning suites.</p>
+<p>The public session API check passes with additive methods only; metadata
+constructor/copy signatures and the public shell-state constructors are unchanged.
+Rendering paths are unchanged; no new per-frame allocation claim is made.</p>
+<p>Final checks also passed <code>publishedConsumerTest</code>: independent Java/Kotlin source
+consumers with Gradle metadata and POM-only resolution, on Kotlin 2.4.20 and 2.4.0,
+plus all 46 retained-client upgrade cases. Changed Markdown links were checked
+locally (94 targets).</p>
+<p><code>graphify update .</code> completed with sequential extraction: 19,045 nodes and
+46,835 edges. Its Kotlin extractor reported ten partially parsed files; Kotlin
+compilation and the passing suites remain authoritative for source correctness.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/docs/development/command-finished-alerts.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -194,6 +194,11 @@ See the <a href="../../ketraterm-ui-swing/README.html">Swing guide</a> for confi
 <td>Terminal-originated desktop notifications through the system tray where supported.</td>
 <td>IDE notifications. Both products apply terminal-output permissions.</td>
 </tr>
+<tr>
+<td>Command-finished alerts</td>
+<td>Opt-in desktop alerts for unfocused panes after a configurable minimum command runtime; initially 10 seconds.</td>
+<td>Opt-in IDE alerts with the same duration, focus, and session-permission checks. Both require shell metadata; see the <a href="../reference/notifications.html#command-finished-alerts">alert contract</a>.</td>
+</tr>
 </tbody></table></div>
 <p>Foreground-process titles use a Unix process-group lookup or a Windows
 descendant heuristic; they do not identify programs inside SSH or WSL. Restored
@@ -201,9 +206,9 @@ IntelliJ tabs start new processes and do not restore output or running commands.
 Project JDK injection excludes WSL launchers and WSL SDK paths.
 Close confirmation relies on shell command markers; it is not a general detector
 of every process running in a session.</p>
-<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-app/README.md">standalone README</a> and
-<a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/ketraterm-intellij-plugin/README.md">plugin README</a> for installation and use.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/1bfaaf9eb48ab36bd9badb1dad89d6b85ff4d45a/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
+<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-app/README.md">standalone README</a> and
+<a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-intellij-plugin/README.md">plugin README</a> for installation and use.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
