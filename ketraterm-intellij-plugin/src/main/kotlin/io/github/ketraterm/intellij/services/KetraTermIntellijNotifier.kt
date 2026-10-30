@@ -21,7 +21,7 @@ import com.intellij.openapi.project.Project
 import io.github.ketraterm.protocol.NotificationLevel
 
 /**
- * IntelliJ-native notification bridge for terminal OSC notification requests.
+ * IntelliJ-native notification bridge for terminal requests and product alerts.
  *
  * Terminal payloads are untrusted host input. IntelliJ notification content may
  * render lightweight HTML, so this bridge escapes terminal-provided title and

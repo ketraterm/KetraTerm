@@ -48,62 +48,64 @@ internal object DesktopNotificationManager {
         body: String,
         level: io.github.ketraterm.protocol.NotificationLevel,
     ) {
-        SwingUtilities.invokeLater {
-            if (!SystemTray.isSupported()) {
-                return@invokeLater
-            }
-
-            val systemTray =
-                try {
-                    SystemTray.getSystemTray()
-                } catch (e: Exception) {
-                    return@invokeLater
+        val display =
+            Runnable {
+                if (!SystemTray.isSupported()) {
+                    return@Runnable
                 }
 
-            val displayTitle = title.ifBlank { "KetraTerm" }
-
-            var icon = trayIcon
-            if (icon == null) {
-                val image = createTrayImage()
-                icon = TrayIcon(image, "KetraTerm")
-                icon.isImageAutoSize = true
-                trayIcon = icon
-            }
-
-            // If the icon is not in the system tray, add it
-            if (!systemTray.trayIcons.contains(icon)) {
-                try {
-                    systemTray.add(icon)
-                } catch (e: Exception) {
-                    return@invokeLater
-                }
-            }
-
-            val messageType =
-                when (level) {
-                    io.github.ketraterm.protocol.NotificationLevel.INFO -> TrayIcon.MessageType.INFO
-                    io.github.ketraterm.protocol.NotificationLevel.WARNING -> TrayIcon.MessageType.WARNING
-                    io.github.ketraterm.protocol.NotificationLevel.ERROR -> TrayIcon.MessageType.ERROR
-                    io.github.ketraterm.protocol.NotificationLevel.NONE -> TrayIcon.MessageType.NONE
-                }
-
-            // Show the OS notification
-            icon.displayMessage(displayTitle, body, messageType)
-
-            // Reset or start the removal timer
-            removeTimer?.stop()
-            val timer =
-                Timer(REMOVE_DELAY_MILLIS) {
+                val systemTray =
                     try {
-                        systemTray.remove(icon)
+                        SystemTray.getSystemTray()
                     } catch (e: Exception) {
-                        // Ignore failures on removal
+                        return@Runnable
+                    }
+
+                val displayTitle = title.ifBlank { "KetraTerm" }
+
+                var icon = trayIcon
+                if (icon == null) {
+                    val image = createTrayImage()
+                    icon = TrayIcon(image, "KetraTerm")
+                    icon.isImageAutoSize = true
+                    trayIcon = icon
+                }
+
+                // If the icon is not in the system tray, add it
+                if (!systemTray.trayIcons.contains(icon)) {
+                    try {
+                        systemTray.add(icon)
+                    } catch (e: Exception) {
+                        return@Runnable
                     }
                 }
-            timer.isRepeats = false
-            timer.start()
-            removeTimer = timer
-        }
+
+                val messageType =
+                    when (level) {
+                        io.github.ketraterm.protocol.NotificationLevel.INFO -> TrayIcon.MessageType.INFO
+                        io.github.ketraterm.protocol.NotificationLevel.WARNING -> TrayIcon.MessageType.WARNING
+                        io.github.ketraterm.protocol.NotificationLevel.ERROR -> TrayIcon.MessageType.ERROR
+                        io.github.ketraterm.protocol.NotificationLevel.NONE -> TrayIcon.MessageType.NONE
+                    }
+
+                // Show the OS notification
+                icon.displayMessage(displayTitle, body, messageType)
+
+                // Reset or start the removal timer
+                removeTimer?.stop()
+                val timer =
+                    Timer(REMOVE_DELAY_MILLIS) {
+                        try {
+                            systemTray.remove(icon)
+                        } catch (e: Exception) {
+                            // Ignore failures on removal
+                        }
+                    }
+                timer.isRepeats = false
+                timer.start()
+                removeTimer = timer
+            }
+        if (SwingUtilities.isEventDispatchThread()) display.run() else SwingUtilities.invokeLater(display)
     }
 
     private fun createTrayImage(): Image {

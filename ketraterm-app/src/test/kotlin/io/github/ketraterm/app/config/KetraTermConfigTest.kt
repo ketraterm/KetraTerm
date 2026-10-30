@@ -30,6 +30,52 @@ import kotlin.test.*
 
 class KetraTermConfigTest {
     @Test
+    fun `command finished alerts default off and round trip their threshold`(
+        @TempDir directory: Path,
+    ) {
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
+        val defaults = manager.load()
+        assertFalse(defaults.commandFinishedAlertsEnabled)
+        assertEquals(10, defaults.commandFinishedAlertThresholdSeconds)
+        val configured = defaults.copy(commandFinishedAlertsEnabled = true, commandFinishedAlertThresholdSeconds = 60)
+        manager.save(configured)
+        assertEquals(configured, manager.load())
+        val saved = Files.readString(manager.configPath)
+        assertTrue(saved.contains("command_finished_alerts_enabled = true"))
+        assertTrue(saved.contains("command_finished_alert_threshold_seconds = 60"))
+    }
+
+    @Test
+    fun `command alert threshold validates programmatic settings`() {
+        for (threshold in listOf(Int.MIN_VALUE, -1, 0, 86_401, Int.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException> { KetraTermConfig(commandFinishedAlertThresholdSeconds = threshold) }
+        }
+        assertEquals(1, KetraTermConfig(commandFinishedAlertThresholdSeconds = 1).commandFinishedAlertThresholdSeconds)
+        assertEquals(86_400, KetraTermConfig(commandFinishedAlertThresholdSeconds = 86_400).commandFinishedAlertThresholdSeconds)
+    }
+
+    @Test
+    fun `command alert threshold recovers malformed and overflowing TOML values`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val manager = KetraTermConfigManager(file)
+        for ((raw, expected) in listOf(
+            "-99" to 1,
+            "0" to 1,
+            "86401" to 86_400,
+            "999999999999999999999999" to 86_400,
+            "\"invalid\"" to 10,
+            "10.5" to 10,
+        )) {
+            Files.writeString(file, "[behavior]\ncommand_finished_alert_threshold_seconds = $raw\ncommand_finished_alerts_enabled = true")
+            val loaded = manager.load()
+            assertEquals(expected, loaded.commandFinishedAlertThresholdSeconds, raw)
+            assertTrue(loaded.commandFinishedAlertsEnabled, raw)
+        }
+    }
+
+    @Test
     fun `prompt styles round trip and reach renderer settings`(
         @TempDir directory: Path,
     ) {

@@ -19,9 +19,15 @@ import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
+import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandLineState
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.session.TerminalShellIntegrationView
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -56,6 +62,167 @@ import kotlin.test.assertTrue
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("native")
 class TabManagerStartupTest {
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "unfocused",
+            "ownPane",
+            "descendant",
+            "otherPane",
+            "disabled",
+            "denied",
+            "short",
+            "unknownDuration",
+            "focusBeforeDelivery",
+            "closedBeforeDelivery",
+            "disposedBeforeDelivery",
+            "disabledBeforeDelivery",
+            "deniedBeforeDelivery",
+            "thresholdBeforeDelivery",
+            "coalesced",
+            "failed",
+            "unknownExit",
+            "sessionPolicyDenied",
+            "sessionPolicyDeniedBeforeDelivery",
+        ],
+    )
+    fun `command completion alerts use the originating pane and recheck focus and lifetime`(
+        mode: String,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(
+            KetraTermConfig(
+                cursorBlinkMillis = 0,
+                smartSuggestionsEnabled = false,
+                showForegroundProcessName = false,
+                commandFinishedAlertsEnabled = mode != "disabled",
+                desktopNotificationsEnabled = mode != "denied",
+            ),
+        )
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("alerts", "Alerts", listOf("unused"), workingDirectory = directory)
+        val state = TerminalShellIntegrationState()
+        val duration =
+            when (mode) {
+                "short" -> 9_999L
+                "unknownDuration" -> null
+                else -> 10_000L
+            }
+        val view =
+            object : TerminalShellIntegrationView by state {
+                override fun commandDurationMillis(recordId: Int): Long? {
+                    when (mode) {
+                        "disabledBeforeDelivery" -> settings.update(settings.config.copy(commandFinishedAlertsEnabled = false))
+                        "deniedBeforeDelivery" -> settings.update(settings.config.copy(desktopNotificationsEnabled = false))
+                        "thresholdBeforeDelivery" -> settings.update(settings.config.copy(commandFinishedAlertThresholdSeconds = 20))
+                    }
+                    return duration
+                }
+            }
+        val integration = TerminalShellIntegrationFactory.host(view, TerminalShellCommandLineState())
+        val notifications = ArrayList<Pair<String, String>>()
+        var focus: Component? = null
+        val content = onEdt { JPanel(CardLayout()) }
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    contentPane = content
+                    pack()
+                    setSize(800, 500)
+                    validate()
+                }
+            }
+        var manager: TabManager? = null
+        try {
+            val opened = CompletableFuture<Boolean>()
+            manager =
+                onEdt {
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            var created = 0
+                            workspace(listener) { options ->
+                                idleSession(options, shellIntegration = if (created++ == 0) integration else null)
+                            }
+                        },
+                        commandFinishedNotifier = { title, body, _ ->
+                            assertTrue(SwingUtilities.isEventDispatchThread())
+                            notifications += title to body
+                        },
+                        focusOwner = { focus },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            val origin = onEdt { requireNotNull(manager.selectedPane) }
+            if (mode == "otherPane") {
+                val secondOpened = CompletableFuture<Boolean>()
+                onEdt { assertTrue(manager.openTab(profile, onComplete = secondOpened::complete)) }
+                assertTrue(secondOpened.get(10, TimeUnit.SECONDS))
+                onEdt { focus = requireNotNull(manager.selectedPane).terminal }
+            }
+            val finishCommand = {
+                state.recordCommandStart(1, includeLine = true, commandText = "secret <build> command")
+                state.recordCommandFinished(
+                    1,
+                    exitCode =
+                        when (mode) {
+                            "failed" -> 7
+                            "unknownExit" -> null
+                            else -> 0
+                        },
+                )
+            }
+            if (mode in setOf("disabledBeforeDelivery", "deniedBeforeDelivery", "thresholdBeforeDelivery")) {
+                finishCommand()
+            } else {
+                onEdt {
+                    when (mode) {
+                        "ownPane" -> focus = origin.component
+                        "descendant" -> focus = origin.terminal
+                    }
+                    if (mode == "sessionPolicyDenied") {
+                        origin.tab.session.setHostPolicy(HostPolicy(notificationPolicy = HostControlPolicy.DENY))
+                    }
+                    finishCommand()
+                    if (mode == "coalesced") finishCommand()
+                    when (mode) {
+                        "focusBeforeDelivery" -> focus = origin.terminal
+                        "closedBeforeDelivery" -> manager.closePane(origin)
+                        "disposedBeforeDelivery" -> frame.dispose()
+                        "sessionPolicyDeniedBeforeDelivery" -> {
+                            origin.tab.session.setHostPolicy(HostPolicy(notificationPolicy = HostControlPolicy.DENY))
+                        }
+                    }
+                }
+            }
+            onEdt {
+                val expected = if (mode in setOf("unfocused", "otherPane", "coalesced", "failed", "unknownExit")) 1 else 0
+                assertEquals(expected, notifications.size, mode)
+                if (expected == 1) {
+                    val body =
+                        when (mode) {
+                            "failed" -> "The command exited with status 7."
+                            "unknownExit" -> "The command finished; its exit status is unknown."
+                            else -> "The command completed successfully."
+                        }
+                    assertEquals("Command finished" to body, notifications.single())
+                }
+            }
+            if (mode == "coalesced") {
+                onEdt { finishCommand() }
+                onEdt { assertEquals(2, notifications.size, "A drained alert releases its pending slot") }
+            }
+        } finally {
+            close(manager, frame)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["first", "tab", "split"])
     fun `installed panes use their laid out grid at first output`(
@@ -624,6 +791,7 @@ class TabManagerStartupTest {
     private fun idleSession(
         options: TerminalWorkspaceOpenOptions,
         onClose: () -> Unit = {},
+        shellIntegration: TerminalShellIntegrationFactory? = null,
         onStart: () -> Unit = {},
     ): TerminalSession =
         TerminalSession.create(
@@ -645,6 +813,7 @@ class TabManagerStartupTest {
                 override fun close() = onClose()
             },
             hostPolicy = options.hostPolicy,
+            shellIntegration = shellIntegration,
         )
 
     private fun close(

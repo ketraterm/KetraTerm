@@ -50,6 +50,80 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
+    @Test
+    fun `standard session permits host notifications by default`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    MockConnector(),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    assertTrue(session.hostNotificationsAllowed)
+                    session.start()
+                    assertTrue(session.hostNotificationsAllowed)
+                }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `host notification permission follows initial live policy and closure`(initiallyDenied: Boolean) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    MockConnector(),
+                    hostPolicy = HostPolicy(notificationPolicy = if (initiallyDenied) HostControlPolicy.DENY else HostControlPolicy.ALLOW),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    assertEquals(!initiallyDenied, session.hostNotificationsAllowed)
+                    session.start()
+                    assertEquals(!initiallyDenied, session.hostNotificationsAllowed)
+                    session.setHostPolicy(HostPolicy(notificationPolicy = HostControlPolicy.DENY))
+                    assertFalse(session.hostNotificationsAllowed)
+                    session.setHostPolicy(HostPolicy(notificationPolicy = HostControlPolicy.ALLOW))
+                    assertTrue(session.hostNotificationsAllowed)
+
+                    session.requestClose()
+                    assertFalse(session.hostNotificationsAllowed)
+                    session.setHostPolicy(HostPolicy())
+                    assertFalse(session.hostNotificationsAllowed)
+                    runCurrent()
+                    assertTrue(session.state.value is TerminalSessionState.Closed)
+                    assertFalse(session.hostNotificationsAllowed)
+                }
+        }
+
+    @Test
+    fun `caller-owned parser without a host adapter cannot authorize host notifications`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(10, 3)
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(10, 3),
+                renderReader = terminal as TerminalRenderFrameReader,
+                responseReader = terminal,
+                connector = MockConnector(),
+                parser = RecordingParser(),
+                inputEncoderFactory = noOpInputEncoderFactory,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
+            ).use { session ->
+                assertFalse(session.hostNotificationsAllowed)
+                session.start()
+                session.setHostPolicy(HostPolicy())
+                assertFalse(session.hostNotificationsAllowed)
+            }
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `capability replies precede input and paste delimiters match actual encoding`(denied: Boolean) =

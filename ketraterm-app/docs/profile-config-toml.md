@@ -72,13 +72,20 @@ All keys below belong to `[behavior]`. Boolean values are `true` or `false`.
 | `paste_sanitization` | `"preserve"` | `preserve` or `strip-c0`; bracketed-paste framing is protected in both. |
 | `shell_request_resize_window` | `false` | Permit terminal-originated grid-size requests to resize the window. |
 | `shell_request_window_manipulation` | `false` | Permit terminal-originated move, minimize, maximize, raise, and lower requests. |
-| `desktop_notifications_enabled` | `true` | Permit product notifications from OSC 9 and OSC 777 events. |
+| `desktop_notifications_enabled` | `true` | Master permission for OSC 9/777 notifications and command-finished alerts. |
+| `command_finished_alerts_enabled` | `false` | Notify when a long-running command finishes while its originating pane is unfocused; requires shell integration. |
+| `command_finished_alert_threshold_seconds` | `10` | Inclusive minimum observed command duration; clamped to `1..86400` seconds. |
 | `smart_suggestions_enabled` | `false` | Master switch for completion and learning. |
 | `shell_suggestions_enabled` | `true` | Automatic suggestions when the master switch is enabled. Explicit requests need only the master switch. |
 | `accept_selected_suggestion_with_enter` | `true` | Enter accepts an already selected suggestion; otherwise it reaches the shell. |
 | `suggestion_learning_persistence_enabled` | `false` | Persist compact completion-learning metadata when completion is enabled. |
 | `scroll_on_output` | `true` | Follow new process output. |
 | `show_foreground_process_name` | `true` | Use a detected process name when it does not supply a title; custom names retain priority. |
+
+Command-finished alerts use monotonic time between shell markers and recheck the
+originating pane's keyboard focus, current preferences, and lifetime before display.
+Pending completions coalesce to one alert per session while the UI is busy;
+command text is never included in these alerts.
 
 Paste handling is independent of the local PTY's newline policy. Legacy `raw`
 and `normalize-line-endings` values load as `preserve`; saving writes the

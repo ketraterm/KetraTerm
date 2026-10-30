@@ -49,6 +49,7 @@ See the [Swing guide](../../ketraterm-ui-swing/README.md) for configuration.
 | Clipboard permissions | Session-bound consent dialogs. | Consent and clipboard access bound to the originating IDE client. |
 | Bell handling | Independent audible/visual settings; urgency requests desktop attention where supported, and pop-on-bell raises the window. | Visual bell. |
 | Notifications | Terminal-originated desktop notifications through the system tray where supported. | IDE notifications. Both products apply terminal-output permissions. |
+| Command-finished alerts | Opt-in desktop alerts for unfocused panes after a configurable minimum command runtime; initially 10 seconds. | Opt-in IDE alerts with the same duration, focus, and session-permission checks. Both require shell metadata; see the [alert contract](../reference/notifications.md#command-finished-alerts). |
 
 Foreground-process titles use a Unix process-group lookup or a Windows
 descendant heuristic; they do not identify programs inside SSH or WSL. Restored

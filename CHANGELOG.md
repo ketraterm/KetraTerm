@@ -59,6 +59,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Added optional `TerminalShellIntegrationView.commandDurationMillis(recordId)` for completed commands, using monotonic timing in the built-in shell state. Unknown timing returns null; existing metadata constructors, copy methods, and wall-clock timestamps remain compatible. Hosts can revalidate deferred notification delivery with the nonblocking `TerminalSession.hostNotificationsAllowed` snapshot.
+
 - Added `SwingTerminal.setSearchWholeWord` and `setSearchRegex` for programmatic search options, and `TerminalRenderFrame.copyTextLine` for copying text and cell geometry without unrelated rendering attributes.
 - Added `SwingTerminalSearchAction`, `SwingTerminalSearchBar.performAction`, and `setShortcutTextProvider` for host-owned search commands and shortcut hints. **Behavior change:** the shared search bar no longer installs Enter, Shift+Enter, or Escape bindings; embedders must bind navigation and closing through their own action system.
 - Added `SwingSettings.alternateScreenWheelToArrowEnabled` to independently disable alternate-buffer wheel-to-arrow fallback. The default remains enabled, with precise fractional accumulation and bounded key output. Application mouse reports retain priority; Shift bypasses reporting and respects the setting. Disabled fallback uses local viewport scrolling. Changing either wheel fallback or mouse-reporting policy through settings reload clears partial arrow input; primary history scrolling retains its behavior. Existing constructors and signatures are preserved.

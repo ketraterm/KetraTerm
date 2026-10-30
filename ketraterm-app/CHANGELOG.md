@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added opt-in desktop alerts when long-running commands finish in an unfocused terminal, with a configurable minimum duration (10 seconds by default).
 - Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.
 - Terminal applications can change the mouse pointer shape (OSC 22).
 - Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.

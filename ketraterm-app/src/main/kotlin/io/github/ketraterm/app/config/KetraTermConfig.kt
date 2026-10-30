@@ -21,6 +21,7 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import java.util.*
 
 private fun defaultShellPath(): String {
@@ -76,6 +77,8 @@ private fun defaultFontFamily(): String {
  * @property lineHeight font metric line-height multiplier.
  * @property shellRequestResizeWindow whether shell requests may resize the application window.
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
+ * @property commandFinishedAlertsEnabled whether completed long-running commands may notify while their pane is unfocused.
+ * @property commandFinishedAlertThresholdSeconds minimum observed command duration in whole seconds, inclusive.
  * @property smartSuggestionsEnabled whether completion, learning, and completion persistence are available.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
  * appear automatically. Explicit requests require only [smartSuggestionsEnabled].
@@ -111,6 +114,8 @@ internal data class KetraTermConfig(
     val shellRequestResizeWindow: Boolean = DEFAULT_SHELL_REQUEST_RESIZE_WINDOW,
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
+    val commandFinishedAlertsEnabled: Boolean = DEFAULT_COMMAND_FINISHED_ALERTS_ENABLED,
+    val commandFinishedAlertThresholdSeconds: Int = DEFAULT_COMMAND_FINISHED_ALERT_THRESHOLD_SECONDS,
     val smartSuggestionsEnabled: Boolean = DEFAULT_SMART_SUGGESTIONS_ENABLED,
     val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
     val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
@@ -145,6 +150,10 @@ internal data class KetraTermConfig(
         }
         require(lineHeight in LINE_HEIGHT_MIN..LINE_HEIGHT_MAX) {
             "lineHeight must be in ${LINE_HEIGHT_MIN}..${LINE_HEIGHT_MAX}, was $lineHeight"
+        }
+        require(commandFinishedAlertThresholdSeconds in COMMAND_FINISHED_ALERT_THRESHOLD_MIN..COMMAND_FINISHED_ALERT_THRESHOLD_MAX) {
+            "commandFinishedAlertThresholdSeconds must be in " +
+                "$COMMAND_FINISHED_ALERT_THRESHOLD_MIN..$COMMAND_FINISHED_ALERT_THRESHOLD_MAX, was $commandFinishedAlertThresholdSeconds"
         }
         require(clipboardMaxDecodedBytes >= 0) {
             "clipboardMaxDecodedBytes must be non-negative, was $clipboardMaxDecodedBytes"
@@ -184,6 +193,10 @@ internal data class KetraTermConfig(
         const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
         const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
+        const val DEFAULT_COMMAND_FINISHED_ALERTS_ENABLED: Boolean = false
+        const val DEFAULT_COMMAND_FINISHED_ALERT_THRESHOLD_SECONDS: Int = TerminalCommandFinishedAlerts.DEFAULT_MINIMUM_DURATION_SECONDS
+        const val COMMAND_FINISHED_ALERT_THRESHOLD_MIN: Int = TerminalCommandFinishedAlerts.MINIMUM_DURATION_SECONDS
+        const val COMMAND_FINISHED_ALERT_THRESHOLD_MAX: Int = TerminalCommandFinishedAlerts.MAXIMUM_DURATION_SECONDS
         const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true

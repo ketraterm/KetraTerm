@@ -43,6 +43,37 @@ import kotlin.test.assertTrue
 
 class SettingsDialogTest {
     @Test
+    fun `command alert controls reset and persist independently of completion`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val enabled =
+                    components(dialog).filterIsInstance<JCheckBox>().single {
+                        it.text ==
+                            "Notify when long-running commands finish"
+                    }
+                val desktop = components(dialog).filterIsInstance<JCheckBox>().single { it.text == "Desktop notifications" }
+                val threshold = components(dialog).filterIsInstance<JSpinner>().single { it.name == "commandFinishedAlertThresholdSeconds" }
+                assertFalse(enabled.isSelected)
+                assertTrue(desktop.isSelected)
+                assertEquals(10, threshold.value)
+                enabled.doClick()
+                threshold.value = 60
+                button(dialog, "Reset to Defaults").doClick()
+                assertFalse(enabled.isSelected)
+                assertTrue(desktop.isSelected)
+                assertEquals(10, threshold.value)
+                enabled.doClick()
+                threshold.value = 25
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertTrue(settings.config.commandFinishedAlertsEnabled)
+            assertEquals(25, settings.config.commandFinishedAlertThresholdSeconds)
+            assertTrue(settings.config.smartSuggestionsEnabled)
+        }
+    }
+
+    @Test
     fun `prompt style selector resets and persists its choice`() {
         withDialog { settings, dialog, closed ->
             onEdt {

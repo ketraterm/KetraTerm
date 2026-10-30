@@ -127,6 +127,24 @@ public interface TerminalShellIntegrationView {
     public fun commandMetadata(recordId: Int): TerminalShellIntegrationCommandMetadata?
 
     /**
+     * Returns a completed command's elapsed time in whole milliseconds, rounded down.
+     *
+     * The producer measures elapsed time independently of wall-clock metadata.
+     * The value is fixed before command-finished listeners run. Unknown, evicted,
+     * prompt-only, running, or abandoned records return `null`; zero is a valid
+     * completed duration. Read it in the completion callback when it must be captured
+     * before later record eviction. Custom views may leave this capability unavailable.
+     *
+     * [TerminalShellIntegrationState] uses a monotonic nanosecond clock and supports
+     * intervals shorter than 2^63 nanoseconds (approximately 292 years), including
+     * signed clock wraparound. Negative elapsed measurements return `null`; longer intervals are unsupported.
+     *
+     * @param recordId retained command record identifier.
+     * @return nonnegative elapsed milliseconds, or `null` when unavailable.
+     */
+    public fun commandDurationMillis(recordId: Int): Long? = null
+
+    /**
      * Returns the newest retained command record id, skipping prompt-only records.
      *
      * @return newest command record id, or `0` when no command is retained.

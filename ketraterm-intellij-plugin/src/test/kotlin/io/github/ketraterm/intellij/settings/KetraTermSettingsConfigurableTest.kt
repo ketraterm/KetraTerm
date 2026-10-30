@@ -34,6 +34,52 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testCommandFinishedAlertControlsApplyAndReset() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.replaceState(
+                original.copy(
+                    commandFinishedAlertsEnabled = false,
+                    commandFinishedAlertThresholdSeconds = 10,
+                ),
+            )
+            val component = configurable.createComponent()
+            val enabled =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.commandFinishedAlerts")
+                }
+            val threshold =
+                descendants(component)
+                    .filterIsInstance<JLabel>()
+                    .single {
+                        it.text == KetraTermBundle.message("settings.ketraterm.commandFinishedAlertThresholdSeconds")
+                    }.labelFor as javax.swing.JSpinner
+            assertFalse(enabled.isSelected)
+            assertEquals(10, threshold.value)
+            enabled.isSelected = true
+            threshold.value = 25
+            assertTrue(configurable.isModified())
+            configurable.apply()
+            assertTrue(settings.state.commandFinishedAlertsEnabled)
+            assertEquals(25, settings.state.commandFinishedAlertThresholdSeconds)
+            assertEquals(
+                original.copy(commandFinishedAlertsEnabled = true, commandFinishedAlertThresholdSeconds = 25),
+                settings.state,
+            )
+            enabled.isSelected = false
+            threshold.value = 3
+            configurable.reset()
+            assertTrue(enabled.isSelected)
+            assertEquals(25, threshold.value)
+            assertFalse(configurable.isModified())
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testPromptStylesApplyAndResetWithoutChangingOtherSettings() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

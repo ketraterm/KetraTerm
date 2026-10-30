@@ -31,6 +31,11 @@ permissions. A blank launch directory uses the project root, falling back to the
 user home when no project path is available. The project JDK can be added to the
 shell environment through the corresponding setting.
 
+Command-finished notifications are off by default. Enable them in KetraTerm settings
+and choose a minimum duration (10 seconds initially). Shell integration must report
+command completion; alerts appear only while that terminal pane has no keyboard
+focus, and their text omits the command line.
+
 Completion is disabled by default and its settings controls are hidden; see
 [completion availability](../docs/features/completion.md#availability).
 

@@ -27,6 +27,7 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import kotlinx.collections.immutable.persistentListOf
 import java.awt.Font
 import java.util.*
@@ -209,6 +210,8 @@ class KetraTermIntellijSettings :
      * already-selected terminal suggestion and otherwise reaches the shell.
      * @property completionLearningPersistenceEnabled whether sanitized learned
      * completion statistics may be read from and written to local disk.
+     * @property commandFinishedAlertsEnabled whether completed long-running commands notify when their pane is unfocused.
+     * @property commandFinishedAlertThresholdSeconds inclusive minimum command runtime, from one second through one day.
      * @property clipboardRead persisted read permission. Its deserialization default
      * stays Deny for legacy XML; fresh services explicitly start with the product default.
      */
@@ -278,6 +281,11 @@ class KetraTermIntellijSettings :
         @JvmField val scrollOnOutput: Boolean = true,
         @OptionTag
         @JvmField val showForegroundProcessName: Boolean = DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
+        @OptionTag
+        @JvmField val commandFinishedAlertsEnabled: Boolean = false,
+        @OptionTag
+        @JvmField
+        val commandFinishedAlertThresholdSeconds: Int = TerminalCommandFinishedAlerts.DEFAULT_MINIMUM_DURATION_SECONDS,
     )
 
     companion object {
@@ -398,6 +406,11 @@ internal object KetraTermIntellijSettingsNormalizer {
                     TerminalClipboardPermission.DENY,
                 ),
             clipboardMaxDecodedBytes = state.clipboardMaxDecodedBytes.coerceAtLeast(0),
+            commandFinishedAlertThresholdSeconds =
+                state.commandFinishedAlertThresholdSeconds.coerceIn(
+                    TerminalCommandFinishedAlerts.MINIMUM_DURATION_SECONDS,
+                    TerminalCommandFinishedAlerts.MAXIMUM_DURATION_SECONDS,
+                ),
             titlePermission =
                 normalizeTitlePermission(
                     state.titlePermission,
