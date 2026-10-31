@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#release-bot-setup">Release bot setup</a><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
 <p><code>VERSION</code> on <code>master</code> is the release version for libraries, the standalone app,
 and the IntelliJ plugin. Set it to the desired version and merge the change
 before releasing. No manual tag or version input is needed.</p>
@@ -45,12 +45,30 @@ fails; rerun against the updated branch. Existing tags are never moved.</li>
 GitHub release with notes from all three versioned changelog sections.
 Relative links in those notes point to the tagged source.</li>
 <li>Triggers website/documentation publication through the existing
-<code>workflow_run</code> hook after successful completion. Pushes and releases made
-with <code>GITHUB_TOKEN</code> do not trigger ordinary event workflows.</li>
+<code>workflow_run</code> hook after successful completion, so downloads reflect the
+published assets. The release bot&#39;s push can also trigger ordinary push
+workflows before publication finishes.</li>
 </ol>
-<p>The workflow needs permission to push directly to <code>master</code> and create tags.
-Repository rules must permit the Actions token to do this; the workflow does
-not bypass branch protection. Existing Maven Central and signing secrets are
+<h2 id="release-bot-setup">Release bot setup</h2>
+<p>The release commit and tag are pushed as a dedicated GitHub App. Create and
+install the app on this repository with <strong>Contents: Read and write</strong>, then add
+it to the <code>master</code> ruleset&#39;s bypass list with <strong>Always allow</strong>. Save the ruleset.
+If release tags have their own ruleset, allow the app to create those tags too.
+Other contributors continue to follow the existing branch rules.</p>
+<p>On the app&#39;s <strong>General</strong> settings page, copy its <strong>Client ID</strong> and generate a
+private key. In the repository&#39;s <strong>Settings &gt; Secrets and variables &gt; Actions</strong>,
+add:</p>
+<ul>
+<li><strong>Variables:</strong> <code>RELEASE_APP_CLIENT_ID</code> containing the app&#39;s Client ID.</li>
+<li><strong>Secrets:</strong> <code>RELEASE_APP_PRIVATE_KEY</code> containing the entire downloaded PEM
+file, including its BEGIN/END lines.</li>
+</ul>
+<p>See <a href="https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow">GitHub&#39;s App authentication guide</a>.
+The workflow validates these credentials before the release build, generates
+a token scoped to this repository with contents-write permission, and uses it
+only for the atomic commit/tag push. The token is revoked at the end of the job.
+Ordinary checkout and release API calls use <code>GITHUB_TOKEN</code>; they do not inherit
+the release app&#39;s bypass access. Existing Maven Central and signing secrets are
 still required.</p>
 <p>For the next development cycle, add a new <code>## [Unreleased]</code> section to each
 changelog and bump <code>VERSION</code> before the next release.</p>
@@ -73,7 +91,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/cbcb759ee96d6baf7532742438284a010e7e5930/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
