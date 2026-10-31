@@ -213,8 +213,8 @@ internal class TerminalShapedGlyphVectorCache(
         init {
             val glyphCount = glyphVector.numGlyphs
             val batchCount = if (glyphCount > GLYPHS_PER_BATCH) (glyphCount + GLYPHS_PER_BATCH - 1) / GLYPHS_PER_BATCH else 0
-            minX = FloatArray(batchCount)
-            maxX = FloatArray(batchCount)
+            val batchMinX = FloatArray(batchCount)
+            val batchMaxX = FloatArray(batchCount)
             prefixMaxX = FloatArray(batchCount)
             suffixMinX = FloatArray(batchCount)
             val context = glyphVector.fontRenderContext
@@ -225,7 +225,8 @@ internal class TerminalShapedGlyphVectorCache(
             val pixelMargin =
                 if (determinant > 0.0) ((abs(transform.scaleY) + abs(transform.shearX)) / determinant).toFloat() else 0f
             val position = Point2D.Float()
-            batches =
+            var preservesGlyphs = true
+            val candidateBatches =
                 Array(batchCount) { batchIndex ->
                     val start = batchIndex * GLYPHS_PER_BATCH
                     val count = minOf(GLYPHS_PER_BATCH, glyphCount - start)
@@ -237,14 +238,29 @@ internal class TerminalShapedGlyphVectorCache(
                         position.x = original.x.toFloat()
                         position.y = original.y.toFloat()
                         batch.setGlyphPosition(glyph, position)
-                        if (glyph < count) batch.setGlyphTransform(glyph, glyphVector.getGlyphTransform(start + glyph))
+                        if (glyph < count) {
+                            batch.setGlyphTransform(glyph, glyphVector.getGlyphTransform(start + glyph))
+                            if (batch.getGlyphVisualBounds(glyph).bounds2D != glyphVector.getGlyphVisualBounds(start + glyph).bounds2D) {
+                                preservesGlyphs = false
+                            }
+                        }
                         glyph++
                     }
                     val bounds = batch.visualBounds
-                    minX[batchIndex] = bounds.minX.toFloat() - pixelMargin
-                    maxX[batchIndex] = bounds.maxX.toFloat() + pixelMargin
+                    batchMinX[batchIndex] = bounds.minX.toFloat() - pixelMargin
+                    batchMaxX[batchIndex] = bounds.maxX.toFloat() + pixelMargin
                     batch
                 }
+            minX = batchMinX
+            maxX = batchMaxX
+            // JBR 25.0.4/25.0.4.1 can re-encode composite-font glyph IDs in
+            // createGlyphVector, changing outlines while public IDs stay equal.
+            // Check bounds instead of IDs and draw the original clipped vector
+            // when needed, preserving the same glyphs for row and cursor painting.
+            // TODO(ui): Remove this bounds check and fallback once supported JBR
+            // builds include the upstream fix and the batch/contextual-rendering
+            // regression tests pass without the workaround.
+            batches = if (preservesGlyphs) candidateBatches else emptyArray()
             var runningMax = Float.NEGATIVE_INFINITY
             var index = 0
             while (index < batchCount) {

@@ -353,37 +353,45 @@ class KetraTermConfigTest {
 
     @Test
     fun `test KetraTermConfigManager path resolution`() {
-        // Overrides
-        // Clean default system property check (which might be set or not during tests, but we can verify our overrides work)
-        System.setProperty("ketraterm.config.path", "/custom/sys/path.toml")
-        assertEquals(Path.of("/custom/sys/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11"))
-        System.clearProperty("ketraterm.config.path")
+        val previousPath = System.getProperty("ketraterm.config.path")
+        try {
+            System.setProperty("ketraterm.config.path", "/custom/sys/path.toml")
+            assertEquals(Path.of("/custom/sys/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11"))
+            System.clearProperty("ketraterm.config.path")
 
-        // Env override
-        val env = mapOf("KetraTerm_CONFIG_PATH" to "/custom/env/path.toml")
-        assertEquals(Path.of("/custom/env/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = env))
+            // Env override
+            val env = mapOf("KetraTerm_CONFIG_PATH" to "/custom/env/path.toml")
+            assertEquals(Path.of("/custom/env/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = env))
 
-        // Windows resolution
-        val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
-        val winPath = KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
-        assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "KetraTerm", "config.toml"), winPath)
+            // Windows resolution
+            val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
+            val winPath = KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
+            assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "KetraTerm", "config.toml"), winPath)
 
-        // Mac resolution
-        val macPath = KetraTermConfigManager.getDefaultPath(osName = "macOS Big Sur", userHome = "/Users/username")
-        assertEquals(Path.of("/Users/username/Library/Application Support/KetraTerm/config.toml"), macPath)
+            // Mac resolution
+            // An inherited KetraTerm_CONFIG_PATH must not override this simulated OS default.
+            val macPath = KetraTermConfigManager.getDefaultPath(osName = "macOS Big Sur", env = emptyMap(), userHome = "/Users/username")
+            assertEquals(Path.of("/Users/username/Library/Application Support/KetraTerm/config.toml"), macPath)
 
-        // Linux resolution
-        val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
-        val linuxPath = KetraTermConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
-        assertEquals(Path.of("/home/username/.custom_config/ketraterm/config.toml"), linuxPath)
+            // Linux resolution
+            val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
+            val linuxPath = KetraTermConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
+            assertEquals(Path.of("/home/username/.custom_config/ketraterm/config.toml"), linuxPath)
 
-        val linuxFallbackPath =
-            KetraTermConfigManager.getDefaultPath(
-                osName = "Linux",
-                env = emptyMap(),
-                userHome = "/home/username",
-            )
-        assertEquals(Path.of("/home/username/.config/ketraterm/config.toml"), linuxFallbackPath)
+            val linuxFallbackPath =
+                KetraTermConfigManager.getDefaultPath(
+                    osName = "Linux",
+                    env = emptyMap(),
+                    userHome = "/home/username",
+                )
+            assertEquals(Path.of("/home/username/.config/ketraterm/config.toml"), linuxFallbackPath)
+        } finally {
+            if (previousPath == null) {
+                System.clearProperty("ketraterm.config.path")
+            } else {
+                System.setProperty("ketraterm.config.path", previousPath)
+            }
+        }
     }
 
     @Test
