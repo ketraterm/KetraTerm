@@ -23,12 +23,32 @@ The workflow:
    GitHub release with notes from all three versioned changelog sections.
    Relative links in those notes point to the tagged source.
 6. Triggers website/documentation publication through the existing
-   `workflow_run` hook after successful completion. Pushes and releases made
-   with `GITHUB_TOKEN` do not trigger ordinary event workflows.
+   `workflow_run` hook after successful completion, so downloads reflect the
+   published assets. The release bot's push can also trigger ordinary push
+   workflows before publication finishes.
 
-The workflow needs permission to push directly to `master` and create tags.
-Repository rules must permit the Actions token to do this; the workflow does
-not bypass branch protection. Existing Maven Central and signing secrets are
+## Release bot setup
+
+The release commit and tag are pushed as a dedicated GitHub App. Create and
+install the app on this repository with **Contents: Read and write**, then add
+it to the `master` ruleset's bypass list with **Always allow**. Save the ruleset.
+If release tags have their own ruleset, allow the app to create those tags too.
+Other contributors continue to follow the existing branch rules.
+
+On the app's **General** settings page, copy its **Client ID** and generate a
+private key. In the repository's **Settings > Secrets and variables > Actions**,
+add:
+
+- **Variables:** `RELEASE_APP_CLIENT_ID` containing the app's Client ID.
+- **Secrets:** `RELEASE_APP_PRIVATE_KEY` containing the entire downloaded PEM
+  file, including its BEGIN/END lines.
+
+See [GitHub's App authentication guide](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow).
+The workflow validates these credentials before the release build, generates
+a token scoped to this repository with contents-write permission, and uses it
+only for the atomic commit/tag push. The token is revoked at the end of the job.
+Ordinary checkout and release API calls use `GITHUB_TOKEN`; they do not inherit
+the release app's bypass access. Existing Maven Central and signing secrets are
 still required.
 
 For the next development cycle, add a new `## [Unreleased]` section to each
