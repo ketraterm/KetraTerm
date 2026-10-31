@@ -106,7 +106,10 @@ protocol references, and contributor resources. The <a href="docs/terminal-featu
 describes supported capabilities; the <a href="docs/terminal-feature-gap-map.html">gap map</a>
 tracks remaining work. Consumer-visible changes are in the <a href="CHANGELOG.html">library changelog</a>.</p>
 <h2 id="development">Development</h2>
-<p>Use JDK 25 and the included Gradle wrapper (<code>gradlew</code> / <code>gradlew.bat</code>).</p>
+<p>Use JetBrains JDK (JBR) 25 and the included Gradle wrapper (<code>gradlew</code> /
+<code>gradlew.bat</code>). The root build selects JBR 25 for the Gradle daemon, compilation,
+tests, and application runs. Gradle can download it when needed. In IntelliJ,
+select JBR 25 as the Gradle JVM to match command-line builds.</p>
 <pre><code class="language-bash">./gradlew :ketraterm-app:run
 ./gradlew test
 ./gradlew publicationChecks
@@ -132,8 +135,8 @@ checks and product development commands.</p>
 <hr>
 <h2 id="license">License</h2>
 <p>Copyright 2026 Gagik Sargsyan. Licensed under the
-<a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/LICENSE">Apache License, Version 2.0</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/README.md">View source on GitHub ↗</a></div></div></main></div>
+<a href="https://github.com/ketraterm/KetraTerm/blob/9569dda0fd97a7ab7bea8719eaeb8d7235c70ea5/LICENSE">Apache License, Version 2.0</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9569dda0fd97a7ab7bea8719eaeb8d7235c70ea5/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
