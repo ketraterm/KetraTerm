@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release from VERSION
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      needed: ${{ steps.prepare.outputs.needed }}
+      revision: ${{ steps.commit.outputs.revision }}
+      tag: ${{ steps.prepare.outputs.tag }}
+      prerelease: ${{ steps.prepare.outputs.prerelease }}
+    env:
+      RELEASE: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Read all published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+      - name: Prepare versioned changelogs
+        id: prepare
+        run: node .github/scripts/release.mjs prepare "$RUNNER_TEMP/releases.json"
+      - name: Setup JBR 25
+        if: steps.prepare.outputs.needed == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.prepare.outputs.needed == 'true'
+      - name: Install system dependencies
+        if: steps.prepare.outputs.needed == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Verify release before creating tag
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        run: |
+          node --test .github/scripts/release.test.mjs
+          xvfb-run -a ./gradlew spotlessCheck checkKotlinAbi test publicationChecks :ketraterm-app:writeNativeVersion --no-daemon
+      - name: Commit changelogs and create tag atomically
+        if: steps.prepare.outputs.needed == 'true'
+        id: commit
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+          EXISTING_TAG: ${{ steps.prepare.outputs.existing_tag }}
+        run: |
+          if [[ "$EXISTING_TAG" != true ]]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add VERSION CHANGELOG.md ketraterm-app/CHANGELOG.md ketraterm-intellij-plugin/CHANGELOG.md
+            if ! git diff --cached --quiet; then
+              git commit -m "Release $TAG"
+            fi
+            git tag "$TAG"
+            git push --atomic origin HEAD:refs/heads/master "refs/tags/$TAG"
+          fi
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  maven:
+    needs: prepare
+    if: needs.prepare.outputs.needed == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      revision: ${{ needs.prepare.outputs.revision }}
+    secrets: inherit
+
+  binaries:
+    needs: [prepare, maven]
+    if: needs.prepare.outputs.needed == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish-binaries.yml
+    with:
+      revision: ${{ needs.prepare.outputs.revision }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+    secrets: inherit

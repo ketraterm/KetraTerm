@@ -8,7 +8,7 @@ on:
   release:
     types: [published]
   workflow_run:
-    workflows: ['Publish Binaries']
+    workflows: ['Release']
     types: [completed]
 
 permissions:

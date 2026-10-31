@@ -28,6 +28,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Setup Node for release automation tests
+        if: runner.os == 'Linux'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test Release Automation
+        if: runner.os == 'Linux'
+        run: node --test .github/scripts/release.test.mjs
+
       - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |

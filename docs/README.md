@@ -29,6 +29,7 @@ dependencies and structure; its `docs/` directory holds detailed contracts.
 ## Development
 
 - [Contributing](../CONTRIBUTING.md): local setup, checks, and contribution workflow.
+- [Releasing](development/releases.md): release preparation, publishing, and prereleases.
 - [Architecture](../ARCHITECTURE.md): module boundaries and data flow.
 - [Conformance testing](development/conformance-testing.md): campaigns and failure reproduction.
 - [Kitty graphics design](development/kitty-graphics-contract.md): protocol, resource, decoder and render-lifetime contract with pinned sender fixtures; current delivery scope is tracked in the gap map.

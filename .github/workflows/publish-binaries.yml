@@ -1,10 +1,17 @@
 name: Publish Binaries
 
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      revision:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      prerelease:
+        required: true
+        type: boolean
 
 env:
   RELEASE: "true"
@@ -15,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
 
       - name: Setup JBR 25
         uses: actions/setup-java@v6
@@ -80,6 +89,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
 
       - name: Setup JBR 25
         uses: actions/setup-java@v6
@@ -153,7 +164,7 @@ jobs:
             JBR_HOME_PATH=$(find packaging/jbr-extract -name "bin" -type d -exec dirname {} \; | head -n 1)
           fi
           echo "Resolved JBR_HOME: $JBR_HOME_PATH"
-          
+
           if [ "${{ runner.os }}" = "Windows" ]; then
             if [ ! -f "$JBR_HOME_PATH/bin/java.exe" ]; then
               echo "Error: java.exe not found in resolved JBR_HOME" >&2
@@ -165,9 +176,9 @@ jobs:
               exit 1
             fi
           fi
-          
+
           "$JBR_HOME_PATH/bin/java" -version
-          
+
           echo "jbr_home=$JBR_HOME_PATH" >> $GITHUB_OUTPUT
 
       - name: Compute Mapped Native Version
@@ -224,7 +235,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p packaging/installer
-          
+
           if [ "${{ runner.os }}" = "Windows" ]; then
             jpackage --type exe \
               --app-image packaging/app-image/KetraTerm \
@@ -300,6 +311,15 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Generate release notes from changelogs
+        run: node .github/scripts/release.mjs notes
 
       - name: Download No-Runtime
         uses: actions/download-artifact@v4
@@ -364,11 +384,13 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v')
         with:
+          tag_name: ${{ inputs.tag }}
+          body_path: release-notes.md
           files: |
             release-artifacts/*
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ inputs.prerelease }}
+          make_latest: ${{ inputs.prerelease && 'false' || 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
