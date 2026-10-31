@@ -40,10 +40,7 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
 import io.github.ketraterm.intellij.ui.*
 import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.session.TerminalClipboardReadResult
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.session.*
 import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest
@@ -90,6 +87,8 @@ class KetraTermProjectTerminalService internal constructor(
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
     private val clipboardSessions = ConcurrentHashMap<String, IntellijClipboardSession>()
     private val pendingCommandAlerts = ConcurrentHashMap.newKeySet<String>()
+    private val pendingProgressUpdates = ConcurrentHashMap.newKeySet<String>()
+    private var progressPresentation: IntellijTerminalProgressPresentation? = null
     private val clipboardReader = SwingClipboardReader()
 
     // Only accessed during serialized workspace creation and its synchronous tabOpened callback.
@@ -349,6 +348,7 @@ class KetraTermProjectTerminalService internal constructor(
         if (disposed) return
         disposed = true
         pendingCommandAlerts.clear()
+        pendingProgressUpdates.clear()
 
         val panes = panesByTabId.values.toList()
         val closeRegistrations = closeListenersByTabId.values.toList()
@@ -363,6 +363,8 @@ class KetraTermProjectTerminalService internal constructor(
 
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure) { persistence?.dispose() }
+        failure = captureCleanupFailure(failure) { progressPresentation?.dispose() }
+        progressPresentation = null
         for ((manager, listener) in closeRegistrations) {
             failure =
                 captureCleanupFailure(failure) {
@@ -486,7 +488,11 @@ class KetraTermProjectTerminalService internal constructor(
             )
         panesByTabId[workspaceTab.id] = pane
         replaceContent(pendingTab.container, pane.component)
-        pendingTab.content.displayName = workspaceTab.title
+        val presentation =
+            progressPresentation ?: IntellijTerminalProgressPresentation(checkNotNull(lastToolWindow)).also {
+                progressPresentation = it
+            }
+        presentation.bind(pendingTab.content, workspaceTab)
         pendingTab.content.preferredFocusableComponent = pane.terminal
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
@@ -732,12 +738,31 @@ class KetraTermProjectTerminalService internal constructor(
             }
         }
 
+        override fun progressChanged(
+            tab: TerminalWorkspaceTab,
+            progress: TerminalProgress,
+        ) {
+            if (disposed || closing || !pendingProgressUpdates.add(tab.id)) return
+            try {
+                ApplicationManager.getApplication().invokeLater {
+                    // Clear before reading so a concurrent report can schedule the next refresh.
+                    pendingProgressUpdates.remove(tab.id)
+                    if (disposed || closing || project.isDisposed) return@invokeLater
+                    val content = contentsByTabId[tab.id] ?: return@invokeLater
+                    progressPresentation?.refreshTab(content, tab)
+                }
+            } catch (failure: Exception) {
+                pendingProgressUpdates.remove(tab.id)
+                throw failure
+            }
+        }
+
         override fun titleChanged(
             tab: TerminalWorkspaceTab,
             title: String,
         ) {
             invokeLaterIfAlive {
-                contentsByTabId[tab.id]?.displayName = tab.title
+                contentsByTabId[tab.id]?.let { progressPresentation?.refreshTab(it, tab) }
                 persistence?.capture()
             }
         }

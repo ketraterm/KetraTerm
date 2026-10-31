@@ -25,10 +25,7 @@ import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.TerminalHostModeCapability
-import io.github.ketraterm.session.TerminalClipboardReadResult
-import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
-import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.session.*
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
@@ -41,6 +38,7 @@ import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.beans.PropertyChangeListener
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
@@ -72,9 +70,13 @@ internal class TabManager(
     workspaceFactory: (TerminalWorkspaceListener) -> TerminalWorkspace = ::TerminalWorkspace,
     private val commandFinishedNotifier: (String, String, NotificationLevel) -> Unit = DesktopNotificationManager::showNotification,
     private val focusOwner: () -> Component? = { KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner },
+    private val windowProgressPublisher: (TerminalProgress) -> Unit = { publishTaskbarProgress(frame, it) },
 ) {
+    private val owningFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val pendingCommandFinishedAlerts = ConcurrentHashMap.newKeySet<String>()
+    private val progressRefreshPending = AtomicBoolean()
+    private var windowProgress: TerminalProgress? = null
     private val workspace = workspaceFactory(StandaloneWorkspaceListener())
 
     // Used only by the serialized startup worker before session output starts.
@@ -200,10 +202,20 @@ internal class TabManager(
             false
         }
 
+    private val paneFocusListener =
+        PropertyChangeListener {
+            if (SwingUtilities.isEventDispatchThread()) {
+                if (!shutdownStarted.get()) refreshProgressPresentation()
+            } else {
+                queueProgressRefresh()
+            }
+        }
+
     init {
-        val focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val focusManager = owningFocusManager
         try {
             focusManager.addKeyEventDispatcher(keyEventDispatcher)
+            focusManager.addPropertyChangeListener("permanentFocusOwner", paneFocusListener)
             settings.addChangeListener(settingsListener)
         } catch (failure: Throwable) {
             var cleanupFailure: Throwable? = failure
@@ -211,6 +223,10 @@ internal class TabManager(
             cleanupFailure = captureCleanupFailure(cleanupFailure, windowResizeController::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure) { settings.removeChangeListener(settingsListener) }
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
+            cleanupFailure =
+                captureCleanupFailure(cleanupFailure) {
+                    focusManager.removePropertyChangeListener("permanentFocusOwner", paneFocusListener)
+                }
             cleanupFailure = captureCleanupFailure(cleanupFailure, workspace::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure, ::closeCompletionLearningWithinBudget)
             throw requireNotNull(cleanupFailure)
@@ -480,12 +496,15 @@ internal class TabManager(
     fun closeAllTabsWithoutConfirmation(onComplete: (Result<Unit>) -> Unit = ::reportWorkspaceCleanup) {
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, tabBar::closeProgressAnimation)
         failure = captureCleanupFailure(failure, windowResizeController::close)
         failure = captureCleanupFailure(failure, commandOutputExporter::close)
         failure = captureCleanupFailure(failure) { settings.removeChangeListener(settingsListener) }
         failure =
             captureCleanupFailure(failure) {
-                KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)
+                val focusManager = owningFocusManager
+                focusManager.removeKeyEventDispatcher(keyEventDispatcher)
+                focusManager.removePropertyChangeListener("permanentFocusOwner", paneFocusListener)
             }
         val tabIds = tabRoots.keys.toList()
         for (tabId in tabIds) {
@@ -759,8 +778,8 @@ internal class TabManager(
 
     fun getActivePane(tabId: String): TerminalPane? {
         val root = tabRoots[tabId] ?: return null
-        val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
-        return root.findActivePane(focusOwner) ?: root.allPanes().firstOrNull()
+        val focused = focusOwner()
+        return root.findActivePane(focused) ?: root.allPanes().firstOrNull()
     }
 
     private fun visualTabIdForPane(pane: TerminalPane): String? =
@@ -996,7 +1015,7 @@ internal class TabManager(
         if (activePane?.tab?.id == tabId) {
             tabBar.updateTitle(visualTabId, title)
             if (tabBar.selectedId() == visualTabId) {
-                frame.title = title
+                updateFrameTitle()
             }
         }
     }
@@ -1013,8 +1032,37 @@ internal class TabManager(
         }
     }
 
-    private fun updateFrameTitle() {
-        frame.title = selectedPane?.tab?.title ?: Chrome.APP_TITLE
+    private fun updateFrameTitle() = refreshProgressPresentation()
+
+    /** Reads retained state at delivery time; one EDT wake covers bursts from every session. */
+    private fun refreshProgressPresentation() {
+        check(SwingUtilities.isEventDispatchThread())
+        for (tabId in tabRoots.keys) {
+            val pane = getActivePane(tabId) ?: continue
+            val progress = pane.tab.session.progress.value
+            tabBar.updateTitle(tabId, pane.tab.title)
+            tabBar.updateProgress(tabId, progress)
+        }
+        val title = tabBar.selectedDisplayTitle() ?: Chrome.APP_TITLE
+        if (frame.title != title) frame.title = title
+        val nextProgress =
+            selectedPane
+                ?.tab
+                ?.session
+                ?.progress
+                ?.value ?: TerminalProgress.HIDDEN
+        if (windowProgress != nextProgress) {
+            windowProgressPublisher(nextProgress)
+            windowProgress = nextProgress
+        }
+    }
+
+    private fun queueProgressRefresh() {
+        if (shutdownStarted.get() || !progressRefreshPending.compareAndSet(false, true)) return
+        SwingUtilities.invokeLater {
+            progressRefreshPending.set(false)
+            if (!shutdownStarted.get()) refreshProgressPresentation()
+        }
     }
 
     private fun showStartError(
@@ -1033,6 +1081,13 @@ internal class TabManager(
     }
 
     private inner class StandaloneWorkspaceListener : TerminalWorkspaceListener {
+        override fun progressChanged(
+            tab: TerminalWorkspaceTab,
+            progress: TerminalProgress,
+        ) {
+            queueProgressRefresh()
+        }
+
         override fun tabOpened(tab: TerminalWorkspaceTab) {
             checkNotNull(publishStartingTab) { "Standalone startup must use the workspace worker" }(tab)
         }
@@ -1201,7 +1256,7 @@ internal class TabManager(
             tab: TerminalWorkspaceTab,
             title: String,
             body: String,
-            level: io.github.ketraterm.protocol.NotificationLevel,
+            level: NotificationLevel,
         ) {
             if (settings.config.desktopNotificationsEnabled) {
                 DesktopNotificationManager.showNotification(title, body, level)

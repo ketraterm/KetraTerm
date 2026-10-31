@@ -35,14 +35,11 @@ import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellCommandLineState
-import io.github.ketraterm.session.TerminalShellIntegrationFactory
-import io.github.ketraterm.session.TerminalShellIntegrationState
-import io.github.ketraterm.session.TerminalShellIntegrationView
-import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.protocol.TerminalProgressState
+import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import io.github.ketraterm.ui.swing.host.SwingTerminalProgressIcon
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceListener
@@ -60,6 +57,8 @@ import javax.swing.SwingUtilities
 
 /** Verifies restart metadata and startup lifecycle through real product panes without creating PTYs. */
 class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
+    private fun progressOf(content: Content): TerminalProgress? = (content.icon as? SwingTerminalProgressIcon)?.progress
+
     fun testDisposalFinishesWhenPersistenceListenerRemovalThrows() {
         storage.loadState(TerminalTabsState(listOf(TerminalTabState(customTitle = "Pending")), 0))
         val service = service()
@@ -575,6 +574,218 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
             }
         }
 
+    fun testOscProgressDecoratesTabsAndSelectedToolWindowWithoutPersistingProgress() =
+        onEdt {
+            val settings = KetraTermIntellijSettings.getInstance()
+            settings.replaceState(settings.state.copy(titlePermission = "deny", smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+            val outputs = CopyOnWriteArrayList<TerminalConnectorListener>()
+            val service = progressService(outputs)
+            val manager = contentManager()
+            var windowTitle = "KetraTerm"
+            val window = toolWindow(manager, onTitleChanged = { windowTitle = it })
+            try {
+                val first = service.openProfileTab(window, TerminalProfile("first", "First", listOf("unused")))
+                PlatformTestUtil.waitWithEventsDispatching("First session was not started", { outputs.size == 1 }, 10)
+                first.component.components
+                    .firstNotNullOf { service.paneForComponent(it) }
+                    .tab.customTitle = "First"
+                val second = service.openProfileTab(window, TerminalProfile("second", "Second", listOf("unused")))
+                PlatformTestUtil.waitWithEventsDispatching("Second session was not started", { outputs.size == 2 }, 10)
+                second.component.components
+                    .firstNotNullOf { service.paneForComponent(it) }
+                    .tab.customTitle = "Second"
+                UIUtil.dispatchAllInvocationEvents()
+
+                emitOutput(outputs[0], "\u001B]9;4;1;50\u0007")
+                PlatformTestUtil.waitWithEventsDispatching("Tab progress was not shown", {
+                    first.displayName == "First" &&
+                        progressOf(first) == TerminalProgress(TerminalProgressState.NORMAL, 50)
+                }, 10)
+                assertEquals("Second", second.displayName)
+                assertEquals("Background tab progress must not replace the selected presentation", "KetraTerm", windowTitle)
+                @Suppress("UsePropertyAccessSyntax")
+                manager.setSelectedContent(first)
+                assertEquals("KetraTerm [50%]", windowTitle)
+
+                emitOutput(outputs[1], "\u001B]9;4;4;65\u001B\\")
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Warning progress was not shown",
+                    {
+                        second.displayName == "Second" &&
+                            progressOf(second) == TerminalProgress(TerminalProgressState.WARNING, 65)
+                    },
+                    10,
+                )
+                assertEquals("KetraTerm [50%]", windowTitle)
+                @Suppress("UsePropertyAccessSyntax")
+                manager.setSelectedContent(second)
+                assertEquals("KetraTerm [Warning 65%]", windowTitle)
+                assertEquals(listOf("First", "Second"), storage.state.tabs.map { it.customTitle })
+
+                emitOutput(outputs[0], "\u001B]9;4;0\u0007")
+                PlatformTestUtil.waitWithEventsDispatching("Hidden progress was not removed", {
+                    first.displayName == "First" &&
+                        first.icon !is SwingTerminalProgressIcon
+                }, 10)
+                emitOutput(outputs[1], "\u001B]9;4;3\u0007")
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Indeterminate progress was not shown",
+                    {
+                        second.displayName == "Second" &&
+                            progressOf(second) == TerminalProgress(TerminalProgressState.INDETERMINATE, 0)
+                    },
+                    10,
+                )
+                assertEquals("KetraTerm [Working\u2026]", windowTitle)
+                emitOutput(outputs[1], "\u001B]9;4;2;20\u0007")
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Error progress was not shown",
+                    {
+                        second.displayName == "Second" &&
+                            progressOf(second) == TerminalProgress(TerminalProgressState.ERROR, 20)
+                    },
+                    10,
+                )
+                assertEquals("KetraTerm [Error 20%]", windowTitle)
+                emitOutput(outputs[1], "\u001Bc")
+                PlatformTestUtil.waitWithEventsDispatching("Reset must clear progress", {
+                    second.displayName == "Second" &&
+                        second.icon !is SwingTerminalProgressIcon
+                }, 10)
+                assertEquals("KetraTerm", windowTitle)
+            } finally {
+                Disposer.dispose(service)
+            }
+        }
+
+    fun testProgressBurstPolicyRevocationTabCloseAndDisposalKeepCurrentPresentation() =
+        onEdt {
+            val settings = KetraTermIntellijSettings.getInstance()
+            settings.replaceState(settings.state.copy(smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+            val outputs = CopyOnWriteArrayList<TerminalConnectorListener>()
+            val service = progressService(outputs)
+            val manager = contentManager()
+            var windowTitle = "KetraTerm"
+            val window = toolWindow(manager, onTitleChanged = { windowTitle = it })
+            try {
+                val content = service.openProfileTab(window, TerminalProfile("build", "Build", listOf("unused")))
+                PlatformTestUtil.waitWithEventsDispatching("Build session was not started", { outputs.size == 1 }, 10)
+                val tab =
+                    content.component.components
+                        .firstNotNullOf { service.paneForComponent(it) }
+                        .tab
+                tab.customTitle = "Build"
+                UIUtil.dispatchAllInvocationEvents()
+                var titleChanges = 0
+                content.addPropertyChangeListener { if (it.propertyName == Content.PROP_ICON) titleChanges++ }
+
+                val burst = buildString { repeat(10) { for (percentage in 0..100) append("\u001B]9;4;1;$percentage\u0007") } }
+                emitOutput(outputs[0], burst)
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Latest progress from the burst was not shown",
+                    {
+                        content.displayName == "Build" &&
+                            progressOf(content) == TerminalProgress(TerminalProgressState.NORMAL, 100)
+                    },
+                    10,
+                )
+                assertEquals("One queued refresh must read the latest retained state", 1, titleChanges)
+                assertEquals("KetraTerm [100%]", windowTitle)
+
+                tab.customTitle = "Renamed"
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Renamed", content.displayName)
+                assertEquals(100, (content.icon as SwingTerminalProgressIcon).progress.percentage)
+                assertEquals(
+                    "Renamed",
+                    storage.state.tabs
+                        .single()
+                        .customTitle,
+                )
+
+                emitOutput(outputs[0], "\u001B]9;4;2;25\u0007")
+                val allowedPolicy = settings.createHostPolicy()
+                tab.session.setHostPolicy(
+                    allowedPolicy.copy(progressPolicy = HostControlPolicy.DENY),
+                )
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Permission revocation must clear progress",
+                    {
+                        content.displayName == "Renamed" &&
+                            content.icon !is SwingTerminalProgressIcon
+                    },
+                    10,
+                )
+                assertEquals("KetraTerm", windowTitle)
+                emitOutput(outputs[0], "\u001B]9;4;1;90\u0007")
+                assertEquals(TerminalProgress.HIDDEN, tab.session.progress.value)
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Renamed", content.displayName)
+                tab.session.setHostPolicy(settings.createHostPolicy())
+
+                emitOutput(outputs[0], "\u001B]9;4;4;35\u0007")
+                PlatformTestUtil.waitWithEventsDispatching(
+                    "Allowed progress must resume",
+                    {
+                        content.displayName == "Renamed" &&
+                            progressOf(content) == TerminalProgress(TerminalProgressState.WARNING, 35)
+                    },
+                    10,
+                )
+                emitOutput(outputs[0], "\u001B]9;4;1;60\u0007")
+                assertTrue(manager.removeContent(content, true))
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Closing the selected tab must restore the window title", "KetraTerm", windowTitle)
+
+                val next = service.openProfileTab(window, TerminalProfile("next", "Next", listOf("unused")))
+                PlatformTestUtil.waitWithEventsDispatching("Next session was not started", { outputs.size == 2 }, 10)
+                next.component.components
+                    .firstNotNullOf { service.paneForComponent(it) }
+                    .tab.customTitle = "Next"
+                emitOutput(outputs[1], "\u001B]9;4;1;40\u0007")
+                PlatformTestUtil.waitWithEventsDispatching("Next tab progress was not shown", {
+                    next.displayName == "Next" &&
+                        progressOf(next) == TerminalProgress(TerminalProgressState.NORMAL, 40)
+                }, 10)
+                emitOutput(outputs[1], "\u001B]9;4;2;60\u0007")
+                service.dispose()
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Disposal must discard queued progress", "Next", next.displayName)
+                assertEquals("KetraTerm", windowTitle)
+            } finally {
+                Disposer.dispose(service)
+            }
+        }
+
+    private fun progressService(outputs: MutableList<TerminalConnectorListener>): KetraTermProjectTerminalService =
+        KetraTermProjectTerminalService(
+            project,
+            workspaceFactory = { listener ->
+                workspace(listener) { options ->
+                    TerminalSession.create(
+                        TerminalBuffers.create(options.columns, options.rows),
+                        connector(onStart = { outputs += it }),
+                        hostPolicy = options.hostPolicy,
+                    )
+                }
+            },
+            prepareStartup = {},
+        ).also { Disposer.register(lifetime, it) }
+
+    private fun emitOutput(
+        output: TerminalConnectorListener,
+        text: String,
+    ) {
+        val bytes = text.encodeToByteArray()
+        val delivery = FutureTask { output.onBytes(bytes, 0, bytes.size) }
+        Thread
+            .ofPlatform()
+            .daemon()
+            .name("intellij-progress-output")
+            .start(delivery)
+        delivery.get(10, TimeUnit.SECONDS)
+    }
+
     private fun onEdt(action: () -> Unit) {
         if (SwingUtilities.isEventDispatchThread()) action() else SwingUtilities.invokeAndWait { action() }
     }
@@ -641,11 +852,14 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
 
     private fun toolWindow(
         manager: ContentManager,
+        onTitleChanged: (String) -> Unit = {},
         onFirstContentAccess: () -> Unit = {},
     ): ToolWindow {
         var accessed = false
+        var title = "KetraTerm"
         return Proxy.newProxyInstance(ToolWindow::class.java.classLoader, arrayOf(ToolWindow::class.java)) { proxy, method, arguments ->
             when (method.name) {
+                "getComponent" -> manager.component
                 "getContentManager" -> {
                     if (!accessed) {
                         accessed = true
@@ -655,6 +869,13 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
                 }
                 "toString" -> "KetraTerm persistence test tool window"
                 "isActive" -> false
+                "isDisposed" -> false
+                "getTitle" -> title
+                "setTitle" -> {
+                    title = arguments?.get(0) as String
+                    onTitleChanged(title)
+                    null
+                }
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.get(0)
                 else -> error("Unexpected tool-window call: ${method.name}")

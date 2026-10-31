@@ -324,6 +324,18 @@ public final class io/github/ketraterm/protocol/TerminalPointerShape : java/lang
 	public static fun values ()[Lio/github/ketraterm/protocol/TerminalPointerShape;
 }
 
+public final class io/github/ketraterm/protocol/TerminalProgressState : java/lang/Enum {
+	public static final field ERROR Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static final field HIDDEN Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static final field INDETERMINATE Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static final field NORMAL Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static final field WARNING Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWireValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/TerminalProgressState;
+	public static fun values ()[Lio/github/ketraterm/protocol/TerminalProgressState;
+}
+
 public final class io/github/ketraterm/protocol/TerminalTextLimits {
 	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalTextLimits;
 	public static final field MAX_CLUSTER_CODEPOINTS I

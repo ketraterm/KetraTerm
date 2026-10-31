@@ -16,12 +16,12 @@
 package io.github.ketraterm.parser.ansi
 
 import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
-import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.protocol.ShellIntegrationEvent
-import io.github.ketraterm.protocol.TerminalGraphicsCommand
-import io.github.ketraterm.protocol.TerminalGraphicsResult
+import io.github.ketraterm.parser.spi.TerminalProgressCommandSink
+import io.github.ketraterm.protocol.*
 
-internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
+internal class RecordingTerminalCommandSink :
+    TerminalAsciiCommandSink,
+    TerminalProgressCommandSink {
     override val graphicsTransferGeneration: Long get() = 0L
 
     override fun applyGraphicsCommand(
@@ -35,7 +35,7 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
 
     override var isAlternateScreenActive: Boolean = false
 
-    override fun applyColorRequest(request: io.github.ketraterm.protocol.TerminalColorRequest) {
+    override fun applyColorRequest(request: TerminalColorRequest) {
         for (i in 0 until request.count) {
             val key = ByteArray(request.keyLength(i)) { request.keyByte(i, it).toByte() }.decodeToString()
             events += "color:${request.target(i)}:${request.operation(i)}:${request.color(i)}:$key"
@@ -348,7 +348,7 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         events += "setAnsiMode:$mode:$enable"
     }
 
-    override fun setPointerShape(shape: io.github.ketraterm.protocol.TerminalPointerShape?) {
+    override fun setPointerShape(shape: TerminalPointerShape?) {
         events += "setPointerShape:$shape"
     }
 
@@ -658,6 +658,13 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
 
     override fun shellIntegrationMarker(event: ShellIntegrationEvent) {
         events += "shellIntegrationMarker:${event.marker.name}:${event.exitCode ?: "null"}"
+    }
+
+    override fun setProgress(
+        state: TerminalProgressState,
+        percentage: Int,
+    ) {
+        events += "setProgress:$state:$percentage"
     }
 
     override fun showNotification(

@@ -36,6 +36,11 @@ Platform consent and native clipboard access stay in the supplied provider.
 `ForegroundProcessTracker` shares best-effort connector queries only while
 collected; it is independent of parsing and painting.
 
+`TerminalProgressTracker` retains one atomic application progress report and owns
+a lazy expiry worker. Its read-only projection keeps synchronous snapshot reads
+without holding a monitor while resuming subscribers. Protocol and expiry rules
+are in the [progress contract](../docs/reference/protocol.md#progress-reporting).
+
 ## Dependencies and contracts
 
 The Gradle API surface exposes core, parser, host, input, render API/cache,

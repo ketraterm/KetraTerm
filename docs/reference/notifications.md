@@ -16,6 +16,7 @@ An unrecognized final field stays in the body and uses info severity. Semicolons
 within the body are retained.
 
 ConEmu OSC 9 subcommands 0–4 and 9 are excluded from notification handling.
+Subcommand 4 instead updates [retained progress presentation](protocol.md#progress-reporting).
 Default host limits are 256 UTF-16 code units for the title and 1,024 for the body,
 clamped without splitting a valid surrogate pair. Parser
 [payload limits](protocol.md#payload-limits) apply first.

@@ -24,6 +24,7 @@ Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
 | Color stack (30001/30101) | Bare command or an empty semicolon; nonempty arguments reject the command. |
 | Hyperlinks (8) | Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links. |
 | Clipboard (52) | ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access. |
+| Progress (9;4) | ASCII decimal fields; malformed envelopes preserve prior progress and never become notifications. |
 | Pointer shape (22) | Exact ASCII CSS names from the supported subset, optionally prefixed with `=`; empty name restores host defaults. Unknown or malformed names leave state unchanged. |
 
 BEL or `ESC \` completes OSC. CAN/SUB, reset, and EOF discard unfinished commands.
@@ -31,6 +32,79 @@ Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
 ignored unless a custom handler is installed. Recovery preserves later commands.
 Host title/notification limits count UTF-16 code units and avoid splitting a valid
 surrogate pair; they do not guarantee grapheme-boundary truncation.
+
+## Progress reporting
+
+`OSC 9 ; 4 ; state ; percentage ST` reports application-controlled progress;
+BEL also terminates the command. The [Microsoft protocol documentation](https://learn.microsoft.com/en-us/windows/terminal/tutorials/progress-bar-sequences)
+defines the following states:
+
+| State | Presentation |
+| --- | --- |
+| `0` | Hidden; clears progress. |
+| `1` | Normal determinate progress. |
+| `2` | Error determinate progress. |
+| `3` | Indeterminate work; ignores the percentage. |
+| `4` | Warning/paused determinate progress. |
+
+Percentages are inclusive `0..100`. Determinate zero remains zero, and 100
+remains visible until cleared. Hidden/indeterminate snapshots use percentage
+zero. Progress is independent of shell command metadata and never triggers a
+notification or a terminal reply.
+
+KetraTerm defaults missing/empty state and percentage fields to zero. It rejects
+unknown states, out-of-range/overflowing numbers, signs, whitespace, non-ASCII
+fields and extra fields. The ordinary 4,096-byte OSC envelope limit applies;
+oversized or cancelled reports leave prior progress unchanged. [Windows Terminal's parser](https://github.com/microsoft/terminal/blob/main/src/terminal/adapter/adaptDispatch.cpp)
+also implements tolerant conventions such as clamping values above 100; those
+are outside this documented slice.
+
+`HostPolicy.progressPolicy` authorizes progress as presentation metadata,
+independently of title, notification, window-manipulation and terminal-response
+permissions. It defaults to allow. `HostEventSink.progressChanged` runs
+synchronously with accepted reports, including equal reports, under the existing
+host callback contract. RIS always emits hidden progress; DECSTR, buffer switches
+and local screen clearing preserve it.
+
+The standard session retains an immutable `TerminalProgress` in
+`TerminalSession.progress`, a read-only `StateFlow`. It initially contains
+`HIDDEN`, conflates intermediate/equal presentation states, and does not complete
+on closure. Consumers own their collection lifetime. Reports received before a
+collector starts are retained. Identical accepted reports renew freshness.
+A single atomic retained report and lazy expiry worker bound pending work per session.
+
+A session clears progress after five minutes without an accepted report, on
+RIS, progress-permission revocation, or immediately when closure begins. Expiry uses
+monotonic time and needs no collector. The five-minute limit is KetraTerm product
+policy, not a protocol requirement. Reallowing permission does not restore stale
+progress; an application must send a new report.
+
+Both products replace the shell icon with a thin progress ring while progress is
+active. Normal, error and warning states use accent, red and amber arcs filled
+according to the percentage; indeterminate work uses a rotating arc. Tab names
+remain unchanged. Localized tooltips/accessibility text retain the numeric/status
+information, and the selected session's window/tool-window title retains status.
+Hidden progress restores the shell icon. Both products always enable progress independently of
+the existing title permission. Library embedders control progress separately
+through `HostPolicy.progressPolicy`.
+Standalone additionally uses per-window taskbar state/value APIs where supported;
+IntelliJ retains ownership of the IDE's global taskbar. A standalone split tab
+uses its active pane, following the existing title-selection convention. Queued
+UI refreshes are bounded and read the latest retained state at delivery, so a
+late callback cannot restore cleared progress.
+
+Custom parser sinks opt in through `TerminalProgressCommandSink`; older plain
+`TerminalCommandSink` implementations remain valid and ignore these reports.
+Decorators must preserve the optional capability explicitly. Custom session
+assembly owns its host-event wiring; automatic retained progress is supplied by
+`TerminalSession.create`.
+
+The optional Swing-host `SwingTerminalProgressIcon` is a host-owned, EDT-confined
+painter with configurable size, colors, phase and accessible description. It owns
+no session, observation job or timer. `SwingTerminalProgressAnimation` supplies
+one explicitly closed, visibility-bound clock per host container; callers enable
+it only for indeterminate work. Embedders can omit the helper or drive phase with
+their own animation/reduced-motion policy.
 
 ## Pointer shapes
 
@@ -59,7 +133,7 @@ separate header and payload budgets.
 
 | Family | Collection limit |
 | --- | --- |
-| Titles, directory, hyperlinks, notifications, palette 4/21/104, shell markers | 4,096 bytes. |
+| Titles, directory, hyperlinks, notifications/progress, palette 4/21/104, shell markers | 4,096 bytes. |
 | Dynamic colors 10/11/12/110/111/112 | 256 bytes. |
 | Pointer shape 22 | 32 bytes. |
 | Color stack 30001/30101 | 6 bytes, including the command number and optional empty semicolon. |

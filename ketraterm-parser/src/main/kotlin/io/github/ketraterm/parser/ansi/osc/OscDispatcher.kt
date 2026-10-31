@@ -18,12 +18,10 @@ package io.github.ketraterm.parser.ansi.osc
 import io.github.ketraterm.parser.ansi.ControlStringPolicy
 import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.spi.TerminalCommandSink
+import io.github.ketraterm.parser.spi.TerminalProgressCommandSink
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult
 import io.github.ketraterm.parser.utf8.Utf8Decoder
-import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.protocol.ShellIntegrationEvent
-import io.github.ketraterm.protocol.ShellIntegrationMarker
-import io.github.ketraterm.protocol.TerminalPointerShape
+import io.github.ketraterm.protocol.*
 
 internal class OscDispatcher {
     private val utf8Decoder = Utf8Decoder()
@@ -116,9 +114,16 @@ internal class OscDispatcher {
             7 -> sink.setCurrentWorkingDirectoryUri(decodePayload(payload, commandEnd + 1, length))
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
             9 -> {
-                val payloadStr = decodePayload(payload, commandEnd + 1, length)
-                if (!isConEmuCommand(payloadStr)) {
-                    sink.showNotification(title = "", body = payloadStr, level = NotificationLevel.INFO)
+                if (dataStart < length &&
+                    payload[dataStart].toInt() == '4'.code &&
+                    (dataStart + 1 == length || payload[dataStart + 1].toInt() == ';'.code)
+                ) {
+                    dispatchProgress(sink, payload, dataStart + 1, length)
+                } else {
+                    val payloadStr = decodePayload(payload, dataStart, length)
+                    if (!isConEmuCommand(payloadStr)) {
+                        sink.showNotification(title = "", body = payloadStr, level = NotificationLevel.INFO)
+                    }
                 }
             }
             10, 11, 12 -> {
@@ -171,6 +176,50 @@ internal class OscDispatcher {
             }
             else -> customOscHandler?.handle(command, payload, commandEnd + 1, length - commandEnd - 1)
         }
+    }
+
+    private fun dispatchProgress(
+        sink: TerminalCommandSink,
+        payload: ByteArray,
+        subcommandEnd: Int,
+        end: Int,
+    ) {
+        val progressSink = sink as? TerminalProgressCommandSink ?: return
+        val stateStart = if (subcommandEnd < end) subcommandEnd + 1 else end
+        val separator = findByte(payload, end, stateStart, ';'.code)
+        val stateEnd = if (separator >= 0) separator else end
+        val percentageStart = if (separator >= 0) separator + 1 else end
+        if (findByte(payload, end, percentageStart, ';'.code) >= 0) return
+        val stateValue = parseProgressParameter(payload, stateStart, stateEnd, 4)
+        val percentage = parseProgressParameter(payload, percentageStart, end, 100)
+        if (stateValue < 0 || percentage < 0) return
+        val state =
+            when (stateValue) {
+                0 -> TerminalProgressState.HIDDEN
+                1 -> TerminalProgressState.NORMAL
+                2 -> TerminalProgressState.ERROR
+                3 -> TerminalProgressState.INDETERMINATE
+                4 -> TerminalProgressState.WARNING
+                else -> return
+            }
+        val effectivePercentage =
+            if (state == TerminalProgressState.HIDDEN || state == TerminalProgressState.INDETERMINATE) 0 else percentage
+        progressSink.setProgress(state, effectivePercentage)
+    }
+
+    private fun parseProgressParameter(
+        payload: ByteArray,
+        start: Int,
+        end: Int,
+        maximum: Int,
+    ): Int {
+        var value = 0
+        for (index in start until end) {
+            val digit = payload[index].toInt() - '0'.code
+            if (digit !in 0..9 || value > maximum / 10 || value == maximum / 10 && digit > maximum % 10) return -1
+            value = value * 10 + digit
+        }
+        return value
     }
 
     private fun dispatchPointerShape(

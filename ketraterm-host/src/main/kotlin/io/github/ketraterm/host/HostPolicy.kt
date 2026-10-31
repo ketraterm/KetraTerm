@@ -29,6 +29,9 @@ package io.github.ketraterm.host
  * @property titlePolicy session-wide policy for OSC title updates and
  * title-stack restore operations before adapter/core title metadata changes or
  * host callbacks are emitted.
+ * @property progressPolicy independent permission for OSC 9;4 reports. Denial suppresses
+ * accepted progress callbacks; session policy replacement also clears retained progress.
+ * Title, notification and window permissions do not govern progress.
  * @property hyperlinkPolicy whether OSC 8 hyperlinks may be retained and
  * attached to written cells.
  * @property currentWorkingDirectoryPolicy whether OSC 7 current-working-directory
@@ -81,7 +84,81 @@ public data class HostPolicy(
     val maxNotificationTitleLength: Int = 256,
     val maxNotificationBodyLength: Int = 1024,
     val maxCurrentWorkingDirectoryUriLength: Int = 4096,
+    val progressPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
 ) {
+    // These internal declarations retain the original JVM constructor/copy and
+    // compiler-generated default-argument signatures. Their JVM visibility also
+    // preserves existing Java source; Kotlin callers use the new primary API.
+    @PublishedApi
+    internal constructor(
+        titlePolicy: TerminalTitlePolicy = TerminalTitlePolicy(),
+        hyperlinkPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        currentWorkingDirectoryPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        notificationPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        windowManipulationPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        palettePolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        terminalResponsePolicy: HostControlPolicy = HostControlPolicy.ALLOW,
+        clipboardPolicy: TerminalClipboardPolicy = TerminalClipboardPolicy(),
+        maxHyperlinkEntries: Int = 4096,
+        maxHyperlinkUriLength: Int = 4096,
+        maxHyperlinkIdLength: Int = 256,
+        maxNotificationTitleLength: Int = 256,
+        maxNotificationBodyLength: Int = 1024,
+        maxCurrentWorkingDirectoryUriLength: Int = 4096,
+    ) : this(
+        titlePolicy = titlePolicy,
+        hyperlinkPolicy = hyperlinkPolicy,
+        currentWorkingDirectoryPolicy = currentWorkingDirectoryPolicy,
+        notificationPolicy = notificationPolicy,
+        windowManipulationPolicy = windowManipulationPolicy,
+        palettePolicy = palettePolicy,
+        terminalResponsePolicy = terminalResponsePolicy,
+        clipboardPolicy = clipboardPolicy,
+        maxHyperlinkEntries = maxHyperlinkEntries,
+        maxHyperlinkUriLength = maxHyperlinkUriLength,
+        maxHyperlinkIdLength = maxHyperlinkIdLength,
+        maxNotificationTitleLength = maxNotificationTitleLength,
+        maxNotificationBodyLength = maxNotificationBodyLength,
+        maxCurrentWorkingDirectoryUriLength = maxCurrentWorkingDirectoryUriLength,
+        progressPolicy = HostControlPolicy.ALLOW,
+    )
+
+    @PublishedApi
+    @JvmName("copy")
+    internal fun copyCompatibility(
+        titlePolicy: TerminalTitlePolicy = this.titlePolicy,
+        hyperlinkPolicy: HostControlPolicy = this.hyperlinkPolicy,
+        currentWorkingDirectoryPolicy: HostControlPolicy = this.currentWorkingDirectoryPolicy,
+        notificationPolicy: HostControlPolicy = this.notificationPolicy,
+        windowManipulationPolicy: HostControlPolicy = this.windowManipulationPolicy,
+        palettePolicy: HostControlPolicy = this.palettePolicy,
+        terminalResponsePolicy: HostControlPolicy = this.terminalResponsePolicy,
+        clipboardPolicy: TerminalClipboardPolicy = this.clipboardPolicy,
+        maxHyperlinkEntries: Int = this.maxHyperlinkEntries,
+        maxHyperlinkUriLength: Int = this.maxHyperlinkUriLength,
+        maxHyperlinkIdLength: Int = this.maxHyperlinkIdLength,
+        maxNotificationTitleLength: Int = this.maxNotificationTitleLength,
+        maxNotificationBodyLength: Int = this.maxNotificationBodyLength,
+        maxCurrentWorkingDirectoryUriLength: Int = this.maxCurrentWorkingDirectoryUriLength,
+    ): HostPolicy =
+        copy(
+            titlePolicy = titlePolicy,
+            hyperlinkPolicy = hyperlinkPolicy,
+            currentWorkingDirectoryPolicy = currentWorkingDirectoryPolicy,
+            notificationPolicy = notificationPolicy,
+            windowManipulationPolicy = windowManipulationPolicy,
+            palettePolicy = palettePolicy,
+            terminalResponsePolicy = terminalResponsePolicy,
+            clipboardPolicy = clipboardPolicy,
+            maxHyperlinkEntries = maxHyperlinkEntries,
+            maxHyperlinkUriLength = maxHyperlinkUriLength,
+            maxHyperlinkIdLength = maxHyperlinkIdLength,
+            maxNotificationTitleLength = maxNotificationTitleLength,
+            maxNotificationBodyLength = maxNotificationBodyLength,
+            maxCurrentWorkingDirectoryUriLength = maxCurrentWorkingDirectoryUriLength,
+            progressPolicy = progressPolicy,
+        )
+
     init {
         require(maxHyperlinkEntries > 0) {
             "maxHyperlinkEntries must be positive, got $maxHyperlinkEntries"

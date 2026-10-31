@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Compatible applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and window/taskbar status where supported. Progress clears after five minutes without updates and works independently of title permission, with no progress setting.
 - Added opt-in desktop alerts when long-running commands finish in an unfocused terminal, with a configurable minimum duration (10 seconds by default).
 - Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.
 - Terminal applications can change the mouse pointer shape (OSC 22).

@@ -301,5 +301,6 @@ class SettingsModelTest {
         assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.writePermission)
         assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.readPermission)
         assertEquals(TerminalTitlePermission.DENY, policy.titlePolicy.permission)
+        assertEquals(HostControlPolicy.ALLOW, policy.progressPolicy)
     }
 }

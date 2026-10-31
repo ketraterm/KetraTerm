@@ -63,8 +63,13 @@ session, and propagates the failure with any cleanup failures suppressed.
   jobs. It propagates the first failure with later failures suppressed. Repeated
   or reentrant calls return without waiting for an active close to finish.
 
-Optional process-title and startup-notification observers are supervised
+Optional process-title, application-progress and startup-notification observers are supervised
 separately, so their failures do not stop session-close observation.
+
+`progressChanged` observes the session's retained progress on a workspace worker,
+after tab publication. Callbacks can skip intermediate states. Dispatch UI work
+without waiting and read `tab.session.progress.value` again at delivery; do not
+retain a second authoritative progress state. Tab removal cancels observation.
 
 ## Profiles and launch options
 
