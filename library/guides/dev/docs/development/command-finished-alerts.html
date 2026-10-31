@@ -87,10 +87,10 @@ stale constructor-linkage failures in the unchanged profile/restore tests;
 all 267 tests then passed without disabling tests or changing their assertions.</p>
 <p>Focused evidence:</p>
 <ul>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalShellIntegrationDurationTest.kt">Duration regressions</a>: clock rollback, nanosecond wrap, bounds, abandonment, eviction, and synchronous capture.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalSessionTest.kt">Session regressions</a>: initial/live notification permission, closure, and unavailable policy ownership.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-workspace/src/test/kotlin/io/github/ketraterm/workspace/TerminalCommandFinishedAlertsTest.kt">Shared policy regressions</a>: defaults, inclusive thresholds, overflow, unknown duration, lifecycle, focus, and denial.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerStartupTest.kt">Standalone callbacks</a> and <a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt">IDE callbacks</a>: real workspace routing, focus changes, live preferences, revoked session permission, coalescing, slot release, and disposal.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalShellIntegrationDurationTest.kt">Duration regressions</a>: clock rollback, nanosecond wrap, bounds, abandonment, eviction, and synchronous capture.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalSessionTest.kt">Session regressions</a>: initial/live notification permission, closure, and unavailable policy ownership.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-workspace/src/test/kotlin/io/github/ketraterm/workspace/TerminalCommandFinishedAlertsTest.kt">Shared policy regressions</a>: defaults, inclusive thresholds, overflow, unknown duration, lifecycle, focus, and denial.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerStartupTest.kt">Standalone callbacks</a> and <a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt">IDE callbacks</a>: real workspace routing, focus changes, live preferences, revoked session permission, coalescing, slot release, and disposal.</li>
 </ul>
 <p>Configuration tests cover legacy defaults, persistence, malformed/overflowing
 standalone values, normalized IDE bounds, and settings controls. Existing shell
@@ -106,7 +106,7 @@ locally (94 targets).</p>
 <p><code>graphify update .</code> completed with sequential extraction: 19,045 nodes and
 46,835 edges. Its Kotlin extractor reported ten partially parsed files; Kotlin
 compilation and the passing suites remain authoritative for source correctness.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/docs/development/command-finished-alerts.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/docs/development/command-finished-alerts.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

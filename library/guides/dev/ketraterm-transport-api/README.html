@@ -36,15 +36,15 @@ KetraTerm modules.</p>
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt"><code>TerminalConnector</code></a></td>
+<td><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt"><code>TerminalConnector</code></a></td>
 <td>Start delivery, write bytes, resize, query optional metadata, and close local resources.</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnectorListener.kt"><code>TerminalConnectorListener</code></a></td>
+<td><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnectorListener.kt"><code>TerminalConnectorListener</code></a></td>
 <td>Consume ordered host bytes and receive remote closure or failure.</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/Validation.kt"><code>ByteArray.checkBounds</code></a></td>
+<td><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/Validation.kt"><code>ByteArray.checkBounds</code></a></td>
 <td>Validate an offset/length range without overflowing <code>offset + length</code>.</td>
 </tr>
 </tbody></table></div>
@@ -103,7 +103,7 @@ through <code>onError</code>, unless local shutdown suppresses it. Never retry t
 <li>Document transport-specific blocking, resize, and failure behavior. The
 interface does not provide a universal timeout or concurrent-write policy.</li>
 </ul>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-pty/src/main/kotlin/io/github/ketraterm/pty/PtyConnector.kt">PTY implementation</a>
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-pty/src/main/kotlin/io/github/ketraterm/pty/PtyConnector.kt">PTY implementation</a>
 shows process-specific lifecycle handling. Its worker and shutdown choices are
 implementation details rather than requirements for every connector.</p>
 <h2 id="sub-documentation">Sub-Documentation</h2>
@@ -111,7 +111,7 @@ implementation details rather than requirements for every connector.</p>
 <li><a href="docs/connector-lifecycle.html">Connector lifecycle and thread invariants</a>.</li>
 <li><a href="Module.html">Module ownership</a>.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-transport-api/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-transport-api/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

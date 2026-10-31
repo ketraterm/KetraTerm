@@ -76,7 +76,7 @@ The adapter has no <code>close</code> operation or transport resources to releas
 processing that stream rather than assuming parser and terminal state remain
 aligned.</p>
 <h2 id="how-to-extend-custom-event-sinks">How to Extend: Custom Event Sinks</h2>
-<p>Implement <a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt"><code>HostEventSink</code></a>
+<p>Implement <a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt"><code>HostEventSink</code></a>
 or delegate unneeded operations to <code>HostEventSink.NONE</code>, as above. Callbacks
 deliver accepted metadata or requests; the host decides how to display titles,
 open links, resize windows, show notifications, or access a clipboard.</p>
@@ -87,7 +87,7 @@ session mutation or wait for a UI thread. There is no initial-state replay.
 Clipboard-read execution audits can arrive on session workers and require a
 thread-safe sink.</p>
 <h2 id="host-policy">Host policy</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt"><code>HostPolicy</code></a> permits
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt"><code>HostPolicy</code></a> permits
 title, hyperlink, working-directory, notification, window, palette, and terminal
 response controls by default; clipboard reads and writes are denied by default.
 Select permissions for the whole stream before feeding it. Shell metadata and
@@ -109,7 +109,7 @@ screen transitions, reset boundaries, and response policy.</li>
 retention limits, invalidation, and host activation responsibilities.</li>
 <li><a href="Module.html">Module context</a>: maintainer ownership and test entry points.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/055e1a2038d8afb9d330b24f3116605e0b347be8/ketraterm-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
