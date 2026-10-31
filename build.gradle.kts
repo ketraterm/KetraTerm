@@ -108,7 +108,10 @@ subprojects {
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-            jvmToolchain(25)
+            jvmToolchain {
+                languageVersion.set(JavaLanguageVersion.of(25))
+                vendor.set(JvmVendorSpec.JETBRAINS)
+            }
         }
     }
 
@@ -142,6 +145,7 @@ subprojects {
             plugins.withId("java-library") {
                 extensions.configure<JavaPluginExtension> {
                     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+                    toolchain.vendor.set(JvmVendorSpec.JETBRAINS)
                 }
                 // Dependency bundles publish their Java dependency variants without empty jars.
                 listOf("apiElements", "runtimeElements").forEach { variant ->
