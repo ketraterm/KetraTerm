@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#progress-reporting">Progress reporting</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -66,6 +66,10 @@ state. Ordinary C0 handling continues during rejection.</p>
 <td>ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access.</td>
 </tr>
 <tr>
+<td>Progress (9;4)</td>
+<td>ASCII decimal fields; malformed envelopes preserve prior progress and never become notifications.</td>
+</tr>
+<tr>
 <td>Pointer shape (22)</td>
 <td>Exact ASCII CSS names from the supported subset, optionally prefixed with <code>=</code>; empty name restores host defaults. Unknown or malformed names leave state unchanged.</td>
 </tr>
@@ -75,6 +79,89 @@ Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
 ignored unless a custom handler is installed. Recovery preserves later commands.
 Host title/notification limits count UTF-16 code units and avoid splitting a valid
 surrogate pair; they do not guarantee grapheme-boundary truncation.</p>
+<h2 id="progress-reporting">Progress reporting</h2>
+<p><code>OSC 9 ; 4 ; state ; percentage ST</code> reports application-controlled progress;
+BEL also terminates the command. The <a href="https://learn.microsoft.com/en-us/windows/terminal/tutorials/progress-bar-sequences">Microsoft protocol documentation</a>
+defines the following states:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code></td>
+<td>Hidden; clears progress.</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Normal determinate progress.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Error determinate progress.</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>Indeterminate work; ignores the percentage.</td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td>Warning/paused determinate progress.</td>
+</tr>
+</tbody></table></div>
+<p>Percentages are inclusive <code>0..100</code>. Determinate zero remains zero, and 100
+remains visible until cleared. Hidden/indeterminate snapshots use percentage
+zero. Progress is independent of shell command metadata and never triggers a
+notification or a terminal reply.</p>
+<p>KetraTerm defaults missing/empty state and percentage fields to zero. It rejects
+unknown states, out-of-range/overflowing numbers, signs, whitespace, non-ASCII
+fields and extra fields. The ordinary 4,096-byte OSC envelope limit applies;
+oversized or cancelled reports leave prior progress unchanged. <a href="https://github.com/microsoft/terminal/blob/main/src/terminal/adapter/adaptDispatch.cpp">Windows Terminal&#39;s parser</a>
+also implements tolerant conventions such as clamping values above 100; those
+are outside this documented slice.</p>
+<p><code>HostPolicy.progressPolicy</code> authorizes progress as presentation metadata,
+independently of title, notification, window-manipulation and terminal-response
+permissions. It defaults to allow. <code>HostEventSink.progressChanged</code> runs
+synchronously with accepted reports, including equal reports, under the existing
+host callback contract. RIS always emits hidden progress; DECSTR, buffer switches
+and local screen clearing preserve it.</p>
+<p>The standard session retains an immutable <code>TerminalProgress</code> in
+<code>TerminalSession.progress</code>, a read-only <code>StateFlow</code>. It initially contains
+<code>HIDDEN</code>, conflates intermediate/equal presentation states, and does not complete
+on closure. Consumers own their collection lifetime. Reports received before a
+collector starts are retained. Identical accepted reports renew freshness.
+A single atomic retained report and lazy expiry worker bound pending work per session.</p>
+<p>A session clears progress after five minutes without an accepted report, on
+RIS, progress-permission revocation, or immediately when closure begins. Expiry uses
+monotonic time and needs no collector. The five-minute limit is KetraTerm product
+policy, not a protocol requirement. Reallowing permission does not restore stale
+progress; an application must send a new report.</p>
+<p>Both products replace the shell icon with a thin progress ring while progress is
+active. Normal, error and warning states use accent, red and amber arcs filled
+according to the percentage; indeterminate work uses a rotating arc. Tab names
+remain unchanged. Localized tooltips/accessibility text retain the numeric/status
+information, and the selected session&#39;s window/tool-window title retains status.
+Hidden progress restores the shell icon. Both products always enable progress independently of
+the existing title permission. Library embedders control progress separately
+through <code>HostPolicy.progressPolicy</code>.
+Standalone additionally uses per-window taskbar state/value APIs where supported;
+IntelliJ retains ownership of the IDE&#39;s global taskbar. A standalone split tab
+uses its active pane, following the existing title-selection convention. Queued
+UI refreshes are bounded and read the latest retained state at delivery, so a
+late callback cannot restore cleared progress.</p>
+<p>Custom parser sinks opt in through <code>TerminalProgressCommandSink</code>; older plain
+<code>TerminalCommandSink</code> implementations remain valid and ignore these reports.
+Decorators must preserve the optional capability explicitly. Custom session
+assembly owns its host-event wiring; automatic retained progress is supplied by
+<code>TerminalSession.create</code>.</p>
+<p>The optional Swing-host <code>SwingTerminalProgressIcon</code> is a host-owned, EDT-confined
+painter with configurable size, colors, phase and accessible description. It owns
+no session, observation job or timer. <code>SwingTerminalProgressAnimation</code> supplies
+one explicitly closed, visibility-bound clock per host container; callers enable
+it only for indeterminate work. Embedders can omit the helper or drive phase with
+their own animation/reduced-motion policy.</p>
 <h2 id="pointer-shapes">Pointer shapes</h2>
 <p><code>OSC 22 ; name ST</code> sets the mouse pointer; BEL also terminates the command.
 An optional <code>=</code> prefix is accepted. An empty name restores the host default.
@@ -102,7 +189,7 @@ separate header and payload budgets.</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>Titles, directory, hyperlinks, notifications, palette 4/21/104, shell markers</td>
+<td>Titles, directory, hyperlinks, notifications/progress, palette 4/21/104, shell markers</td>
 <td>4,096 bytes.</td>
 </tr>
 <tr>
@@ -405,9 +492,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -541,7 +628,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

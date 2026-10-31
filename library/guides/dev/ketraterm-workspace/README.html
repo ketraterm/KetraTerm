@@ -77,10 +77,14 @@ remains registered until the host chooses to remove or restart it.</li>
 jobs. It propagates the first failure with later failures suppressed. Repeated
 or reentrant calls return without waiting for an active close to finish.</li>
 </ul>
-<p>Optional process-title and startup-notification observers are supervised
+<p>Optional process-title, application-progress and startup-notification observers are supervised
 separately, so their failures do not stop session-close observation.</p>
+<p><code>progressChanged</code> observes the session&#39;s retained progress on a workspace worker,
+after tab publication. Callbacks can skip intermediate states. Dispatch UI work
+without waiting and read <code>tab.session.progress.value</code> again at delivery; do not
+retain a second authoritative progress state. Tab removal cancels observation.</p>
 <h2 id="profiles-and-launch-options">Profiles and launch options</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
 as a list, rather than split from a command string. Keep the supplied collections
@@ -164,7 +168,7 @@ for reply and cancellation behavior.</p>
 <li><a href="https://ketraterm.github.io/KetraTerm/settings.html">Standalone profile persistence</a></li>
 <li><a href="../ketraterm-shell-integration/README.html">Shell metadata API</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

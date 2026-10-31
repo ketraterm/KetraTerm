@@ -51,6 +51,7 @@ Levels are case-insensitive <code>info</code>, <code>warning</code>, <code>error
 An unrecognized final field stays in the body and uses info severity. Semicolons
 within the body are retained.</p>
 <p>ConEmu OSC 9 subcommands 0–4 and 9 are excluded from notification handling.
+Subcommand 4 instead updates <a href="protocol.html#progress-reporting">retained progress presentation</a>.
 Default host limits are 256 UTF-16 code units for the title and 1,024 for the body,
 clamped without splitting a valid surrogate pair. Parser
 <a href="protocol.html#payload-limits">payload limits</a> apply first.</p>
@@ -78,7 +79,7 @@ Focus in another tab, split pane, or IDE editor permits an alert. Notification
 text reports completion and exit status without including captured command text
 or directories. The standalone desktop-notification master switch and native
 IDE notification controls also apply. Platform delivery remains best effort.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/docs/reference/notifications.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/docs/reference/notifications.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

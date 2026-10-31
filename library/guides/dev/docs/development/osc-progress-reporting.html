@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>OSC 9;4 progress verification · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">OSC 9;4 progress verification</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#rendering-runtime-investigation">Rendering runtime investigation</a><a class="depth-2" href="#circular-presentation-and-product-preferences">Circular presentation and product preferences</a></nav></details><div class="article-content"><div class="prose"><h1 id="osc-94-progress-verification">OSC 9;4 progress verification</h1>
+<p>Baseline: <code>b342a6aec</code>, 2026-10-30. Existing scoped tests ran before production
+changes. The new parser reproduction expected five progress callbacks and got
+an empty list. The IDE reproduction also demonstrated missing progress labels.
+The historical finding remains in the <a href="../terminal-feature-gap-map.html#resolved-audit-findings">canonical gap map</a>;
+the <a href="../reference/protocol.html#progress-reporting">protocol contract</a> separates wire
+semantics, compatibility conventions and the user-approved five-minute expiry.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Suite</th>
+<th align="right">Baseline cases</th>
+<th align="right">Verified cases</th>
+<th align="right">Failures</th>
+<th align="right">Skipped/aborted</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Protocol</td>
+<td align="right">22</td>
+<td align="right">23</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Parser</td>
+<td align="right">814</td>
+<td align="right">820</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Host</td>
+<td align="right">594</td>
+<td align="right">600</td>
+<td align="right">0</td>
+<td align="right">13</td>
+</tr>
+<tr>
+<td>Session, including default dispatcher</td>
+<td align="right">509</td>
+<td align="right">520</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Workspace, including default dispatcher</td>
+<td align="right">130</td>
+<td align="right">131</td>
+<td align="right">0</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td>Standalone</td>
+<td align="right">235</td>
+<td align="right">241</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Shell integration</td>
+<td align="right">-</td>
+<td align="right">73</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>PTY</td>
+<td align="right">-</td>
+<td align="right">95</td>
+<td align="right">0</td>
+<td align="right">14</td>
+</tr>
+<tr>
+<td>Swing UI</td>
+<td align="right">1,729</td>
+<td align="right">1,729</td>
+<td align="right">4</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>IntelliJ plugin</td>
+<td align="right">267</td>
+<td align="right">269</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Retained compiled clients</td>
+<td align="right">-</td>
+<td align="right">46</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+</tbody></table></div>
+<p>The 13 inherited host aborts are <code>HostGraphemeTest</code> R06 cases: their existing
+assertions execute before the known-failure guard. They were unchanged. Workspace
+skips are four unavailable fish/zsh cases and two opt-in PTY cases; PTY&#39;s 14 native
+host cases retain their opt-in guard. No tests were disabled or assertions weakened.</p>
+<p>The complete Swing suite was also run in an isolated archive of the untouched
+baseline with the same JDK and test JVM settings. Both runs contain the same four
+failures, with identical test identities and assertion messages:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Test identity</th>
+<th>Remaining assertion</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalShapedGlyphVectorCacheTest.clipped glyph batches preserve full vector pixels across marks ligatures and batch boundaries</code></td>
+<td><code>rtl=false, cellWidth=4, scale=1.0, clip=0..4</code>: expected <code>-1</code>, actual <code>7252</code>.</td>
+</tr>
+<tr>
+<td><code>TerminalTextPainterTest.ComplexTextRendering.bounded shaping retains the same Arabic context as a short run</code>, <code>beh</code></td>
+<td>Logical cell 2, array index 121: expected <code>0</code>, actual <code>-1</code>.</td>
+</tr>
+<tr>
+<td>Same method, <code>lam-alef</code></td>
+<td>Logical cell 3, array index 205: expected <code>-1</code>, actual <code>0</code>.</td>
+</tr>
+<tr>
+<td>Same method, <code>marked-beh</code></td>
+<td>Logical cell 2, array index 53: expected <code>-1</code>, actual <code>0</code>.</td>
+</tr>
+</tbody></table></div>
+<p>Focused coverage:</p>
+<ul>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-parser/src/test/kotlin/io/github/ketraterm/parser/OscProgressTest.kt">Parser</a> and <a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-host/src/test/kotlin/io/github/ketraterm/host/HostProgressTest.kt">host</a>: states/defaults, zero/100, invalid numbers, overflow, exact payload limits, chunking, cancellation/recovery, legacy sinks, permissions and reset ordering.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalProgressTest.kt">Session</a>: retained reads, expiry boundaries, identical refreshes, late workers, nanosecond wrap, subscriber reentry, owner cancellation, revocation and closure.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-workspace/src/test/kotlin/io/github/ketraterm/workspace/TerminalWorkspaceProgressTest.kt">Workspace</a>: first output after publication, conflation, originating tab and observer cleanup.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerProgressTest.kt">Standalone</a> and <a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt">IDE</a>: real byte-to-product routing, state labels, selection/split focus, unchanged raw titles/persistence, coalescing, queued revocation/close and disposal.</li>
+</ul>
+<p>All 33 added regression cases passed. Formatting and the four changed library
+ABI checks passed. Existing constructor/copy shapes remain intact; progress is
+an optional sink capability and an optional host-observer method. Published
+source consumers passed all four combinations of Kotlin 2.4.0/2.4.20 and
+Gradle/POM-only metadata, plus all 46 retained-binary upgrade cases. Publications
+were staged locally; no remote publication or baseline replacement was performed.</p>
+<p>Validation used full JetBrains JDK 25, serial Gradle workers and task-local JVM
+limits. Initial attempts hit native compiler-memory exhaustion, including an
+uncapped source-consumer smoke JVM; bounded reruns passed unchanged assertions.
+New test fixture construction and source encoding were corrected. The standalone
+progress-label test initially expected <code>Working\u2026</code> and received <code>Working\u0085</code>;
+the IDE&#39;s existing <code>testSearchTextResolvesStatusAndCountMessages</code> initially received
+misdecoded UTF-8 instead of <code>Searching\u2026</code>. Baseline Unicode was restored and
+the original assertions retained.</p>
+<p>Progress processing allocates receipt/snapshot objects on reports; formatting
+runs on presentation changes and painting reads cached labels. No new per-frame
+allocation or latency claim is made. Native taskbar appearance remains platform
+owned; deterministic product tests inject its publication boundary. No installed
+product or Plugin Verifier pass is claimed.</p>
+<p><code>graphify update .</code> completed with sequential extraction: 19,184 nodes,
+47,214 edges and 733 communities. Its Kotlin extractor reported ten partially
+parsed files; compiler/test results remain authoritative. No LLM extraction or
+labeling was run. All 184 local Markdown link targets were checked.</p>
+<p>Across these suites, 4,510 cases passed, four inherited rendering cases failed,
+and 33 cases retained their existing skip/abort conditions.</p>
+<h2 id="rendering-runtime-investigation">Rendering runtime investigation</h2>
+<p>Follow-up on 2026-10-31 isolated the four local failures to the selected test
+runtime. On this same Windows host, unchanged code/fonts and default resource
+settings produced:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Test runtime</th>
+<th align="right">Cases</th>
+<th align="right">Failures</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Temurin 25.0.3+9, affected classes</td>
+<td align="right">135</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Temurin 25.0.3+9, complete Swing suite</td>
+<td align="right">1,729</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>JBR 25.0.4.1+1-b610.67, affected classes</td>
+<td align="right">135</td>
+<td align="right">4</td>
+</tr>
+<tr>
+<td>IDE-bundled JBR 25.0.4+1-b508.27, affected classes</td>
+<td align="right">135</td>
+<td align="right">4</td>
+</tr>
+</tbody></table></div>
+<p>The controlled vendor comparison kept the Gradle JVM on Temurin and changed only
+the test launcher. Both launches used the default 512 MiB test heap, without
+custom CPU/code-cache/JIT limits. The Windows CI logs for baseline commit
+<code>b342a6aec</code> confirm Temurin 25.0.4+101.0, actual execution of the Swing test task,
+and a successful build (run 41056463129, job 124065117653).</p>
+<p>Thus the earlier four failures are runtime-specific local observations, not
+unconditional repository failures or evidence of a green-CI discrepancy. The
+precise rendering/font-engine difference inside these JDK builds has not been
+isolated. Prior local test runtime history is not established. No IDE JVM,
+repository toolchain settings, fonts, production code or assertions were changed
+by this investigation; temporary launcher scripts and logs remain under build/.</p>
+<p>The IDE project SDK named <code>25</code> resolves to local Temurin 25.0.3. Its Gradle JVM
+entry <code>jbr-25</code> instead resolves to the IDE bundle. SDK registration labels still
+say JBR 25.0.3, but the installed bundle&#39;s release file reports 25.0.4; that bundle
+also reproduces all four failures. Therefore this is not confined to the newly
+selected downloaded JBR build. Direct IDE tests using project SDK <code>25</code> provide a
+plausible explanation for earlier local success, but past launcher/cache history
+was not available to establish that retrospectively.</p>
+<h2 id="circular-presentation-and-product-preferences">Circular presentation and product preferences</h2>
+<p>Follow-up on 2026-10-31 replaces active shell icons with thin progress rings in
+both products. Determinate states use the reported percentage; indeterminate
+work rotates. Tab names stay unchanged. Cached tooltip/accessibility descriptions
+and selected-window status retain state and percentage. Hidden progress restores
+the profile icon. The shared Swing helpers expose size, colors, phase and explicit
+animation lifecycle to library hosts. One visibility-bound clock per presentation
+owner stops when hidden, inactive or disposed.</p>
+<p>The original title preference and persistence remain unchanged. Progress is always
+enabled in both products, independently of title permission. Library hosts can
+deny progress separately through <code>HostPolicy.progressPolicy</code>; session revocation
+clears retained progress. Regressions check both directions of permission
+independence and title-policy replacement during active progress. Existing startup
+permission-revocation tests remain unchanged.</p>
+<p><code>HostPolicy</code> adds the progress field at the end of its constructor. Internal
+Kotlin declarations preserve the original JVM constructor/default-constructor and
+copy/default-copy signatures, including calls from existing Java source.</p>
+<p>Deterministic ring tests cover size/phase bounds, colors, percentage extent,
+elapsed-time rotation, graphics-state preservation, EDT ownership, visibility,
+completion and disposal. Product tests cover raw tab names, icons, selection,
+accessibility, retained updates, reset and closure.</p>
+<p>A warmed Windows Temurin 25.0.3 allocation probe measured zero bytes in each of
+two one-million-iteration phase-update loops. Fifty thousand indeterminate
+Java2D paints to a 16-pixel ARGB image with antialiasing enabled allocated
+4,400,000 bytes (88 bytes/paint). JFR paint-stack allocation samples identified
+JDK <code>ArcIterator</code> instances. Shapes, strokes and colors are retained by the icon;
+this measurement does not claim zero Java2D/Swing repaint or timer allocation.
+The probe and JFR capture remain under ignored build/ output.</p>
+<p>Follow-up validation on Windows/Temurin 25.0.3 passed the affected root suites:
+601 host, 520 session (including default-dispatcher coverage), 131 workspace,
+84 Swing-host and 242 standalone cases: 1,578 total, no failures, 19 existing skips.
+The original Java constructor tests compile, and the tracked host client runs
+unchanged against the new host JAR with Kotlin 2.4.0 and 2.4.20. Formatting and
+shared Swing-host ABI checks passed. Retained JVM entry points are explicitly
+marked published ABI so subsequent snapshots continue tracking them.</p>
+<p>The final IntelliJ fixture suite passed all 269 cases on JBR 25.0.4.1, including
+OSC progress presentation with application-title permission explicitly denied.</p>
+<p>Final reruns also passed all five changed-module ABI checks and the complete
+published-consumer matrix: Kotlin 2.4.0/2.4.20, Gradle/POM metadata, Java/Kotlin
+source smokes and all 46 retained-binary upgrade cases. Standalone progress
+fixtures explicitly deny title permission too; all 242 application cases passed.
+No tests were disabled or assertions weakened.</p>
+<p>Graphify refreshed 19,216 nodes and 47,261 edges without LLM extraction. Its
+extractor reported 11 partially parsed files; Kotlin compilation and the relevant
+tests passed. Changed Markdown relative links and Git whitespace checks passed.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/docs/development/osc-progress-reporting.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

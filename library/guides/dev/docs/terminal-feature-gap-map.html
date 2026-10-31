@@ -194,10 +194,6 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 <td>Additional OSC 22 shapes and Kitty stack/query extensions beyond the <a href="features/terminal.html#appearance">implemented subset</a>.</td>
 </tr>
 <tr>
-<td><code>TODO(parser/session/ui/host/profile/policy)</code></td>
-<td>ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work.</td>
-</tr>
-<tr>
 <td><code>TODO(core/policy)</code></td>
 <td>Additional consumer-backed XTGETTCAP entries beyond the implemented legacy keys: further modified-key aliases, keypad names beyond the four application-mode corners, function keys above F12 and replies for active extended keyboard formats. Implemented discovery is listed in the <a href="features/terminal.html#host-integration-and-queries">catalog</a> and <a href="reference/protocol.html#xtgettcap">reply contract</a>.</td>
 </tr>
@@ -281,8 +277,13 @@ Frame publication does not prove screen presentation.</li>
 <td>Configurable command-finished alerts based on shell metadata, duration, and focus state. Command-finished listeners and terminal-requested OSC notifications already exist; neither product turns completion of a long-running command into an automatic alert.</td>
 <td><strong>Resolved 2026-10-29.</strong> Both products now provide opt-in duration/focus alerts with live session permission and lifecycle checks. See the <a href="reference/notifications.html#command-finished-alerts">contract</a> and <a href="development/command-finished-alerts.html">verification record</a>.</td>
 </tr>
+<tr>
+<td><code>TODO(parser/session/ui/host/profile/policy)</code></td>
+<td>ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work.</td>
+<td><strong>Resolved 2026-10-30.</strong> Documented OSC 9;4 states now drive retained, permission-controlled session progress and both products, with percentage/spinning shell-icon rings and five-minute stale expiry. Products always enable progress independently of title permission; embedders can control progress separately. See the <a href="reference/protocol.html#progress-reporting">contract</a> and <a href="development/osc-progress-reporting.html">verification record</a>.</td>
+</tr>
 </tbody></table></div>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

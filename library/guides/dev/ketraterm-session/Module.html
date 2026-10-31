@@ -51,6 +51,10 @@ admission. Optional OSC interpretation and grid extraction belong to
 Platform consent and native clipboard access stay in the supplied provider.
 <code>ForegroundProcessTracker</code> shares best-effort connector queries only while
 collected; it is independent of parsing and painting.</p>
+<p><code>TerminalProgressTracker</code> retains one atomic application progress report and owns
+a lazy expiry worker. Its read-only projection keeps synchronous snapshot reads
+without holding a monitor while resuming subscribers. Protocol and expiry rules
+are in the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
 <h2 id="dependencies-and-contracts">Dependencies and contracts</h2>
 <p>The Gradle API surface exposes core, parser, host, input, render API/cache,
 transport API, and coroutines. Shared protocol vocabulary is an implementation
@@ -70,7 +74,7 @@ guidance.</li>
 <p>Run <code>./gradlew :ketraterm-session:test</code> from the repository root. This includes
 <code>defaultDispatcherTest</code> in a separate JVM with one ordinary I/O worker, so cleanup
 independence is checked against actual defaults without changing other tests&#39; schedulers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/f7d40f33a6ad6294f21ac321b8bb9c412a5dcd0a/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c00ecdba56fd454e6a0bda883e9300b276d0c784/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
