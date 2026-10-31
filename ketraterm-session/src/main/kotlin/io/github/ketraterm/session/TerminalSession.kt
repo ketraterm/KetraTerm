@@ -32,6 +32,7 @@ import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.TerminalPointerShape
+import io.github.ketraterm.protocol.TerminalProgressState
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -382,6 +383,8 @@ public class TerminalSession private constructor(
         policy: TerminalInputPolicy,
     ): TerminalInputEncoder = inputEncoderFactory?.create(modes, output, policy) ?: TerminalInputEncoders.create(modes, output, policy)
 
+    private val progressTracker = TerminalProgressTracker(sessionScope)
+
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
     private val mutableRenderGeneration = runtime.renderGeneration
 
@@ -391,6 +394,23 @@ public class TerminalSession private constructor(
      * successful final frame is available to both early and late observers.
      */
     public val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
+
+    /**
+     * Retained OSC 9;4 progress from the standard [create] pipeline, initially
+     * [TerminalProgress.HIDDEN]. Safe to read or collect from any thread.
+     * Updates are conflated state, not an event log; consumers own collection.
+     * No shell integration or render subscription is required.
+     *
+     * Title permission authorizes these presentation hints. Explicit hide, RIS,
+     * progress-permission revocation, and session closure clear them. Active progress
+     * expires after five minutes without an accepted report, including when no
+     * one collects this flow; identical reports renew that timeout. The timeout
+     * uses monotonic elapsed time independently of the wall clock.
+     *
+     * The flow does not complete on closure. Caller-assembled parsers do not
+     * automatically feed this state; their host-event wiring remains host-owned.
+     */
+    public val progress: StateFlow<TerminalProgress> = progressTracker.progress
 
     /**
      * Best-effort foreground executable name, or `null` when unavailable.
@@ -1038,6 +1058,8 @@ public class TerminalSession private constructor(
 
     /**
      * Updates the active host security policy dynamically.
+     * Denying progress clears retained progress before this call returns; changing
+     * title permission does not affect progress. Closed sessions ignore updates.
      *
      * @param policy new security policy.
      */
@@ -1046,6 +1068,7 @@ public class TerminalSession private constructor(
             synchronized(outboundWriteLock) {
                 if (isSessionClosed()) return
                 hostCommandAdapter?.setHostPolicy(policy)
+                if (policy.progressPolicy == HostControlPolicy.DENY) progressTracker.clear()
                 if (mutableState.value == TerminalSessionState.Created && policy.terminalResponsePolicy == HostControlPolicy.DENY) {
                     terminal.clearResponseBytes()
                 }
@@ -1681,6 +1704,7 @@ public class TerminalSession private constructor(
 
     private fun requestClosure(event: TerminalSessionCloseEvent) {
         if (!closingEvent.compareAndSet(null, event)) return
+        progressTracker.close()
         // Stop queued writes immediately; cleanup may wait for an in-flight decode.
         outboundJob.cancel(CancellationException("Terminal session closing"))
         val cleanupJob = SupervisorJob()
@@ -1695,6 +1719,7 @@ public class TerminalSession private constructor(
 
     private fun transitionToClosed(event: TerminalSessionCloseEvent) {
         if (!closingEvent.compareAndSet(null, event)) return
+        progressTracker.close()
         outboundJob.cancel(CancellationException("Terminal session closing"))
         finishClosure(event, propagateFailure = true)
     }
@@ -2116,6 +2141,9 @@ public class TerminalSession private constructor(
                     timeSource = clipboardReadTimeSource,
                 )
             session.clipboardReads = clipboardReads
+            recordingHostEvents.progressReport = { state, percentage ->
+                if (!session.isClosed) session.progressTracker.update(state, percentage)
+            }
             recordingHostEvents.resizeConnector = session::resizeConnector
             recordingHostEvents.clipboardReadRequest = { request ->
                 session.drainResponses()
@@ -2144,6 +2172,7 @@ private class SessionHostEventSink(
     private val delegate: HostEventSink,
     private val shellIntegration: TerminalShellIntegration?,
 ) : HostEventSink {
+    var progressReport: ((TerminalProgressState, Int) -> Unit)? = null
     var resizeConnector: ((Int, Int) -> Unit)? = null
     var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
 
@@ -2239,6 +2268,14 @@ private class SessionHostEventSink(
         level: NotificationLevel,
     ) {
         delegate.showNotification(title, body, level)
+    }
+
+    override fun progressChanged(
+        state: TerminalProgressState,
+        percentage: Int,
+    ) {
+        checkNotNull(progressReport).invoke(state, percentage)
+        delegate.progressChanged(state, percentage)
     }
 
     override fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) {

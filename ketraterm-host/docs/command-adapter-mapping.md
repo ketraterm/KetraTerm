@@ -56,6 +56,10 @@ registry indexes, and emits `hyperlinksCleared` if the registry was nonempty.
 It also emits `paletteChanged` if core's effective palette changed. Numeric
 hyperlink IDs are never recycled.
 
+Hard reset also emits `progressChanged(HIDDEN, 0)` regardless of presentation
+permission, so a retained indicator can always be cleared. Soft reset preserves
+progress; session/host lifecycle and expiry own its remaining lifetime.
+
 RIS returns to primary and clears its content/history. Retained alternate cells
 can remain reachable through mode `47`; their old hyperlink IDs are unresolved.
 Do not treat hard reset as a new adapter identity lifetime. See the
@@ -88,6 +92,13 @@ color changes and resets only publish effective `paletteChanged` metadata;
 they do not trigger color-scheme reports. A direct embedder must drain
 theme-change reports just as it drains parser-generated replies. See the
 [protocol contract](../../docs/reference/protocol.md#change-reports).
+
+OSC 9;4 progress reports use `progressPolicy`, independently of title, desktop
+notification, window-manipulation, and terminal-response permissions. The adapter
+validates direct percentages in `0..100` and forwards synchronous, ordered
+`progressChanged` callbacks. HIDDEN and INDETERMINATE normalize their ignored
+percentage to zero; determinate zero is preserved. The adapter retains no progress
+state and creates no timer. See the [wire contract](../../docs/reference/protocol.md#progress-reporting).
 
 Permissions do not enlarge protocol allowlists. Unsupported selectors retain
 their protocol-defined failure or silence behavior. Detailed support status

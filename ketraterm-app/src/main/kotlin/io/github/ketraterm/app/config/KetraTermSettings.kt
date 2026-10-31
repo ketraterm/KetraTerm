@@ -89,6 +89,7 @@ internal class KetraTermSettings(
                 TerminalTitlePolicy(
                     permission = config.titlePermission,
                 ),
+            progressPolicy = HostControlPolicy.ALLOW,
             clipboardPolicy =
                 TerminalClipboardPolicy(
                     writePermission = config.clipboardWrite,

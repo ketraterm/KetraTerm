@@ -276,6 +276,12 @@ class TerminalWorkspace internal constructor(
                                     if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
                                 }
                             }
+                        val progressJob =
+                            launch(presentationFailureHandler) {
+                                session.progress.collect { progress ->
+                                    if (tabBySession(session) === tab) listener.progressChanged(tab, progress)
+                                }
+                            }
                         val startupJob =
                             session.startupCommandStatus?.let { status ->
                                 launch(presentationFailureHandler) {
@@ -290,7 +296,12 @@ class TerminalWorkspace internal constructor(
                             val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
                             startupJob?.cancel()
                             processTitleJob.cancelAndJoin()
+                            progressJob.cancelAndJoin()
                             var failure = captureCleanupFailure(null) { tab.updateForegroundProcessName(null) }
+                            failure =
+                                captureCleanupFailure(failure) {
+                                    tabBySession(session)?.let { listener.progressChanged(it, session.progress.value) }
+                                }
                             failure =
                                 captureCleanupFailure(failure) {
                                     if (!closed.event.locallyRequested) {
@@ -943,6 +954,19 @@ class TerminalWorkspaceTab internal constructor(
  * Host-neutral workspace events.
  */
 interface TerminalWorkspaceListener {
+    /**
+     * Current retained progress for [tab], including the initial hidden state.
+     * Called asynchronously on a workspace worker after tab publication, outside
+     * the workspace lock. Intermediate updates may be conflated. Dispatch UI work
+     * without waiting and read [TerminalSession.progress] again at delivery to
+     * avoid restoring stale progress after reset, closure, expiry or policy changes.
+     * Removing a tab cancels its observation; retained state belongs to its session.
+     */
+    fun progressChanged(
+        tab: TerminalWorkspaceTab,
+        progress: TerminalProgress,
+    ) = Unit
+
     /**
      * Effective palette change for an attached tab. The immutable value may be
      * retained. Metadata callbacks run synchronously under the session mutation

@@ -21,6 +21,7 @@ import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
+import io.github.ketraterm.parser.spi.TerminalProgressCommandSink
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
@@ -70,7 +71,8 @@ public class HostCommandAdapter
         private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
         private val modeReportCapabilities: Int = 0,
         @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
-    ) : TerminalAsciiCommandSink {
+    ) : TerminalAsciiCommandSink,
+        TerminalProgressCommandSink {
         /** Core upload-invalidation token, read under the terminal's usual caller serialization. */
         override val graphicsTransferGeneration: Long get() = terminal.graphicsTransferGeneration
 
@@ -274,6 +276,7 @@ public class HostCommandAdapter
             activeHyperlinkNumericId = 0
             hyperlinkIds.clear()
             hyperlinkKeysByNumericId.clear()
+            hostEvents.progressChanged(TerminalProgressState.HIDDEN, 0)
             if (hadHyperlinks) hostEvents.hyperlinksCleared()
             publishPaletteChange(previousPalette)
         }
@@ -1150,6 +1153,24 @@ public class HostCommandAdapter
 
         override fun shellIntegrationMarker(event: ShellIntegrationEvent) {
             hostEvents.shellIntegrationMarker(event)
+        }
+
+        /**
+         * Forwards application progress under the session's independent progress permission.
+         * State retention and expiry belong to the host or session. Hard reset separately
+         * reports HIDDEN regardless of permission so presentation can always be cleared.
+         *
+         * @throws IllegalArgumentException if [percentage] is outside `0..100`, even when denied.
+         */
+        override fun setProgress(
+            state: TerminalProgressState,
+            percentage: Int,
+        ) {
+            require(percentage in 0..100) { "percentage must be in 0..100, got $percentage" }
+            if (hostPolicy.progressPolicy != HostControlPolicy.ALLOW) return
+            val effectivePercentage =
+                if (state == TerminalProgressState.HIDDEN || state == TerminalProgressState.INDETERMINATE) 0 else percentage
+            hostEvents.progressChanged(state, effectivePercentage)
         }
 
         override fun showNotification(

@@ -298,8 +298,7 @@ class OscDispatcherTest {
         }
 
         @Test
-        fun `OSC 9 ignores ConEmu progress and working directory commands`() {
-            assertTrue(dispatch("9;4;1;50").events.isEmpty())
+        fun `OSC 9 keeps unsupported ConEmu subcommands out of notifications`() {
             assertTrue(dispatch("9;9;C:\\some\\directory").events.isEmpty())
             assertTrue(dispatch("9;1;state").events.isEmpty())
             assertTrue(dispatch("9;0").events.isEmpty())

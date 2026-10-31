@@ -185,6 +185,37 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalOverlayPane : 
 	public fun isOptimizedDrawingEnabled ()Z
 }
 
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalProgressAnimation : java/lang/AutoCloseable {
+	public fun <init> (Ljavax/swing/JComponent;Ljava/util/function/DoubleConsumer;)V
+	public fun close ()V
+	public final fun getActive ()Z
+	public final fun isRunning ()Z
+	public final fun setActive (Z)V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalProgressIcon : javax/accessibility/AccessibleIcon, javax/swing/Icon {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getAccessibleIconDescription ()Ljava/lang/String;
+	public fun getAccessibleIconHeight ()I
+	public fun getAccessibleIconWidth ()I
+	public final fun getErrorColor ()Ljava/awt/Color;
+	public fun getIconHeight ()I
+	public fun getIconWidth ()I
+	public final fun getNormalColor ()Ljava/awt/Color;
+	public final fun getPhase ()D
+	public final fun getProgress ()Lio/github/ketraterm/session/TerminalProgress;
+	public final fun getWarningColor ()Ljava/awt/Color;
+	public fun paintIcon (Ljava/awt/Component;Ljava/awt/Graphics;II)V
+	public fun setAccessibleIconDescription (Ljava/lang/String;)V
+	public final fun setErrorColor (Ljava/awt/Color;)V
+	public final fun setNormalColor (Ljava/awt/Color;)V
+	public final fun setPhase (D)V
+	public final fun setProgress (Lio/github/ketraterm/session/TerminalProgress;)V
+	public final fun setWarningColor (Ljava/awt/Color;)V
+}
+
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchAction : java/lang/Enum {
 	public static final field CLOSE Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
 	public static final field NEXT_MATCH Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;

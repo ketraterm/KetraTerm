@@ -70,6 +70,7 @@ defines event and encoding behavior.
 | Shell metadata | OSC 7 directories and OSC 133 prompt/command markers; see [shell support](shells.md). |
 | Clipboard | Selection-aware OSC 52 host callbacks. Built-in desktop providers write to the clipboard and read from the clipboard or available primary selection. |
 | Notifications | OSC 9 and OSC 777, including optional severity; [protocol](../reference/notifications.md). |
+| Progress reports | OSC 9;4 normal, error, indeterminate, warning and hidden states, with retained session observation; [contract](../reference/protocol.md#progress-reporting). |
 | Bell | BEL events and retained urgency/pop-on-bell modes for host handling. |
 | Window actions | Minimize, restore, move, raise/lower, resize, and maximize requests where the host permits them. |
 | Status queries | Operating status, cursor position, primary/secondary device attributes, [XTVERSION product/build identity](../reference/protocol.md#xtversion), and supported mode status. |

@@ -535,6 +535,7 @@ class KetraTermIntellijSettingsTest {
         val policy = settings.createHostPolicy()
         assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.writePermission)
         assertEquals(TerminalTitlePermission.DENY, policy.titlePolicy.permission)
+        assertEquals(HostControlPolicy.ALLOW, policy.progressPolicy)
     }
 
     @Test

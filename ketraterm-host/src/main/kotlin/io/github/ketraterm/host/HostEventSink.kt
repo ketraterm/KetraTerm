@@ -17,6 +17,7 @@ package io.github.ketraterm.host
 
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalProgressState
 import io.github.ketraterm.render.api.TerminalColorPalette
 
 /**
@@ -174,6 +175,21 @@ public interface HostEventSink {
      * @param event typed marker event.
      */
     public fun shellIntegrationMarker(event: ShellIntegrationEvent): Unit = Unit
+
+    /**
+     * Called for an accepted OSC 9;4 progress report under progress permission.
+     * [percentage] is in `0..100`, and zero for HIDDEN or INDETERMINATE. Determinate
+     * zero is preserved; this callback does not imply command completion or success.
+     * Repeated reports are delivered and may refresh a host-owned expiry deadline.
+     * Hard reset also reports HIDDEN with zero, regardless of permission.
+     *
+     * Delivery follows the synchronous parser-callback contract above. Retain state
+     * or schedule UI work at the host/session boundary; do not wait for a UI thread.
+     */
+    public fun progressChanged(
+        state: TerminalProgressState,
+        percentage: Int,
+    ): Unit = Unit
 
     /**
      * Called when the shell requests a desktop notification.

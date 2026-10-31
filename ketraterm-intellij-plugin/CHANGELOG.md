@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
+- Applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and status in tooltips and the selected tool-window title. Progress works independently of title permission, with no progress setting.
 - Added optional notifications when long-running commands finish in an unfocused terminal.
   Enable them in KetraTerm settings and choose the minimum command duration; they are off by default.
-
 - Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.
 - Terminal applications can change the mouse pointer shape (OSC 22).
 - Made the search bar more compact and responsive in narrow tool windows and split panes, collapsing search options into a popup when needed.

@@ -52,6 +52,24 @@ public final class io/github/ketraterm/session/TerminalInputAdmission : java/lan
 	public static fun values ()[Lio/github/ketraterm/session/TerminalInputAdmission;
 }
 
+public final class io/github/ketraterm/session/TerminalProgress {
+	public static final field Companion Lio/github/ketraterm/session/TerminalProgress$Companion;
+	public fun <init> (Lio/github/ketraterm/protocol/TerminalProgressState;I)V
+	public final fun component1 ()Lio/github/ketraterm/protocol/TerminalProgressState;
+	public final fun component2 ()I
+	public final fun copy (Lio/github/ketraterm/protocol/TerminalProgressState;I)Lio/github/ketraterm/session/TerminalProgress;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalProgress;Lio/github/ketraterm/protocol/TerminalProgressState;IILjava/lang/Object;)Lio/github/ketraterm/session/TerminalProgress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPercentage ()I
+	public final fun getState ()Lio/github/ketraterm/protocol/TerminalProgressState;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalProgress$Companion {
+	public final fun getHIDDEN ()Lio/github/ketraterm/session/TerminalProgress;
+}
+
 public final class io/github/ketraterm/session/TerminalSession : io/github/ketraterm/core/api/TerminalInputState, io/github/ketraterm/input/api/TerminalInputEncoder, io/github/ketraterm/render/api/TerminalRenderFrameReader, io/github/ketraterm/transport/TerminalConnectorListener, java/lang/AutoCloseable {
 	public static final field Companion Lio/github/ketraterm/session/TerminalSession$Companion;
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/cache/TerminalRenderPublisher;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/core/api/TerminalHostResponseReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/parser/api/TerminalOutputParser;Lio/github/ketraterm/input/api/TerminalInputEncoderFactory;Lio/github/ketraterm/session/TerminalHyperlinkResolver;Lio/github/ketraterm/host/HostCommandAdapter;Lio/github/ketraterm/input/policy/TerminalInputPolicy;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;)V
@@ -108,6 +126,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun getModeSnapshot ()Lio/github/ketraterm/core/api/TerminalModeSnapshot;
 	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun getPointerShape ()Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public final fun getProgress ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getPromptMarkersExpected ()Z
 	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getShellIntegrationState ()Lio/github/ketraterm/session/TerminalShellIntegrationView;

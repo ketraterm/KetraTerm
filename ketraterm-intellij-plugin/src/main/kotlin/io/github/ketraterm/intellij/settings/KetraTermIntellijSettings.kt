@@ -148,6 +148,7 @@ class KetraTermIntellijSettings :
                 TerminalTitlePolicy(
                     permission = titlePermission,
                 ),
+            progressPolicy = HostControlPolicy.ALLOW,
             clipboardPolicy =
                 TerminalClipboardPolicy(
                     writePermission = writePermission,

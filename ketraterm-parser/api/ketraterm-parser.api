@@ -175,3 +175,12 @@ public final class io/github/ketraterm/parser/spi/TerminalCommandSink$DefaultImp
 	public static fun requestTerminalVersion (Lio/github/ketraterm/parser/spi/TerminalCommandSink;)V
 }
 
+public abstract interface class io/github/ketraterm/parser/spi/TerminalProgressCommandSink : io/github/ketraterm/parser/spi/TerminalCommandSink {
+	public abstract fun setProgress (Lio/github/ketraterm/protocol/TerminalProgressState;I)V
+}
+
+public final class io/github/ketraterm/parser/spi/TerminalProgressCommandSink$DefaultImpls {
+	public static fun requestClipboard (Lio/github/ketraterm/parser/spi/TerminalProgressCommandSink;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun requestTerminalVersion (Lio/github/ketraterm/parser/spi/TerminalProgressCommandSink;)V
+}
+

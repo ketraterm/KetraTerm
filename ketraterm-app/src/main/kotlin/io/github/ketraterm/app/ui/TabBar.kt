@@ -16,6 +16,10 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.appMessages
+import io.github.ketraterm.protocol.TerminalProgressState
+import io.github.ketraterm.session.TerminalProgress
+import io.github.ketraterm.ui.swing.host.SwingTerminalProgressAnimation
+import io.github.ketraterm.ui.swing.host.SwingTerminalProgressIcon
 import io.github.ketraterm.workspace.TerminalProfileKind
 import java.awt.*
 import java.awt.event.*
@@ -32,7 +36,16 @@ internal data class TabEntry(
     var title: String,
     val profileKind: TerminalProfileKind,
     var color: Color? = null,
-)
+) {
+    var progress: TerminalProgress? = null
+    var displayTitle: String = title
+        private set
+
+    fun refreshDisplayTitle() {
+        val label = progress?.let(::terminalProgressLabel)
+        displayTitle = label?.let { "[$it] $title" } ?: title
+    }
+}
 
 /**
  * Custom-painted horizontal tab bar matching modern badge/pill designs.
@@ -55,6 +68,33 @@ internal class TabBar(
     private val tabFillShape = Path2D.Double()
     private val tabBorderShape = Path2D.Double()
     private val profileIcons = ProfileIcons()
+    private val progressIcon = SwingTerminalProgressIcon(16)
+    private val progressAnimation =
+        SwingTerminalProgressAnimation(this) { phase ->
+            progressIcon.phase = phase
+            repaint()
+        }
+
+    fun closeProgressAnimation() = progressAnimation.close()
+
+    private fun updateAccessibleDescription() {
+        getAccessibleContext().accessibleDescription = entries.find { it.id == selectedId }?.displayTitle
+    }
+
+    private fun hasVisibleIndeterminate(): Boolean {
+        var index = 0
+        while (index < entries.size && index < tabWidths.size) {
+            val x = layout.tabX(index) - scrollOffset
+            if (x + tabWidths[index] > 0 &&
+                x < width &&
+                entries[index].progress?.state == TerminalProgressState.INDETERMINATE
+            ) {
+                return true
+            }
+            index++
+        }
+        return false
+    }
 
     // Layout state
     private var tabWidths: List<Int> = emptyList()
@@ -142,8 +182,10 @@ internal class TabBar(
             }
         }
         entries.removeIf { it.id == id }
+        progressAnimation.active = hasVisibleIndeterminate()
         if (selectedId == id) {
             selectedId = entries.lastOrNull()?.id
+            updateAccessibleDescription()
         }
         if (fadingOutId == id || fadingInId == id) {
             fadeTimer?.stop()
@@ -208,7 +250,24 @@ internal class TabBar(
         id: String,
         title: String,
     ) {
-        entries.find { it.id == id }?.title = title
+        val entry = entries.find { it.id == id } ?: return
+        if (entry.title == title) return
+        entry.title = title
+        entry.refreshDisplayTitle()
+        updateAccessibleDescription()
+        repaint()
+    }
+
+    fun updateProgress(
+        id: String,
+        progress: TerminalProgress,
+    ) {
+        val entry = entries.find { it.id == id } ?: return
+        if (entry.progress == progress) return
+        entry.progress = progress
+        progressAnimation.active = hasVisibleIndeterminate()
+        entry.refreshDisplayTitle()
+        updateAccessibleDescription()
         repaint()
     }
 
@@ -224,6 +283,7 @@ internal class TabBar(
         if (selectedId != id) {
             val oldId = selectedId
             selectedId = id
+            updateAccessibleDescription()
             startSelectionFade(oldId, id)
             val index = entries.indexOfFirst { it.id == id }
             if (index != -1) {
@@ -251,6 +311,8 @@ internal class TabBar(
     }
 
     fun selectedTitle(): String? = entries.find { it.id == selectedId }?.title
+
+    fun selectedDisplayTitle(): String? = entries.find { it.id == selectedId }?.displayTitle
 
     private fun scrollToVisible(index: Int) {
         if (index !in entries.indices || maxScrollOffset <= 0) return
@@ -342,6 +404,7 @@ internal class TabBar(
 
             val fm = g2.getFontMetrics(font.deriveFont(13f))
             updateLayout(fm)
+            progressAnimation.active = hasVisibleIndeterminate()
             updateRenameTextFieldBounds(fm)
 
             paintTabs(g2, fm)
@@ -517,14 +580,20 @@ internal class TabBar(
         val iconX = x + TAB_LABEL_PADDING_LEFT
         val iconH = 12
         val iconDrawY = y + (h - iconH) / 2
-        profileIcons.paint(
-            g2 = g2,
-            profileKind = entry.profileKind,
-            x = iconX,
-            y = iconDrawY,
-            selected = useSelectedShape,
-            highlighted = index == tabHoverIndex,
-        )
+        val progress = entry.progress
+        if (progress != null && progress.state != TerminalProgressState.HIDDEN) {
+            progressIcon.progress = progress
+            progressIcon.paintIcon(this, g2, iconX - 2, y + (h - 16) / 2)
+        } else {
+            profileIcons.paint(
+                g2 = g2,
+                profileKind = entry.profileKind,
+                x = iconX,
+                y = iconDrawY,
+                selected = useSelectedShape,
+                highlighted = index == tabHoverIndex,
+            )
+        }
 
         val titleFg =
             when {
@@ -890,6 +959,7 @@ internal class TabBar(
                                     } else if (id != selectedId) {
                                         val oldId = selectedId
                                         selectedId = id
+                                        updateAccessibleDescription()
                                         startSelectionFade(oldId, id)
                                         repaint()
                                         onTabSelected(id)
@@ -1218,8 +1288,9 @@ internal class TabBar(
             val w = tabWidths.getOrNull(hit.index) ?: return null
             val labelMaxWidth =
                 w - TAB_LABEL_PADDING_LEFT - ICON_TEXT_GAP - CLOSE_BUTTON_SIZE - CLOSE_BUTTON_MARGIN_RIGHT - 4
+            if (entry.progress?.state != null && entry.progress?.state != TerminalProgressState.HIDDEN) return entry.displayTitle
             if (fm.stringWidth(entry.title) > labelMaxWidth) {
-                return entry.title
+                return entry.displayTitle
             }
         }
         return null

@@ -70,6 +70,16 @@ without waiting for terminal mutation. It becomes false when closure starts and
 is false for caller-owned parsers without a session-managed host adapter. Recheck
 this snapshot immediately before deferred notification delivery.
 
+## Application progress
+
+`progress` retains OSC 9;4 presentation hints from the standard `create` pipeline
+as immutable `TerminalProgress` snapshots. Read `.value` or collect the flow in a
+consumer-owned scope. It needs no shell integration or render subscription;
+intermediate/equal states may be conflated. `HostPolicy.progressPolicy` governs acceptance independently of title permission.
+Hidden reports, RIS, revocation, closure and five-minute inactivity clear it.
+See the [progress contract](../docs/reference/protocol.md#progress-reporting) for
+numeric conventions, lifecycle and custom-assembly responsibilities.
+
 ## Input and lifecycle
 
 Use `submitInput` with semantic key, mouse, focus, paste, or text-replacement

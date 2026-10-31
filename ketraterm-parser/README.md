@@ -65,6 +65,11 @@ to receive semantic operations. Its contracts matter beyond individual commands:
   is an optional batching capability. Its ASCII slices are also borrowed;
   ordinary sinks continue to receive scalar callbacks.
 
+[TerminalProgressCommandSink](src/main/kotlin/io/github/ketraterm/parser/spi/TerminalProgressCommandSink.kt)
+is an independent optional capability for OSC 9;4 progress reports. Custom sinks
+and delegates must expose it explicitly to receive progress. Other sinks consume
+these sequences without notification fallback. See the [progress contract](../docs/reference/protocol.md#progress-reporting).
+
 The factory retains at most 32 codepoints per grapheme. Additional continuations
 advance segmentation context without being emitted. Read boundaries publish
 printable prefixes while allowing later continuations to update them; publication

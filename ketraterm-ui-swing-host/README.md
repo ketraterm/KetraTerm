@@ -180,3 +180,20 @@ defines keys and arguments. Message arguments are plain text, not markup.
 hosts. These limits do not define the core grid or renderer's valid configuration.
 
 For packages and dependencies, see [Module.md](Module.md).
+
+## Progress icons
+
+`SwingTerminalProgressIcon` draws a thin ring from a `TerminalProgress` snapshot.
+Hosts construct/configure it on the EDT and install it in their own tab or label.
+Its constructor sets logical size (8..128); `normalColor`, `errorColor`,
+`warningColor`, `phase` and `setAccessibleIconDescription` customize presentation.
+The host supplies localized description/tooltip text on state changes. Hidden
+progress paints nothing; the host restores its ordinary shell icon.
+
+The icon schedules no work. An optional `SwingTerminalProgressAnimation` accepts
+a borrowed container and primitive `DoubleConsumer` callback: update the phase of
+indeterminate icons and repaint their header owner. Set `active` only while such
+work is present. The clock stops while the container is hidden; close it on the
+EDT at owner disposal to detach its listener. Hosts may omit animation, freeze
+phase for reduced motion, or provide their own timing and session observation.
+See the [progress contract](../docs/reference/protocol.md#progress-reporting).
