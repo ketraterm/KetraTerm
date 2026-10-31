@@ -11,7 +11,7 @@
     "label": "0.4.0",
     "stable": true,
     "api": true,
-    "guides": false
+    "guides": true
   },
   {
     "id": "v0.3.0",

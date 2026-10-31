@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Grid Storage Layout &amp; Memory Architecture · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="v0.4.0">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-core</a></li><li><span aria-current="page">Grid Storage Layout &amp; Memory Architecture</span></li></ol></nav><div class="doc-version"><span>v0.4.0</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-parallel-array-cell-storage-line">1. Parallel Array Cell Storage (Line)</a><a class="depth-3" href="#invariants">Invariants:</a><a class="depth-2" href="#2-off-screen-history-ring-historyring">2. Off-Screen History Ring (HistoryRing)</a><a class="depth-2" href="#3-row-owned-cluster-payloads">3. Row-owned cluster payloads</a></nav></details><div class="article-content"><div class="prose"><h1 id="grid-storage-layout--memory-architecture">Grid Storage Layout &amp; Memory Architecture</h1>
+<p>This is an internal storage guide, not a public encoding contract. Consumers use
+<code>TerminalReader</code>, <code>TerminalLine</code>, and render-frame copies; raw arrays and cluster
+handles remain private to core.</p>
+<h2 id="1-parallel-array-cell-storage-line">1. Parallel Array Cell Storage (<code>Line</code>)</h2>
+<p>Each physical <a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/model/Line.kt">Line</a>
+holds parallel primitive arrays:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Storage</th>
+<th>Type</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>codepoints</code></td>
+<td><code>IntArray</code></td>
+<td>Scalar, empty cell, wide spacer, or cluster handle</td>
+</tr>
+<tr>
+<td><code>attrs</code></td>
+<td><code>LongArray</code></td>
+<td>Primary packed attributes</td>
+</tr>
+<tr>
+<td><code>extendedAttrs</code></td>
+<td><code>LongArray?</code></td>
+<td>Extended attributes; absent storage reads as zero</td>
+</tr>
+</tbody></table></div>
+<p><code>extendedAttrs</code> is allocated on the first nonzero extended write and retained
+through clears for reuse. A full-row zero overwrite clears the retained array
+once, then marks it dormant. Subsequent zero writes, erases, and shifts skip
+extended-array work until a nonzero write reactivates it. Partial zero edits
+conservatively keep active storage; there is no per-cell count or scan to detect
+the last nonzero word. Stored values remain zero while dormant, so reads and
+partial reactivation cannot expose old styling.</p>
+<p>An exact live-payload count lets scalar-only erases skip cluster accounting.</p>
+<h3 id="invariants">Invariants:</h3>
+<ul>
+<li>Terminal grids have at least two columns, so a wide occupant always fits on one row.</li>
+<li><code>0</code> denotes an empty cell.</li>
+<li>Positive values hold direct Unicode scalars, including supplementary values.</li>
+<li><code>-1</code> is the trailing spacer of a two-cell occupant.</li>
+<li>Values <code>&lt;= -2</code> identify references into that row&#39;s own cluster payload array.</li>
+<li>Attributes use the same column index as the cell value. Overwriting or erasing
+a cluster marks its payload dead. Shifts within a row move its references;
+copies between rows copy the actual codepoints.</li>
+</ul>
+<p>Rows also carry a soft-wrap flag, wide-wrap padding provenance, authored-output
+provenance, line identity, and render generation. These are distinct facts:
+erasing text can retain a row&#39;s identity and authored blank output, while
+replacing the row creates a new identity. Reflow excludes artificial wrap
+padding from logical text.</p>
+<p>A public <code>TerminalLine</code> decodes cluster handles to their base codepoint.
+<code>readCluster</code> copies the complete payload into caller-owned storage. Render
+copies translate internal packed attributes and cluster references into the
+stable encodings in <code>ketraterm-render-api</code>.</p>
+<h2 id="2-off-screen-history-ring-historyring">2. Off-Screen History Ring (<code>HistoryRing</code>)</h2>
+<p>A screen&#39;s <a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt">HistoryRing</a>
+contains both retained history and live viewport rows, oldest first. Primary
+capacity is <code>maxHistory + height</code>; alternate capacity is <code>height</code>.</p>
+<p>The reference table is allocated at full capacity, while row objects are
+constructed for the initial viewport plus a batch of spare rows. Additional
+batches are allocated as output fills the ring. Once capacity is reached,
+<code>push()</code> reuses the oldest row and advances eviction accounting. The caller
+clears recycled contents, resets the payload append cursor, and assigns a new
+identity before exposing the row again.</p>
+<p>Full-width region scrolling rotates row references rather than copying each
+cell. Partial-width scrolling copies only the selected cell slices and does not
+admit rows to history. History destruction drops logical reachability without
+scanning discarded cells or releasing external resources. Spare rows retain
+their own arrays and stale contents for reuse, bounded by the ring&#39;s allocated
+row count. All spare rows are fully initialized before becoming live again.
+Retaining the newest rows swaps only surviving row references; it is linear in
+the retained row count.</p>
+<p>Height-only primary resize adjusts the reference table while retaining surviving
+row arrays and payloads. A width change reconstructs logical lines into new
+rows. Its temporary builder preserves source-row and source-column provenance
+until payloads are copied; equal raw references in different rows are unrelated.
+See the <a href="terminal-core-contract.html#resize">resize contract</a>.</p>
+<h2 id="3-row-owned-cluster-payloads">3. Row-owned cluster payloads</h2>
+<p><code>Line</code> lazily allocates one flat <code>IntArray</code> when it first stores a cluster. A raw
+reference packs the sign bit, a 25-bit codepoint offset, and five bits for
+<code>length - 1</code>. Bit 30 stays clear, so a reference cannot equal the <code>-1</code> spacer.
+Lengths therefore decode without a metadata-table lookup. The shared
+<a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalTextLimits.kt"><code>TerminalTextLimits</code></a>
+defines the 32-codepoint bound; the <a href="terminal-core-contract.html">writer contract</a>
+defines validation and overflow behavior.</p>
+<p>Writes copy borrowed input synchronously. A replacement reuses its region when
+the new payload fits. Other writes append and mark replaced regions dead. The
+exact live-codepoint count resets the append cursor as soon as no clusters
+remain. Full clear and fill reset both counters directly, without a cluster scan.</p>
+<p>When append space is exhausted, compaction copies only live payloads in column
+order and updates their references. A second lazy array is retained and swapped
+with the active array. This is safe even after shifts reorder payload offsets;
+an in-place column-order copy could overwrite a later source. Both arrays are
+reused once their capacities are sufficient, including through row recycling.
+Rendering only reads storage and never triggers compaction.</p>
+<p>Compaction reserves twice the required live size, with a minimum of 16 integers,
+to amortize scans during sustained overwrites. Each array&#39;s capacity is bounded
+by <code>max(16, 2 * width * 32)</code> and the encoding&#39;s checked limit of 2^25 integers.
+Live-size arithmetic uses <code>Long</code> before allocation to prevent overflow. Dead
+regions are reclaimed during ordinary mutation; array capacity is deliberately
+retained for reuse. A row becomes collectible with all its payload storage when
+the ring stops retaining it. Scalar-only rows allocate neither payload array.</p>
+<p>All row access requires serialization with terminal mutation. The
+assembled session supplies it; direct core callers provide their own boundary.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-core/docs/grid-storage-layout.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>
