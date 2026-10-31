@@ -12,7 +12,7 @@
   <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
   <script type="module" src="assets/site.js"></script>
 </head>
-<body data-product="app" data-version="v0.3.0 · Stable release">
+<body data-product="app" data-version="v0.4.0 · Stable release">
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="site-identity">
@@ -22,48 +22,40 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a   href="guide.html">Guide</a><a aria-current="page"  href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a aria-current="page" href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">Settings reference</span></li></ol></nav><div class="doc-version"><span>v0.3.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#configuration-file">Configuration file</a><a class="depth-2" href="#window-font-and-theme">Window, font, and theme</a><a class="depth-2" href="#behavior">Behavior</a><a class="depth-2" href="#shell">Shell</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a><a class="depth-2" href="#loading-and-saving">Loading and saving</a></nav></details><div class="article-content"><div class="prose"><h1 id="app-settings">App settings</h1>
-<p>This reference covers KetraTerm 0.3.0. Use the settings dialog for live updates;
-direct edits to <code>config.toml</code> take effect on the next app launch. Saving settings
-rewrites the file, including its generated comments.</p>
-<h2 id="configuration-file">Configuration file</h2>
-<p>The first nonblank override wins: the JVM property <code>ketraterm.config.path</code>,
-then the environment variable <code>KetraTerm_CONFIG_PATH</code>. Both name a file.
-Otherwise the app uses:</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Platform</th>
-<th>Default path</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Windows</td>
-<td><code>%APPDATA%\KetraTerm\config.toml</code>; without <code>APPDATA</code>, <code>~\.config\ketraterm\config.toml</code>.</td>
-</tr>
-<tr>
-<td>macOS</td>
-<td><code>~/Library/Application Support/KetraTerm/config.toml</code>.</td>
-</tr>
-<tr>
-<td>Linux and other platforms</td>
-<td><code>$XDG_CONFIG_HOME/ketraterm/config.toml</code>; without <code>XDG_CONFIG_HOME</code>, <code>~/.config/ketraterm/config.toml</code>.</td>
-</tr>
-</tbody></table></div>
-<p>Use section headers and one <code>key = value</code> per physical line. The parser accepts
-a configuration subset of TOML. Use the generated file as the format template.
-For Windows paths, single-quoted strings preserve backslashes.</p>
-<pre><code class="language-toml">[font]
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a aria-current="page" href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">Settings reference</span></li></ol></nav><div class="doc-version"><span>v0.4.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-toml-configuration-syntax">1. TOML Configuration Syntax</a><a class="depth-3" href="#window-font-and-theme">Window, font, and theme</a><a class="depth-3" href="#behavior">Behavior</a><a class="depth-3" href="#shell-launch-and-startup-command">Shell launch and startup command</a><a class="depth-3" href="#terminal-originated-permissions">Terminal-originated permissions</a><a class="depth-2" href="#2-directory-resolution-hierarchy">2. Directory Resolution Hierarchy</a><a class="depth-2" href="#3-configuration-backup--fallback-lifecycle">3. Configuration Backup &amp; Fallback Lifecycle</a></nav></details><div class="article-content"><div class="prose"><h1 id="app-settings">App settings</h1>
+<p>The standalone application stores one preferences snapshot in <code>config.toml</code>.
+Use the settings dialog for live updates. Direct file edits take effect on the
+next application launch. This file belongs to the standalone product; embedded
+libraries and the IntelliJ plugin have their own configuration owners.</p>
+<h2 id="1-toml-configuration-syntax">1. TOML Configuration Syntax</h2>
+<p>The application accepts section headers, one <code>key = value</code> per physical line,
+booleans, numbers, quoted strings, and comments. Use the generated file as the
+format template: the parser implements this configuration subset, rather than
+the full TOML language. Arrays, inline tables, and multiline values are not
+configuration values.</p>
+<p>A small configuration can override only the preferences you need:</p>
+<pre><code class="language-toml">[window]
+columns = 120
+rows = 35
+scrollback_lines = 5000
+
+[font]
 size = 16
+line_height = 1.0
 
 [theme]
 name = &quot;nord&quot;
 
 [shell]
-path = &#39;C:\Program Files\PowerShell\7\pwsh.exe&#39;
-startup_command = &#39;npm run dev&#39;
+path = &quot;bash&quot;
+startup_command = &quot;&quot;
+
+[security]
+clipboard_write = &quot;allow&quot;
+clipboard_read = &quot;prompt&quot;
+title_permission = &quot;allow&quot;
 </code></pre>
-<h2 id="window-font-and-theme">Window, font, and theme</h2>
+<h3 id="window-font-and-theme">Window, font, and theme</h3>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -95,7 +87,7 @@ startup_command = &#39;npm run dev&#39;
 <td><code>font</code></td>
 <td><code>family</code></td>
 <td>Platform default</td>
-<td>Windows: <code>Cascadia Mono</code>; macOS: <code>Menlo</code>; elsewhere: <code>Monospaced</code>.</td>
+<td>Installed family name. Windows: <code>Cascadia Mono</code>; macOS: <code>Menlo</code>; elsewhere: <code>Monospaced</code>.</td>
 </tr>
 <tr>
 <td><code>font</code></td>
@@ -113,18 +105,21 @@ startup_command = &#39;npm run dev&#39;
 <td><code>font</code></td>
 <td><code>use_system_fallback_fonts</code></td>
 <td><code>true</code></td>
-<td>Boolean.</td>
+<td>Boolean; permits installed system fonts as fallback.</td>
 </tr>
 <tr>
 <td><code>theme</code></td>
 <td><code>name</code></td>
-<td><code>&quot;one-dark&quot;</code></td>
+<td><code>one-dark</code></td>
 <td><code>campbell</code>, <code>one-dark</code>, <code>nord</code>, <code>tokyo-night</code>, <code>everforest</code>.</td>
 </tr>
 </tbody></table></div>
-<p>Window dimensions and scrollback capacity apply to new terminals.</p>
-<h2 id="behavior">Behavior</h2>
-<p>These keys belong to <code>[behavior]</code>.</p>
+<p>Unknown theme identifiers use <code>one-dark</code> at rendering time. Font selection uses
+Swing&#39;s font-family resolution and fallback rules. Window and scrollback values
+are initial settings for new terminals, rather than requests to replace an
+existing process or history buffer.</p>
+<h3 id="behavior">Behavior</h3>
+<p>All keys below belong to <code>[behavior]</code>. Boolean values are <code>true</code> or <code>false</code>.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -136,12 +131,17 @@ startup_command = &#39;npm run dev&#39;
 <tbody><tr>
 <td><code>cursor_shape</code></td>
 <td><code>&quot;block&quot;</code></td>
-<td><code>block</code>, <code>underline</code>, or <code>beam</code>.</td>
+<td><code>block</code>, <code>underline</code>, or <code>beam</code>; unknown values render as a block.</td>
 </tr>
 <tr>
 <td><code>cursor_blink_millis</code></td>
 <td><code>600</code></td>
 <td>Integer, 0..10000; zero disables blinking.</td>
+</tr>
+<tr>
+<td><code>prompt_decoration</code></td>
+<td><code>&quot;gutter&quot;</code></td>
+<td><code>gutter</code>, <code>divider</code>, or <code>none</code>, ignoring case.</td>
 </tr>
 <tr>
 <td><code>treat_ambiguous_as_wide</code></td>
@@ -161,47 +161,57 @@ startup_command = &#39;npm run dev&#39;
 <tr>
 <td><code>paste_on_middle_click</code></td>
 <td><code>true</code></td>
-<td>Middle-button clipboard paste.</td>
+<td>Middle-button gesture pastes ordinary clipboard text.</td>
 </tr>
 <tr>
 <td><code>paste_sanitization</code></td>
-<td><code>&quot;raw&quot;</code></td>
-<td><code>raw</code>, <code>strip-c0</code>, or <code>normalize-line-endings</code>.</td>
+<td><code>&quot;preserve&quot;</code></td>
+<td><code>preserve</code> or <code>strip-c0</code>; bracketed-paste framing is protected in both.</td>
 </tr>
 <tr>
 <td><code>shell_request_resize_window</code></td>
 <td><code>false</code></td>
-<td>Permit terminal-requested window resizing.</td>
+<td>Permit terminal-originated grid-size requests to resize the window.</td>
 </tr>
 <tr>
 <td><code>shell_request_window_manipulation</code></td>
 <td><code>false</code></td>
-<td>Permit move, minimize, maximize, raise, and lower requests.</td>
+<td>Permit terminal-originated move, minimize, maximize, raise, and lower requests.</td>
 </tr>
 <tr>
 <td><code>desktop_notifications_enabled</code></td>
 <td><code>true</code></td>
-<td>Permit desktop notifications.</td>
+<td>Master permission for OSC 9/777 notifications and command-finished alerts.</td>
+</tr>
+<tr>
+<td><code>command_finished_alerts_enabled</code></td>
+<td><code>false</code></td>
+<td>Notify when a long-running command finishes while its originating pane is unfocused; requires shell integration.</td>
+</tr>
+<tr>
+<td><code>command_finished_alert_threshold_seconds</code></td>
+<td><code>10</code></td>
+<td>Inclusive minimum observed command duration; clamped to <code>1..86400</code> seconds.</td>
 </tr>
 <tr>
 <td><code>smart_suggestions_enabled</code></td>
 <td><code>false</code></td>
-<td>Enable completion and learning.</td>
+<td>Master switch for completion and learning.</td>
 </tr>
 <tr>
 <td><code>shell_suggestions_enabled</code></td>
 <td><code>true</code></td>
-<td>Show automatic suggestions when completion is enabled.</td>
+<td>Automatic suggestions when the master switch is enabled. Explicit requests need only the master switch.</td>
 </tr>
 <tr>
 <td><code>accept_selected_suggestion_with_enter</code></td>
 <td><code>true</code></td>
-<td>Enter accepts a selected suggestion.</td>
+<td>Enter accepts an already selected suggestion; otherwise it reaches the shell.</td>
 </tr>
 <tr>
 <td><code>suggestion_learning_persistence_enabled</code></td>
 <td><code>false</code></td>
-<td>Persist completion-learning data when completion is enabled.</td>
+<td>Persist compact completion-learning metadata when completion is enabled.</td>
 </tr>
 <tr>
 <td><code>scroll_on_output</code></td>
@@ -211,18 +221,25 @@ startup_command = &#39;npm run dev&#39;
 <tr>
 <td><code>show_foreground_process_name</code></td>
 <td><code>true</code></td>
-<td>Use detected process names as automatic tab-title fallbacks.</td>
+<td>Use a detected process name when it does not supply a title; custom names retain priority.</td>
 </tr>
 </tbody></table></div>
-<p>Completion and persistence switches are available through the file; the 0.3.0
-settings dialog hides those controls. Persisted command data can contain
-sensitive text.</p>
-<h2 id="shell">Shell</h2>
-<p>These keys belong to <code>[shell]</code>.</p>
+<p>Command-finished alerts use monotonic time between shell markers and recheck the
+originating pane&#39;s keyboard focus, current preferences, and lifetime before display.
+Pending completions coalesce to one alert per session while the UI is busy;
+command text is never included in these alerts.</p>
+<p>Paste handling is independent of the local PTY&#39;s newline policy. Legacy <code>raw</code>
+and <code>normalize-line-endings</code> values load as <code>preserve</code>; saving writes the
+canonical value. See the <a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-input/docs/terminal-input-contract.md#paste-and-focus-contract">paste contract</a>
+for control-character and framing rules.</p>
+<p>Persisted completion data is stored beside the configuration file. See the
+<a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/docs/reference/storage.md">storage reference</a> for retained ranking data,
+command replay, and privacy limits.</p>
+<h3 id="shell-launch-and-startup-command">Shell launch and startup command</h3>
 <div class="table-scroll"><table>
 <thead>
 <tr>
-<th>Key</th>
+<th><code>[shell]</code> key</th>
 <th>Default</th>
 <th>Meaning</th>
 </tr>
@@ -230,7 +247,7 @@ sensitive text.</p>
 <tbody><tr>
 <td><code>path</code></td>
 <td>Platform shell</td>
-<td>Executable path or name. Windows: <code>powershell.exe</code>; elsewhere: <code>$SHELL</code>, falling back to <code>/bin/bash</code>.</td>
+<td>One executable path or command name. Windows: <code>powershell.exe</code>; elsewhere: <code>$SHELL</code>, falling back to <code>/bin/bash</code>. A blank value uses this default.</td>
 </tr>
 <tr>
 <td><code>start_directory</code></td>
@@ -240,67 +257,113 @@ sensitive text.</p>
 <tr>
 <td><code>startup_command</code></td>
 <td><code>&quot;&quot;</code></td>
-<td>One command line submitted after the first complete interactive prompt; blank disables it.</td>
+<td>One shell command line to submit after the first complete interactive prompt; blank disables it.</td>
 </tr>
 </tbody></table></div>
-<p>Startup commands require a directly configured interactive PowerShell, Bash,
-zsh, or fish shell with hooks enabled. WSL launchers, unsupported shells, and
-explicit command/script launches cannot use them. Input before submission
-cancels the pending command. The command must fit on one line, contain no
-control characters, and be at most 16384 UTF-16 code units.</p>
-<h2 id="terminal-permissions">Terminal permissions</h2>
-<p>These keys belong to <code>[security]</code>. In 0.3.0, local/remote classification depends
-on the launched executable; an SSH command typed inside a local shell retains
-the local session&#39;s permissions.</p>
+<p><code>path</code> is not a shell command line containing arguments. Use application launch
+arguments for a one-off process command. Discovered profiles may supply their
+normal shell flags when the executable matches a known profile.</p>
+<p>For example, <code>startup_command = &#39;npm run dev&#39;</code> runs once in each new terminal.
+It requires a directly configured interactive PowerShell, Bash, zsh, or fish
+shell with startup hooks enabled. WSL launchers, unsupported shells, and explicit
+command/script entry points cannot use it; incompatible launches report an
+error. User input before submission cancels the pending command. Commands are
+interpreted by the selected shell, with no additional host quoting or expansion.
+Use a script for multiline programs. The limit is 16384 UTF-16 code units, with
+no control characters.</p>
+<p>For Windows paths, single-quoted literal strings preserve backslashes:
+<code>path = &#39;C:\tools\pwsh.exe&#39;</code>. Keep each value on one physical line. The settings
+writer preserves quotes, significant whitespace, Unicode, and backslashes;
+values requiring escapes use the parser&#39;s supported triple-quoted form. Saving
+replaces the file with canonical generated content, so custom comments and
+unknown keys are not retained.</p>
+<h3 id="terminal-originated-permissions">Terminal-originated permissions</h3>
+<p>All keys below belong to <code>[security]</code>. Permissions cover the whole terminal
+session, including nested SSH and multiplexer output.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
 <th>Key</th>
-<th>Default</th>
+<th>New-file default</th>
 <th>Accepted values</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><code>clipboard_local_write</code></td>
-<td><code>&quot;prompt&quot;</code></td>
-<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
-</tr>
-<tr>
-<td><code>clipboard_remote_write</code></td>
-<td><code>&quot;deny&quot;</code></td>
-<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
+<td><code>clipboard_write</code></td>
+<td><code>&quot;allow&quot;</code></td>
+<td><code>allow</code>, <code>prompt</code>, <code>deny</code>.</td>
 </tr>
 <tr>
 <td><code>clipboard_read</code></td>
-<td><code>&quot;deny&quot;</code></td>
-<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
+<td><code>&quot;prompt&quot;</code></td>
+<td><code>allow</code>, <code>prompt</code>, <code>deny</code>. Existing files with a missing or invalid value use <code>deny</code>.</td>
 </tr>
 <tr>
 <td><code>clipboard_max_decoded_bytes</code></td>
 <td><code>1048576</code></td>
-<td>Integer, 0..2147483647; decoded payload limit.</td>
+<td>Integer, 0..2147483647; decoded UTF-8 limit for clipboard reads and writes.</td>
 </tr>
 <tr>
-<td><code>title_local_permission</code></td>
+<td><code>title_permission</code></td>
 <td><code>&quot;allow&quot;</code></td>
 <td><code>allow</code>, <code>deny</code>.</td>
 </tr>
+</tbody></table></div>
+<p>The settings dialog labels <code>prompt</code> as Ask. These permissions govern terminal
+requests, rather than the user&#39;s explicit copy or paste actions. Removed
+local/remote permission keys are ignored; use the session-wide keys above.</p>
+<h2 id="2-directory-resolution-hierarchy">2. Directory Resolution Hierarchy</h2>
+<p>The first nonblank override wins:</p>
+<ol>
+<li>JVM system property <code>ketraterm.config.path</code>.</li>
+<li>Environment variable <code>KetraTerm_CONFIG_PATH</code>.</li>
+<li>Platform default shown below.</li>
+</ol>
+<div class="table-scroll"><table>
+<thead>
 <tr>
-<td><code>title_remote_permission</code></td>
-<td><code>&quot;deny&quot;</code></td>
-<td><code>allow</code>, <code>deny</code>.</td>
+<th>Platform</th>
+<th>Configuration file</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>%APPDATA%\KetraTerm\config.toml</code>; without <code>APPDATA</code>, <code>~\.config\ketraterm\config.toml</code>.</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>~/Library/Application Support/KetraTerm/config.toml</code>.</td>
+</tr>
+<tr>
+<td>Linux and other platforms</td>
+<td><code>$XDG_CONFIG_HOME/ketraterm/config.toml</code>; without <code>XDG_CONFIG_HOME</code>, <code>~/.config/ketraterm/config.toml</code>.</td>
 </tr>
 </tbody></table></div>
-<p>These permissions govern terminal requests separately from explicit user copy
-and paste actions. The app does not configure a clipboard allowlist, so
-<code>allowlist</code> denies requests.</p>
-<h2 id="loading-and-saving">Loading and saving</h2>
-<p>A missing file is created with defaults. Numeric settings are clamped to their
-bounds; malformed values generally use the field default. A configuration load
-failure attempts to preserve the old file as <code>&lt;filename&gt;.broken</code> and write a
-default configuration. Settings saves use atomic replacement; a failed save
-keeps the active settings unchanged.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/website/released-app/v0.3.0/settings.md">View source on GitHub ↗</a></div></div></main></div>
+<p>Override values name the file, rather than its parent directory. The app&#39;s
+<code>ketra info</code> companion command reports the active path; <code>ketra config</code> opens it
+through the helper&#39;s editor selection. Native helpers are not installed into
+WSL or Ubuntu launcher profiles.</p>
+<h2 id="3-configuration-backup--fallback-lifecycle">3. Configuration Backup &amp; Fallback Lifecycle</h2>
+<ul>
+<li>A missing file is generated with defaults, including clipboard reads set to
+<code>prompt</code>. If generation fails, the app reports the write failure and uses the
+defaults in memory.</li>
+<li>Numeric values outside their bounds are clamped, including integer overflow.
+Malformed numbers and invalid booleans use the corresponding field default.
+Existing files use <code>deny</code> for missing or invalid clipboard-read permissions.</li>
+<li>A parse or configuration-validation failure moves the existing file to
+<code>&lt;filename&gt;.broken</code>, replacing any previous backup, then attempts to write a
+default file. These recovery defaults deny clipboard reads. A failed backup
+leaves the original file in place and returns the recovery defaults.</li>
+<li>An I/O read failure is reported and uses recovery defaults without backing up
+or replacing the unreadable file.</li>
+<li>Settings saves stage a complete snapshot beside the destination and require
+atomic replacement. A failed save preserves the previous file and active
+settings. Successful saves publish the snapshot to consumers on the EDT.</li>
+</ul>
+<p>See <a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-app/README.md">README.md</a> for application launch and
+<a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-app/Module.md">Module.md</a> for application structure and dependencies.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-app/docs/profile-config-toml.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
     <p>Open source · Apache 2.0</p>

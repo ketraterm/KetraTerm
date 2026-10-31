@@ -12,7 +12,7 @@
   <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
   <script type="module" src="assets/site.js"></script>
 </head>
-<body data-product="app" data-version="v0.3.0 · Stable release">
+<body data-product="app" data-version="v0.4.0 · Stable release">
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="site-identity">
@@ -22,7 +22,43 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a   href="guide.html">Guide</a><a   href="settings.html">Settings</a><a aria-current="page"  href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a aria-current="page" href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App changelog</span></li></ol></nav><div class="doc-version"><span>v0.3.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#030---2026-09-23">[0.3.0] - 2026-09-23</a><a class="depth-2" href="#022---2026-09-11">[0.2.2] - 2026-09-11</a><a class="depth-2" href="#021---2026-07-14">[0.2.1] - 2026-07-14</a><a class="depth-2" href="#020---2026-07-13">[0.2.0] - 2026-07-13</a><a class="depth-2" href="#013---2026-07-08">[0.1.3] - 2026-07-08</a><a class="depth-2" href="#012---2026-07-03">[0.1.2] - 2026-07-03</a><a class="depth-2" href="#011---2026-07-02">[0.1.1] - 2026-07-02</a><a class="depth-2" href="#010---2026-06-30">[0.1.0] - 2026-06-30</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-standalone-changelog">KetraTerm Standalone Changelog</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a aria-current="page" href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App changelog</span></li></ol></nav><div class="doc-version"><span>v0.4.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#040---2026-10-31">[0.4.0] - 2026-10-31</a><a class="depth-2" href="#030---2026-09-23">[0.3.0] - 2026-09-23</a><a class="depth-2" href="#022---2026-09-11">[0.2.2] - 2026-09-11</a><a class="depth-2" href="#021---2026-07-14">[0.2.1] - 2026-07-14</a><a class="depth-2" href="#020---2026-07-13">[0.2.0] - 2026-07-13</a><a class="depth-2" href="#013---2026-07-08">[0.1.3] - 2026-07-08</a><a class="depth-2" href="#012---2026-07-03">[0.1.2] - 2026-07-03</a><a class="depth-2" href="#011---2026-07-02">[0.1.1] - 2026-07-02</a><a class="depth-2" href="#010---2026-06-30">[0.1.0] - 2026-06-30</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-standalone-changelog">KetraTerm Standalone Changelog</h1>
+<h2 id="040---2026-10-31">[0.4.0] - 2026-10-31</h2>
+<ul>
+<li>Compatible applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and window/taskbar status where supported. Progress clears after five minutes without updates and works independently of title permission, with no progress setting.</li>
+<li>Added opt-in desktop alerts when long-running commands finish in an unfocused terminal, with a configurable minimum duration (10 seconds by default).</li>
+<li>Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.</li>
+<li>Terminal applications can change the mouse pointer shape (OSC 22).</li>
+<li>Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.</li>
+<li>Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.</li>
+<li>Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.</li>
+<li>Search now starts at the viewport and wraps through history. Frequent queries show <code>1,000+</code> instead of collecting every result; next/previous navigation still reaches matches throughout retained history, and visible matches remain highlighted.</li>
+<li>Fixed a thin orange highlight remaining after changing a selected search result into a query with no matches.</li>
+<li>Added explanatory search tooltips, shortcut hints, and keyboard focus indicators. Use Alt+C for match case, Alt+W for whole words, Alt+R for regex, Enter/Shift+Enter for next/previous match, and Escape to close search; Tab and Space navigate and toggle controls.</li>
+<li>Fixed window geometry refresh throwing after prompt-style changes or window moves and resizes.</li>
+<li>Added a Prompt style setting with Gutter, Divider, and None choices, applied to open terminals and saved across restarts.</li>
+<li>Reserved prompt gutters before the first prompt for shells with configured integration, while shells without prompt support use the full available width.</li>
+<li>Centered full-screen terminal apps consistently across shell profiles, including spare pixels around the existing grid.</li>
+<li>Improved responsiveness when displaying large text output, including logs, CJK text, and emoji.</li>
+<li>Search controls follow the selected theme.</li>
+<li>Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.</li>
+<li>Discarded stale suggestions to protect newer input. Closing the terminal or disabling suggestions closes completion popups.</li>
+<li>Improved window-state reporting while terminal output is active.</li>
+<li>Kept cursors visible when terminals lose focus, with thin outlines for blocks and steady bars or underlines. Cursor thickness stays consistent across split panes.</li>
+<li>Improved link highlighting and activation across wrapped lines, scrolling and output updates, with hand cursors only when links can be activated.</li>
+<li>Improved cursor-position reporting in terminal apps using margins.</li>
+<li>Fixed terminal apps failing to query the current cursor shape and blinking style.</li>
+<li>Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.</li>
+<li>Fixed terminal windows failing to grow near screen edges; resizing now keeps the window within the available desktop.</li>
+<li>Fixed terminal column switching when shell window resizing is disabled or the window layout cannot resize.</li>
+<li>Improved responsiveness and reliability when pasting large text into busy terminals.</li>
+<li>Compatible terminal apps can now read clipboard text with your permission. Keyboard-accessible dialogs let you approve once, deny, or block reads for that terminal. New settings ask before reading; saved permissions are preserved.</li>
+<li>Improved keyboard compatibility with terminal apps that configure and query modifier handling.</li>
+<li>Improved compatibility with terminal apps that query active terminal settings and supported features. Input settings can be changed safely during large pastes.</li>
+<li>Simplified clipboard and title permissions so they apply consistently throughout a terminal, including SSH sessions. Clipboard choices are now Deny, Ask, and Allow, with writes allowed by default. Previous separate local/remote settings reset to the new defaults.</li>
+<li>Improved protection when pasting copied terminal sequences and simplified paste handling settings.</li>
+<li>Improved compatibility with combined text formatting commands and prevented oversized terminal commands from changing formatting or terminal settings unexpectedly.</li>
+</ul>
 <h2 id="030---2026-09-23">[0.3.0] - 2026-09-23</h2>
 <ul>
 <li>Fixed scrolling in split terminal layouts disturbing neighboring content.</li>
@@ -93,7 +129,7 @@
 <li>Added local terminal sessions for zsh, bash, sh, PowerShell, and cmd.exe.</li>
 <li>Added configurable typography, default colors, palettes, and scrollback capacity.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/53b548442ec75b6d28f8c061a9b36c04e8cf560c/ketraterm-app/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-app/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
     <p>Open source · Apache 2.0</p>
