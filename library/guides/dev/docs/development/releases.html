@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Releasing KetraTerm · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
+<p><code>VERSION</code> on <code>master</code> is the release version for libraries, the standalone app,
+and the IntelliJ plugin. Set it to the desired version and merge the change
+before releasing. No manual tag or version input is needed.</p>
+<p>In GitHub Actions, select <strong>Release</strong>, then <strong>Run workflow</strong> on <code>master</code>.
+The workflow:</p>
+<ol>
+<li>Reads <code>VERSION</code> and compares it with all published GitHub releases,
+including prereleases. An already published version is skipped; a downgrade
+or an alias of an existing version fails.</li>
+<li>Replaces the leading <code>Unreleased</code> heading in each of the three changelogs
+with the version and the current UTC date. Older entries and already
+finalized dates are preserved. A finalized section with additional
+Unreleased changes is rejected to avoid ambiguous release contents.</li>
+<li>Runs formatting, ABI, tests, local publication checks, and native version
+validation before creating the release commit.</li>
+<li>Commits the changelogs to <code>master</code> and creates <code>v{version}</code> on that commit
+in one atomic push. If <code>master</code> advances during verification, the push
+fails; rerun against the updated branch. Existing tags are never moved.</li>
+<li>Publishes Maven artifacts, builds application binaries, and creates the
+GitHub release with notes from all three versioned changelog sections.
+Relative links in those notes point to the tagged source.</li>
+<li>Triggers website/documentation publication through the existing
+<code>workflow_run</code> hook after successful completion. Pushes and releases made
+with <code>GITHUB_TOKEN</code> do not trigger ordinary event workflows.</li>
+</ol>
+<p>The workflow needs permission to push directly to <code>master</code> and create tags.
+Repository rules must permit the Actions token to do this; the workflow does
+not bypass branch protection. Existing Maven Central and signing secrets are
+still required.</p>
+<p>For the next development cycle, add a new <code>## [Unreleased]</code> section to each
+changelog and bump <code>VERSION</code> before the next release.</p>
+<h2 id="prereleases">Prereleases</h2>
+<p>Use the native packager&#39;s existing formats: <code>0.5.0-alpha01</code>, <code>0.5.0-beta02</code>,
+or <code>0.5.0-rc01</code>. Stage numbers are 1–19; unpadded forms such as <code>alpha1</code>
+are also accepted, but cannot be published alongside their padded aliases.
+The order is alpha, beta, rc, then stable, with numeric ordering within a
+stage (<code>alpha2</code> precedes <code>alpha10</code>). Dotted suffixes (<code>alpha.1</code>), unnumbered
+stages, build metadata, and <code>-SNAPSHOT</code> are rejected before publication.
+Prereleases are marked as such on GitHub and never become the latest stable
+release. A subsequent <code>0.5.0</code> release is newer than <code>0.5.0-rc19</code>.</p>
+<h2 id="interrupted-releases">Interrupted releases</h2>
+<p>Use GitHub&#39;s <strong>Re-run failed jobs</strong> to resume after a publishing failure,
+preserving successful Maven publication. Maven releases are immutable; do not
+rerun a successful Maven upload unnecessarily. If preparation is rerun with an
+existing unpublished tag, it checks out and validates that tagged commit,
+preserving its files and date rather than releasing newer changes on <code>master</code>.
+Tags containing unfinalized changelogs are rejected.</p>
+<p>Run the release automation tests locally with:</p>
+<pre><code class="language-shell">node --test .github/scripts/release.test.mjs
+</code></pre>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -59,7 +59,7 @@ state without emitting a terminal reset. If a callback throws, the exception
 propagates; stop processing that stream because parser and sink state may no
 longer agree.</p>
 <h2 id="how-to-implement-custom-command-sink">How to Implement: Custom Command Sink</h2>
-<p>Implement <a href="https://github.com/ketraterm/KetraTerm/blob/4c2101db8856753cd48ad52f6425f319f4467fe2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt">TerminalCommandSink</a>
+<p>Implement <a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt">TerminalCommandSink</a>
 to receive semantic operations. Its contracts matter beyond individual commands:</p>
 <ul>
 <li><code>writeCluster</code> and <code>updatePreviousCluster</code> borrow an <code>IntArray</code> for the callback
@@ -74,11 +74,11 @@ this observation.</li>
 screen switches. <code>applyGraphicsCommand</code> borrows controls and a decoded byte
 prefix; consume them synchronously and honor transfer failures before admission.
 See the <a href="docs/ansi-fsm-specification.html#graphics-apc-collection">graphics collection contract</a>.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/4c2101db8856753cd48ad52f6425f319f4467fe2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalAsciiCommandSink.kt">TerminalAsciiCommandSink</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalAsciiCommandSink.kt">TerminalAsciiCommandSink</a>
 is an optional batching capability. Its ASCII slices are also borrowed;
 ordinary sinks continue to receive scalar callbacks.</li>
 </ul>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/4c2101db8856753cd48ad52f6425f319f4467fe2/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalProgressCommandSink.kt">TerminalProgressCommandSink</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalProgressCommandSink.kt">TerminalProgressCommandSink</a>
 is an independent optional capability for OSC 9;4 progress reports. Custom sinks
 and delegates must expose it explicitly to receive progress. Other sinks consume
 these sequences without notification fallback. See the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
@@ -106,7 +106,7 @@ session APIs.</p>
 <li><a href="docs/grapheme-segmentation.html">Grapheme segmentation</a>: UTF-8, publication, retention, and charset state.</li>
 <li><a href="../docs/terminal-feature-map.html">Feature map</a> and <a href="../docs/terminal-feature-gap-map.html">gap map</a>: supported behavior and deferred scope.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/4c2101db8856753cd48ad52f6425f319f4467fe2/ketraterm-parser/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/df78b1ffc74f3470af9e3862ae88214748011b92/ketraterm-parser/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
