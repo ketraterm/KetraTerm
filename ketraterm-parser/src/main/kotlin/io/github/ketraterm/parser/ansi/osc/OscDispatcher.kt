@@ -114,7 +114,8 @@ internal class OscDispatcher {
             7 -> sink.setCurrentWorkingDirectoryUri(decodePayload(payload, commandEnd + 1, length))
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
             9 -> {
-                if (dataStart < length && payload[dataStart].toInt() == '4'.code &&
+                if (dataStart < length &&
+                    payload[dataStart].toInt() == '4'.code &&
                     (dataStart + 1 == length || payload[dataStart + 1].toInt() == ';'.code)
                 ) {
                     dispatchProgress(sink, payload, dataStart + 1, length)
