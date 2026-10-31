@@ -59,7 +59,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xterm-differential-smoke-${{ github.run_id }}
+          name: xterm-differential-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
           if-no-files-found: warn
           retention-days: 14
@@ -68,7 +68,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resize-reflow-smoke-${{ github.run_id }}
+          name: resize-reflow-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/resize-reflow-invariant/campaign-*.json
           if-no-files-found: warn
           retention-days: 14
@@ -77,7 +77,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cursor-wrap-smoke-${{ github.run_id }}
+          name: cursor-wrap-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/cursor-wrap-model/campaign-*.json
           if-no-files-found: warn
           retention-days: 14
@@ -86,7 +86,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xterm-differential-smoke-failure-${{ github.run_id }}
+          name: xterm-differential-smoke-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ketraterm-testkit/build/reports/xterm-differential/failures/*.json
             ketraterm-testkit/build/reports/tests/xtermDifferentialSmokeTest/
@@ -177,7 +177,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xterm-differential-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: xterm-differential-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
           if-no-files-found: warn
           retention-days: 30
@@ -186,7 +186,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: resize-reflow-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: resize-reflow-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/resize-reflow-invariant/campaign-*.json
           if-no-files-found: warn
           retention-days: 30
@@ -195,7 +195,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cursor-wrap-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: cursor-wrap-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ketraterm-testkit/build/reports/cursor-wrap-model/campaign-*.json
           if-no-files-found: warn
           retention-days: 30
@@ -204,7 +204,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xterm-differential-nightly-failure-shard-${{ matrix.shard }}-${{ github.run_id }}
+          name: xterm-differential-nightly-failure-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ketraterm-testkit/build/reports/xterm-differential/failures/*.json
             ketraterm-testkit/build/reports/tests/xtermDifferentialNightlyTest/

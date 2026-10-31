@@ -81,14 +81,7 @@ val writeNativeVersion =
         val outputFile = layout.buildDirectory.file("native-version.txt")
         outputs.file(outputFile)
 
-        argumentProviders.add(
-            CommandLineArgumentProvider {
-                listOf(
-                    project.version.toString(),
-                    outputFile.get().asFile.absolutePath,
-                )
-            },
-        )
+        args(project.version.toString(), outputFile.get().asFile.absolutePath)
     }
 
 val prepareJpackageInput =

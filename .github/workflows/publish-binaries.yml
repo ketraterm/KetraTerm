@@ -13,12 +13,16 @@ on:
         required: true
         type: boolean
 
+permissions:
+  contents: read
+
 env:
   RELEASE: "true"
 
 jobs:
   build-no-runtime:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -30,7 +34,9 @@ jobs:
         with:
           distribution: 'jetbrains'
           java-version: '25'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build No-Runtime Archive
         run: |
@@ -47,6 +53,8 @@ jobs:
         with:
           name: KetraTerm-no-runtime
           path: dist/KetraTerm-Java-Preinstalled.zip
+          if-no-files-found: error
+          overwrite: true
 
   build-native:
     strategy:
@@ -86,6 +94,7 @@ jobs:
             portable_name: portable-macos-applesilicon
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -97,7 +106,9 @@ jobs:
         with:
           distribution: 'jetbrains'
           java-version: '25'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install Linux Packaging Tools
         if: matrix.package_os == 'linux'
@@ -128,7 +139,7 @@ jobs:
       - name: Download JBR
         shell: bash
         run: |
-          curl -L -o "${{ steps.jbr_config.outputs.jbr_filename }}" "${{ steps.jbr_config.outputs.jbr_url }}"
+          curl --fail --location --retry 3 -o "${{ steps.jbr_config.outputs.jbr_filename }}" "${{ steps.jbr_config.outputs.jbr_url }}"
 
       - name: Verify JBR Checksum
         shell: bash
@@ -289,6 +300,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.installer_name }}
+          if-no-files-found: error
+          overwrite: true
           path: |
             dist/*.exe
             dist/*.dmg
@@ -299,6 +312,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.portable_name }}
+          if-no-files-found: error
+          overwrite: true
           path: |
             dist/*.zip
             dist/*.tar.gz
@@ -306,6 +321,7 @@ jobs:
   publish-github-release:
     needs: [build-no-runtime, build-native]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -386,6 +402,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
+          fail_on_unmatched_files: true
           body_path: release-notes.md
           files: |
             release-artifacts/*

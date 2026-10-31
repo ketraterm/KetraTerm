@@ -9,13 +9,21 @@ on:
       - '.github/workflows/*website*'
       - '.github/workflows/deploy-docs.yml'
       - '.github/workflows/publish-binaries.yml'
+      - '.github/workflows/release.yml'
+      - '.github/scripts/**'
+      - 'VERSION'
 
 permissions:
   contents: read
 
+concurrency:
+  group: check-website-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:

@@ -15,6 +15,7 @@ jobs:
     name: Prepare release from VERSION
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     outputs:
@@ -51,7 +52,7 @@ jobs:
         if: steps.prepare.outputs.needed == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb zsh fish
       - name: Verify release before creating tag
         if: steps.prepare.outputs.needed == 'true'
         env:
@@ -60,6 +61,16 @@ jobs:
         run: |
           node --test .github/scripts/release.test.mjs
           xvfb-run -a ./gradlew spotlessCheck checkKotlinAbi test publicationChecks :ketraterm-app:writeNativeVersion --no-daemon
+      - name: Upload failed release verification reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-verification-reports
+          overwrite: true
+          path: |
+            **/build/reports/tests/
+            build/reports/configuration-cache/
+            build/reports/problems/
       - name: Commit changelogs and create tag atomically
         if: steps.prepare.outputs.needed == 'true'
         id: commit

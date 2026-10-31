@@ -7,10 +7,18 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +55,7 @@ jobs:
       - name: Run Tests (Linux with Xvfb)
         if: runner.os == 'Linux'
         run: |
-          xvfb-run ./gradlew test :ketraterm-testkit:publishedConsumerTest --continue "-Djava.awt.headless=true"
+          xvfb-run -a ./gradlew test :ketraterm-testkit:publishedConsumerTest --continue "-Djava.awt.headless=true"
 
       - name: Run Tests (Windows & macOS)
         if: runner.os != 'Linux'
@@ -56,18 +64,20 @@ jobs:
 
       - name: Run IntelliJ Plugin Tests (Linux)
         if: runner.os == 'Linux'
+        working-directory: ketraterm-intellij-plugin
         run: |
-          xvfb-run ./gradlew -p ketraterm-intellij-plugin test "-Djava.awt.headless=true"
+          xvfb-run -a ./gradlew test "-Djava.awt.headless=true"
 
       - name: Compile Benchmark Harnesses
         run: ./gradlew :ketraterm-benchmarks:jmhJar
 
-      - name: Check Published Library ABI
-        run: ./gradlew checkKotlinAbi
+      - name: Check Published Library ABI and Native Version
+        run: ./gradlew checkKotlinAbi :ketraterm-app:writeNativeVersion
 
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.os }}
+          overwrite: true
           path: '**/build/reports/tests/'

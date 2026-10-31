@@ -13,6 +13,7 @@ jobs:
   dependency-submission:
     name: Submit Dependency Graph
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
