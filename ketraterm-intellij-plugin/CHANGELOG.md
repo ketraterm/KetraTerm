@@ -1,6 +1,6 @@
 # KetraTerm IntelliJ Plugin Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-10-31
 
 - Applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and status in tooltips and the selected tool-window title. Progress works independently of title permission, with no progress setting.
 - Added optional notifications when long-running commands finish in an unfocused terminal.
