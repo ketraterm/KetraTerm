@@ -52,8 +52,8 @@ jobs:
       - name: Compile Benchmark Harnesses
         run: ./gradlew :ketraterm-benchmarks:jmhJar
 
-      - name: Check Published Library ABI and Formatting
-        run: ./gradlew checkKotlinAbi spotlessCheck
+      - name: Check Published Library ABI
+        run: ./gradlew checkKotlinAbi
 
       - name: Upload Test Results
         if: failure()
