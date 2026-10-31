@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,11 +102,30 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.host</a><span class="delimiter">/</span><span class="current">SwingTerminalHostShortcutMap</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Terminal</span><wbr><span>Host</span><wbr><span>Shortcut</span><wbr><span><span>Map</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingTerminalHostShortcutMap</a></div><p class="paragraph">Immutable mapping from host-owned terminal actions to Swing shortcuts.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingTerminalHostShortcutMap</a></div><p class="paragraph">Immutable mapping from host-owned terminal actions to Swing shortcuts.</p><p class="paragraph">Each action has at most one shortcut, and each shortcut belongs to at most one action. Unspecified actions are unbound. Hosts explicitly install bindings using <a href="for-each-shortcut.html">forEachShortcut</a> or dispatch key events using <a href="action-for.html">actionFor</a>.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-780422243%2FConstructors%2F2084009030" anchor-label="SwingTerminalHostShortcutMap" id="-780422243%2FConstructors%2F2084009030" data-filterable-set=":ketraterm-ui-swing-host/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-ui-swing-host/main" data-filterable-set=":ketraterm-ui-swing-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-terminal-host-shortcut-map.html"><span>Swing</span><wbr><span>Terminal</span><wbr><span>Host</span><wbr><span>Shortcut</span><wbr><span><span>Map</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-780422243%2FConstructors%2F2084009030"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">shortcuts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a><span class="token punctuation">, </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Creates a detached snapshot of shortcuts, including an empty map. Subsequent changes to the supplied map do not affect this instance.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div data-togglable="TYPE">
         <h2 class="tableheader">Types</h2>
         <div class="table"><a data-name="923140102%2FClasslikes%2F2084009030" anchor-label="Companion" id="923140102%2FClasslikes%2F2084009030" data-filterable-set=":ketraterm-ui-swing-host/main"></a>
@@ -153,7 +172,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="for-each-shortcut.html"><span class="token function">forEachShortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">consumer<span class="token operator">: </span><span class="token punctuation">(</span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a><span class="token punctuation">, </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Invokes <a href="for-each-shortcut.html">consumer</a> for each configured action shortcut.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="for-each-shortcut.html"><span class="token function">forEachShortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">consumer<span class="token operator">: </span><span class="token punctuation">(</span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a><span class="token punctuation">, </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Invokes <a href="for-each-shortcut.html">consumer</a> once for each configured binding in action enum order. Unbound actions are omitted.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -168,7 +187,37 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="shortcut.html"><span class="token function">shortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">action<span class="token operator">: </span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a></div><div class="brief "><p class="paragraph">Returns the configured shortcut for <a href="shortcut.html">action</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="shortcut.html"><span class="token function">shortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">action<span class="token operator">: </span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns the configured shortcut for <a href="shortcut.html">action</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="880225905%2FFunctions%2F2084009030" anchor-label="withoutShortcut" id="880225905%2FFunctions%2F2084009030" data-filterable-set=":ketraterm-ui-swing-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing-host/main" data-filterable-set=":ketraterm-ui-swing-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="without-shortcut.html"><span>without</span><wbr><span><span>Shortcut</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="880225905%2FFunctions%2F2084009030"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="without-shortcut.html"><span class="token function">withoutShortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">action<span class="token operator">: </span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">SwingTerminalHostShortcutMap</a></div><div class="brief "><p class="paragraph">Returns a map with <a href="without-shortcut.html">action</a> unbound. This instance is unchanged.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-948242650%2FFunctions%2F2084009030" anchor-label="withShortcut" id="-948242650%2FFunctions%2F2084009030" data-filterable-set=":ketraterm-ui-swing-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing-host/main" data-filterable-set=":ketraterm-ui-swing-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="with-shortcut.html"><span>with</span><wbr><span><span>Shortcut</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-948242650%2FFunctions%2F2084009030"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="with-shortcut.html"><span class="token function">withShortcut</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">action<span class="token operator">: </span><a href="../-swing-terminal-host-action/index.html">SwingTerminalHostAction</a><span class="token punctuation">, </span></span><span class="parameter ">shortcut<span class="token operator">: </span><a href="../-swing-terminal-host-shortcut/index.html">SwingTerminalHostShortcut</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">SwingTerminalHostShortcutMap</a></div><div class="brief "><p class="paragraph">Returns a map with <a href="with-shortcut.html">action</a> bound to <a href="with-shortcut.html">shortcut</a>, replacing its previous binding. This instance is unchanged.</p></div></div></div>
                 </div>
               </div>
             </div>

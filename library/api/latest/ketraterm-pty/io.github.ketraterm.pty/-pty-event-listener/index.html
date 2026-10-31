@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-pty</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.pty</a><span class="delimiter">/</span><span class="current">PtyEventListener</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Pty</span><wbr><span>Event</span><wbr><span><span>Listener</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">PtyEventListener</a></div><p class="paragraph">Host callbacks for a running PTY-backed terminal session.</p><p class="paragraph">Implementations should return quickly. Metadata callbacks are delivered from the connector reader thread as parser output is handled, or the caller of a host theme update. Delivery holds the session mutation lock; do not reenter mutation or wait for a UI thread. There is no initial replay. Listener failures are reported through <a href="listener-failed.html">listenerFailed</a>.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">PtyEventListener</a></div><p class="paragraph">Host callbacks for a running PTY-backed terminal session.</p><p class="paragraph">Implementations should return quickly. Metadata callbacks are delivered from the connector reader thread as parser output is handled, or the caller of a host theme update. Delivery holds the session mutation lock; do not reenter mutation or wait for a UI thread. There is no initial replay. Listener failures are reported through <a href="listener-failed.html">listenerFailed</a>. <a href="read-clipboard.html">readClipboard</a> is an asynchronous operation with the separate threading and failure contract documented below.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -139,6 +139,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="bell.html"><span class="token function">bell</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">session<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when BEL is received from the terminal process.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="153979962%2FFunctions%2F-1964973557" anchor-label="columnModeChanged" id="153979962%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="column-mode-changed.html"><span>column</span><wbr><span>Mode</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="153979962%2FFunctions%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="column-mode-changed.html"><span class="token function">columnModeChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">session<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a><span class="token punctuation">, </span></span><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Receives a completed logical column switch with synchronized grid and PTY dimensions. Hosts may schedule a window resize according to their own layout policy. See <a href="../../../ketraterm-host/io.github.ketraterm.host/-host-event-sink/column-mode-changed.html">io.github.ketraterm.host.HostEventSink.columnModeChanged</a>.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -323,17 +338,17 @@
               </div>
             </div>
           </div>
-<a data-name="-284652121%2FFunctions%2F-1964973557" anchor-label="requestColumnMode" id="-284652121%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+<a data-name="-358023111%2FFunctions%2F-1964973557" anchor-label="readClipboard" id="-358023111%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="request-column-mode.html"><span>request</span><wbr><span>Column</span><wbr><span><span>Mode</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-284652121%2FFunctions%2F-1964973557"></span>
+                  <div><a href="read-clipboard.html"><span>read</span><wbr><span><span>Clipboard</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-358023111%2FFunctions%2F-1964973557"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="request-column-mode.html"><span class="token function">requestColumnMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">session<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a><span class="token punctuation">, </span></span><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Accepts a DECCOLM grid change before terminal/transport mutation. Defaults to rejection. See <a href="../../../ketraterm-host/io.github.ketraterm.host/-host-event-sink/request-column-mode.html">io.github.ketraterm.host.HostEventSink.requestColumnMode</a> for the synchronous, nonblocking host acceptance contract.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="read-clipboard.html"><span class="token function">readClipboard</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">session<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a><span class="token punctuation">, </span></span><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-terminal-clipboard-read-request/index.html">TerminalClipboardReadRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-clipboard-read-result/index.html">TerminalClipboardReadResult</a></div><div class="brief "><p class="paragraph">Resolves a clipboard read for the requesting <a href="read-clipboard.html">session</a>.</p></div></div></div>
                 </div>
               </div>
             </div>

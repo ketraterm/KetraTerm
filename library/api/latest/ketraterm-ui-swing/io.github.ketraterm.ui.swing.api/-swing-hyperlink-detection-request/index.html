@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,14 +102,93 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.api</a><span class="delimiter">/</span><span class="current">SwingHyperlinkDetectionRequest</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Detection</span><wbr><span><span>Request</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingHyperlinkDetectionRequest</a></div><p class="paragraph">Immutable visible terminal text snapshot passed to <a href="../-swing-hyperlink-detector/index.html">SwingHyperlinkDetector</a>.</p><p class="paragraph">Lines are logical terminal lines: soft-wrapped render rows are joined, and a line separator is appended to each line to match IntelliJ-style console filter contracts. Offsets returned by <a href="line-start-offset.html">lineStartOffset</a> and <a href="line-end-offset.html">lineEndOffset</a> are cumulative UTF-16 offsets across the supplied lines in this request; they are not offsets in the terminal's complete output.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingHyperlinkDetectionRequest</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineTexts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">firstAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">lastAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>context<span class="token operator">: </span><a href="../-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a><span class="token operator"> = </span>SwingHyperlinkDetectionContext.INDEPENDENT_LINE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bindingEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>sourceEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>providerEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>analysisEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>firstRetainedRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">firstLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows</span></span><span class="token punctuation">)</span></div><p class="paragraph">Owned immutable logical text and absolute row anchors for one discovery batch.</p><p class="paragraph">Soft-wrapped physical rows form a logical line, with one appended newline. UTF-16 offsets are local to each logical line, while absolute row anchors survive append/eviction within a source epoch. The arrays/list are defensively copied. Empty requests are valid. Binding epochs separate resets/rebindings; source epochs separate replacement, reflow and buffer changes; provider epochs separate configuration/instance changes.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="661796547%2FConstructors%2F848369053" anchor-label="SwingHyperlinkDetectionRequest" id="661796547%2FConstructors%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-detection-request.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Detection</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="661796547%2FConstructors%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineTexts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">firstAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">lastAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows<span class="token punctuation">, </span></span><span class="parameter ">context<span class="token operator">: </span><a href="../-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a><span class="token operator"> = </span>SwingHyperlinkDetectionContext.INDEPENDENT_LINE<span class="token punctuation">, </span></span><span class="parameter ">bindingEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">sourceEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">providerEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">analysisEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">firstRetainedRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">firstLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="911821884%2FProperties%2F848369053" anchor-label="lineCount" id="911821884%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-1684677142%2FProperties%2F848369053" anchor-label="analysisEpoch" id="-1684677142%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="analysis-epoch.html"><span>analysis</span><wbr><span><span>Epoch</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1684677142%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="analysis-epoch.html">analysisEpoch</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Changes when earlier content requires ordered state reconstruction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1843804321%2FProperties%2F848369053" anchor-label="bindingEpoch" id="-1843804321%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="binding-epoch.html"><span>binding</span><wbr><span><span>Epoch</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1843804321%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="binding-epoch.html">bindingEpoch</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1223319288%2FProperties%2F848369053" anchor-label="context" id="-1223319288%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="context.html"><span><span>context</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1223319288%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="context.html">context</a><span class="token operator">: </span><a href="../-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2106647965%2FProperties%2F848369053" anchor-label="firstRetainedRow" id="2106647965%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="first-retained-row.html"><span>first</span><wbr><span>Retained</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2106647965%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="first-retained-row.html">firstRetainedRow</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Absolute retained boundary; eviction alone does not restart ordered provider state.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="911821884%2FProperties%2F848369053" anchor-label="lineCount" id="911821884%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -119,7 +198,37 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="line-count.html">lineCount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Number of logical lines in this visible snapshot.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="line-count.html">lineCount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Number of logical lines in this batch.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1766924737%2FProperties%2F848369053" anchor-label="providerEpoch" id="-1766924737%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="provider-epoch.html"><span>provider</span><wbr><span><span>Epoch</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1766924737%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="provider-epoch.html">providerEpoch</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1626405225%2FProperties%2F848369053" anchor-label="sourceEpoch" id="1626405225%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="source-epoch.html"><span>source</span><wbr><span><span>Epoch</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1626405225%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="source-epoch.html">sourceEpoch</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
                 </div>
               </div>
             </div>
@@ -128,32 +237,62 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="258771771%2FFunctions%2F848369053" anchor-label="lineEndOffset" id="258771771%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-504599026%2FFunctions%2F848369053" anchor-label="hyperlink" id="-504599026%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="line-end-offset.html"><span>line</span><wbr><span>End</span><wbr><span><span>Offset</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="258771771%2FFunctions%2F848369053"></span>
+                  <div><a href="hyperlink.html"><span><span>hyperlink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-504599026%2FFunctions%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-end-offset.html"><span class="token function">lineEndOffset</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the cumulative UTF-16 end offset for logical line <a href="line-end-offset.html">index</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="hyperlink.html"><span class="token function">hyperlink</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineIndex<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">startOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">endOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">action<span class="token operator">: </span><a href="../-swing-hyperlink-action/index.html">SwingHyperlinkAction</a><span class="token punctuation">, </span></span><span class="parameter ">validationStartOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">validationEndOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>Int.MAX_VALUE<span class="token punctuation">, </span></span><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">presentation<span class="token operator">: </span><a href="../-swing-hyperlink-presentation/index.html">SwingHyperlinkPresentation</a><span class="token operator"> = </span>SwingHyperlinkPresentation.DEFAULT<span class="token punctuation">, </span></span><span class="parameter ">activation<span class="token operator">: </span><a href="../-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a><span class="token operator"> = </span>SwingHyperlinkActivation.MODIFIER</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-swing-hyperlink/index.html">SwingHyperlink</a></div><div class="brief "><p class="paragraph">Builds a single-line occurrence with a conservative context dependency. Explicit validation bounds must contain the highlight and its delimiters. Ordered defaults depend on the whole supplied batch; specify a narrower dependency only when the action is genuinely independent of surrounding text. The retained owner validates source/validation offsets against its snapshots.</p></div></div></div>
                 </div>
               </div>
             </div>
           </div>
-<a data-name="171761684%2FFunctions%2F848369053" anchor-label="lineStartOffset" id="171761684%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+<a data-name="700657210%2FFunctions%2F848369053" anchor-label="lineFirstAbsoluteRow" id="700657210%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="line-start-offset.html"><span>line</span><wbr><span>Start</span><wbr><span><span>Offset</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="171761684%2FFunctions%2F848369053"></span>
+                  <div><a href="line-first-absolute-row.html"><span>line</span><wbr><span>First</span><wbr><span>Absolute</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="700657210%2FFunctions%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-start-offset.html"><span class="token function">lineStartOffset</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the cumulative UTF-16 start offset for logical line <a href="line-start-offset.html">index</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-first-absolute-row.html"><span class="token function">lineFirstAbsoluteRow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">First physical row of the logical line, in this source epoch's absolute coordinates.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1429034242%2FFunctions%2F848369053" anchor-label="lineFirstId" id="-1429034242%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-first-id.html"><span>line</span><wbr><span>First</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1429034242%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-first-id.html"><span class="token function">lineFirstId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Stable source line identity for host-owned historical output metadata.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1520450244%2FFunctions%2F848369053" anchor-label="lineLastAbsoluteRow" id="-1520450244%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-last-absolute-row.html"><span>line</span><wbr><span>Last</span><wbr><span>Absolute</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1520450244%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-last-absolute-row.html"><span class="token function">lineLastAbsoluteRow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Last physical row of that same logical line, inclusive.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -168,7 +307,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-text.html"><span class="token function">lineText</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Returns the logical line text at <a href="line-text.html">index</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="line-text.html"><span class="token function">lineText</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Logical text, including the trailing newline.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1017411675%2FFunctions%2F848369053" anchor-label="range" id="-1017411675%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="range.html"><span><span>range</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1017411675%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="range.html"><span class="token function">range</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">startLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">startOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">endLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">endOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-swing-hyperlink-text-range/index.html">SwingHyperlinkTextRange</a></div><div class="brief "><p class="paragraph">Builds an absolute range from line-local UTF-16 offsets.</p></div></div></div>
                 </div>
               </div>
             </div>

@@ -40,7 +40,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../index.html" aria-label="KetraTerm Library home"><img src="../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -96,7 +96,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-completion</code> module defines the dependency-free command-line completion engine foundation shared by standalone and IDE hosts.</p>
+              <p class="paragraph">This module owns command-line tokenization, semantic context resolution, structured source evaluation, deterministic ranking, and bounded in-memory learning. It depends on Kotlin coroutines and has no terminal-module dependencies; source evaluation does not require a terminal session or UI. The README.md supplies the consumer entry point.</p>
             </span></div>
         </div>
       </div>
@@ -109,20 +109,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">This module provides host-neutral suspending local-filesystem support shared by standalone and IDE products. It owns local-file URI resolution, direct-directory scanner contracts, deterministic entry projection, and bounded interruptible NIO scanning while keeping command parsing, source scheduling, ranking, jobs, and caches out of the module.</p>
-            </span></div>
-        </div>
-      </div>
-<a data-name="-1710628849%2FMain%2F0" anchor-label="ketraterm-completion-persistence" id="-1710628849%2FMain%2F0" data-filterable-set=""></a>
-      <div class="table-row table-row_multimodule">
-        <div class="main-subrow ">
-          <div class="w-100"><span class="inline-flex">
-              <div><a href="ketraterm-completion-persistence/index.html">ketraterm-completion-persistence</a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1710628849%2FMain%2F0"></span>
-                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-              </span></span></div>
-          <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-completion-persistence</code> module provides optional local-file storage for compact exact-command completion-learning snapshots. Version 3 stores opaque ranking counters separately from optional positive plaintext replay rows. The file boundary rechecks replay eligibility, enforces byte/line/row bounds, uses a strict versioned codec, and replaces files atomically when supported.</p>
+              <p class="paragraph">Local filesystem support for host-composed completion sources. The package <code class="lang-kotlin">io.github.ketraterm.completion.host</code> contains:</p>
             </span></div>
         </div>
       </div>
@@ -135,7 +122,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-core</code> module is a high-performance, headless terminal grid engine. It implements the headless screen-state engine, coordinates all spatial grid mutations, manages cursor physics, scrollback margins, and controls alternate/primary screen switches.</p>
+              <p class="paragraph">The headless state engine. Semantic writer, cursor, and mode operations mutate primary or alternate screen state; readers expose that state through public core roles and primitive render frames.</p>
             </span></div>
         </div>
       </div>
@@ -148,7 +135,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-host</code> module serves as the production bridge and adapter layer between the byte-stream parser (<code class="lang-kotlin">ketraterm-parser</code>) and the headless state machine/grid engine (<code class="lang-kotlin">ketraterm-core</code>).</p>
+              <p class="paragraph">Parser-to-core command mapping and host-control policy for the terminal pipeline. The public package is <code class="lang-kotlin">io.github.ketraterm.host</code>.</p>
             </span></div>
         </div>
       </div>
@@ -161,7 +148,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-input</code> module is the platform-agnostic, host-bound input encoding engine for <strong>KetraTerm Terminal</strong>. It converts UI-level, platform-neutral events—such as keyboard presses, text paste, window focus transitions, and mouse pointer actions—into standardized ANSI/DEC/xterm byte sequences written to the terminal host's input stream.</p>
+              <p class="paragraph">Host-bound encoding for platform-neutral input events. The public facade reads core input modes and writes through <code class="lang-kotlin">TerminalHostOutput</code>; the module neither parses terminal output nor owns a connector.</p>
             </span></div>
         </div>
       </div>
@@ -174,7 +161,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-parser</code> module is a high-performance, strictly bounded, and allocation-conscious parser that transforms raw terminal host byte streams (from a PTY, SSH, or network socket) into semantic terminal command invocations.</p>
+              <p class="paragraph">Converts ordered terminal host bytes into semantic commands. The public entry points are io.github.ketraterm.parser.api.TerminalParsers and io.github.ketraterm.parser.api.TerminalOutputParser; the destination is io.github.ketraterm.parser.spi.TerminalCommandSink. This module depends only on <code class="lang-kotlin">ketraterm-protocol</code>.</p>
             </span></div>
         </div>
       </div>
@@ -187,7 +174,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-protocol</code> module represents the zero-dependency, immutable core vocabulary of the <strong>KetraTerm Terminal</strong> pipeline. It defines the fundamental, standard-aligned constants, enumerations, and interfaces shared by all terminal components.</p>
+              <p class="paragraph">Shared protocol vocabulary. Its only production dependency is the Kotlin standard library. The module contains identifiers, semantic values, small validation helpers, and a host-bound byte sink; parsing and terminal behavior remain in their owning layers.</p>
             </span></div>
         </div>
       </div>
@@ -200,7 +187,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-pty</code> module owns the lifecycle management, process stream pumping, and terminal size synchronizations of local, host-backed pseudo-terminal (PTY) processes.</p>
+              <p class="paragraph">Local PTY process and connector lifecycle, with convenience construction of the shared session runtime. Public APIs live in <code class="lang-kotlin">io.github.ketraterm.pty</code>; the README.md covers host assembly.</p>
             </span></div>
         </div>
       </div>
@@ -213,7 +200,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-render-api</code> module defines the strictly bounded, dependency-free public render contract and vocabulary shared across the terminal pipeline. It acts as the immutable, allocation-conscious bridge between stateful terminal state providers, frame caches, and UI rendering modules.</p>
+              <p class="paragraph">Primitive renderer-facing contracts in <code class="lang-kotlin">io.github.ketraterm.render.api</code>. Its only production dependency is the Kotlin standard library.</p>
             </span></div>
         </div>
       </div>
@@ -226,7 +213,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-render-cache</code> module provides a high-performance, renderer-side double and triple-buffering publication system for <strong>KetraTerm Terminal</strong>. It consumes short-lived render frames exposed by <code class="lang-kotlin">:ketraterm-render-api</code> and stores flat, primitive-packed, allocation-free snapshotted layouts.</p>
+              <p class="paragraph">Renderer-owned primitive storage and leased publication of copied terminal frames. Its sole production dependency is <code class="lang-kotlin">ketraterm-render-api</code>; synchronization with terminal mutation belongs to the source reader.</p>
             </span></div>
         </div>
       </div>
@@ -239,20 +226,20 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph"><code class="lang-kotlin">ketraterm-session</code> is the runtime synchronization boundary between transport, parser, core, input encoding, and render publication.</p>
+              <p class="paragraph">The runtime boundary joining transport, parser, core, host mapping, input encoding, and render publication. Public contracts live in <code class="lang-kotlin">io.github.ketraterm.session</code>; the README.md covers consumer assembly.</p>
             </span></div>
         </div>
       </div>
-<a data-name="-2133437727%2FMain%2F0" anchor-label="ketraterm-testkit" id="-2133437727%2FMain%2F0" data-filterable-set=""></a>
+<a data-name="-134734706%2FMain%2F0" anchor-label="ketraterm-shell-integration" id="-134734706%2FMain%2F0" data-filterable-set=""></a>
       <div class="table-row table-row_multimodule">
         <div class="main-subrow ">
           <div class="w-100"><span class="inline-flex">
-              <div><a href="ketraterm-testkit/index.html">ketraterm-testkit</a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2133437727%2FMain%2F0"></span>
+              <div><a href="ketraterm-shell-integration/index.html">ketraterm-shell-integration</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-134734706%2FMain%2F0"></span>
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-testkit</code> module is the dedicated test double and mock harness module for KetraTerm Terminal. It provides in-memory connectors and lifecycle simulation tools for testing terminal runtimes, transport layers, and host-bound input/output loops without spinning up physical shells, PTYs, or socket connections.</p>
+              <p class="paragraph">Optional OSC-based producer for the shell metadata contracts in <code class="lang-kotlin">ketraterm-session</code>. The public package <code class="lang-kotlin">io.github.ketraterm.shell.integration</code> exposes <code class="lang-kotlin">OscShellIntegration</code> and its configuration factory. Session, PTY, and Swing do not depend on this module.</p>
             </span></div>
         </div>
       </div>
@@ -265,7 +252,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-transport-api</code> module defines the transport-neutral, highly performant connection contracts between terminal runtimes and host byte-streams.</p>
+              <p class="paragraph">Transport-neutral byte-stream contracts. The only production dependency is the Kotlin standard library. The package <code class="lang-kotlin">io.github.ketraterm.transport</code> contains <code class="lang-kotlin">TerminalConnector</code>, <code class="lang-kotlin">TerminalConnectorListener</code>, and byte-range validation.</p>
             </span></div>
         </div>
       </div>
@@ -278,7 +265,7 @@
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">A reusable, premium-tier Swing terminal component built in Kotlin/JVM 25.</p>
+              <p class="paragraph">Reusable Swing rendering and interaction for a host-owned <code class="lang-kotlin">TerminalSession</code>. The public component is <code class="lang-kotlin">io.github.ketraterm.ui.swing.api.SwingTerminal</code>. See the README.md#how-to-use for construction and lifecycle.</p>
             </span></div>
         </div>
       </div>
@@ -290,19 +277,8 @@
 <span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-497322379%2FMain%2F0"></span>
                 <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
               </span></span></div>
-          <div><span class="brief-comment"></span></div>
-        </div>
-      </div>
-<a data-name="-10512528%2FMain%2F0" anchor-label="ketraterm-workspace" id="-10512528%2FMain%2F0" data-filterable-set=""></a>
-      <div class="table-row table-row_multimodule">
-        <div class="main-subrow ">
-          <div class="w-100"><span class="inline-flex">
-              <div><a href="ketraterm-workspace/index.html">ketraterm-workspace</a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-10512528%2FMain%2F0"></span>
-                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-              </span></span></div>
           <div><span class="brief-comment">
-              <p class="paragraph">The <code class="lang-kotlin">ketraterm-workspace</code> module provides a host-neutral session and tab manager for <strong>KetraTerm Terminal</strong>. It coordinates multiple active terminal sessions (tabs) under a unified workspace lifecycle, maps configurations onto file-based profiles, and implements standard TOML-backed settings persistence.</p>
+              <p class="paragraph">Optional host-facing Swing helpers in <code class="lang-kotlin">io.github.ketraterm.ui.swing.host</code>. The source module's <code class="lang-kotlin">README.md</code> describes consumer wiring and lifecycle.</p>
             </span></div>
         </div>
       </div>

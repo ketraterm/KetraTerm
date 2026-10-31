@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,39 +102,54 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.api</a><span class="delimiter">/</span><span class="current">SwingHyperlinkDetectionContext</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Detection</span><wbr><span><span>Context</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="index.html">SwingHyperlinkDetectionContext</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="index.html">SwingHyperlinkDetectionContext</a><span class="token operator">&gt; </span></div><p class="paragraph">Text dependency used to schedule detection and validate cached results.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="index.html">SwingHyperlinkDetectionContext</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="index.html">SwingHyperlinkDetectionContext</a><span class="token operator">&gt; </span></div><p class="paragraph">Text dependency and ordering required by a detector.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button><button class="section-tab" data-togglable="ENTRY">Entries</button></div>
     <div class="tabs-section-body">
       <div data-togglable="ENTRY">
         <h2 class="tableheader">Entries</h2>
-        <div class="table"><a data-name="-1501326761%2FClasslikes%2F848369053" anchor-label="LOGICAL_LINE" id="-1501326761%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-1719158586%2FClasslikes%2F848369053" anchor-label="INDEPENDENT_LINE" id="-1719158586%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="-l-o-g-i-c-a-l_-l-i-n-e/index.html">LOGICAL_LINE</a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1501326761%2FClasslikes%2F848369053"></span>
+                  <div><a href="-i-n-d-e-p-e-n-d-e-n-t_-l-i-n-e/index.html">INDEPENDENT_LINE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1719158586%2FClasslikes%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><a href="-l-o-g-i-c-a-l_-l-i-n-e/index.html">LOGICAL_LINE</a></div></div><div class="brief "><p class="paragraph">Each logical line is independent. Requests may contain only changed lines; results must not depend on neighboring lines or request positions.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><a href="-i-n-d-e-p-e-n-d-e-n-t_-l-i-n-e/index.html">INDEPENDENT_LINE</a></div></div><div class="brief "><p class="paragraph">Each logical line is independent; requests may omit unchanged lines.</p></div></div></div>
                 </div>
               </div>
             </div>
           </div>
-<a data-name="-1907387405%2FClasslikes%2F848369053" anchor-label="VIEWPORT" id="-1907387405%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+<a data-name="-816615582%2FClasslikes%2F848369053" anchor-label="ORDERED_CONTENT" id="-816615582%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="-v-i-e-w-p-o-r-t/index.html">VIEWPORT</a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1907387405%2FClasslikes%2F848369053"></span>
+                  <div><a href="-o-r-d-e-r-e-d_-c-o-n-t-e-n-t/index.html">ORDERED_CONTENT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-816615582%2FClasslikes%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><a href="-v-i-e-w-p-o-r-t/index.html">VIEWPORT</a></div></div><div class="brief "><p class="paragraph">Detection requires every visible logical line in viewport order. Results depend on that complete text and order unless they declare an explicit validation range through <a href="../-swing-hyperlink-detection-sink/add-hyperlink.html">SwingHyperlinkDetectionSink.addHyperlink</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><a href="-o-r-d-e-r-e-d_-c-o-n-t-e-n-t/index.html">ORDERED_CONTENT</a></div></div><div class="brief "><p class="paragraph">Logical lines are consumed in source order. Results may reference earlier source lines. Continuation/replay is owned by the binding's discovery owner; an epoch change requires fresh state, not continuation of an interrupted call.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1058219877%2FClasslikes%2F848369053" anchor-label="INDEPENDENT_AND_ORDERED" id="-1058219877%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-i-n-d-e-p-e-n-d-e-n-t_-a-n-d_-o-r-d-e-r-e-d/index.html">INDEPENDENT_AND_ORDERED</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1058219877%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><a href="-i-n-d-e-p-e-n-d-e-n-t_-a-n-d_-o-r-d-e-r-e-d/index.html">INDEPENDENT_AND_ORDERED</a></div></div><div class="brief "><p class="paragraph">Separate independently scheduled requests for text-derived and ordered provider results.</p></div></div></div>
                 </div>
               </div>
             </div>

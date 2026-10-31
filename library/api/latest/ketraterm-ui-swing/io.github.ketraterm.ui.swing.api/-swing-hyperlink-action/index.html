@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.api</a><span class="delimiter">/</span><span class="current">SwingHyperlinkAction</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span><span>Action</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="index.html">SwingHyperlinkAction</a></div><p class="paragraph">Host-owned action for a hyperlink discovered from visible terminal text.</p><p class="paragraph">Reusable Swing UI stores only compact primitive ids in its paint and hit-test paths. The host action is invoked only after explicit user activation, such as Ctrl-left-click, and may route to an IDE, browser, file opener, or a security prompt.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="index.html">SwingHyperlinkAction</a></div><p class="paragraph">Host-owned navigation and optional hover behavior for a discovered hyperlink.</p><p class="paragraph">Actions belong to retained occurrences independently of the viewport. Swing UI invokes activation and hover callbacks on the EDT, never during painting. <a href="open.html">open</a> follows the occurrence's <a href="../-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a> policy or an explicit context-menu request and may navigate through an IDE, browser, or file opener.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -128,17 +128,47 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="778501509%2FFunctions%2F848369053" anchor-label="open" id="778501509%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-985973246%2FFunctions%2F848369053" anchor-label="mouseEntered" id="-985973246%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="open.html"><span><span>open</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="778501509%2FFunctions%2F848369053"></span>
+                  <div><a href="mouse-entered.html"><span>mouse</span><wbr><span><span>Entered</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-985973246%2FFunctions%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="open.html"><span class="token function">open</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Opens the hyperlink target.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="mouse-entered.html"><span class="token function">mouseEntered</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">component<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html">JComponent</a><span class="token punctuation">, </span></span><span class="parameter ">x<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">y<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">width<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">height<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Optional provider hover callback. Bounds are component-local; invoked on entry, never in paint.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1545815639%2FFunctions%2F848369053" anchor-label="mouseExited" id="-1545815639%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="mouse-exited.html"><span>mouse</span><wbr><span><span>Exited</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1545815639%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="mouse-exited.html"><span class="token function">mouseExited</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Balances an entry when the pointer leaves, the occurrence changes, or the binding closes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="964130193%2FFunctions%2F848369053" anchor-label="open" id="964130193%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="open.html"><span><span>open</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="964130193%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="open.html"><span class="token function">open</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Opens the hyperlink target.</p></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="open.html"><span class="token function">open</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/event/MouseEvent.html">MouseEvent</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Opens from a captured gesture, preserving a host navigation popup's anchor.</p></div></div></div>
                 </div>
               </div>
             </div>

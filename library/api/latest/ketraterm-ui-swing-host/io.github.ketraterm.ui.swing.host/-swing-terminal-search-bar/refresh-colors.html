@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span>refresh</span><wbr><span><span>Colors</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="refresh-colors.html"><span class="token function">refreshColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Refreshes host colors from the terminal component.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="refresh-colors.html"><span class="token function">refreshColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Reapplies the last supplied colors. Off-EDT calls enqueue work on the EDT.</p><hr><div class="symbol monospace"><span class="token keyword">fun </span><a href="refresh-colors.html"><span class="token function">refreshColors</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">colors<span class="token operator">: </span><a href="../-swing-terminal-search-colors/index.html">SwingTerminalSearchColors</a></span></span><span class="token punctuation">)</span></div><p class="paragraph">Applies one prepared host palette without changing the query, visibility or search. Off-EDT calls enqueue work on the EDT; EDT calls apply immediately and repaint. The snapshot is retained until replaced, including across close/open cycles.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

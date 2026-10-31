@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span><span>state</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="state.html">state</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/StateFlow///PointingToDeclaration/">StateFlow</span><span class="token operator">&lt;</span><a href="../-terminal-session-state/index.html">TerminalSessionState</a><span class="token operator">&gt;</span></div><p class="paragraph">Lifecycle state retained for current and future collectors.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="state.html">state</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/StateFlow///PointingToDeclaration/">StateFlow</span><span class="token operator">&lt;</span><a href="../-terminal-session-state/index.html">TerminalSessionState</a><span class="token operator">&gt;</span></div><p class="paragraph">Lifecycle state retained for current and future collectors. Closed is published after cleanup and the final frame publication attempt, so a successful final frame is available to both early and late observers.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

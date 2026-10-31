@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -109,7 +109,22 @@
     <div class="tabs-section-body">
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="-86227552%2FFunctions%2F-1402815689" anchor-label="enterAltBuffer" id="-86227552%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+        <div class="table"><a data-name="-1838267789%2FFunctions%2F-1402815689" anchor-label="applyColorRequest" id="-1838267789%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="apply-color-request.html"><span>apply</span><wbr><span>Color</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1838267789%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="apply-color-request.html"><span class="token function">applyColorRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-color-request/index.html">TerminalColorRequest</a><span class="token punctuation">, </span></span><span class="parameter ">allowResponses<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies borrowed OSC 21 color operations in order, without retaining <a href="apply-color-request.html">request</a>. Queries observe preceding operations and share one response in request order. Resets restore the latest theme; dynamic selection and cursor roles retain their dynamic behavior until changed or reset. Application changes do not emit color-scheme notifications.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-86227552%2FFunctions%2F-1402815689" anchor-label="enterAltBuffer" id="-86227552%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -169,6 +184,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1747203288%2FFunctions%2F-1402815689" anchor-label="popColors" id="-1747203288%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pop-colors.html"><span>pop</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1747203288%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-colors.html"><span class="token function">popColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores and removes the most recently saved colors; an empty stack has no effect. The latest host theme remains the source for color resets. Host light/dark preference and bold-as-bright behavior are preserved. An effective change invalidates visible rows without emitting a color-scheme notification; unchanged colors preserve palette identity and render generations.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-947824431%2FFunctions%2F-1402815689" anchor-label="popKittyKeyboardFlags" id="-947824431%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
@@ -179,7 +209,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-kitty-keyboard-flags.html"><span class="token function">popKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pops the Kitty keyboard flags from the stack up to <a href="pop-kitty-keyboard-flags.html">count</a> times.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-kitty-keyboard-flags.html"><span class="token function">popKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pops up to <a href="pop-kitty-keyboard-flags.html">count</a> entries from the active screen's Kitty keyboard stack. A positive count that empties the stack (or finds it empty) resets all flags to zero. Otherwise, restores the last popped flags. Work is independent of <a href="pop-kitty-keyboard-flags.html">count</a>; nonpositive counts leave flags and stack unchanged.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="981961703%2FFunctions%2F-1402815689" anchor-label="pushColors" id="981961703%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="push-colors.html"><span>push</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="981961703%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-colors.html"><span class="token function">pushColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Saves effective indexed and named colors, including dynamic presentation, on a terminal-wide stack of ten entries. A full stack discards its oldest entry. Screen switches, resize, and theme changes preserve saved colors; hard and soft terminal resets clear the stack. Saving does not repaint.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -194,7 +239,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-kitty-keyboard-flags.html"><span class="token function">pushKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pushes the current Kitty keyboard progressive-enhancement flags to the stack, and sets the new active flags.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-kitty-keyboard-flags.html"><span class="token function">pushKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pushes the current Kitty keyboard progressive-enhancement flags to the stack, and sets the new active flags. Each screen retains at most 32 entries, evicting the oldest when full.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -210,6 +255,111 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-cursor-style.html"><span class="token function">resetCursorStyle</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores the configured default shape and enables cursor blinking.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1783202644%2FFunctions%2F-1402815689" anchor-label="resetDynamicColor" id="1783202644%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-dynamic-color.html"><span>reset</span><wbr><span>Dynamic</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1783202644%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-dynamic-color.html"><span class="token function">resetDynamicColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">target<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores one dynamic color from the latest host-configured theme. Other application overrides are preserved; unsupported targets are ignored.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="969866675%2FFunctions%2F-1402815689" anchor-label="resetKeyFormatOption" id="969866675%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-format-option.html"><span>reset</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="969866675%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-format-option.html"><span class="token function">resetKeyFormatOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores one format resource to 0; unknown resources are ignored.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="221923090%2FFunctions%2F-1402815689" anchor-label="resetKeyFormatOptions" id="221923090%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-format-options.html"><span>reset</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Options</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="221923090%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-format-options.html"><span class="token function">resetKeyFormatOptions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores all xterm format resources atomically, preserving modifier resources.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1010473517%2FFunctions%2F-1402815689" anchor-label="resetKeyModifierOption" id="-1010473517%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-modifier-option.html"><span>reset</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1010473517%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-modifier-option.html"><span class="token function">resetKeyModifierOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores one modifier resource's initial value; unknown resources are ignored.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1619540722%2FFunctions%2F-1402815689" anchor-label="resetKeyModifierOptions" id="1619540722%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-modifier-options.html"><span>reset</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Options</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1619540722%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-modifier-options.html"><span class="token function">resetKeyModifierOptions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores all xterm modifier resources atomically, preserving format resources.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1734252167%2FFunctions%2F-1402815689" anchor-label="resetPaletteColors" id="1734252167%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-palette-colors.html"><span>reset</span><wbr><span>Palette</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1734252167%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-palette-colors.html"><span class="token function">resetPaletteColors</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">indices<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>indices.size</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores indexed colors from the latest host-configured theme in one update.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1825231150%2FFunctions%2F-1402815689" anchor-label="setAlternateScrollEnabled" id="-1825231150%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-alternate-scroll-enabled.html"><span>set</span><wbr><span>Alternate</span><wbr><span>Scroll</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1825231150%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-alternate-scroll-enabled.html"><span class="token function">setAlternateScrollEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets alternate-screen wheel scrolling (DEC private mode 1007). Enabled by default; host policy may suppress wheel-to-key translation. Preserves pending wrap and survives screen switches, resize, and DECSTR.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -300,6 +450,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-bracketed-paste-enabled.html"><span class="token function">setBracketedPasteEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enables or disables bracketed paste reporting (<code class="lang-kotlin">CSI ? 2004 h</code> / <code class="lang-kotlin">CSI ? 2004 l</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="442890429%2FFunctions%2F-1402815689" anchor-label="setColorSchemeReportingEnabled" id="442890429%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-color-scheme-reporting-enabled.html"><span>set</span><wbr><span>Color</span><wbr><span>Scheme</span><wbr><span>Reporting</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="442890429%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-color-scheme-reporting-enabled.html"><span class="token function">setColorSchemeReportingEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Subscribes to host color-scheme changes (DECSET/DECRST <code class="lang-kotlin">?2031</code>).</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -409,6 +574,21 @@
               </div>
             </div>
           </div>
+<a data-name="1206927147%2FFunctions%2F-1402815689" anchor-label="setInBandResizeReportingEnabled" id="1206927147%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-in-band-resize-reporting-enabled.html"><span>set</span><wbr><span>In</span><wbr><span>Band</span><wbr><span>Resize</span><wbr><span>Reporting</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1206927147%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-in-band-resize-reporting-enabled.html"><span class="token function">setInBandResizeReportingEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Subscribes to text-area resize reports (DECSET/DECRST <code class="lang-kotlin">?2048</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1459638512%2FFunctions%2F-1402815689" anchor-label="setInsertMode" id="1459638512%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
@@ -420,6 +600,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-insert-mode.html"><span class="token function">setInsertMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enables or disables Insert Replace Mode (IRM, <code class="lang-kotlin">CSI 4 h</code> / <code class="lang-kotlin">CSI 4 l</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-287369577%2FFunctions%2F-1402815689" anchor-label="setKeyFormatOption" id="-287369577%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-key-format-option.html"><span>set</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-287369577%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-key-format-option.html"><span class="token function">setKeyFormatOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Selects format 0 (CSI 27) or 1 (CSI u) for one xterm resource. Resource 0 is independent storage, as in xterm; it does not override per-class formats.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1851630793%2FFunctions%2F-1402815689" anchor-label="setKeyModifierOption" id="-1851630793%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-key-modifier-option.html"><span>set</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1851630793%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-key-modifier-option.html"><span class="token function">setKeyModifierOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets one xterm modifier resource. Resource 0 retains the legacy-profile admission mask; the current PC profile always permits modifiers. Values are -1 (disable), 0..3 for ordinary keys, 0..15 for resource 0, and 0..4 for other key classes.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -570,6 +780,51 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-reverse-video.html"><span class="token function">setReverseVideo</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Toggles reverse-video presentation state (DECSCNM, <code class="lang-kotlin">CSI ? 5 h</code> / <code class="lang-kotlin">CSI ? 5 l</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1368757876%2FFunctions%2F-1402815689" anchor-label="setReverseWrap" id="-1368757876%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-reverse-wrap.html"><span>set</span><wbr><span>Reverse</span><wbr><span><span>Wrap</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1368757876%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-reverse-wrap.html"><span class="token function">setReverseWrap</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enables reverse wrap across soft-wrapped rows (DEC private mode 45). Requires auto-wrap. Stops at hard line breaks and the top margin. Changing this mode preserves the cursor and pending wrap.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-506246125%2FFunctions%2F-1402815689" anchor-label="setReverseWrapExtended" id="-506246125%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-reverse-wrap-extended.html"><span>set</span><wbr><span>Reverse</span><wbr><span>Wrap</span><wbr><span><span>Extended</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-506246125%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-reverse-wrap-extended.html"><span class="token function">setReverseWrapExtended</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enables extended reverse wrap (DEC private mode 1045). Requires auto-wrap and takes precedence over mode 45. Crosses hard line breaks and cycles from the top margin to the bottom margin. Changing this mode preserves the cursor and pending wrap.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-62183442%2FFunctions%2F-1402815689" anchor-label="setShiftMouseCaptureEnabled" id="-62183442%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-shift-mouse-capture-enabled.html"><span>set</span><wbr><span>Shift</span><wbr><span>Mouse</span><wbr><span>Capture</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-62183442%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-shift-mouse-capture-enabled.html"><span class="token function">setShiftMouseCaptureEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Requests Shift as a mouse reporting modifier (XTSHIFTESCAPE). Disabled by default so Shift restores local interaction. Hosts may deny reporting. Preserves pending wrap and survives screen switches, resize, and DECSTR.</p></div></div></div>
                 </div>
               </div>
             </div>

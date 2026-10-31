@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span>get</span><wbr><span>Mode</span><wbr><span><span>Snapshot</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-mode-snapshot.html"><span class="token function">getModeSnapshot</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-mode-snapshot/index.html">TerminalModeSnapshot</a></div><p class="paragraph">Returns an immutable snapshot of the current durable mode flags.</p><span class="kdoc-tag"><h4 class="">Return</h4><p class="paragraph">A detached <a href="../-terminal-mode-snapshot/index.html">TerminalModeSnapshot</a> instance containing all active mode state.</p></span></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-mode-snapshot.html"><span class="token function">getModeSnapshot</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-mode-snapshot/index.html">TerminalModeSnapshot</a></div><p class="paragraph">Returns an immutable snapshot of the published <a href="../-terminal-mode-snapshot/index.html">TerminalModeSnapshot</a> fields.</p><p class="paragraph">Additional xterm key resources are read through <a href="../-terminal-input-state/-companion/key-modifier-option.html">TerminalInputState.keyModifierOption</a> and <a href="../-terminal-input-state/-companion/key-format-option.html">TerminalInputState.keyFormatOption</a> from <a href="get-input-mode-bits.html">getInputModeBits</a>.</p><span class="kdoc-tag"><h4 class="">Return</h4><p class="paragraph">A detached <a href="../-terminal-mode-snapshot/index.html">TerminalModeSnapshot</a> of the commonly used mode fields.</p></span></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

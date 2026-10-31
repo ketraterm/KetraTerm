@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,24 +102,24 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-pty</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.pty</a><span class="delimiter">/</span><span class="current">PtyOptions</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Pty</span><wbr><span><span>Options</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">PtyOptions</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>command<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultCommand()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>environment<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultEnvironment()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>workingDirectory<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span><span class="token operator"> = </span>Path.of(System.getProperty("user.home"))<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">80</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">24</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>treatAmbiguousAsWide<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>inputPolicy<span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a><span class="token operator"> = </span>defaultInputPolicy()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxHistory<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>readBufferSize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">8192</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>readerThreadName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">"terminal-pty-reader"</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>watcherThreadName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">"terminal-pty-watcher"</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>eventListener<span class="token operator">: </span><a href="../-pty-event-listener/index.html">PtyEventListener</a><span class="token operator"> = </span>PtyEventListener.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hostPolicy<span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>startupCommand<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-startup-command/index.html">TerminalStartupCommand</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><p class="paragraph">Configuration for starting a local PTY-backed terminal session.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>command</span></span></u></div></span></div><div><div class="title"><p class="paragraph">command and arguments passed to the PTY child process.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>environment</span></span></u></div></span></div><div><div class="title"><p class="paragraph">environment variables for the child process. <code class="lang-kotlin">TERM</code> and <code class="lang-kotlin">COLORTERM</code> default to the shared terminal capability identity when the caller does not provide them.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>working</span><wbr><span><span>Directory</span></span></u></div></span></div><div><div class="title"><p class="paragraph">initial process working directory, or <code class="lang-kotlin">null</code> to let PTY4J use its platform default.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>columns</span></span></u></div></span></div><div><div class="title"><p class="paragraph">initial terminal width in cells.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>rows</span></span></u></div></span></div><div><div class="title"><p class="paragraph">initial terminal height in rows.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>treat</span><wbr><span>Ambiguous</span><wbr><span>As</span><wbr><span><span>Wide</span></span></u></div></span></div><div><div class="title"><p class="paragraph">whether East Asian Ambiguous codepoints occupy two cells in the core width policy for future writes.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>input</span><wbr><span><span>Policy</span></span></u></div></span></div><div><div class="title"><p class="paragraph">host-bound input encoding policy. Local PTY sessions default Return/Enter to CR even when LNM is active, because contemporary PTY line disciplines can otherwise turn DEC CR LF into an extra newline. Unbracketed paste line endings are likewise canonicalized to CR so every pasted boundary has the same input semantics as Enter.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>max</span><wbr><span><span>History</span></span></u></div></span></div><div><div class="title"><p class="paragraph">maximum scrollback lines retained by the core buffer.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>read</span><wbr><span>Buffer</span><wbr><span><span>Size</span></span></u></div></span></div><div><div class="title"><p class="paragraph">buffer size used by the PTY stdout reader thread.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>reader</span><wbr><span>Thread</span><wbr><span><span>Name</span></span></u></div></span></div><div><div class="title"><p class="paragraph">name for the daemon PTY stdout reader thread.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>watcher</span><wbr><span>Thread</span><wbr><span><span>Name</span></span></u></div></span></div><div><div class="title"><p class="paragraph">name for the daemon process exit watcher thread.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>event</span><wbr><span><span>Listener</span></span></u></div></span></div><div><div class="title"><p class="paragraph">host callbacks for parser-discovered PTY metadata events such as BEL and title changes.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Policy</span></span></u></div></span></div><div><div class="title"><p class="paragraph">safety policy for terminal-triggered host actions.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>startup</span><wbr><span><span>Command</span></span></u></div></span></div><div><div class="title"><p class="paragraph">command to submit once the shell emits a complete OSC 133 prompt. The caller is responsible for installing shell integration before launch.</p></div></div></div></div></div></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">PtyOptions</a></div><p class="paragraph">Configuration for starting a local PTY-backed terminal session.</p><p class="paragraph">Use <a href="-companion/create.html">create</a> and <a href="copy.html">copy</a> for named construction and immutable updates. Command and environment collections are defensively copied when built. Callbacks, policies, and shell producers retain their documented host ownership.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="CONSTRUCTOR">
         <h2 class="tableheader">Constructors</h2>
-        <div class="table"><a data-name="1551904093%2FConstructors%2F-1964973557" anchor-label="PtyOptions" id="1551904093%2FConstructors%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+        <div class="table"><a data-name="213106980%2FConstructors%2F-1964973557" anchor-label="PtyOptions" id="213106980%2FConstructors%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
           <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="-pty-options.html"><span>Pty</span><wbr><span><span>Options</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1551904093%2FConstructors%2F-1964973557"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="213106980%2FConstructors%2F-1964973557"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultCommand()<span class="token punctuation">, </span></span><span class="parameter ">environment<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultEnvironment()<span class="token punctuation">, </span></span><span class="parameter ">workingDirectory<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span><span class="token operator"> = </span>Path.of(System.getProperty("user.home"))<span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">80</span><span class="token punctuation">, </span></span><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">24</span><span class="token punctuation">, </span></span><span class="parameter ">treatAmbiguousAsWide<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter ">inputPolicy<span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a><span class="token operator"> = </span>defaultInputPolicy()<span class="token punctuation">, </span></span><span class="parameter ">maxHistory<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span><span class="token punctuation">, </span></span><span class="parameter ">readBufferSize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">8192</span><span class="token punctuation">, </span></span><span class="parameter ">readerThreadName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">"terminal-pty-reader"</span><span class="token punctuation">, </span></span><span class="parameter ">watcherThreadName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">"terminal-pty-watcher"</span><span class="token punctuation">, </span></span><span class="parameter ">eventListener<span class="token operator">: </span><a href="../-pty-event-listener/index.html">PtyEventListener</a><span class="token operator"> = </span>PtyEventListener.NONE<span class="token punctuation">, </span></span><span class="parameter ">hostPolicy<span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter ">startupCommand<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-startup-command/index.html">TerminalStartupCommand</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Creates a validated snapshot with default values.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -128,7 +128,22 @@
       </div>
       <div data-togglable="TYPE">
         <h2 class="tableheader">Types</h2>
-        <div class="table"><a data-name="1028906932%2FClasslikes%2F-1964973557" anchor-label="Companion" id="1028906932%2FClasslikes%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+        <div class="table"><a data-name="219232709%2FClasslikes%2F-1964973557" anchor-label="Builder" id="219232709%2FClasslikes%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-builder/index.html"><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="219232709%2FClasslikes%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-builder/index.html">Builder</a></div><div class="brief "><p class="paragraph">Mutable construction draft. Not thread-safe; <a href="-builder/build.html">build</a> never retains this draft.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1028906932%2FClasslikes%2F-1964973557" anchor-label="Companion" id="1028906932%2FClasslikes%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -157,7 +172,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial terminal width in cells.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -172,7 +187,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command.html">command</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command.html">command</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">command and arguments passed to the PTY child process.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -187,7 +202,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="environment.html">environment</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="environment.html">environment</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">environment variables for the child process. <code class="lang-kotlin">TERM</code> and <code class="lang-kotlin">COLORTERM</code> default to the shared terminal capability identity when the caller does not provide them.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -202,7 +217,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="event-listener.html">eventListener</a><span class="token operator">: </span><a href="../-pty-event-listener/index.html">PtyEventListener</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="event-listener.html">eventListener</a><span class="token operator">: </span><a href="../-pty-event-listener/index.html">PtyEventListener</a></div><div class="brief "><p class="paragraph">host callbacks for parser-discovered PTY metadata events such as BEL and title changes.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -217,7 +232,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="host-policy.html">hostPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-host-policy/index.html">HostPolicy</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="host-policy.html">hostPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-host-policy/index.html">HostPolicy</a></div><div class="brief "><p class="paragraph">safety policy for terminal-triggered host actions.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -232,7 +247,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="input-policy.html">inputPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="input-policy.html">inputPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a></div><div class="brief "><p class="paragraph">host-bound input encoding policy. Local PTY sessions default Return/Enter to CR even when LNM is active, because contemporary PTY line disciplines can otherwise turn DEC CR LF into an extra newline. Unbracketed paste line endings are likewise canonicalized to CR so every pasted boundary has the same input semantics as Enter.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -247,7 +262,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-history.html">maxHistory</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-history.html">maxHistory</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum scrollback lines retained by the core buffer.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1399287392%2FProperties%2F-1964973557" anchor-label="modeReportCapabilities" id="-1399287392%2FProperties%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="mode-report-capabilities.html"><span>mode</span><wbr><span>Report</span><wbr><span><span>Capabilities</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1399287392%2FProperties%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="mode-report-capabilities.html">modeReportCapabilities</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">implemented host actions from TerminalHostModeCapability.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -262,7 +292,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="read-buffer-size.html">readBufferSize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="read-buffer-size.html">readBufferSize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">buffer size used by the PTY stdout reader thread.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -277,7 +307,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="reader-thread-name.html">readerThreadName</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="reader-thread-name.html">readerThreadName</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">name for the daemon PTY stdout reader thread.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -292,7 +322,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial terminal height in rows.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1876636151%2FProperties%2F-1964973557" anchor-label="shellIntegration" id="-1876636151%2FProperties%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="shell-integration.html"><span>shell</span><wbr><span><span>Integration</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1876636151%2FProperties%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="shell-integration.html">shellIntegration</a><span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-shell-integration-factory/index.html">TerminalShellIntegrationFactory</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">selected producer of shell metadata, editing context and prompt readiness. Null installs no shell integration. PTY assembly does not select a protocol implementation or own the producer's lifetime.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -307,7 +352,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="startup-command.html">startupCommand</a><span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-startup-command/index.html">TerminalStartupCommand</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="startup-command.html">startupCommand</a><span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-startup-command/index.html">TerminalStartupCommand</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">command to submit once <a href="shell-integration.html">shellIntegration</a> reports a ready prompt. The caller is responsible for installing its shell hooks before launch.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -322,7 +367,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="treat-ambiguous-as-wide.html">treatAmbiguousAsWide</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="treat-ambiguous-as-wide.html">treatAmbiguousAsWide</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether East Asian Ambiguous codepoints occupy two cells in the core width policy for future writes.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -337,7 +382,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="watcher-thread-name.html">watcherThreadName</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="watcher-thread-name.html">watcherThreadName</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">name for the daemon process exit watcher thread.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -352,7 +397,71 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="working-directory.html">workingDirectory</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="working-directory.html">workingDirectory</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">initial process working directory, or <code class="lang-kotlin">null</code> to let PTY4J use its platform default.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1711229319%2FFunctions%2F-1964973557" anchor-label="copy" id="1711229319%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy.html"><span><span>copy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1711229319%2FFunctions%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy.html"><span class="token function">copy</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">configure<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html">Consumer</a><span class="token operator">&lt;</span><a href="-builder/index.html">PtyOptions.Builder</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PtyOptions</a></div><div class="brief "><p class="paragraph">Configures a fresh draft synchronously and returns a validated immutable snapshot. Exceptions propagate without changing this snapshot. Supplied services remain host-owned.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-575379692%2FFunctions%2F-1964973557" anchor-label="equals" id="-575379692%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="equals.html"><span><span>equals</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-575379692%2FFunctions%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">operator override </span><span class="token keyword">fun </span><a href="equals.html"><span class="token function">equals</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">other<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1367360686%2FFunctions%2F-1964973557" anchor-label="hashCode" id="-1367360686%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hash-code.html"><span>hash</span><wbr><span><span>Code</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1367360686%2FFunctions%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="hash-code.html"><span class="token function">hashCode</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-661997107%2FFunctions%2F-1964973557" anchor-label="toBuilder" id="-661997107%2FFunctions%2F-1964973557" data-filterable-set=":ketraterm-pty/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-pty/main" data-filterable-set=":ketraterm-pty/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-builder.html"><span>to</span><wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-661997107%2FFunctions%2F-1964973557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-pty/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-builder.html"><span class="token function">toBuilder</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="-builder/index.html">PtyOptions.Builder</a></div><div class="brief "><p class="paragraph">Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots.</p></div></div></div>
                 </div>
               </div>
             </div>

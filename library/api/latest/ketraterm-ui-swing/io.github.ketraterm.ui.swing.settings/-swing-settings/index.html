@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,24 +102,24 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.settings</a><span class="delimiter">/</span><span class="current">SwingSettings</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span><span>Settings</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">SwingSettings</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>font<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a><span class="token operator"> = </span>defaultTerminalFont()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fallbackFonts<span class="token operator">: </span><span data-unresolved-link="kotlinx.collections.immutable/ImmutableList///PointingToDeclaration/">ImmutableList</span><span class="token operator">&lt;</span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultFallbackFonts()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>useSystemFallbackFonts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>palette<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-color-palette/index.html">TerminalColorPalette</a><span class="token operator"> = </span>defaultPalette()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">80</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">24</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>treatAmbiguousAsWide<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorBlinkMillis<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">600</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>textAntialiasing<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator"> = </span>RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fractionalMetrics<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator"> = </span>RenderingHints.VALUE_FRACTIONALMETRICS_OFF<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hyperlinkActivationForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SELECTION_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>searchMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SEARCH_MATCH_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>searchActiveMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visualBellEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visualBellColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_COLOR<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visualBellDurationMillis<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_DURATION_MILLIS<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visualBellEdgeThicknessPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationPromptDotsVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationPromptDotColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationFailedPromptDotColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationPromptDotDiameter<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">8</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationDecorationGutterWidth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">16</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationFailedCommandRailsVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationFailedCommandRailColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellIntegrationFailedCommandRailWidth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">3</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>padding<span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a><span class="token operator"> = </span>SwingPadding(0, 4, 4, 6)<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>alternateScreenPadding<span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a><span class="token operator"> = </span>SwingPadding(0, 2, 2, 2)<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>pasteSanitizationPolicy<span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-paste-sanitization-policy/index.html">PasteSanitizationPolicy</a><span class="token operator"> = </span>PasteSanitizationPolicy.RAW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorShape<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cursor-shape/index.html">TerminalRenderCursorShape</a><span class="token operator"> = </span>TerminalRenderCursorShape.BLOCK<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>scrollbackLines<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>lineHeight<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token operator"> = </span><span class="token constant">1.0f</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellRequestResizeWindow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellRequestWindowManipulation<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>smartSuggestionsEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionsEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>acceptSelectedSuggestionWithEnter<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>scrollOnOutput<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span></div><p class="paragraph">Immutable Swing terminal UI settings.</p><p class="paragraph">Padding and fallback collections are immutable values, so copy can safely share them. Convert host-owned font lists with <code class="lang-kotlin">toImmutableList()</code> before constructing or copying settings. Padding reads never allocate defensive copies.</p><p class="paragraph">Hosts can replace this value and call <a href="../../io.github.ketraterm.ui.swing.api/-swing-terminal/reload-settings.html">io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings</a> to rebuild metrics and repaint.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingSettings</a></div><p class="paragraph">Immutable Swing terminal UI settings.</p><p class="paragraph">Padding and fallback collections are immutable values, so <a href="copy.html">copy</a> can safely share them. Host-owned font lists are copied into immutable storage at build time. Padding reads never allocate defensive copies.</p><p class="paragraph">Hosts can replace this value and call <a href="../../io.github.ketraterm.ui.swing.api/-swing-terminal/reload-settings.html">io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings</a> to rebuild metrics and repaint. Use <a href="-companion/create.html">create</a> for named construction and <a href="copy.html">copy</a> for immutable updates from Kotlin or Java. Builders are temporary caller-owned drafts; snapshots store validated values directly. Scrollback capacity and shell window permissions belong to core creation and host policy.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="CONSTRUCTOR">
         <h2 class="tableheader">Constructors</h2>
-        <div class="table"><a data-name="232284506%2FConstructors%2F848369053" anchor-label="SwingSettings" id="232284506%2FConstructors%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-94712952%2FConstructors%2F848369053" anchor-label="SwingSettings" id="-94712952%2FConstructors%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="-swing-settings.html"><span>Swing</span><wbr><span><span>Settings</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="232284506%2FConstructors%2F848369053"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-94712952%2FConstructors%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">font<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a><span class="token operator"> = </span>defaultTerminalFont()<span class="token punctuation">, </span></span><span class="parameter ">fallbackFonts<span class="token operator">: </span><span data-unresolved-link="kotlinx.collections.immutable/ImmutableList///PointingToDeclaration/">ImmutableList</span><span class="token operator">&lt;</span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a><span class="token operator">&gt;</span><span class="token operator"> = </span>defaultFallbackFonts()<span class="token punctuation">, </span></span><span class="parameter ">useSystemFallbackFonts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">palette<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-color-palette/index.html">TerminalColorPalette</a><span class="token operator"> = </span>defaultPalette()<span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">80</span><span class="token punctuation">, </span></span><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">24</span><span class="token punctuation">, </span></span><span class="parameter ">treatAmbiguousAsWide<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter ">cursorBlinkMillis<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">600</span><span class="token punctuation">, </span></span><span class="parameter ">textAntialiasing<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator"> = </span>RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB<span class="token punctuation">, </span></span><span class="parameter ">fractionalMetrics<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator"> = </span>RenderingHints.VALUE_FRACTIONALMETRICS_OFF<span class="token punctuation">, </span></span><span class="parameter ">hyperlinkActivationForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND<span class="token punctuation">, </span></span><span class="parameter ">selectionBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SELECTION_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter ">searchMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SEARCH_MATCH_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter ">searchActiveMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND<span class="token punctuation">, </span></span><span class="parameter ">visualBellEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">visualBellColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_COLOR<span class="token punctuation">, </span></span><span class="parameter ">visualBellDurationMillis<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_DURATION_MILLIS<span class="token punctuation">, </span></span><span class="parameter ">visualBellEdgeThicknessPixels<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS<span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationPromptDotsVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationPromptDotColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR<span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationFailedPromptDotColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR<span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationPromptDotDiameter<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">8</span><span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationDecorationGutterWidth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">16</span><span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationFailedCommandRailsVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationFailedCommandRailColor<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR<span class="token punctuation">, </span></span><span class="parameter ">shellIntegrationFailedCommandRailWidth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">3</span><span class="token punctuation">, </span></span><span class="parameter ">padding<span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a><span class="token operator"> = </span>SwingPadding(0, 4, 4, 6)<span class="token punctuation">, </span></span><span class="parameter ">alternateScreenPadding<span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a><span class="token operator"> = </span>SwingPadding(0, 2, 2, 2)<span class="token punctuation">, </span></span><span class="parameter ">pasteSanitizationPolicy<span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-paste-sanitization-policy/index.html">PasteSanitizationPolicy</a><span class="token operator"> = </span>PasteSanitizationPolicy.RAW<span class="token punctuation">, </span></span><span class="parameter ">cursorShape<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cursor-shape/index.html">TerminalRenderCursorShape</a><span class="token operator"> = </span>TerminalRenderCursorShape.BLOCK<span class="token punctuation">, </span></span><span class="parameter ">scrollbackLines<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span><span class="token punctuation">, </span></span><span class="parameter ">lineHeight<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token operator"> = </span><span class="token constant">1.0f</span><span class="token punctuation">, </span></span><span class="parameter ">shellRequestResizeWindow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter ">shellRequestWindowManipulation<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter ">smartSuggestionsEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span><span class="token punctuation">, </span></span><span class="parameter ">shellSuggestionsEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">acceptSelectedSuggestionWithEnter<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">scrollOnOutput<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Creates a validated snapshot with default values.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -128,7 +128,22 @@
       </div>
       <div data-togglable="TYPE">
         <h2 class="tableheader">Types</h2>
-        <div class="table"><a data-name="1068252368%2FClasslikes%2F848369053" anchor-label="Companion" id="1068252368%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-321507871%2FClasslikes%2F848369053" anchor-label="Builder" id="-321507871%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-builder/index.html"><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-321507871%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-builder/index.html">Builder</a></div><div class="brief "><p class="paragraph">Mutable construction draft. Not thread-safe; <a href="-builder/build.html">build</a> never retains this draft.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1068252368%2FClasslikes%2F848369053" anchor-label="Companion" id="1068252368%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -172,7 +187,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="alternate-screen-padding.html">alternateScreenPadding</a><span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a></div><div class="brief "><p class="paragraph">alternate-screen visual inset around the terminal grid in pixels. The default keeps top padding at zero and uses small symmetric side insets because alternate-screen applications do not use the primary scrollback scrollbar or shell-integration prompt gutter.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="alternate-screen-padding.html">alternateScreenPadding</a><span class="token operator">: </span><a href="../-swing-padding/index.html">SwingPadding</a></div><div class="brief "><p class="paragraph">configured alternate-screen inset in pixels. Defaults preserve primary total margins for grid sizing. Rendering centers the installed grid in the remaining space, including spare pixels after cell rounding. Explicit overrides are used as exact insets. Like other constructor properties, <code class="lang-kotlin">copy</code> preserves explicit padding. Default padding is rebalanced when the prompt presentation mode changes, keeping default grid dimensions equal across buffers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-77633399%2FProperties%2F848369053" anchor-label="alternateScreenWheelToArrowEnabled" id="-77633399%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="alternate-screen-wheel-to-arrow-enabled.html"><span>alternate</span><wbr><span>Screen</span><wbr><span>Wheel</span><wbr><span>To</span><wbr><span>Arrow</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-77633399%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="alternate-screen-wheel-to-arrow-enabled.html">alternateScreenWheelToArrowEnabled</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Converts local wheel motion to arrow keys in the alternate buffer. Defaults to true. Requires application mode 1007 (enabled by default). Application mouse reporting takes priority. Shift bypasses reporting unless XTSHIFTESCAPE requests capture. When false, wheel motion uses local viewport scrolling, allowing unhandled motion to reach the host. Primary-buffer scrolling is unaffected. Reloading a changed value clears partial wheel-to-arrow input.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -187,7 +217,37 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial preferred column count.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial preferred column count, at least <a href="../../../ketraterm-core/io.github.ketraterm.core/-terminal-buffers/-m-i-n_-w-i-d-t-h.html">TerminalBuffers.MIN_WIDTH</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="782959132%2FProperties%2F848369053" anchor-label="columnSpacing" id="782959132%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="column-spacing.html"><span>column</span><wbr><span><span>Spacing</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="782959132%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="column-spacing.html">columnSpacing</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Adjusts each cell's horizontal advance by signed logical pixels without scaling the font. Defaults to zero. Negative values condense spacing; positive values expand it. Wide characters occupy two adjusted cells. Painting and hit testing share the adjusted width. Text retains its uncondensed glyph-fitting size; existing paint-span clipping still applies. Adjacent glyphs can overlap within a run. Cell-native primitives follow the adjusted cells. At a fixed component width, condensed spacing increases the visible column count. Live sessions resize normally. Closed sessions preserve their final grid and clip columns. Component construction and settings reload validate the resolved font metrics and reject a cell width below one pixel or geometry that exceeds the integer pixel range. Rejected reloads preserve the previous settings and geometry. Settings snapshots alone cannot validate the resulting width before the component resolves its font metrics.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1838504495%2FProperties%2F848369053" anchor-label="copyOnSelection" id="-1838504495%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-on-selection.html"><span>copy</span><wbr><span>On</span><wbr><span><span>Selection</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1838504495%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="copy-on-selection.html">copyOnSelection</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Copies a nonempty selection once when a local primary-button gesture completes. Defaults to false and uses the supplied clipboard handler. The gesture captures this value at press. Programmatic changes never trigger copying. Clipboard callbacks run on the EDT. Failures propagate after gesture cleanup.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -262,7 +322,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="fractional-metrics.html">fractionalMetrics</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a></div><div class="brief "><p class="paragraph">fractional font metrics hint used during painting.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="fractional-metrics.html">fractionalMetrics</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a></div><div class="brief "><p class="paragraph">value accepted by <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/RenderingHints.html#KEY_FRACTIONALMETRICS">RenderingHints.KEY_FRACTIONALMETRICS</a>.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -277,7 +337,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="hyperlink-activation-foreground.html">hyperlinkActivationForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">packed ARGB foreground used for the linked span currently under Ctrl-hover.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="hyperlink-activation-foreground.html">hyperlinkActivationForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">packed ARGB foreground used for the default linked span while hovered and eligible for activation.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -292,7 +352,82 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="line-height.html">lineHeight</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div><div class="brief "><p class="paragraph">vertical line height scaling factor.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="line-height.html">lineHeight</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div><div class="brief "><p class="paragraph">finite positive vertical line height scaling factor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1107062033%2FProperties%2F848369053" anchor-label="middleClickPaste" id="1107062033%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="middle-click-paste.html"><span>middle</span><wbr><span>Click</span><wbr><span><span>Paste</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1107062033%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="middle-click-paste.html">middleClickPaste</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Enables paste on a local middle-button press, using <a href="middle-click-paste-source.html">middleClickPasteSource</a>. Defaults to false. Application mouse tracking takes priority; Shift restores local input unless XTSHIFTESCAPE requests capture. Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard. Without a <a href="../../io.github.ketraterm.ui.swing.api/-swing-host-services/middle-click-paste-handler.html">io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler</a>, clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access and may complete later. Changing this setting does not cancel requests already issued to a hook.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-854298058%2FProperties%2F848369053" anchor-label="middleClickPasteSource" id="-854298058%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="middle-click-paste-source.html"><span>middle</span><wbr><span>Click</span><wbr><span>Paste</span><wbr><span><span>Source</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-854298058%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="middle-click-paste-source.html">middleClickPasteSource</a><span class="token operator">: </span><a href="../-swing-paste-source/index.html">SwingPasteSource</a></div><div class="brief "><p class="paragraph">Clipboard source captured on an enabled local middle-button press. Defaults to <a href="../-swing-paste-source/-c-l-i-p-b-o-a-r-d/index.html">SwingPasteSource.CLIPBOARD</a>. The built-in path reads only this source; unavailable PRIMARY never falls back to the ordinary clipboard. A host paste hook receives the captured source and owns obtaining or declining the text. Keyboard, menu, and programmatic clipboard paste continue using the ordinary clipboard.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="407944337%2FProperties%2F848369053" anchor-label="mouseReportingEnabled" id="407944337%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="mouse-reporting-enabled.html"><span>mouse</span><wbr><span>Reporting</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="407944337%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="mouse-reporting-enabled.html">mouseReportingEnabled</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Allows application mouse reports from this view. Defaults to true. Disabling preserves terminal modes and permits local selection, links, and menus. Shift restores local interaction unless XTSHIFTESCAPE requests capture. A started button gesture retains its route until release. Alternate-buffer wheel input is controlled separately by <a href="alternate-screen-wheel-to-arrow-enabled.html">alternateScreenWheelToArrowEnabled</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1180974170%2FProperties%2F848369053" anchor-label="osc8HyperlinkActivation" id="-1180974170%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="osc8-hyperlink-activation.html"><span>osc8Hyperlink</span><wbr><span><span>Activation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1180974170%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="osc8-hyperlink-activation.html">osc8HyperlinkActivation</a><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.api/-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a></div><div class="brief "><p class="paragraph">gesture policy for terminal-authored links. Defaults to Ctrl/Cmd activation; DIRECT allows an ordinary primary-button click. The hand cursor and active style follow eligibility, independently of visibility. Activation occurs on release without a selection drag. Detected links carry their own per-result activation policy.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1977892450%2FProperties%2F848369053" anchor-label="osc8HyperlinkPresentation" id="1977892450%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="osc8-hyperlink-presentation.html"><span>osc8Hyperlink</span><wbr><span><span>Presentation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1977892450%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="osc8-hyperlink-presentation.html">osc8HyperlinkPresentation</a><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.api/-swing-hyperlink-presentation/index.html">SwingHyperlinkPresentation</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">prepared host styles for terminal-authored OSC 8 links. Null preserves the default dotted underline and activation color. Hosts resolve theme data before constructing this snapshot. Terminal-authored underlines retain priority over link decorations.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -327,17 +462,32 @@
               </div>
             </div>
           </div>
-<a data-name="-676286261%2FProperties%2F848369053" anchor-label="pasteSanitizationPolicy" id="-676286261%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+<a data-name="-962313259%2FProperties%2F848369053" anchor-label="pasteControlPolicy" id="-962313259%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="paste-sanitization-policy.html"><span>paste</span><wbr><span>Sanitization</span><wbr><span><span>Policy</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-676286261%2FProperties%2F848369053"></span>
+                  <div><a href="paste-control-policy.html"><span>paste</span><wbr><span>Control</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-962313259%2FProperties%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="paste-sanitization-policy.html">pasteSanitizationPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-paste-sanitization-policy/index.html">PasteSanitizationPolicy</a></div><div class="brief "><p class="paragraph">paste payload transformation applied before host-bound input emission.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="paste-control-policy.html">pasteControlPolicy</a><span class="token operator">: </span><a href="../../../ketraterm-input/io.github.ketraterm.input.policy/-paste-control-policy/index.html">PasteControlPolicy</a></div><div class="brief "><p class="paragraph">paste payload transformation applied before host-bound input emission.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2012856387%2FProperties%2F848369053" anchor-label="promptDecoration" id="-2012856387%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="prompt-decoration.html"><span>prompt</span><wbr><span><span>Decoration</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2012856387%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="prompt-decoration.html">promptDecoration</a><span class="token operator">: </span><a href="../-swing-prompt-decoration/index.html">SwingPromptDecoration</a></div><div class="brief "><p class="paragraph">Presentation of known prompt boundaries on the primary screen. Defaults to gutter markers. Dividers reserve one cell height per prompt in the view without changing terminal rows. The alternate screen never displays prompt decorations.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -352,22 +502,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial preferred row count.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-280766786%2FProperties%2F848369053" anchor-label="scrollbackLines" id="-280766786%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="scrollback-lines.html"><span>scrollback</span><wbr><span><span>Lines</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-280766786%2FProperties%2F848369053"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="scrollback-lines.html">scrollbackLines</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum scrollback lines retained by the terminal.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">initial preferred row count, at least one.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -552,36 +687,6 @@
               </div>
             </div>
           </div>
-<a data-name="1258948142%2FProperties%2F848369053" anchor-label="shellRequestResizeWindow" id="1258948142%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="shell-request-resize-window.html"><span>shell</span><wbr><span>Request</span><wbr><span>Resize</span><wbr><span><span>Window</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1258948142%2FProperties%2F848369053"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="shell-request-resize-window.html">shellRequestResizeWindow</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether the terminal panel requests window resizing.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="1667865765%2FProperties%2F848369053" anchor-label="shellRequestWindowManipulation" id="1667865765%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="shell-request-window-manipulation.html"><span>shell</span><wbr><span>Request</span><wbr><span>Window</span><wbr><span><span>Manipulation</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1667865765%2FProperties%2F848369053"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="shell-request-window-manipulation.html">shellRequestWindowManipulation</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether the terminal panel allows shell window manipulation.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
 <a data-name="-1747939033%2FProperties%2F848369053" anchor-label="shellSuggestionsEnabled" id="-1747939033%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -622,7 +727,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="text-antialiasing.html">textAntialiasing</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a></div><div class="brief "><p class="paragraph">text antialiasing hint used during painting.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="text-antialiasing.html">textAntialiasing</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a></div><div class="brief "><p class="paragraph">value accepted by <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/RenderingHints.html#KEY_TEXT_ANTIALIASING">RenderingHints.KEY_TEXT_ANTIALIASING</a>.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -652,7 +757,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="use-system-fallback-fonts.html">useSystemFallbackFonts</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether the complex-text renderer may use installed system fonts after <a href="fallback-fonts.html">fallbackFonts</a> fail. System font discovery is asynchronous and disabled by default to keep Swing startup and painting responsive.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="use-system-fallback-fonts.html">useSystemFallbackFonts</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether the complex-text renderer may use installed system fonts after <a href="fallback-fonts.html">fallbackFonts</a> fail (enabled by default). System font discovery is asynchronous, keeping discovery work outside painting.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -713,6 +818,70 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="visual-bell-enabled.html">visualBellEnabled</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether host BEL events trigger the Swing visual bell overlay.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1170903777%2FFunctions%2F848369053" anchor-label="copy" id="1170903777%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy.html"><span><span>copy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1170903777%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy.html"><span class="token function">copy</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">configure<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/function/Consumer.html">Consumer</a><span class="token operator">&lt;</span><a href="-builder/index.html">SwingSettings.Builder</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">SwingSettings</a></div><div class="brief "><p class="paragraph">Configures a fresh draft synchronously and returns a validated immutable snapshot. Exceptions propagate without changing this snapshot. Supplied services remain host-owned.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="467396656%2FFunctions%2F848369053" anchor-label="equals" id="467396656%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="equals.html"><span><span>equals</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="467396656%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">operator override </span><span class="token keyword">fun </span><a href="equals.html"><span class="token function">equals</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">other<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-950449482%2FFunctions%2F848369053" anchor-label="hashCode" id="-950449482%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hash-code.html"><span>hash</span><wbr><span><span>Code</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-950449482%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="hash-code.html"><span class="token function">hashCode</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-622651671%2FFunctions%2F848369053" anchor-label="toBuilder" id="-622651671%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-builder.html"><span>to</span><wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-622651671%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-builder.html"><span class="token function">toBuilder</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="-builder/index.html">SwingSettings.Builder</a></div><div class="brief "><p class="paragraph">Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots.</p></div></div></div>
                 </div>
               </div>
             </div>

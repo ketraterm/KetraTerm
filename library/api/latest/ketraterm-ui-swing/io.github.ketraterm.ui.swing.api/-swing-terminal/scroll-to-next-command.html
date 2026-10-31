@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span>scroll</span><wbr><span>To</span><wbr><span>Next</span><wbr><span><span>Command</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="scroll-to-next-command.html"><span class="token function">scrollToNextCommand</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Scrolls to the nearest next shell command.</p><p class="paragraph">The component uses session-owned OSC 133 command metadata and reveals the command's prompt-start line when present, otherwise its command start line. This method may be called from any thread; component state is updated asynchronously on the EDT.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="scroll-to-next-command.html"><span class="token function">scrollToNextCommand</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Scrolls to the nearest next shell command.</p><p class="paragraph">The component uses the selected integration's command metadata and reveals the command's prompt-start line when present, otherwise its command start line. This method may be called from any thread; component state is updated asynchronously on the EDT.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

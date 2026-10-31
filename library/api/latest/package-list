@@ -6,8 +6,6 @@ io.github.ketraterm.completion.api
 io.github.ketraterm.completion.model
 module:ketraterm-completion-host
 io.github.ketraterm.completion.host
-module:ketraterm-completion-persistence
-io.github.ketraterm.completion.persistence
 module:ketraterm-core
 io.github.ketraterm.core
 io.github.ketraterm.core.api
@@ -35,8 +33,8 @@ module:ketraterm-render-cache
 io.github.ketraterm.render.cache
 module:ketraterm-session
 io.github.ketraterm.session
-module:ketraterm-testkit
-io.github.ketraterm.testkit
+module:ketraterm-shell-integration
+io.github.ketraterm.shell.integration
 module:ketraterm-transport-api
 io.github.ketraterm.transport
 module:ketraterm-ui-swing
@@ -46,6 +44,3 @@ io.github.ketraterm.ui.swing.settings
 io.github.ketraterm.ui.swing.suggestion
 module:ketraterm-ui-swing-host
 io.github.ketraterm.ui.swing.host
-module:ketraterm-workspace
-io.github.ketraterm.workspace
-io.github.ketraterm.workspace.config

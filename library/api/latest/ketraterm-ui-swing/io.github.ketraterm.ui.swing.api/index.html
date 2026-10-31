@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -133,7 +133,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-swing-host-services/index.html">SwingHostServices</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>uiDispatcher<span class="token operator">: </span><a href="-terminal-ui-dispatcher/index.html">TerminalUiDispatcher</a><span class="token operator"> = </span>SWING<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>clipboardHandler<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.settings/-terminal-clipboard-handler/index.html">TerminalClipboardHandler</a><span class="token operator"> = </span>TerminalClipboardHandler.SYSTEM<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hyperlinkHandler<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.settings/-terminal-hyperlink-handler/index.html">TerminalHyperlinkHandler</a><span class="token operator"> = </span>TerminalHyperlinkHandler.SYSTEM<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hyperlinkDetector<span class="token operator">: </span><a href="-swing-hyperlink-detector/index.html">SwingHyperlinkDetector</a><span class="token operator"> = </span>SwingHyperlinkDetector.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>viewportListener<span class="token operator">: </span><a href="-terminal-viewport-listener/index.html">TerminalViewportListener</a><span class="token operator"> = </span>TerminalViewportListener.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>scrollbarOverlayEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionProvider<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-provider/index.html">SwingShellSuggestionProvider</a><span class="token operator"> = </span>SwingShellSuggestionProvider.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionHandler<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-handler/index.html">SwingShellSuggestionHandler</a><span class="token operator"> = </span>SwingShellSuggestionHandler.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionFeedbackHandler<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-feedback-handler/index.html">SwingShellSuggestionFeedbackHandler</a><span class="token operator"> = </span>SwingShellSuggestionFeedbackHandler.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionKeymap<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-keymap/index.html">SwingShellSuggestionKeymap</a><span class="token operator"> = </span>SwingShellSuggestionKeymap.STANDARD<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shellSuggestionViewFactory<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-view-factory/index.html">SwingShellSuggestionViewFactory</a><span class="token operator"> = </span>SwingShellSuggestionViewFactory.DEFAULT<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hostKeyHandler<span class="token operator">: </span><a href="-swing-terminal-host-key-handler/index.html">SwingTerminalHostKeyHandler</a><span class="token operator"> = </span>SwingTerminalHostKeyHandler.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>contextMenuHandler<span class="token operator">: </span><a href="-swing-terminal-context-menu-handler/index.html">SwingTerminalContextMenuHandler</a><span class="token operator"> = </span>SwingTerminalContextMenuHandler.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fontResolver<span class="token operator">: </span><a href="-terminal-font-resolver/index.html">TerminalFontResolver</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Host-provided non-render services for <a href="-swing-terminal/index.html">SwingTerminal</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-host-services/index.html">SwingHostServices</a></div><div class="brief "><p class="paragraph">Host-provided non-render services for <a href="-swing-terminal/index.html">SwingTerminal</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1404411974%2FClasslikes%2F848369053" anchor-label="SwingHyperlink" id="1404411974%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink/index.html"><span>Swing</span><wbr><span><span>Hyperlink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1404411974%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-hyperlink/index.html">SwingHyperlink</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>sourceRange<span class="token operator">: </span><a href="-swing-hyperlink-text-range/index.html">SwingHyperlinkTextRange</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>dependencyRange<span class="token operator">: </span><a href="-swing-hyperlink-text-range/index.html">SwingHyperlinkTextRange</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>action<span class="token operator">: </span><a href="-swing-hyperlink-action/index.html">SwingHyperlinkAction</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>presentation<span class="token operator">: </span><a href="-swing-hyperlink-presentation/index.html">SwingHyperlinkPresentation</a><span class="token operator"> = </span>SwingHyperlinkPresentation.DEFAULT<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>activation<span class="token operator">: </span><a href="-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a><span class="token operator"> = </span>SwingHyperlinkActivation.MODIFIER<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>consumedThrough<span class="token operator">: </span><a href="-swing-hyperlink-text-position/index.html">SwingHyperlinkTextPosition</a><span class="token operator"> = </span>dependencyRange.end<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>providerOrder<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Immutable discovered occurrence, independent of viewport/action-array positions.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -148,7 +163,22 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-hyperlink-action/index.html">SwingHyperlinkAction</a></div><div class="brief "><p class="paragraph">Host-owned action for a hyperlink discovered from visible terminal text.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-hyperlink-action/index.html">SwingHyperlinkAction</a></div><div class="brief "><p class="paragraph">Host-owned navigation and optional hover behavior for a discovered hyperlink.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-831416944%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkActivation" id="-831416944%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-activation/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span><span>Activation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-831416944%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-swing-hyperlink-activation/index.html">SwingHyperlinkActivation</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Host activation policy, applied independently of visibility and link appearance.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -163,7 +193,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Text dependency used to schedule detection and validate cached results.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Text dependency and ordering required by a detector.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -178,22 +208,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-hyperlink-detection-request/index.html">SwingHyperlinkDetectionRequest</a></div><div class="brief "><p class="paragraph">Immutable visible terminal text snapshot passed to <a href="-swing-hyperlink-detector/index.html">SwingHyperlinkDetector</a>.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-2113081692%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkDetectionSink" id="-2113081692%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="-swing-hyperlink-detection-sink/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Detection</span><wbr><span><span>Sink</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2113081692%2FClasslikes%2F848369053"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="-swing-hyperlink-detection-sink/index.html">SwingHyperlinkDetectionSink</a></div><div class="brief "><p class="paragraph">Receives detected visible-viewport hyperlink ranges.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-hyperlink-detection-request/index.html">SwingHyperlinkDetectionRequest</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineTexts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">firstAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">lastAbsoluteRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>context<span class="token operator">: </span><a href="-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a><span class="token operator"> = </span>SwingHyperlinkDetectionContext.INDEPENDENT_LINE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bindingEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>sourceEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>providerEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>analysisEpoch<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>firstRetainedRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">firstLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator"> = </span>firstAbsoluteRows</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Owned immutable logical text and absolute row anchors for one discovery batch.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -208,7 +223,67 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-hyperlink-detector/index.html">SwingHyperlinkDetector</a></div><div class="brief "><p class="paragraph">Host-provided visible-viewport hyperlink detector.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-hyperlink-detector/index.html">SwingHyperlinkDetector</a></div><div class="brief "><p class="paragraph">Host discovery outside terminal mutation, painting and pointer handling.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1718618828%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkPresentation" id="1718618828%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-presentation/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span><span>Presentation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1718618828%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-swing-hyperlink-presentation/index.html">SwingHyperlinkPresentation</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>normal<span class="token operator">: </span><a href="-swing-hyperlink-style/index.html">SwingHyperlinkStyle</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hovered<span class="token operator">: </span><a href="-swing-hyperlink-style/index.html">SwingHyperlinkStyle</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>active<span class="token operator">: </span><a href="-swing-hyperlink-style/index.html">SwingHyperlinkStyle</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>followed<span class="token operator">: </span><a href="-swing-hyperlink-style/index.html">SwingHyperlinkStyle</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>isVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Prepared provider styles; theme/framework lookup happens before construction, never in paint.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1923114805%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkStyle" id="-1923114805%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-style/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span><span>Style</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1923114805%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-swing-hyperlink-style/index.html">SwingHyperlinkStyle</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>foregroundArgb<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>backgroundArgb<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>underlineArgb<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>underlineStyle<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>underlineThickness<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resolved, host-neutral colors and decoration. Null fields inherit terminal presentation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-754326544%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkTextPosition" id="-754326544%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-text-position/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Text</span><wbr><span><span>Position</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-754326544%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-swing-hyperlink-text-position/index.html">SwingHyperlinkTextPosition</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>absoluteRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>offset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-comparable/index.html">Comparable</a><span class="token operator">&lt;</span><a href="-swing-hyperlink-text-position/index.html">SwingHyperlinkTextPosition</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">A UTF-16 offset in a logical line anchored at its first absolute physical row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1352403404%2FClasslikes%2F848369053" anchor-label="SwingHyperlinkTextRange" id="1352403404%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-hyperlink-text-range/index.html"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span>Text</span><wbr><span><span>Range</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1352403404%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-swing-hyperlink-text-range/index.html">SwingHyperlinkTextRange</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>start<span class="token operator">: </span><a href="-swing-hyperlink-text-position/index.html">SwingHyperlinkTextPosition</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>end<span class="token operator">: </span><a href="-swing-hyperlink-text-position/index.html">SwingHyperlinkTextPosition</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Half-open logical-text range; an end offset may include the line's trailing newline.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -223,7 +298,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-scrollbar-adapter/index.html">SwingScrollbarAdapter</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scrollbar<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JScrollBar.html">JScrollBar</a></span></span><span class="token punctuation">)</span> : <a href="-terminal-viewport-listener/index.html">TerminalViewportListener</a></div><div class="brief "><p class="paragraph">Bridges a top-origin Swing scrollbar to the shared terminal viewport.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-scrollbar-adapter/index.html">SwingScrollbarAdapter</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scrollbar<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JScrollBar.html">JScrollBar</a></span></span><span class="token punctuation">)</span> : <a href="-terminal-viewport-listener/index.html">TerminalViewportListener</a>, <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/AutoCloseable.html">AutoCloseable</a></div><div class="brief "><p class="paragraph">Bridges a top-origin Swing scrollbar to the shared terminal viewport.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -253,7 +328,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-terminal/index.html">SwingTerminal</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">settingsProvider<span class="token operator">: </span><a href="../io.github.ketraterm.ui.swing.settings/-swing-settings-provider/index.html">SwingSettingsProvider</a><span class="token operator"> = </span>SwingSettingsProvider { SwingSettings() }<span class="token punctuation">, </span></span><span class="parameter ">hostServices<span class="token operator">: </span><a href="-swing-host-services/index.html">SwingHostServices</a><span class="token operator"> = </span>SwingHostServices()</span></span><span class="token punctuation">)</span> : <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html">JComponent</a>, <a href="-swing-scrollbar-scroller/index.html">SwingScrollbarScroller</a></div><div class="brief "><p class="paragraph">Reusable Swing terminal component.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-terminal/index.html">SwingTerminal</a> : <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html">JComponent</a>, <a href="-swing-scrollbar-scroller/index.html">SwingScrollbarScroller</a></div><div class="brief "><p class="paragraph">Reusable Swing terminal component.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -318,6 +393,51 @@
               </div>
             </div>
           </div>
+<a data-name="-1184582866%2FClasslikes%2F848369053" anchor-label="SwingTerminalMessages" id="-1184582866%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-terminal-messages/index.html"><span>Swing</span><wbr><span>Terminal</span><wbr><span><span>Messages</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1184582866%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-terminal-messages/index.html">SwingTerminalMessages</a></div><div class="brief "><p class="paragraph">Host message lookup for reusable Swing presentation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="435694526%2FClasslikes%2F848369053" anchor-label="SwingTerminalMiddleClickPasteHandler" id="435694526%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-terminal-middle-click-paste-handler/index.html"><span>Swing</span><wbr><span>Terminal</span><wbr><span>Middle</span><wbr><span>Click</span><wbr><span>Paste</span><wbr><span><span>Handler</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="435694526%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-swing-terminal-middle-click-paste-handler/index.html">SwingTerminalMiddleClickPasteHandler</a></div><div class="brief "><p class="paragraph">Host-owned handling of an enabled local middle-button paste gesture.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="272390169%2FClasslikes%2F848369053" anchor-label="SwingTerminalMiddleClickPasteRequest" id="272390169%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-terminal-middle-click-paste-request/index.html"><span>Swing</span><wbr><span>Terminal</span><wbr><span>Middle</span><wbr><span>Click</span><wbr><span>Paste</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="272390169%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-swing-terminal-middle-click-paste-request/index.html">SwingTerminalMiddleClickPasteRequest</a></div><div class="brief "><p class="paragraph">One-use paste authority captured for a local middle-button press.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1412947869%2FClasslikes%2F848369053" anchor-label="TerminalFontResolver" id="1412947869%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -329,6 +449,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="-terminal-font-resolver/index.html">TerminalFontResolver</a></div><div class="brief "><p class="paragraph">Custom host font resolver policy.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="105003824%2FClasslikes%2F848369053" anchor-label="TerminalSelectionListener" id="105003824%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-selection-listener/index.html"><span>Terminal</span><wbr><span>Selection</span><wbr><span><span>Listener</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="105003824%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-selection-listener/index.html">TerminalSelectionListener</a></div><div class="brief "><p class="paragraph">Observes committed selection changes synchronously on the Swing EDT.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1509873985%2FClasslikes%2F848369053" anchor-label="TerminalSelectionRange" id="1509873985%2FClasslikes%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-selection-range/index.html"><span>Terminal</span><wbr><span>Selection</span><wbr><span><span>Range</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1509873985%2FClasslikes%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-selection-range/index.html">TerminalSelectionRange</a></div><div class="brief "><p class="paragraph">Immutable selection range in one component binding and terminal layout.</p></div></div></div>
                 </div>
               </div>
             </div>

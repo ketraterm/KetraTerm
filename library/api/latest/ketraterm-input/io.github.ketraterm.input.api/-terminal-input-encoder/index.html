@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-input</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.input.api</a><span class="delimiter">/</span><span class="current">TerminalInputEncoder</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Input</span><wbr><span><span>Encoder</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalInputEncoder</a></div><p class="paragraph">Encodes UI-level terminal input events into host-bound bytes.</p><p class="paragraph">Implementations are responsible for reading the current input-facing mode state at the appropriate event boundary and writing the resulting bytes to a host output sink.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalInputEncoder</a></div><p class="paragraph">Encodes UI-level terminal input events into host-bound bytes.</p><p class="paragraph">Implementations are responsible for reading the current input-facing mode state at the appropriate event boundary and writing the resulting bytes to a host output sink.</p><p class="paragraph">The default factory implementation requires external serialization of calls and policy updates. Sessions bind custom encoders through <a href="../-terminal-input-encoder-factory/index.html">TerminalInputEncoderFactory</a> to session-owned mode state and ordered output, and serialize each instance's calls.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -194,7 +194,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="set-input-policy.html"><span class="token function">setInputPolicy</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">policy<span class="token operator">: </span><a href="../../io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Updates the input policy dynamically.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-input-policy.html"><span class="token function">setInputPolicy</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">policy<span class="token operator">: </span><a href="../../io.github.ketraterm.input.policy/-terminal-input-policy/index.html">TerminalInputPolicy</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Updates the input policy dynamically.</p></div></div></div>
                 </div>
               </div>
             </div>

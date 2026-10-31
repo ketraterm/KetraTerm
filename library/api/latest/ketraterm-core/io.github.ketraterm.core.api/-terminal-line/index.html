@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-core</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.core.api</a><span class="delimiter">/</span><span class="current">TerminalLine</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span><span>Line</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalLine</a></div><p class="paragraph">A read-only, EPHEMERAL view of a single physical terminal line.</p><ul><li><p class="paragraph">DANGER - TEMPORAL COUPLING: The UI Renderer MUST NOT store or hold references to this object outside the immediate execution scope of the current render frame. The backing memory may mutate at any time if background output arrives.</p></li></ul></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalLine</a></div><p class="paragraph">Read-only borrowed view of one physical terminal line.</p><p class="paragraph">Read only while the owning terminal is serialized against mutation and do not retain the view after releasing that serialization. Mutations may replace or reuse its backing storage. Renderer-owned copies use the public render frame contract.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -128,7 +128,22 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="842002007%2FFunctions%2F-1402815689" anchor-label="getCodepoint" id="842002007%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+        <div class="table"><a data-name="-2145197062%2FFunctions%2F-1402815689" anchor-label="getClusterLength" id="-2145197062%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-cluster-length.html"><span>get</span><wbr><span>Cluster</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2145197062%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="get-cluster-length.html"><span class="token function">getClusterLength</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the number of codepoints in the cluster at <a href="get-cluster-length.html">col</a>, or <code class="lang-kotlin">0</code> for a scalar, blank, or wide spacer cell. This is the capacity required by <a href="read-cluster.html">readCluster</a>, not a UTF-16 length or a display width.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="842002007%2FFunctions%2F-1402815689" anchor-label="getCodepoint" id="842002007%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -139,36 +154,6 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-codepoint.html"><span class="token function">getCodepoint</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the <strong>base (first) codepoint</strong> for the cell at <a href="get-codepoint.html">col</a>.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="536723955%2FFunctions%2F-1402815689" anchor-label="getPackedAttr" id="536723955%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="get-packed-attr.html"><span>get</span><wbr><span>Packed</span><wbr><span><span>Attr</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="536723955%2FFunctions%2F-1402815689"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-packed-attr.html"><span class="token function">getPackedAttr</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Returns the primary packed attribute word for the cell at <a href="get-packed-attr.html">col</a>.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-700516998%2FFunctions%2F-1402815689" anchor-label="getPackedExtendedAttr" id="-700516998%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="get-packed-extended-attr.html"><span>get</span><wbr><span>Packed</span><wbr><span>Extended</span><wbr><span><span>Attr</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-700516998%2FFunctions%2F-1402815689"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="get-packed-extended-attr.html"><span class="token function">getPackedExtendedAttr</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Returns the extended packed attribute word for the cell at <a href="get-packed-extended-attr.html">col</a>.</p></div></div></div>
                 </div>
               </div>
             </div>

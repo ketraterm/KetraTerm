@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.api</a><span class="delimiter">/</span><span class="current">SwingHyperlinkDetector</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Hyperlink</span><wbr><span><span>Detector</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="index.html">SwingHyperlinkDetector</a></div><p class="paragraph">Host-provided visible-viewport hyperlink detector.</p><p class="paragraph">The reusable Swing terminal calls this outside painting and mouse movement, after visible render-cache text has been snapshotted. Implementations may allocate and may call host/IDE link-discovery APIs, but must not touch Swing component state directly. Reported offsets are UTF-16 offsets within the supplied line text.</p><p class="paragraph"><a href="context.html">context</a> declares whether detection depends on individual logical lines or the complete visible viewport. Detectors must not depend on earlier requests.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="index.html">SwingHyperlinkDetector</a></div><p class="paragraph">Host discovery outside terminal mutation, painting and pointer handling.</p><p class="paragraph">The binding owner serializes calls within each context and owns their cancellation. A detector declaring both contexts must permit concurrent independent and ordered calls. Implementations may suspend and allocate bounded discovery results, acquire host-read access, and return owned results. They must propagate cancellation, discard any tainted ordered state, and never touch Swing state. <a href="configuration-generation.html">configurationGeneration</a> changes when provider configuration becomes stale.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -128,7 +128,37 @@
       </div>
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="525860364%2FProperties%2F848369053" anchor-label="context" id="525860364%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-1095395566%2FProperties%2F848369053" anchor-label="configurationChanges" id="-1095395566%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="configuration-changes.html"><span>configuration</span><wbr><span><span>Changes</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1095395566%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="configuration-changes.html">configurationChanges</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/Flow///PointingToDeclaration/">Flow</span><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Reconciliation notifications for provider/index/theme changes without terminal output. The binding owns collection and cancellation. Publish <a href="configuration-generation.html">configurationGeneration</a> before emitting; this signal alone does not invalidate results when the generation and detector instance are unchanged.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1621050861%2FProperties%2F848369053" anchor-label="configurationGeneration" id="1621050861%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="configuration-generation.html"><span>configuration</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1621050861%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="configuration-generation.html">configurationGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Equality-only configuration generation. Publish changed configuration and a distinct generation before emitting <a href="configuration-changes.html">configurationChanges</a>; a notification with the same generation does not invalidate results. Without a notification, the owner observes the generation on its next reconciliation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="525860364%2FProperties%2F848369053" anchor-label="context" id="525860364%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -138,7 +168,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="context.html">context</a><span class="token operator">: </span><a href="../-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a></div><div class="brief "><p class="paragraph">Text context required by detection and its actions, fixed for this detector's lifetime.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="context.html">context</a><span class="token operator">: </span><a href="../-swing-hyperlink-detection-context/index.html">SwingHyperlinkDetectionContext</a></div><div class="brief "><p class="paragraph">Fixed dependency discipline for this detector instance.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -147,17 +177,32 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="1824761343%2FFunctions%2F848369053" anchor-label="detect" id="1824761343%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="1884852274%2FFunctions%2F848369053" anchor-label="detect" id="1884852274%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="detect.html"><span><span>detect</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1824761343%2FFunctions%2F848369053"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1884852274%2FFunctions%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="detect.html"><span class="token function">detect</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-swing-hyperlink-detection-request/index.html">SwingHyperlinkDetectionRequest</a><span class="token punctuation">, </span></span><span class="parameter ">sink<span class="token operator">: </span><a href="../-swing-hyperlink-detection-sink/index.html">SwingHyperlinkDetectionSink</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Detects hyperlinks in <a href="detect.html">request</a> and reports them to <a href="detect.html">sink</a>.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="detect.html"><span class="token function">detect</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-swing-hyperlink-detection-request/index.html">SwingHyperlinkDetectionRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="../-swing-hyperlink/index.html">SwingHyperlink</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns one request's completed results. An empty list means successful detection with no links; failure/cancellation must throw and cannot mean empty success. The returned list and its results must not be mutated after return. Unknown/out-of-bounds source coordinates are ignored by the owner. Ordered state is valid only within the request's binding/source/provider/analysis epochs.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2043818439%2FFunctions%2F848369053" anchor-label="discardOrderedState" id="-2043818439%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="discard-ordered-state.html"><span>discard</span><wbr><span>Ordered</span><wbr><span><span>State</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2043818439%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="discard-ordered-state.html"><span class="token function">discardOrderedState</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Releases retained ordered source/provider state at a binding or provider boundary. The owner calls this only after the ordered invocation has finished (including cancellation before dispatch). It must be nonblocking, may run on any thread, and must not touch independent state.</p></div></div></div>
                 </div>
               </div>
             </div>

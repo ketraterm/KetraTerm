@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,24 +102,24 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.host</a><span class="delimiter">/</span><span class="current">TerminalTitlePolicy</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Title</span><wbr><span><span>Policy</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalTitlePolicy</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>origin<span class="token operator">: </span><a href="../-terminal-title-origin/index.html">TerminalTitleOrigin</a><span class="token operator"> = </span>TerminalTitleOrigin.LOCAL<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>localPermission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>remotePermission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>overflowPolicy<span class="token operator">: </span><a href="../-terminal-title-overflow-policy/index.html">TerminalTitleOverflowPolicy</a><span class="token operator"> = </span>TerminalTitleOverflowPolicy.CLAMP<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_MAX_LENGTH</span></span><span class="token punctuation">)</span></div><p class="paragraph">Host policy for terminal-triggered icon and window title metadata updates.</p><p class="paragraph">OSC 0/1/2 and xterm title-stack restore operations can rename host UI surfaces. That is convenient for a standalone local terminal, but product hosts such as IDE tabs, workspace panes, and SSH sessions may want stricter behavior to prevent confusing or spoofed labels. The host chooses <a href="origin.html">origin</a> per session and this policy applies the matching permission before adapter or core title metadata is changed.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalTitlePolicy</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>permission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>overflowPolicy<span class="token operator">: </span><a href="../-terminal-title-overflow-policy/index.html">TerminalTitleOverflowPolicy</a><span class="token operator"> = </span>TerminalTitleOverflowPolicy.CLAMP<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_MAX_LENGTH</span></span><span class="token punctuation">)</span></div><p class="paragraph">Host policy for terminal-triggered icon and window title metadata updates.</p><p class="paragraph">OSC 0/1/2 and xterm title-stack restore operations can rename host UI surfaces. The permission applies to all output in the session, including nested SSH and multiplexer output, before adapter or core metadata changes. A title is application-provided display text, never an authenticated identity.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="CONSTRUCTOR">
         <h2 class="tableheader">Constructors</h2>
-        <div class="table"><a data-name="-1216010297%2FConstructors%2F-1906139840" anchor-label="TerminalTitlePolicy" id="-1216010297%2FConstructors%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+        <div class="table"><a data-name="-1762979842%2FConstructors%2F-1906139840" anchor-label="TerminalTitlePolicy" id="-1762979842%2FConstructors%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="-terminal-title-policy.html"><span>Terminal</span><wbr><span>Title</span><wbr><span><span>Policy</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1216010297%2FConstructors%2F-1906139840"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1762979842%2FConstructors%2F-1906139840"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">origin<span class="token operator">: </span><a href="../-terminal-title-origin/index.html">TerminalTitleOrigin</a><span class="token operator"> = </span>TerminalTitleOrigin.LOCAL<span class="token punctuation">, </span></span><span class="parameter ">localPermission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">remotePermission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">overflowPolicy<span class="token operator">: </span><a href="../-terminal-title-overflow-policy/index.html">TerminalTitleOverflowPolicy</a><span class="token operator"> = </span>TerminalTitleOverflowPolicy.CLAMP<span class="token punctuation">, </span></span><span class="parameter ">maxLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_MAX_LENGTH</span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">permission<span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a><span class="token operator"> = </span>TerminalTitlePermission.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">overflowPolicy<span class="token operator">: </span><a href="../-terminal-title-overflow-policy/index.html">TerminalTitleOverflowPolicy</a><span class="token operator"> = </span>TerminalTitleOverflowPolicy.CLAMP<span class="token punctuation">, </span></span><span class="parameter ">maxLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_MAX_LENGTH</span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -147,22 +147,7 @@
       </div>
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="1076403823%2FProperties%2F-1906139840" anchor-label="localPermission" id="1076403823%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="local-permission.html"><span>local</span><wbr><span><span>Permission</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1076403823%2FProperties%2F-1906139840"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="local-permission.html">localPermission</a><span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a></div><div class="brief "><p class="paragraph">permission for local terminal streams.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-1497872481%2FProperties%2F-1906139840" anchor-label="maxLength" id="-1497872481%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+        <div class="table"><a data-name="-1497872481%2FProperties%2F-1906139840" anchor-label="maxLength" id="-1497872481%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -173,21 +158,6 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-length.html">maxLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum retained title length in UTF-16 code units. Clamping never splits a valid surrogate pair.</p></div></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-<a data-name="-558695221%2FProperties%2F-1906139840" anchor-label="origin" id="-558695221%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
-          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
-            <div class="main-subrow keyValue ">
-              <div class=""><span class="inline-flex">
-                  <div><a href="origin.html"><span><span>origin</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-558695221%2FProperties%2F-1906139840"></span>
-                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
-                  </span></span></div>
-              <div>
-                <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="origin.html">origin</a><span class="token operator">: </span><a href="../-terminal-title-origin/index.html">TerminalTitleOrigin</a></div><div class="brief "><p class="paragraph">whether the terminal stream comes from a local or remote session from the host product's perspective.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -207,17 +177,17 @@
               </div>
             </div>
           </div>
-<a data-name="-1130447076%2FProperties%2F-1906139840" anchor-label="remotePermission" id="-1130447076%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+<a data-name="-945968062%2FProperties%2F-1906139840" anchor-label="permission" id="-945968062%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="remote-permission.html"><span>remote</span><wbr><span><span>Permission</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1130447076%2FProperties%2F-1906139840"></span>
+                  <div><a href="permission.html"><span><span>permission</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-945968062%2FProperties%2F-1906139840"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="remote-permission.html">remotePermission</a><span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a></div><div class="brief "><p class="paragraph">permission for remote terminal streams.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="permission.html">permission</a><span class="token operator">: </span><a href="../-terminal-title-permission/index.html">TerminalTitlePermission</a></div><div class="brief "><p class="paragraph">permission for title updates throughout the session.</p></div></div></div>
                 </div>
               </div>
             </div>

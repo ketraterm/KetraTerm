@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span><span>failure</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="failure.html">failure</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div><p class="paragraph">Transport failure reported by <a href="on-error.html">onError</a>, or <code class="lang-kotlin">null</code> when the remote closed normally or the session was locally closed.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="failure.html">failure</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div><p class="paragraph">The first startup, transport, outbound worker, or cleanup failure. An initiating failure is available as soon as shutdown begins; cleanup failures are retained before <a href="state.html">state</a> reaches <a href="../-terminal-session-state/-closed/index.html">TerminalSessionState.Closed</a>. Null means no known failure.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

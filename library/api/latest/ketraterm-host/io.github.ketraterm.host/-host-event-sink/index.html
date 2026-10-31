@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.host</a><span class="delimiter">/</span><span class="current">HostEventSink</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Host</span><wbr><span>Event</span><wbr><span><span>Sink</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">HostEventSink</a></div><p class="paragraph">Host-facing events emitted while parser commands are mapped to core state.</p><p class="paragraph">Hosts receive metadata and decide whether host-side actions can be honored. Grid mutation and terminal modes remain owned by core; session coordinates transport changes and terminal-to-host byte responses.</p><p class="paragraph">Callbacks are synchronous and ordered on the mutation caller's thread. A TerminalSession holds its mutation lock during delivery. Return promptly; do not mutate the session or wait for a UI thread. Schedule UI work using the product's lifecycle. Direct sinks propagate exceptions to the caller; the PTY convenience bridge isolates and reports listener failures. No initial state replay or per-frame delivery is performed.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">HostEventSink</a></div><p class="paragraph">Host-facing events emitted while parser commands are mapped to core state.</p><p class="paragraph">Hosts receive metadata and decide whether host-side actions can be honored. Grid mutation and terminal modes remain owned by core; session coordinates transport changes and terminal-to-host byte responses.</p><p class="paragraph">Parser metadata callbacks are synchronous and ordered on the mutation caller's thread. A TerminalSession holds its mutation lock during delivery. Return promptly; do not mutate the session or wait for a UI thread. Schedule UI work using the product's lifecycle. Direct sinks propagate exceptions to the caller; the PTY convenience bridge isolates and reports listener failures. Read-execution audits may arrive on session workers as documented below. No initial state replay or per-frame delivery is performed.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -139,6 +139,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="bell.html"><span class="token function">bell</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the parser emits BEL.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="751893416%2FFunctions%2F-1906139840" anchor-label="columnModeChanged" id="751893416%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="column-mode-changed.html"><span>column</span><wbr><span>Mode</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="751893416%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="column-mode-changed.html"><span class="token function">columnModeChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Reports a completed logical column switch with synchronized core/transport dimensions. Hosts may schedule a physical window resize according to their own permission and layout policy. Called during parsing; do not wait for the EDT or mutate the grid.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -183,7 +198,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-registered.html"><span class="token function">hyperlinkRegistered</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after a new OSC 8 registry entry is accepted. <a href="hyperlink-registered.html">hyperlinkId</a> is a positive session-local numeric identity; <a href="hyperlink-registered.html">id</a> is the optional application ID. Reusing an existing entry emits nothing. No browser action is implied.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-registered.html"><span class="token function">hyperlinkRegistered</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after a new OSC 8 registry entry is accepted. <a href="hyperlink-registered.html">hyperlinkId</a> is a positive session-local numeric identity; <a href="hyperlink-registered.html">id</a> is the optional application ID. Reusing an existing entry emits no registration. No browser action is implied.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -198,7 +213,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-removed.html"><span class="token function">hyperlinkRemoved</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after LRU eviction makes <a href="hyperlink-removed.html">hyperlinkId</a> unresolvable. Registration of its replacement follows this event. Numeric IDs are never reassigned. Closing OSC 8 or soft reset does not remove existing registry entries.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-removed.html"><span class="token function">hyperlinkRemoved</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after LRU eviction makes <a href="hyperlink-removed.html">hyperlinkId</a> unresolvable. Registration of a replacement follows all removals. Lowered limits can evict multiple entries, including when reusing an explicit key without registering a replacement. Numeric IDs are never reassigned. Closing OSC 8 or soft reset does not remove existing registry entries.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -293,6 +308,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1007160640%2FFunctions%2F-1906139840" anchor-label="progressChanged" id="-1007160640%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="progress-changed.html"><span>progress</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1007160640%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="progress-changed.html"><span class="token function">progressChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">state<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-progress-state/index.html">TerminalProgressState</a><span class="token punctuation">, </span></span><span class="parameter ">percentage<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called for an accepted OSC 9;4 progress report under progress permission. <a href="progress-changed.html">percentage</a> is in <code class="lang-kotlin">0..100</code>, and zero for HIDDEN or INDETERMINATE. Determinate zero is preserved; this callback does not imply command completion or success. Repeated reports are delivered and may refresh a host-owned expiry deadline. Hard reset also reports HIDDEN with zero, regardless of permission.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1148464118%2FFunctions%2F-1906139840" anchor-label="raiseWindow" id="1148464118%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -308,17 +338,17 @@
               </div>
             </div>
           </div>
-<a data-name="-2105545579%2FFunctions%2F-1906139840" anchor-label="requestColumnMode" id="-2105545579%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+<a data-name="-1558135621%2FFunctions%2F-1906139840" anchor-label="resizeForColumnMode" id="-1558135621%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="request-column-mode.html"><span>request</span><wbr><span>Column</span><wbr><span><span>Mode</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2105545579%2FFunctions%2F-1906139840"></span>
+                  <div><a href="resize-for-column-mode.html"><span>resize</span><wbr><span>For</span><wbr><span>Column</span><wbr><span><span>Mode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1558135621%2FFunctions%2F-1906139840"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="request-column-mode.html"><span class="token function">requestColumnMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Accepts an application-requested 80/132-column switch before core changes.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="resize-for-column-mode.html"><span class="token function">resizeForColumnMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Prepares an 80/132-column switch before the destructive core reset.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -394,6 +424,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-prompt.html"><span class="token function">terminalClipboardPrompt</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-prompt-event/index.html">TerminalClipboardPromptEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when an OSC 52 clipboard write request requires product-host user approval and has been decoded to text.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1106292296%2FFunctions%2F-1906139840" anchor-label="terminalClipboardReadCompleted" id="1106292296%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-read-completed.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span>Read</span><wbr><span><span>Completed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1106292296%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-read-completed.html"><span class="token function">terminalClipboardReadCompleted</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-read-audit-event/index.html">TerminalClipboardReadAuditEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Content-free execution audit. Unlike parser metadata, this callback can arrive on a session worker; it must be thread-safe and return promptly. Do not reenter session mutation or wait for a UI thread from this callback. Never infer execution from the earlier admission decision alone.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="886099887%2FFunctions%2F-1906139840" anchor-label="terminalClipboardReadRequested" id="886099887%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-read-requested.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span>Read</span><wbr><span><span>Requested</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="886099887%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-read-requested.html"><span class="token function">terminalClipboardReadRequested</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-terminal-clipboard-read-request/index.html">TerminalClipboardReadRequest</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Admits a validated read for session execution, including read denial when terminal replies are permitted. Direct adapter embedders own the response. This synchronous callback must not access the clipboard or wait for consent.</p></div></div></div>
                 </div>
               </div>
             </div>

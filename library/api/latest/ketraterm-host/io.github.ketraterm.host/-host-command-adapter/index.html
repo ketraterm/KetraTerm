@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,24 +102,24 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.host</a><span class="delimiter">/</span><span class="current">HostCommandAdapter</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Host</span><wbr><span>Command</span><wbr><span><span>Adapter</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">HostCommandAdapter</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">terminal<span class="token operator">: </span><a href="../../../ketraterm-core/io.github.ketraterm.core.api/-terminal-buffer/index.html">TerminalBuffer</a><span class="token punctuation">, </span></span><span class="parameter ">hostEvents<span class="token operator">: </span><a href="../-host-event-sink/index.html">HostEventSink</a><span class="token operator"> = </span>HostEventSink.NONE<span class="token punctuation">, </span></span><span class="parameter ">hostPolicy<span class="token operator">: </span><a href="../-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter ">kittyKeyboardSupportedFlags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK</span></span><span class="token punctuation">)</span> : <a href="../../../ketraterm-parser/io.github.ketraterm.parser.spi/-terminal-command-sink/index.html">TerminalCommandSink</a></div><p class="paragraph">Production bridge from parser semantic commands to the terminal core.</p><p class="paragraph">The parser owns byte/protocol decoding. The core owns grid mutation, mode state, cursor physics, and width policy. This adapter is the narrow place where ANSI/DEC mode ids become concrete core API calls.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>terminal</span></span></u></div></span></div><div><div class="title"><p class="paragraph">public core buffer API mutated by parser semantic commands.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Events</span></span></u></div></span></div><div><div class="title"><p class="paragraph">optional sink for accepted host metadata and requests.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Policy</span></span></u></div></span></div><div><div class="title"><p class="paragraph">safety limits for host-owned metadata.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>kitty</span><wbr><span>Keyboard</span><wbr><span>Supported</span><wbr><span><span>Flags</span></span></u></div></span></div><div><div class="title"><p class="paragraph">progressive Kitty keyboard flags the active input host can provide truthfully. The value must be a subset of the input encoder's implemented protocol mask.</p></div></div></div></div></div></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">HostCommandAdapter</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">terminal<span class="token operator">: </span><a href="../../../ketraterm-core/io.github.ketraterm.core.api/-terminal-buffer/index.html">TerminalBuffer</a><span class="token punctuation">, </span></span><span class="parameter ">hostEvents<span class="token operator">: </span><a href="../-host-event-sink/index.html">HostEventSink</a><span class="token operator"> = </span>HostEventSink.NONE<span class="token punctuation">, </span></span><span class="parameter ">hostPolicy<span class="token operator">: </span><a href="../-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter ">kittyKeyboardSupportedFlags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK<span class="token punctuation">, </span></span><span class="parameter ">modeReportCapabilities<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">defaultBackarrowSendsBackspace<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></span></span><span class="token punctuation">)</span> : <a href="../../../ketraterm-parser/io.github.ketraterm.parser.spi/-terminal-ascii-command-sink/index.html">TerminalAsciiCommandSink</a>, <a href="../../../ketraterm-parser/io.github.ketraterm.parser.spi/-terminal-progress-command-sink/index.html">TerminalProgressCommandSink</a></div><p class="paragraph">Production bridge from parser semantic commands to the terminal core.</p><p class="paragraph">The parser owns byte/protocol decoding. The core owns grid mutation, mode state, cursor physics, and width policy. This adapter is the narrow place where ANSI/DEC mode ids become concrete core API calls.</p><p class="paragraph">Serialize command calls and mutable metadata reads with the supplied terminal. Host callbacks run synchronously on that caller's thread and their failures propagate. Policy replacement and <a href="current-policy.html">currentPolicy</a> are safe across threads; metadata registries and the remaining command surface are not independently thread-safe.</p><p class="paragraph">Java callers may omit trailing optional constructor parameters, using the same defaults as Kotlin callers. Hosts with richer keyboard metadata or bell actions should supply their implemented capability masks explicitly.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>terminal</span></span></u></div></span></div><div><div class="title"><p class="paragraph">public core buffer API mutated by parser semantic commands.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Events</span></span></u></div></span></div><div><div class="title"><p class="paragraph">optional sink for accepted host metadata and requests.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Policy</span></span></u></div></span></div><div><div class="title"><p class="paragraph">safety limits for host-owned metadata.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>kitty</span><wbr><span>Keyboard</span><wbr><span>Supported</span><wbr><span><span>Flags</span></span></u></div></span></div><div><div class="title"><p class="paragraph">progressive Kitty keyboard flags the active input host can provide truthfully. The value must be a subset of the input encoder's implemented protocol mask.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>mode</span><wbr><span>Report</span><wbr><span><span>Capabilities</span></span></u></div></span></div><div><div class="title"><p class="paragraph">implemented host actions from TerminalHostModeCapability.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>default</span><wbr><span>Backarrow</span><wbr><span>Sends</span><wbr><span><span>Backspace</span></span></u></div></span></div><div><div class="title"><p class="paragraph">current legacy Backspace default before DECBKM overrides it.</p></div></div></div></div></div></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="CONSTRUCTOR">
         <h2 class="tableheader">Constructors</h2>
-        <div class="table"><a data-name="1125949952%2FConstructors%2F-1906139840" anchor-label="HostCommandAdapter" id="1125949952%2FConstructors%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+        <div class="table"><a data-name="1300632199%2FConstructors%2F-1906139840" anchor-label="HostCommandAdapter" id="1300632199%2FConstructors%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="-host-command-adapter.html"><span>Host</span><wbr><span>Command</span><wbr><span><span>Adapter</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1125949952%2FConstructors%2F-1906139840"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1300632199%2FConstructors%2F-1906139840"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">terminal<span class="token operator">: </span><a href="../../../ketraterm-core/io.github.ketraterm.core.api/-terminal-buffer/index.html">TerminalBuffer</a><span class="token punctuation">, </span></span><span class="parameter ">hostEvents<span class="token operator">: </span><a href="../-host-event-sink/index.html">HostEventSink</a><span class="token operator"> = </span>HostEventSink.NONE<span class="token punctuation">, </span></span><span class="parameter ">hostPolicy<span class="token operator">: </span><a href="../-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter ">kittyKeyboardSupportedFlags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK</span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">terminal<span class="token operator">: </span><a href="../../../ketraterm-core/io.github.ketraterm.core.api/-terminal-buffer/index.html">TerminalBuffer</a><span class="token punctuation">, </span></span><span class="parameter ">hostEvents<span class="token operator">: </span><a href="../-host-event-sink/index.html">HostEventSink</a><span class="token operator"> = </span>HostEventSink.NONE<span class="token punctuation">, </span></span><span class="parameter ">hostPolicy<span class="token operator">: </span><a href="../-host-policy/index.html">HostPolicy</a><span class="token operator"> = </span>HostPolicy()<span class="token punctuation">, </span></span><span class="parameter ">kittyKeyboardSupportedFlags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK<span class="token punctuation">, </span></span><span class="parameter ">modeReportCapabilities<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">defaultBackarrowSendsBackspace<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -158,6 +158,36 @@
               </div>
             </div>
           </div>
+<a data-name="-243871126%2FProperties%2F-1906139840" anchor-label="currentPolicy" id="-243871126%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="current-policy.html"><span>current</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-243871126%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="current-policy.html">currentPolicy</a><span class="token operator">: </span><a href="../-host-policy/index.html">HostPolicy</a></div><div class="brief "><p class="paragraph">Immutable active policy snapshot for asynchronous host-operation revalidation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-304370473%2FProperties%2F-1906139840" anchor-label="graphicsTransferGeneration" id="-304370473%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="graphics-transfer-generation.html"><span>graphics</span><wbr><span>Transfer</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-304370473%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="graphics-transfer-generation.html">graphicsTransferGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Core upload-invalidation token, read under the terminal's usual caller serialization.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-673391722%2FProperties%2F-1906139840" anchor-label="iconTitle" id="-673391722%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -168,7 +198,37 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">var </span><a href="icon-title.html">iconTitle</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">The current icon title reported by the shell or application.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="icon-title.html">iconTitle</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">The current authoritative core icon title. Read under the same serialization as core mutation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="403673907%2FProperties%2F-1906139840" anchor-label="isAlternateScreenActive" id="403673907%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="is-alternate-screen-active.html"><span>is</span><wbr><span>Alternate</span><wbr><span>Screen</span><wbr><span><span>Active</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="403673907%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="is-alternate-screen-active.html">isAlternateScreenActive</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="124740993%2FProperties%2F-1906139840" anchor-label="pointerShape" id="124740993%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pointer-shape.html"><span>pointer</span><wbr><span><span>Shape</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="124740993%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="pointer-shape.html">pointerShape</a><span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-pointer-shape/index.html">TerminalPointerShape</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Accepted OSC 22 pointer override, or null for host defaults. Safe to read from any thread. Pointer presentation is independent of window-manipulation and terminal-response permission.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -183,7 +243,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">var </span><a href="window-title.html">windowTitle</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">The current window title reported by the shell or application.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="window-title.html">windowTitle</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">The current authoritative core window title. Read under the same serialization as core mutation.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -192,17 +252,47 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="196694949%2FFunctions%2F-1906139840" anchor-label="appendToPreviousCluster" id="196694949%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+        <div class="table"><a data-name="2055247237%2FFunctions%2F-1906139840" anchor-label="applyColorRequest" id="2055247237%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="append-to-previous-cluster.html"><span>append</span><wbr><span>To</span><wbr><span>Previous</span><wbr><span><span>Cluster</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="196694949%2FFunctions%2F-1906139840"></span>
+                  <div><a href="apply-color-request.html"><span>apply</span><wbr><span>Color</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2055247237%2FFunctions%2F-1906139840"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="append-to-previous-cluster.html"><span class="token function">appendToPreviousCluster</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">codepoint<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="apply-color-request.html"><span class="token function">applyColorRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-color-request/index.html">TerminalColorRequest</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2014873227%2FFunctions%2F-1906139840" anchor-label="applyDecodedGraphicsCommand" id="-2014873227%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="apply-decoded-graphics-command.html"><span>apply</span><wbr><span>Decoded</span><wbr><span>Graphics</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2014873227%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="apply-decoded-graphics-command.html"><span class="token function">applyDecodedGraphicsCommand</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-command/index.html">TerminalGraphicsCommand</a><span class="token punctuation">, </span></span><span class="parameter ">image<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-image/index.html">TerminalRenderImage</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">result<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-result/index.html">TerminalGraphicsResult</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Commits a session-decoded image under the current response permission. Caller serialization must cover decoding admission through this commit.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-148398096%2FFunctions%2F-1906139840" anchor-label="applyGraphicsCommand" id="-148398096%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="apply-graphics-command.html"><span>apply</span><wbr><span>Graphics</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-148398096%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="apply-graphics-command.html"><span class="token function">applyGraphicsCommand</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-command/index.html">TerminalGraphicsCommand</a><span class="token punctuation">, </span></span><span class="parameter ">data<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">result<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-result/index.html">TerminalGraphicsResult</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies graphics controls under the current terminal-response policy. Denying replies does not suppress image admission or placement. Controls and payload are borrowed and consumed synchronously by the terminal.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -792,6 +882,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1161283564%2FFunctions%2F-1906139840" anchor-label="popColors" id="-1161283564%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pop-colors.html"><span>pop</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1161283564%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="pop-colors.html"><span class="token function">popColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="63835325%2FFunctions%2F-1906139840" anchor-label="popKittyKeyboardFlags" id="63835325%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -818,6 +923,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="pop-title-stack.html"><span class="token function">popTitleStack</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scope<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1965603963%2FFunctions%2F-1906139840" anchor-label="pushColors" id="1965603963%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="push-colors.html"><span>push</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1965603963%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="push-colors.html"><span class="token function">pushColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -972,6 +1092,21 @@
               </div>
             </div>
           </div>
+<a data-name="1551767431%2FFunctions%2F-1906139840" anchor-label="requestKeyFormatOption" id="1551767431%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-key-format-option.html"><span>request</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1551767431%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="request-key-format-option.html"><span class="token function">requestKeyFormatOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-149595481%2FFunctions%2F-1906139840" anchor-label="requestKeyModifierOption" id="-149595481%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -1002,6 +1137,21 @@
               </div>
             </div>
           </div>
+<a data-name="684117525%2FFunctions%2F-1906139840" anchor-label="requestModeStatus" id="684117525%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-mode-status.html"><span>request</span><wbr><span>Mode</span><wbr><span><span>Status</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="684117525%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="request-mode-status.html"><span class="token function">requestModeStatus</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">decPrivate<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="988511421%2FFunctions%2F-1906139840" anchor-label="requestRectangleChecksum" id="988511421%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -1013,6 +1163,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="request-rectangle-checksum.html"><span class="token function">requestRectangleChecksum</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">requestId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">page<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">top<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">left<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">bottom<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">right<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1227416280%2FFunctions%2F-1906139840" anchor-label="requestTerminalVersion" id="1227416280%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-terminal-version.html"><span>request</span><wbr><span>Terminal</span><wbr><span><span>Version</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1227416280%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="request-terminal-version.html"><span class="token function">requestTerminalVersion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -1043,6 +1208,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="reset-attributes.html"><span class="token function">resetAttributes</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1534784192%2FFunctions%2F-1906139840" anchor-label="resetDynamicColor" id="-1534784192%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-dynamic-color.html"><span>reset</span><wbr><span>Dynamic</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1534784192%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="reset-dynamic-color.html"><span class="token function">resetDynamicColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">target<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -1103,6 +1283,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="reset-key-modifier-options.html"><span class="token function">resetKeyModifierOptions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-754802149%2FFunctions%2F-1906139840" anchor-label="resetPaletteColors" id="-754802149%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-palette-colors.html"><span>reset</span><wbr><span>Palette</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-754802149%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="reset-palette-colors.html"><span class="token function">resetPaletteColors</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">indices<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -1452,6 +1647,21 @@
               </div>
             </div>
           </div>
+<a data-name="-80736701%2FFunctions%2F-1906139840" anchor-label="setDefaultBackarrowSendsBackspace" id="-80736701%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-default-backarrow-sends-backspace.html"><span>set</span><wbr><span>Default</span><wbr><span>Backarrow</span><wbr><span>Sends</span><wbr><span><span>Backspace</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-80736701%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="set-default-backarrow-sends-backspace.html"><span class="token function">setDefaultBackarrowSendsBackspace</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Publishes the host default without requiring parser synchronization.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-1198169232%2FFunctions%2F-1906139840" anchor-label="setDynamicColor" id="-1198169232%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -1692,6 +1902,36 @@
               </div>
             </div>
           </div>
+<a data-name="550228362%2FFunctions%2F-1906139840" anchor-label="setPointerShape" id="550228362%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-pointer-shape.html"><span>set</span><wbr><span>Pointer</span><wbr><span><span>Shape</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="550228362%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-pointer-shape.html"><span class="token function">setPointerShape</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">shape<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-pointer-shape/index.html">TerminalPointerShape</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-52626587%2FFunctions%2F-1906139840" anchor-label="setProgress" id="-52626587%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-progress.html"><span>set</span><wbr><span><span>Progress</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-52626587%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-progress.html"><span class="token function">setProgress</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">state<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-progress-state/index.html">TerminalProgressState</a><span class="token punctuation">, </span></span><span class="parameter ">percentage<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Forwards application progress under the session's independent progress permission. State retention and expiry belong to the host or session. Hard reset separately reports HIDDEN regardless of permission so presentation can always be cleared.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="537960045%2FFunctions%2F-1906139840" anchor-label="setScrollRegion" id="537960045%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
             <div class="main-subrow keyValue ">
@@ -1718,6 +1958,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-selective-erase-protection.html"><span class="token function">setSelectiveEraseProtection</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1969808602%2FFunctions%2F-1906139840" anchor-label="setShiftMouseCaptureEnabled" id="1969808602%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-shift-mouse-capture-enabled.html"><span>set</span><wbr><span>Shift</span><wbr><span>Mouse</span><wbr><span>Capture</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1969808602%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="set-shift-mouse-capture-enabled.html"><span class="token function">setShiftMouseCaptureEnabled</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -1913,6 +2168,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="tab.html"><span class="token function">tab</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-271431987%2FFunctions%2F-1906139840" anchor-label="updatePreviousCluster" id="-271431987%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="update-previous-cluster.html"><span>update</span><wbr><span>Previous</span><wbr><span><span>Cluster</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-271431987%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="update-previous-cluster.html"><span class="token function">updatePreviousCluster</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">codepoints<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1381711023%2FFunctions%2F-1906139840" anchor-label="writeAscii" id="1381711023%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="write-ascii.html"><span>write</span><wbr><span><span>Ascii</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1381711023%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="write-ascii.html"><span class="token function">writeAscii</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">bytes<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a><span class="token punctuation">, </span></span><span class="parameter ">offset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
