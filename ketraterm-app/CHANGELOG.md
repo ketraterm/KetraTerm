@@ -1,6 +1,6 @@
 # KetraTerm Standalone Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-10-31
 
 - Compatible applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and window/taskbar status where supported. Progress clears after five minutes without updates and works independently of title permission, with no progress setting.
 - Added opt-in desktop alerts when long-running commands finish in an unfocused terminal, with a configurable minimum duration (10 seconds by default).
