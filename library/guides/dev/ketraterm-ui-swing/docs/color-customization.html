@@ -132,8 +132,27 @@ results without changing the query, active match, or session palette.</p>
 <h2 id="prompt-decorations">Prompt decorations</h2>
 <p>Choose <code>promptDecoration = SwingPromptDecoration.GUTTER</code>, <code>DIVIDER</code>, or <code>NONE</code>.
 Decorations require shell metadata and appear only on the primary screen.
+Prompts without a completed command block use a hollow gutter circle. Dividers
+always remain solid lines. Both styles ignore hover and clicks while a command
+is pending, running, or abandoned. Completed commands use filled gutter circles
+and enable hover styling and click-to-select command blocks for both styles.
 Color overrides belong to <code>SwingSettings</code>; reload a new snapshot on the EDT to
 repaint existing decorations without changing shell records or grid dimensions.</p>
+<p>Gutter and divider modes share the same left padding and
+<code>shellIntegrationDecorationGutterWidth</code>. Switching between these styles preserves
+the text&#39;s horizontal position. Defaults reserve 10 logical pixels for the gutter
+plus 2 pixels of left padding, for a compact 12-pixel total inset in both idle and
+failed-command views. Explicit widths and padding remain authoritative.
+Dots and rails share an axis slightly left of
+the gutter&#39;s center, leaving more space before text. Failed-command rails appear
+in both modes; in divider mode they span the failed prompt and output between
+divider bands. Rails and divider rules align their thickness to device pixels
+at fractional display scales, and adjacent rail segments join without seams.
+Configure the same
+<code>shellIntegrationFailedCommandRailColor</code>, <code>shellIntegrationFailedCommandRailWidth</code>,
+and <code>shellIntegrationFailedCommandRailsVisible</code> settings for either style.
+Disabling rails preserves the shared gutter; alternate screens and
+<code>promptDecoration = NONE</code> do not paint rails. <code>NONE</code> also removes the gutter.</p>
 <pre><code class="language-kotlin">val settings = SwingSettings.create {
     it.promptDecoration = SwingPromptDecoration.GUTTER
     it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
@@ -193,8 +212,8 @@ permitted terminal palette changes. Explicit overrides stay fixed. Transparent
 colors retain the decoration&#39;s hit target and space: a hidden divider rule still
 reserves its band. Use <code>promptDecoration = NONE</code> to remove decoration space, or
 <code>shellIntegrationPromptDotsVisible = false</code> to suppress dots and their halos while
-retaining any configured failure rails. Hover follows the full existing gutter
-or divider hit target, not just the painted dot or rule.</p>
+retaining any configured failure rails. For completed commands, hover follows
+the full existing gutter or divider hit target, not just the painted dot or rule.</p>
 <h2 id="search-controls">Search controls</h2>
 <p>The optional host search bar uses a separate immutable <code>SwingTerminalSearchColors</code>
 snapshot. It supports independent failure/no-match counter and query-border colors,
@@ -262,7 +281,7 @@ This intentionally improves faint text on light themes. Selection and color-poli
 changes are local UI settings; reloading them alone preserves application palette
 overrides. A deliberate host palette change follows the existing session palette
 replacement contract.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-ui-swing/docs/color-customization.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/52498795c8cb6a8ddf938a9ea81db46971590ecf/ketraterm-ui-swing/docs/color-customization.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
