@@ -145,7 +145,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/196305e1be52ace95c5c3b08b69ed36ca11b034b/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -260,6 +260,12 @@ painters or input controllers.</p>
 numeric typing in application keypad mode. Unsupported or headless toolkits
 retain existing keypad behavior without inferring lock state or repeatedly
 querying an unavailable facility.</p>
+<p>Admitted typing, editing keys, and paste immediately return to the live viewport
+and cancel pending scroll animation. Local shortcuts, modifier and lock keys,
+focus changes, and key releases preserve the scrollback position. New output
+keeps scrolled content anchored by default; set <code>SwingSettings.Builder.scrollOnOutput</code>
+to <code>true</code> to return to live output when new rows enter history. Input rejected by
+session startup, closure, or capacity limits does not move the viewport.</p>
 <p><code>mouseReportingEnabled</code> controls application mouse reporting.
 <code>alternateScreenWheelToArrowEnabled</code> independently controls wheel-to-arrow input
 in the alternate screen. Both default to <code>true</code>; mode 1007 must also be enabled
@@ -290,7 +296,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/196305e1be52ace95c5c3b08b69ed36ca11b034b/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
