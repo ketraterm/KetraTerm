@@ -35,6 +35,48 @@ class SwingSettingsTest {
     private val chrome = SwingTerminalChrome()
 
     @Test
+    fun `prompt color overrides are nullable independent and frozen in settings snapshots`() {
+        val original = SwingSettings()
+        assertNull(original.shellIntegrationPromptDividerColor)
+        assertNull(original.shellIntegrationPromptDividerHoverColor)
+        assertNull(original.shellIntegrationPromptDotHoverColor)
+        assertNull(original.shellIntegrationFailedPromptDotHoverColor)
+        assertNull(original.shellIntegrationPromptDotHoverHaloColor)
+        assertNull(original.shellIntegrationFailedPromptDotHoverHaloColor)
+        val draft =
+            original.toBuilder().apply {
+                shellIntegrationPromptDividerColor = 0
+                shellIntegrationPromptDividerHoverColor = 0x80123456.toInt()
+                shellIntegrationPromptDotHoverColor = 0xff123456.toInt()
+                shellIntegrationFailedPromptDotHoverColor = 0xff654321.toInt()
+                shellIntegrationPromptDotHoverHaloColor = 0x40556677
+                shellIntegrationFailedPromptDotHoverHaloColor = 0
+            }
+        val configured = draft.build()
+        assertEquals(0, configured.shellIntegrationPromptDividerColor)
+        assertEquals(0x80123456.toInt(), configured.shellIntegrationPromptDividerHoverColor)
+        assertEquals(0xff123456.toInt(), configured.shellIntegrationPromptDotHoverColor)
+        assertEquals(0xff654321.toInt(), configured.shellIntegrationFailedPromptDotHoverColor)
+        assertEquals(0x40556677, configured.shellIntegrationPromptDotHoverHaloColor)
+        assertEquals(0, configured.shellIntegrationFailedPromptDotHoverHaloColor)
+        draft.shellIntegrationPromptDividerColor = null
+        assertNotEquals(draft.build(), configured)
+        assertEquals(0, configured.shellIntegrationPromptDividerColor)
+        assertEquals(configured, configured.copy {})
+        assertEquals(configured.hashCode(), configured.toBuilder().build().hashCode())
+        val reset =
+            configured.copy {
+                it.shellIntegrationPromptDividerColor = null
+                it.shellIntegrationPromptDividerHoverColor = null
+                it.shellIntegrationPromptDotHoverColor = null
+                it.shellIntegrationFailedPromptDotHoverColor = null
+                it.shellIntegrationPromptDotHoverHaloColor = null
+                it.shellIntegrationFailedPromptDotHoverHaloColor = null
+            }
+        assertEquals(original, reset)
+    }
+
+    @Test
     fun `search styles retain defaults and background convenience setters preserve other roles`() {
         val original = SwingSettings()
         assertEquals(0x55FFD54F, original.searchMatchStyle.background)

@@ -184,6 +184,37 @@ public class SwingSettings private constructor(
     public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
     public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
     public val shellIntegrationFailedPromptDotColor: Int = builder.shellIntegrationFailedPromptDotColor
+
+    /** Hovered normal prompt dot ARGB, or null to retain its normal color. Gutter mode only. */
+    public val shellIntegrationPromptDotHoverColor: Int? = builder.shellIntegrationPromptDotHoverColor
+
+    /** Hovered failed-command prompt dot ARGB, or null to retain its failed color. Gutter mode only. */
+    public val shellIntegrationFailedPromptDotHoverColor: Int? = builder.shellIntegrationFailedPromptDotHoverColor
+
+    /**
+     * Hover halo behind a normal prompt dot, as exact ARGB. Null uses the hovered dot's RGB
+     * with alpha 0x52. Zero alpha suppresses the halo. Gutter mode only.
+     */
+    public val shellIntegrationPromptDotHoverHaloColor: Int? = builder.shellIntegrationPromptDotHoverHaloColor
+
+    /**
+     * Hover halo behind a failed-command prompt dot, as exact ARGB. Null uses the hovered dot's
+     * RGB with alpha 0x52. Independent of the normal halo and failed-command rail. Gutter mode only.
+     */
+    public val shellIntegrationFailedPromptDotHoverHaloColor: Int? = builder.shellIntegrationFailedPromptDotHoverHaloColor
+
+    /**
+     * Prompt divider rule ARGB, or null to use the terminal default foreground RGB with alpha
+     * 0x30. Zero alpha hides the rule without removing its reserved band. Divider mode only.
+     */
+    public val shellIntegrationPromptDividerColor: Int? = builder.shellIntegrationPromptDividerColor
+
+    /**
+     * Hovered prompt divider rule ARGB. Null independently uses the terminal default foreground
+     * RGB with alpha 0x70; it does not inherit [shellIntegrationPromptDividerColor]. Divider mode only.
+     */
+    public val shellIntegrationPromptDividerHoverColor: Int? = builder.shellIntegrationPromptDividerHoverColor
+
     public val shellIntegrationPromptDotDiameter: Int = builder.shellIntegrationPromptDotDiameter
     public val shellIntegrationDecorationGutterWidth: Int = builder.shellIntegrationDecorationGutterWidth
     public val shellIntegrationFailedCommandRailsVisible: Boolean = builder.shellIntegrationFailedCommandRailsVisible
@@ -399,6 +430,24 @@ public class SwingSettings private constructor(
         public var shellIntegrationFailedPromptDotColor: Int =
             source?.shellIntegrationFailedPromptDotColor ?: DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR
 
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotHoverColor]. */
+        public var shellIntegrationPromptDotHoverColor: Int? = source?.shellIntegrationPromptDotHoverColor
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotHoverColor]. */
+        public var shellIntegrationFailedPromptDotHoverColor: Int? = source?.shellIntegrationFailedPromptDotHoverColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotHoverHaloColor]. */
+        public var shellIntegrationPromptDotHoverHaloColor: Int? = source?.shellIntegrationPromptDotHoverHaloColor
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotHoverHaloColor]. */
+        public var shellIntegrationFailedPromptDotHoverHaloColor: Int? = source?.shellIntegrationFailedPromptDotHoverHaloColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDividerColor]. */
+        public var shellIntegrationPromptDividerColor: Int? = source?.shellIntegrationPromptDividerColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDividerHoverColor]. */
+        public var shellIntegrationPromptDividerHoverColor: Int? = source?.shellIntegrationPromptDividerHoverColor
+
         /** Draft value for [SwingSettings.shellIntegrationPromptDotDiameter]; validated when [build] is called. */
         public var shellIntegrationPromptDotDiameter: Int = source?.shellIntegrationPromptDotDiameter ?: 8
 
@@ -501,6 +550,12 @@ public class SwingSettings private constructor(
             shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
             shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
             shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
+            shellIntegrationPromptDotHoverColor == other.shellIntegrationPromptDotHoverColor &&
+            shellIntegrationFailedPromptDotHoverColor == other.shellIntegrationFailedPromptDotHoverColor &&
+            shellIntegrationPromptDotHoverHaloColor == other.shellIntegrationPromptDotHoverHaloColor &&
+            shellIntegrationFailedPromptDotHoverHaloColor == other.shellIntegrationFailedPromptDotHoverHaloColor &&
+            shellIntegrationPromptDividerColor == other.shellIntegrationPromptDividerColor &&
+            shellIntegrationPromptDividerHoverColor == other.shellIntegrationPromptDividerHoverColor &&
             shellIntegrationPromptDotDiameter == other.shellIntegrationPromptDotDiameter &&
             shellIntegrationDecorationGutterWidth == other.shellIntegrationDecorationGutterWidth &&
             shellIntegrationFailedCommandRailsVisible == other.shellIntegrationFailedCommandRailsVisible &&
@@ -552,6 +607,12 @@ public class SwingSettings private constructor(
         result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
         result = 31 * result + shellIntegrationPromptDotColor.hashCode()
         result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDotHoverColor.hashCode()
+        result = 31 * result + shellIntegrationFailedPromptDotHoverColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDotHoverHaloColor.hashCode()
+        result = 31 * result + shellIntegrationFailedPromptDotHoverHaloColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDividerColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDividerHoverColor.hashCode()
         result = 31 * result + shellIntegrationPromptDotDiameter.hashCode()
         result = 31 * result + shellIntegrationDecorationGutterWidth.hashCode()
         result = 31 * result + shellIntegrationFailedCommandRailsVisible.hashCode()

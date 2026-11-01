@@ -132,8 +132,28 @@ public final class JavaConsumer {
             draft.setSearchActiveMatchStyle(new io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle(0xFFFFC857, 0xFF161616, 0xFFFFFFFF));
             draft.setMinimumContrastRatio(4.5);
             draft.setFaintOpacity(0.75);
+            draft.setShellIntegrationPromptDotHoverColor(0xFFFFFFFF);
+            draft.setShellIntegrationFailedPromptDotHoverColor(0xFFFF8A8A);
+            draft.setShellIntegrationPromptDotHoverHaloColor(0x404B6EAF);
+            draft.setShellIntegrationFailedPromptDotHoverHaloColor(0x40E74856);
+            draft.setShellIntegrationPromptDividerColor(0x304B6EAF);
+            draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getShellIntegrationPromptDotHoverColor() != 0xFFFFFFFF
+            || copiedSettings.getShellIntegrationFailedPromptDotHoverColor() != 0xFFFF8A8A
+            || copiedSettings.getShellIntegrationPromptDotHoverHaloColor() != 0x404B6EAF
+            || copiedSettings.getShellIntegrationFailedPromptDotHoverHaloColor() != 0x40E74856
+            || copiedSettings.getShellIntegrationPromptDividerColor() != 0x304B6EAF
+            || copiedSettings.getShellIntegrationPromptDividerHoverColor() != 0xFF4B6EAF)
+            throw new AssertionError("Java prompt colors did not survive copying");
+        var automaticPromptColors = copiedSettings.copy(draft -> {
+            draft.setShellIntegrationPromptDividerColor(null);
+            draft.setShellIntegrationPromptDotHoverHaloColor(0);
+        });
+        if (automaticPromptColors.getShellIntegrationPromptDividerColor() != null
+            || automaticPromptColors.getShellIntegrationPromptDotHoverHaloColor() != 0)
+            throw new AssertionError("Java prompt colors lost null or transparent values");
         if (copiedSettings.getMinimumContrastRatio() != 4.5 || copiedSettings.getFaintOpacity() != 0.75
             || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
             || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())

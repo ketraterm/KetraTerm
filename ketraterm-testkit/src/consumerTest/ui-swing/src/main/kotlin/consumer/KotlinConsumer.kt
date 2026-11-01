@@ -93,6 +93,12 @@ fun main() =
                     )
                 it.minimumContrastRatio = 4.5
                 it.faintOpacity = 0.75
+                it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+                it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+                it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+                it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+                it.shellIntegrationPromptDividerColor = 0x304B6EAF
+                it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
             }
         check(interactionSettings == interactionSettings.copy {})
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
@@ -105,6 +111,15 @@ fun main() =
                 interactionSettings.searchMatchStyle.copy(background = 0),
         )
         check(interactionSettings.hashCode() == interactionSettings.copy {}.hashCode())
+        val promptColors = interactionSettings.toBuilder().build()
+        check(promptColors.shellIntegrationPromptDotHoverColor == 0xFFFFFFFF.toInt())
+        check(promptColors.shellIntegrationFailedPromptDotHoverColor == 0xFFFF8A8A.toInt())
+        check(promptColors.shellIntegrationPromptDotHoverHaloColor == 0x404B6EAF)
+        check(promptColors.shellIntegrationFailedPromptDotHoverHaloColor == 0x40E74856)
+        check(promptColors.shellIntegrationPromptDividerColor == 0x304B6EAF)
+        check(promptColors.shellIntegrationPromptDividerHoverColor == 0xFF4B6EAF.toInt())
+        check(promptColors.copy { it.shellIntegrationPromptDividerColor = null }.shellIntegrationPromptDividerColor == null)
+        check(promptColors.copy { it.shellIntegrationPromptDotHoverHaloColor = 0 }.shellIntegrationPromptDotHoverHaloColor == 0)
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)
         val arrowSettings = interactionSettings.copy { it.alternateScreenWheelToArrowEnabled = true }

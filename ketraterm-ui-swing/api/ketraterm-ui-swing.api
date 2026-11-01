@@ -641,8 +641,14 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationFailedCommandRailWidth ()I
 	public final fun getShellIntegrationFailedCommandRailsVisible ()Z
 	public final fun getShellIntegrationFailedPromptDotColor ()I
+	public final fun getShellIntegrationFailedPromptDotHoverColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationFailedPromptDotHoverHaloColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDividerColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDividerHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotColor ()I
 	public final fun getShellIntegrationPromptDotDiameter ()I
+	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -698,8 +704,14 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationFailedCommandRailWidth ()I
 	public final fun getShellIntegrationFailedCommandRailsVisible ()Z
 	public final fun getShellIntegrationFailedPromptDotColor ()I
+	public final fun getShellIntegrationFailedPromptDotHoverColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationFailedPromptDotHoverHaloColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDividerColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDividerHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotColor ()I
 	public final fun getShellIntegrationPromptDotDiameter ()I
+	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
+	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -748,8 +760,14 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationFailedCommandRailWidth (I)V
 	public final fun setShellIntegrationFailedCommandRailsVisible (Z)V
 	public final fun setShellIntegrationFailedPromptDotColor (I)V
+	public final fun setShellIntegrationFailedPromptDotHoverColor (Ljava/lang/Integer;)V
+	public final fun setShellIntegrationFailedPromptDotHoverHaloColor (Ljava/lang/Integer;)V
+	public final fun setShellIntegrationPromptDividerColor (Ljava/lang/Integer;)V
+	public final fun setShellIntegrationPromptDividerHoverColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotColor (I)V
 	public final fun setShellIntegrationPromptDotDiameter (I)V
+	public final fun setShellIntegrationPromptDotHoverColor (Ljava/lang/Integer;)V
+	public final fun setShellIntegrationPromptDotHoverHaloColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V

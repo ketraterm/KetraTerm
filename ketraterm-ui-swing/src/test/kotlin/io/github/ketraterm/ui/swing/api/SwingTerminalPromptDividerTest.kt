@@ -50,6 +50,91 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
     @ParameterizedTest
+    @CsvSource("GUTTER,false", "GUTTER,true", "DIVIDER,false")
+    fun `prompt colors follow pointer hover and reload without changing metadata or grid geometry`(
+        mode: SwingPromptDecoration,
+        failed: Boolean,
+    ) = edt {
+        Fixture(mode).use { f ->
+            f.prompt(">one")
+            if (failed) {
+                f.session.readRenderFrame {
+                    f.state.recordCommandStart(it.lineId(0), includeLine = true)
+                    f.state.recordCommandFinished(it.lineId(0), exitCode = 1)
+                }
+                f.flush()
+            }
+            val red = 0xffff0000.toInt()
+            val green = 0xff00ff00.toInt()
+            val blue = 0xff0000ff.toInt()
+            f.settings =
+                f.settings.copy {
+                    it.shellIntegrationPromptDotColor = red
+                    it.shellIntegrationFailedPromptDotColor = blue
+                    it.shellIntegrationPromptDotHoverColor = green
+                    it.shellIntegrationFailedPromptDotHoverColor = WHITE
+                    it.shellIntegrationPromptDotHoverHaloColor = 0
+                    it.shellIntegrationFailedPromptDotHoverHaloColor = 0
+                    it.shellIntegrationPromptDividerColor = red
+                    it.shellIntegrationPromptDividerHoverColor = green
+                }
+            f.component.reloadSettings()
+            f.flush()
+            val bounds = Rectangle()
+            assertTrue(f.component.copyCellBounds(0, 0, bounds))
+            val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 else 1
+            val y =
+                if (mode ==
+                    SwingPromptDecoration.GUTTER
+                ) {
+                    bounds.y + f.cellHeight / 2
+                } else {
+                    bounds.y - f.cellHeight + (f.cellHeight - 2) / 2
+                }
+
+            fun color(): Int {
+                val image = BufferedImage(f.component.width, f.component.height, BufferedImage.TYPE_INT_ARGB)
+                val g = image.createGraphics()
+                try {
+                    f.component.paint(g)
+                } finally {
+                    g.dispose()
+                }
+                return image.getRGB(x, y)
+            }
+            assertEquals(if (failed) blue else red, color())
+            val resizes = f.connector.resizes.toList()
+            val writes = f.connector.writes.toList()
+            val records = f.state.recordCount()
+            val grid = f.component.visibleGridSize()
+            f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, x, y, 0, false))
+            assertEquals(if (failed) WHITE else green, color())
+            assertEquals(java.awt.Cursor.HAND_CURSOR, f.component.cursor.type)
+
+            f.settings =
+                f.settings.copy {
+                    when {
+                        mode == SwingPromptDecoration.DIVIDER -> it.shellIntegrationPromptDividerHoverColor = blue
+                        failed -> it.shellIntegrationFailedPromptDotHoverColor = blue
+                        else -> it.shellIntegrationPromptDotHoverColor = blue
+                    }
+                }
+            f.component.reloadSettings()
+            f.flush()
+            assertEquals(blue, color())
+            val after = Rectangle()
+            assertTrue(f.component.copyCellBounds(0, 0, after))
+            assertEquals(bounds, after)
+            assertEquals(grid, f.component.visibleGridSize())
+            assertEquals(records, f.state.recordCount())
+            assertEquals(resizes, f.connector.resizes)
+            assertEquals(writes, f.connector.writes)
+            f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_EXITED, 0, 0, -1, -1, 0, false))
+            assertEquals(if (failed) blue else red, color())
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `binding preferred size matches the configured grid and actual shell gutter`(promptMarkersExpected: Boolean) =
         edt {

@@ -64,6 +64,8 @@ Search chrome accepts immutable `SwingTerminalSearchColors` snapshots.
 Terminal selection colors are configured through `SwingSettings.selectionStyle`
 and `inactiveSelectionStyle`. `searchMatchStyle` and `searchActiveMatchStyle`
 configure match backgrounds, foregrounds, and optional borders independently.
+Prompt decorations accept independent divider normal/hover colors and normal/failed
+dot hover and halo colors through the `shellIntegration*Color` settings.
 `minimumContrastRatio` and `faintOpacity` control
 text readability; see [color customization](../../ketraterm-ui-swing/docs/color-customization.md).
 Completion adapters accept source-ID-to-display-label maps. Neither changes

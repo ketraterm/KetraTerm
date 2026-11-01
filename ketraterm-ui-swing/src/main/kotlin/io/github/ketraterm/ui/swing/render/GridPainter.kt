@@ -173,6 +173,7 @@ internal class GridPainter(
                     if (geometry?.hasDividerBefore(row) == true) {
                         shellIntegrationDecorationPainter.paintDivider(
                             g,
+                            settings,
                             metrics,
                             row,
                             contentWidth,

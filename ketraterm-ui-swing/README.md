@@ -49,6 +49,12 @@ fun createUnboundTerminalView(
         )
         it.minimumContrastRatio = 4.5 // Optional readability policy; 1.0 preserves exact colors.
         it.faintOpacity = 0.5
+        it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+        it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+        it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+        it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+        it.shellIntegrationPromptDividerColor = 0x304B6EAF
+        it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
     }
 
     return SwingTerminal(settingsProvider = { settings }).apply {
@@ -58,7 +64,7 @@ fun createUnboundTerminalView(
 ```
 
 The font name is a host choice; use a font available in your environment.
-Selection and search styling, terminal color precedence, and migration notes are explained in
+Selection, search and prompt decoration colors, terminal color precedence, and migration notes are explained in
 [Color customization](docs/color-customization.md).
 `columns` and `rows` set the preferred size. Once laid out, the visible cell
 dimensions determine the live session's grid and connector size. Settings and

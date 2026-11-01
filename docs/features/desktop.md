@@ -18,7 +18,7 @@ controls and platform integrations are listed separately below.
 | Clipboard interaction | Copy/paste, optional copy on selection, and configurable clipboard/primary-selection middle-button paste. |
 | Mouse routing | Application reporting, application-requested Shift capture (XTSHIFTESCAPE), and mode 1007 alternate-screen wheel-to-arrow input, bounded by host reporting/wheel settings. Shift restores local interaction by default. |
 | Mouse pointer | Application OSC 22 requests for portable native shapes; activatable links and prompt actions retain pointer precedence. |
-| Prompt presentation | Gutter, divider, or hidden decorations; requires [shell metadata](shells.md). |
+| Prompt presentation | Gutter, divider, or hidden decorations; independent divider normal/hover colors and normal/failed dot hover and halo colors. [Color settings and defaults](../../ketraterm-ui-swing/docs/color-customization.md#prompt-decorations) preserve geometry and metadata. Requires [shell metadata](shells.md). |
 | Bell | Configurable visual indicator; sound and desktop attention are product-owned. |
 | Clear screen | Sends Ctrl+L to request clearing/redrawing by the foreground program; accepted requests return to the live viewport. Clears local selection, search, and suggestions. |
 | Closed sessions | Final output remains visible, scrollable, selectable, and searchable. |

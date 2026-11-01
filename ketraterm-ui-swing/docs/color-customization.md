@@ -80,6 +80,56 @@ convenience aliases for their style's background. Assigning either preserves
 that style's foreground and border. Reloading search styles repaints existing
 results without changing the query, active match, or session palette.
 
+## Prompt decorations
+
+Choose `promptDecoration = SwingPromptDecoration.GUTTER`, `DIVIDER`, or `NONE`.
+Decorations require shell metadata and appear only on the primary screen.
+Color overrides belong to `SwingSettings`; reload a new snapshot on the EDT to
+repaint existing decorations without changing shell records or grid dimensions.
+
+```kotlin
+val settings = SwingSettings.create {
+    it.promptDecoration = SwingPromptDecoration.GUTTER
+    it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+    it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+    it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+    it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+    // Used when promptDecoration is DIVIDER.
+    it.shellIntegrationPromptDividerColor = 0x304B6EAF
+    it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
+}
+```
+
+All six overrides accept packed ARGB values or null. Alpha is used as supplied;
+zero alpha hides that part of the decoration. Null restores these defaults:
+
+| Override | Null behavior |
+| --- | --- |
+| `shellIntegrationPromptDotHoverColor` | Retain the normal prompt dot's resolved color. |
+| `shellIntegrationFailedPromptDotHoverColor` | Retain `shellIntegrationFailedPromptDotColor`. |
+| `shellIntegrationPromptDotHoverHaloColor` | Use the hovered normal dot's RGB with alpha `0x52`. |
+| `shellIntegrationFailedPromptDotHoverHaloColor` | Use the hovered failed dot's RGB with alpha `0x52`. |
+| `shellIntegrationPromptDividerColor` | Use the current terminal default foreground's RGB with alpha `0x30`. |
+| `shellIntegrationPromptDividerHoverColor` | Independently use the current terminal default foreground's RGB with alpha `0x70`. This does not inherit the normal divider override. |
+
+Dots paint over their hover halos, with their alphas composed normally. Set both
+halo overrides to `0` to retain dot color changes without halos. A transparent
+hover dot alone does not suppress its default halo; configure both roles to hide
+both. Normal and failed colors are independent; marker hover never recolors a
+failed-command rail. Normal-state dots and rails keep their existing
+`shellIntegrationPromptDotColor`, `shellIntegrationFailedPromptDotColor`, and
+`shellIntegrationFailedCommandRailColor` settings. The established normal-dot
+default `0x8CFFFFFF` requests terminal foreground RGB with alpha `0x8C`.
+
+These colors do not affect terminal text or participate in `minimumContrastRatio`.
+Palette-derived defaults follow the current session foreground, including
+permitted terminal palette changes. Explicit overrides stay fixed. Transparent
+colors retain the decoration's hit target and space: a hidden divider rule still
+reserves its band. Use `promptDecoration = NONE` to remove decoration space, or
+`shellIntegrationPromptDotsVisible = false` to suppress dots and their halos while
+retaining any configured failure rails. Hover follows the full existing gutter
+or divider hit target, not just the painted dot or rule.
+
 ## Terminal overrides and precedence
 
 Host styles are presentation defaults. Permitted OSC 21 selection overrides in
