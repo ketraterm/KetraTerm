@@ -13,7 +13,7 @@ contracts. `ketraterm-protocol` is an implementation dependency.
 ## Components
 
 The producer owns prompt-marker interpretation, stable-line command anchors,
-bounded command-text extraction, and primitive command fingerprints. Session
+bounded command-text extraction, immutable styled prompt-row capture, and primitive command fingerprints. Session
 provides serialized frame access and owns shared observation, outbound writes,
 and startup submission. The producer owns no threads or coroutine scope.
 

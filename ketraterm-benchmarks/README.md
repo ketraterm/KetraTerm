@@ -59,6 +59,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
 | Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchScanBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |
 | Color-policy resolution without Java2D | `TerminalColorResolutionBenchmark`; warmed reusable row buffers, selection/search foregrounds and contrast-cache hits or changing truecolor. `ratio=1.0,3.0,4.5` includes disabled, default and stronger contrast. Its owner-thread allocation counter excludes Swing dispatch and painting. |
+| Sticky prompt overlay updates and painting | `StickyCommandHeaderBenchmark`; hidden/ASCII/Unicode cases, warmed fractional updates, cached raster painting, and separate command-transition preparation. |
 | Prompt decoration software painting | `TerminalPromptDecorationBenchmark`; warmed default/custom colors with identical alpha values. Includes Java2D antialiasing/compositing allocation, excluding fixture construction. |
 
 Read the selected fixture before interpreting a result. Isolated parsing uses a
@@ -76,6 +77,28 @@ zero allocation claim for a complete frame. For example:
 ```text
 java -jar <jmh-jar> ".*SwingPaintBenchmark.paintPublishedFrame" -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=true -wi 3 -i 5 -w 1s -r 1s -f 1 -t 1 -prof gc
 ```
+
+### Sticky command headers
+
+`StickyCommandHeaderBenchmark.fractionalScroll` measures owner-thread state updates
+without EDT dispatch or source reads. `countUpdateAllocations` uses the same
+owner-thread allocation counter as the color-policy benchmark, batching 128 warmed
+updates per invocation. `paint` measures the cached raster composite; `commandTransition`
+includes new raster preparation and is intentionally allocation-permitted. Prompt
+snapshots and fixture construction occur in setup. ASCII and Unicode cases use the
+same terminal painter as the normal grid.
+
+```text
+java -Xms128m -Xmx512m -jar <jmh-jar> ".*StickyCommandHeaderBenchmark.*" -wi 2 -i 3 -w 1s -r 1s -f 1 -t 1 -foe true -prof gc -rf json -rff sticky-header.json
+java -Xms128m -Xmx512m -jar <jmh-jar> ".*SwingPaintBenchmark.paintPublishedFrame" -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=false -p stickyHeaders=false,true -wi 2 -i 3 -w 1s -r 1s -f 1 -t 1 -foe true -prof gc -rf json -rff sticky-full-paint.json
+```
+
+The complete-component comparison uses the same retained prompt and output with
+only the overlay toggle changed. It includes amortized EDT dispatch and Java2D
+costs. Keep this boundary separate from the update-only allocation counter; neither
+establishes zero allocation for all terminal workloads or platforms. These short
+runs are useful validation; use additional forks and longer measurements for
+performance comparisons. Run under JDK 25, even if a different Java is on `PATH`.
 
 ### Reverse-wrap cursor motion
 

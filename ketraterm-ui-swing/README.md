@@ -114,6 +114,30 @@ selection. Width changes clip rather than reflow it; height changes expose a
 bottom-anchored window over retained rows. Presentation changes do not restart
 the session.
 
+### Sticky command headers
+
+`stickyCommandHeadersEnabled` defaults to `true`, independently of `promptDecoration`.
+When command output reaches the viewport top and its input has scrolled away, one
+opaque overlay repeats the captured physical prompt/input row, including the prompt
+prefix, directory, command, original cell colors and attributes. It uses the same
+terminal font, metrics, spacing, shaping, and fallback as ordinary output. Long rows
+clip to the available width; they are never shortened, scaled, or given a separate font.
+
+This applies to live running commands, scrollback, and retained closed-session output.
+Alternate-screen content, prompts still visible at the top, untouched trailing rows,
+and commands without a captured prompt have no overlay. The overlay reserves no grid
+space and does not resize the terminal. A subtle four-pixel shadow fades below the
+header; only its opaque row intercepts pointer actions. Primary click reveals the original command;
+if its grid anchor has been evicted, the retained header remains and the click does
+nothing. Wheel gestures over the overlay scroll local history. Covered cells receive
+no new selection, hyperlink, context-menu, paste, or application-mouse gestures.
+
+The standard OSC integration captures the row before command output. Custom shell
+views implement `commandOutputRecordIdAtLine` and `commandPrompt` to supply this
+presentation; a host using `TerminalShellIntegrationState` can pass an immutable
+`TerminalRenderRowSnapshot` to its command-start overload. See the
+[shell metadata contract](../ketraterm-shell-integration/README.md) for retention bounds.
+
 ### Search
 
 `search(query)` starts a background search; observe `searchState` for results or

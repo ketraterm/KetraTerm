@@ -201,17 +201,34 @@ public class SwingTerminal
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
+        private val stickyCommandHeader = StickyCommandHeader(chrome, hostServices.fontResolver)
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
         private var hyperlinkCursor: Cursor = DEFAULT_CURSOR
         private val terminalMouseListener =
             object : MouseAdapter() {
                 override fun mousePressed(event: MouseEvent) {
                     if (handleScrollbarOverlayPressed(event)) return
+                    if (stickyCommandHeader.contains(event.x, event.y)) {
+                        requestFocusInWindow()
+                        stickyCommandHeader.press(event.button)
+                        event.consume()
+                        return
+                    }
                     mouseController.mouseListener.mousePressed(event)
                 }
 
                 override fun mouseReleased(event: MouseEvent) {
+                    if (stickyCommandHeader.ownsButton(event.button)) {
+                        val target = stickyCommandHeader.release(event.x, event.y, event.button)
+                        if (target != 0) commandInteractionController.revealCommand(target)
+                        event.consume()
+                        return
+                    }
                     if (handleScrollbarOverlayReleased(event)) return
+                    if (stickyCommandHeader.contains(event.x, event.y) && !mouseController.hasPressedButtons) {
+                        event.consume()
+                        return
+                    }
                     if (isInScrollbarOverlayGutter(event) && !mouseController.hasPressedButtons) {
                         event.consume()
                         return
@@ -221,6 +238,7 @@ public class SwingTerminal
                 }
 
                 override fun mouseExited(event: MouseEvent) {
+                    stickyCommandHeader.clearHover()
                     if (hostServices.scrollbarOverlayEnabled && scrollbarOverlay.handleExited()) repaint()
                     mouseController.mouseListener.mouseExited(event)
                 }
@@ -229,6 +247,13 @@ public class SwingTerminal
             object : MouseMotionAdapter() {
                 override fun mouseDragged(event: MouseEvent) {
                     if (handleScrollbarOverlayDragged(event)) return
+                    if (stickyCommandHeader.gestureActive) {
+                        stickyCommandHeader.drag(event.x, event.y)
+                        if (!mouseController.hasPressedButtons) {
+                            event.consume()
+                            return
+                        }
+                    }
                     if (isInScrollbarOverlayGutter(event)) {
                         event.consume()
                         return
@@ -252,6 +277,12 @@ public class SwingTerminal
                         clearPointerHover()
                         return
                     }
+                    stickyCommandHeader.updatePointer(event.x, event.y)
+                    if (stickyCommandHeader.hovered) {
+                        clearPointerHover(forgetPointer = false)
+                        updatePointerCursor()
+                        return
+                    }
                     mouseController.mouseMotionListener.mouseMoved(event)
                 }
             }
@@ -269,12 +300,12 @@ public class SwingTerminal
                     override fun cellAt(
                         x: Int,
                         y: Int,
-                    ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
+                    ): Long = this@SwingTerminal.cellAt(x, selectionPointerY(x, y), this@SwingTerminal.renderCache)
 
                     override fun visualCellAt(
                         x: Int,
                         y: Int,
-                    ): Long = this@SwingTerminal.visualCellAt(x, y, this@SwingTerminal.renderCache)
+                    ): Long = this@SwingTerminal.visualCellAt(x, selectionPointerY(x, y), this@SwingTerminal.renderCache)
 
                     override fun scrollViewportByRows(deltaRows: Int): Boolean = viewportController.scrollByRows(deltaRows)
 
@@ -507,10 +538,15 @@ public class SwingTerminal
                         cache: TerminalRenderCache,
                     ): Long = this@SwingTerminal.cellAt(x, y, cache)
 
-                    override fun isPromptDividerAt(
+                    override fun isTerminalMouseExcludedAt(
                         x: Int,
                         y: Int,
-                    ): Boolean = this@SwingTerminal.isPromptDividerAt(x, y)
+                    ): Boolean = this@SwingTerminal.isPromptDividerAt(x, y) || stickyCommandHeader.contains(x, y)
+
+                    override fun isStickyCommandHeaderAt(
+                        x: Int,
+                        y: Int,
+                    ): Boolean = stickyCommandHeader.contains(x, y)
 
                     override fun terminalPixelYAt(
                         y: Int,
@@ -751,13 +787,15 @@ public class SwingTerminal
         }
 
         private fun clearPointerHover(forgetPointer: Boolean = true) {
+            if (forgetPointer) stickyCommandHeader.clearHover()
             if (forgetPointer) mouseController.updatePointerModifiers(0)
             updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
             hyperlinkController.clearHyperlinkHover(forgetPointer)
         }
 
         private fun refreshHyperlinkHover() {
-            if (mouseController.isMouseTrackingIntercepted()) {
+            stickyCommandHeader.refreshPointer()
+            if (stickyCommandHeader.hovered || mouseController.isMouseTrackingIntercepted()) {
                 hyperlinkController.clearHyperlinkHover(forgetPointer = false)
             } else {
                 hyperlinkController.refreshHyperlinkHover()
@@ -769,6 +807,7 @@ public class SwingTerminal
             val shape = session?.pointerShape
             val next =
                 when {
+                    stickyCommandHeader.hovered -> HAND_CURSOR
                     hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW -> HAND_CURSOR
                     hyperlinkCursor === HAND_CURSOR -> HAND_CURSOR
                     shape != null -> APPLICATION_POINTER_CURSORS[shape.ordinal]
@@ -790,6 +829,10 @@ public class SwingTerminal
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
             addComponentListener(resizeListener)
+            addPropertyChangeListener("graphicsConfiguration") {
+                updateVisualViewportGeometry()
+                repaint()
+            }
             addHierarchyListener { event ->
                 if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L) {
                     if (isShowing) reconcileHyperlinksOnEdt() else clearPointerHover()
@@ -1305,6 +1348,7 @@ public class SwingTerminal
                     hyperlinkPresentations = hyperlinkDiscoveryController.hyperlinkPresentationsFor(renderCache),
                     followedHyperlinkId = hyperlinkDiscoveryController.followedHyperlinkId,
                 )
+                stickyCommandHeader.paint(g)
                 if (hostServices.scrollbarOverlayEnabled) {
                     scrollbarOverlay.paint(
                         g = g,
@@ -1397,8 +1441,9 @@ public class SwingTerminal
                         .takeWhile { it !is TerminalSessionState.Closed }
                         .collect {
                             // Host metadata can be published inside a borrowed frame callback.
-                            // Defer source reads or gutter-triggered resize until the borrowed frame is released.
-                            if (settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                            // Defer header preparation, source reads and gutter resize until that frame is released.
+                            if (settings.stickyCommandHeadersEnabled ||
+                                settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
                                 !chrome.promptDecorationsAvailable &&
                                 session.shellIntegrationState.recordCount() > 0
                             ) {
@@ -1577,6 +1622,7 @@ public class SwingTerminal
                 ) {
                     reconcileHyperlinksOnEdt()
                 }
+                updateVisualViewportGeometry()
                 repaint()
             }
             session?.let {
@@ -3280,6 +3326,7 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            stickyCommandHeader.reset()
             painter.clearImages()
             renderCache.reset()
             searchCache.reset()
@@ -3355,6 +3402,12 @@ public class SwingTerminal
             if (position == null) {
                 clearPointerHover()
             } else {
+                stickyCommandHeader.updatePointer(position.x, position.y)
+                if (stickyCommandHeader.hovered) {
+                    clearPointerHover(forgetPointer = false)
+                    updatePointerCursor()
+                    return
+                }
                 val markerRow = promptMarkerRowAt(position.x, position.y)
                 updateHoveredPromptMarker(markerRow)
                 if (markerRow == NO_PROMPT_MARKER_ROW) {
@@ -3484,9 +3537,27 @@ public class SwingTerminal
                         visibleGridRows = visibleGridRows(),
                     ),
                 )
+            val headerChanged =
+                session?.let {
+                    stickyCommandHeader.update(
+                        it.shellIntegrationState,
+                        renderCache,
+                        visualGeometry,
+                        settings,
+                        metrics,
+                        width,
+                        height,
+                        graphicsConfiguration,
+                    )
+                } ?: false
             refreshHyperlinkHover()
-            return chromeChanged or layoutChanged or originChanged
+            return chromeChanged or layoutChanged or originChanged or headerChanged
         }
+
+        private fun selectionPointerY(
+            x: Int,
+            y: Int,
+        ): Int = if (stickyCommandHeader.contains(x, y)) stickyCommandHeader.bottom else y
 
         private fun updateChromeLayout(): Boolean =
             chrome.updateLayout(settings, metrics, width, height, renderCache.columns, renderCache.rows)

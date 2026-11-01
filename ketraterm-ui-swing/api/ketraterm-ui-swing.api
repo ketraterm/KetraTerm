@@ -652,6 +652,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
+	public final fun getStickyCommandHeadersEnabled ()Z
 	public final fun getTextAntialiasing ()Ljava/lang/Object;
 	public final fun getTreatAmbiguousAsWide ()Z
 	public final fun getUseSystemFallbackFonts ()Z
@@ -715,6 +716,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
+	public final fun getStickyCommandHeadersEnabled ()Z
 	public final fun getTextAntialiasing ()Ljava/lang/Object;
 	public final fun getTreatAmbiguousAsWide ()Z
 	public final fun getUseSystemFallbackFonts ()Z
@@ -772,6 +774,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V
+	public final fun setStickyCommandHeadersEnabled (Z)V
 	public final fun setTextAntialiasing (Ljava/lang/Object;)V
 	public final fun setTreatAmbiguousAsWide (Z)V
 	public final fun setUseSystemFallbackFonts (Z)V

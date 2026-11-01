@@ -23,6 +23,62 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalRenderCacheTest {
     @Test
+    fun `immutable row snapshot preserves styled cells clusters and identities after source mutation`() {
+        val frame = MutableFrame(6, 2)
+        frame.setRow(1, "prompt")
+        frame.setLineId(1, 42)
+        frame.setWrapped(1, true)
+        val snapshot = TerminalRenderRowSnapshot.copyOf(frame, 1)
+        frame.setRow(1, "change")
+        val cache = TerminalRenderCache(6, 1)
+        cache.accept(snapshot)
+        assertEquals(1, cache.rows)
+        assertEquals(42, cache.lineIds[0])
+        assertEquals('p'.code, cache.codeWords[0])
+        assertTrue(cache.lineWrapped[0])
+        assertFalse(cache.cursorVisible)
+        assertEquals(1, frame.copyCounts[1])
+        frame.setClusterRow("e\u0301")
+        val clusterSnapshot = TerminalRenderRowSnapshot.copyOf(frame, 0)
+        frame.setRow(0, "change")
+        cache.reset()
+        cache.accept(clusterSnapshot)
+        assertTrue(cache.clusterRefs[0] != 0L)
+        assertEquals('e'.code, cache.clusterCodepoints[0])
+        assertEquals(0x0301, cache.clusterCodepoints[1])
+        assertTrue(clusterSnapshot.storageBytes > 0)
+    }
+
+    @Test
+    fun `independent row snapshots with the same identity replace cached cells after reset`() {
+        val source = MutableFrame(6, 1)
+        source.setLineId(0, 42)
+        source.setRow(0, "before")
+        val first = TerminalRenderRowSnapshot.copyOf(source, 0)
+        source.setRow(0, "after!")
+        val second = TerminalRenderRowSnapshot.copyOf(source, 0)
+        val cache = TerminalRenderCache(6, 1)
+        cache.accept(first)
+        assertArrayEquals("before".map { it.code }.toIntArray(), cache.codeWords)
+        cache.reset()
+        cache.accept(second)
+        assertEquals(42, cache.lineIds[0])
+        assertArrayEquals("after!".map { it.code }.toIntArray(), cache.codeWords)
+    }
+
+    @Test
+    fun `row snapshot validates all destinations before writing and rejects invalid rows`() {
+        val snapshot = TerminalRenderRowSnapshot.copyOf(MutableFrame(3, 1), 0)
+        val codes = IntArray(3) { -1 }
+        assertThrows(IllegalArgumentException::class.java) {
+            snapshot.copyLine(0, codes, 0, LongArray(2), 0, IntArray(3), 0)
+        }
+        assertArrayEquals(intArrayOf(-1, -1, -1), codes)
+        assertThrows(IllegalArgumentException::class.java) { snapshot.lineId(1) }
+        assertThrows(IllegalArgumentException::class.java) { TerminalRenderRowSnapshot.copyOf(MutableFrame(3, 1), -1) }
+    }
+
+    @Test
     fun `image versions survive copies while failed and reset caches release their references`() {
         fun image(color: Int) =
             object : TerminalRenderImage {

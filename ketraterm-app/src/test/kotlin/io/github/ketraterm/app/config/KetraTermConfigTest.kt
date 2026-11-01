@@ -30,6 +30,22 @@ import kotlin.test.*
 
 class KetraTermConfigTest {
     @Test
+    fun `sticky headers default on and survive config restart`(
+        @TempDir directory: Path,
+    ) {
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
+        assertTrue(manager.load().stickyCommandHeadersEnabled)
+        for (enabled in listOf(false, true)) {
+            val config = KetraTermConfig(stickyCommandHeadersEnabled = enabled)
+            manager.save(config)
+            assertEquals(config, manager.load())
+            assertTrue(Files.readString(manager.configPath).contains("sticky_command_headers_enabled = $enabled"))
+        }
+        Files.writeString(manager.configPath, "[behavior]\nsticky_command_headers_enabled = invalid\n")
+        assertTrue(manager.load().stickyCommandHeadersEnabled)
+    }
+
+    @Test
     fun `output scrolling defaults off and preserves explicit saved preferences`(
         @TempDir directory: Path,
     ) {

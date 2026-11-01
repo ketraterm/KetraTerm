@@ -197,6 +197,8 @@ internal class KetraTermConfigManager(
                     SwingPromptDecoration.entries.firstOrNull {
                         it.name.equals(behavior["prompt_decoration"]?.trim(), ignoreCase = true)
                     } ?: default.promptDecoration,
+                stickyCommandHeadersEnabled =
+                    behavior["sticky_command_headers_enabled"]?.toBooleanStrictOrNull() ?: default.stickyCommandHeadersEnabled,
                 shellPath = cleanShellPath,
                 startDirectory = startDirectory,
                 startupCommand = shell["startup_command"].orEmpty(),
@@ -319,6 +321,8 @@ internal class KetraTermConfigManager(
 
         # Prompt presentation: "gutter", "divider", or "none".
         prompt_decoration = ${TomlParser.quoteString(config.promptDecoration.name.lowercase(Locale.ROOT))}
+        # Pin command text above scrolled output when its input is no longer visible
+        sticky_command_headers_enabled = ${config.stickyCommandHeadersEnabled}
         # Play a system beep when the terminal receives a BEL character
         audible_bell = ${config.audibleBell}
         # Show a visual edge pulse when the terminal receives a BEL character

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -218,6 +219,8 @@ public class TerminalShellIntegrationState(
     private val commandStartedAtNanos = LongArray(capacity)
     private val commandDurationsMillis = LongArray(capacity) { UNKNOWN_DURATION_MILLIS }
     private val commandTexts = arrayOfNulls<String>(capacity)
+    private val commandPrompts = arrayOfNulls<TerminalRenderRowSnapshot>(capacity)
+    private var commandPromptBytes = 0L
     private val commandWorkingDirectoryUris = arrayOfNulls<String>(capacity)
 
     private var count = 0
@@ -330,6 +333,15 @@ public class TerminalShellIntegrationState(
         includeLine: Boolean,
         commandText: String? = null,
         workingDirectoryUri: String? = null,
+    ): Unit = recordCommandStart(lineId, includeLine, commandText, workingDirectoryUri, null)
+
+    /** Records a command atomically with its immutable original prompt/input [prompt] row. */
+    public fun recordCommandStart(
+        lineId: Long,
+        includeLine: Boolean,
+        commandText: String?,
+        workingDirectoryUri: String?,
+        prompt: TerminalRenderRowSnapshot?,
     ) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         val changedRevision =
@@ -343,6 +355,7 @@ public class TerminalShellIntegrationState(
                 exitCodes[index] = TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
                 lifecycles[index] = TerminalShellIntegrationCommandLifecycle.RUNNING
                 commandTexts[index] = boundedCommandText(commandText)
+                retainCommandPromptLocked(index, prompt)
                 commandWorkingDirectoryUris[index] = workingDirectoryUri
                 commandStartedAtEpochMillis[index] = epochMillis()
                 commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
@@ -439,6 +452,28 @@ public class TerminalShellIntegrationState(
             val index = indexForRecordIdLocked(recordId)
             if (index == NO_INDEX) null else commandTexts[index]
         }
+    }
+
+    public override fun commandPrompt(recordId: Int): TerminalRenderRowSnapshot? =
+        synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandPrompts[index]
+        }
+
+    private fun retainCommandPromptLocked(
+        index: Int,
+        prompt: TerminalRenderRowSnapshot?,
+    ) {
+        commandPromptBytes -= commandPrompts[index]?.storageBytes ?: 0
+        commandPrompts[index] = null
+        if (prompt == null || prompt.storageBytes > MAX_COMMAND_PROMPT_BYTES) return
+        var oldest = 0
+        while (commandPromptBytes + prompt.storageBytes > MAX_COMMAND_PROMPT_BYTES && oldest < count) {
+            commandPromptBytes -= commandPrompts[oldest]?.storageBytes ?: 0
+            commandPrompts[oldest++] = null
+        }
+        commandPrompts[index] = prompt
+        commandPromptBytes += prompt.storageBytes
     }
 
     public override fun commandWorkingDirectoryUri(recordId: Int): String? {
@@ -875,6 +910,8 @@ public class TerminalShellIntegrationState(
     // Separate primitive columns share one eviction slice and retain their alignment.
     @Suppress("DuplicatedCode")
     private fun evictOldestLocked() {
+        commandPromptBytes -= commandPrompts[0]?.storageBytes ?: 0
+        commandPrompts.copyInto(commandPrompts, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptStartLineIds.copyInto(promptStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptEndLineIds.copyInto(promptEndLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandStartLineIds.copyInto(commandStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
@@ -896,6 +933,7 @@ public class TerminalShellIntegrationState(
         )
         count--
         commandTexts[count] = null
+        commandPrompts[count] = null
         commandWorkingDirectoryUris[count] = null
         activePromptIndex = shiftIndexAfterEviction(activePromptIndex)
         activeCommandIndex = shiftIndexAfterEviction(activeCommandIndex)
@@ -929,6 +967,30 @@ public class TerminalShellIntegrationState(
             index++
         }
         return NO_INDEX
+    }
+
+    public override fun commandOutputRecordIdAtLine(lineId: Long): Int {
+        if (lineId <= NO_LINE_ID) return TerminalShellIntegrationCommandRecord.NONE
+        synchronized(lock) {
+            var index = count - 1
+            while (index >= 0) {
+                val start = commandStartLineIds[index]
+                if (start != NO_LINE_ID && lineId >= start) {
+                    val end = commandEndLineIds[index]
+                    val ownsOutput =
+                        if (end != NO_LINE_ID) {
+                            lineId <= end && isLineInCommandOutputRange(index, lineId, start, end)
+                        } else {
+                            index == activeCommandIndex &&
+                                lifecycles[index] == TerminalShellIntegrationCommandLifecycle.RUNNING &&
+                                (lineId > start || isCommandStartInclusive(index))
+                        }
+                    if (ownsOutput) return recordIds[index]
+                }
+                index--
+            }
+            return TerminalShellIntegrationCommandRecord.NONE
+        }
     }
 
     private fun commandIndexAtLineLocked(lineId: Long): Int {
@@ -1153,15 +1215,18 @@ public class TerminalShellIntegrationState(
         var index = 0
         while (index < count) {
             commandTexts[index] = null
+            commandPrompts[index] = null
             commandWorkingDirectoryUris[index] = null
             index++
         }
+        commandPromptBytes = 0
         count = 0
         activePromptIndex = NO_INDEX
         activeCommandIndex = NO_INDEX
     }
 
     private companion object {
+        const val MAX_COMMAND_PROMPT_BYTES = 8L * 1024 * 1024
         private val LOGGER = System.getLogger(TerminalShellIntegrationState::class.java.name)
         private const val DEFAULT_CAPACITY = 4096
         private const val NO_INDEX = -1

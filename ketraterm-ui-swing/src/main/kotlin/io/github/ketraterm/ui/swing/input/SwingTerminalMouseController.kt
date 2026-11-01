@@ -102,7 +102,7 @@ internal class SwingTerminalMouseController(
                 beginGesture(event, modeBits)
                 if (handleContextMenu(event, modeBits)) return
                 if (!host.renderCache.hasFrame) return
-                if (host.handlePromptMarkerMousePressed(event) || host.isPromptDividerAt(event.x, event.y)) {
+                if (host.handlePromptMarkerMousePressed(event) || host.isTerminalMouseExcludedAt(event.x, event.y)) {
                     decorationGesture = true
                     event.consume()
                     return
@@ -180,7 +180,7 @@ internal class SwingTerminalMouseController(
             resetWheelInput()
             return
         }
-        if (isMouseTrackingIntercepted(modeBits)) {
+        if (!host.isStickyCommandHeaderAt(event.x, event.y) && isMouseTrackingIntercepted(modeBits)) {
             selectWheelRoute(WheelRoute.TRACKED)
             host.finishViewportScroll()
             handleMouseTracking(event, TerminalMouseEventType.WHEEL, modeBits)
@@ -276,7 +276,7 @@ internal class SwingTerminalMouseController(
             return true
         }
 
-        val overDivider = host.isPromptDividerAt(event.x, event.y)
+        val overDivider = host.isTerminalMouseExcludedAt(event.x, event.y)
         if (overDivider && (type != TerminalMouseEventType.RELEASE || !hasTrackedPosition)) {
             event.consume()
             return true

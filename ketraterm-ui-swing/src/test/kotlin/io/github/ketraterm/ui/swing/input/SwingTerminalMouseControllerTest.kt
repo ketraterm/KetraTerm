@@ -783,6 +783,32 @@ class SwingTerminalMouseControllerTest {
             rotation,
         )
 
+    @Test
+    fun `header wheel input scrolls history even when terminal mouse tracking is enabled`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.ANY_EVENT)
+        host.overHeader = true
+        val controller = SwingTerminalMouseController(host)
+        val wheel = mouseWheel(-1.0)
+        controller.wheelListener.mouseWheelMoved(wheel)
+        assertEquals(1, host.scrollCount)
+        assertTrue(host.mouseReports.isEmpty())
+        assertTrue(wheel.isConsumed)
+    }
+
+    @Test
+    fun `tracked release over header uses last terminal position without motion reports`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.ANY_EVENT)
+        val controller = SwingTerminalMouseController(host)
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON1, 0))
+        host.overHeader = true
+        controller.mouseMotionListener.mouseDragged(mouseDragged())
+        controller.mouseListener.mouseReleased(mouseReleased())
+        assertEquals(listOf(TerminalMouseEventType.PRESS, TerminalMouseEventType.RELEASE), host.mouseReports.map { it.type })
+        assertEquals(host.mouseReports[0].column, host.mouseReports[1].column)
+        assertEquals(host.mouseReports[0].row, host.mouseReports[1].row)
+        assertFalse(controller.hasPressedButtons)
+    }
+
     private class RecordingInputEncoder : TerminalInputEncoder {
         override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
 
@@ -848,6 +874,18 @@ class SwingTerminalMouseControllerTest {
         var shiftMouseCapture = false
         var alternateScrollEnabled = true
         var modeSnapshotReads = 0
+
+        var overHeader = false
+
+        override fun isStickyCommandHeaderAt(
+            x: Int,
+            y: Int,
+        ): Boolean = overHeader
+
+        override fun isTerminalMouseExcludedAt(
+            x: Int,
+            y: Int,
+        ): Boolean = overHeader
 
         override fun getInputModeBits(): Long {
             modeSnapshotReads++

@@ -45,7 +45,13 @@ internal interface SwingTerminalMouseHost {
     ): Long
 
     /** Whether the pointer is over presentation space that has no terminal mouse coordinates. */
-    fun isPromptDividerAt(
+    fun isTerminalMouseExcludedAt(
+        x: Int,
+        y: Int,
+    ): Boolean = false
+
+    /** UI overlay wheel gestures always scroll local history rather than report terminal mouse input. */
+    fun isStickyCommandHeaderAt(
         x: Int,
         y: Int,
     ): Boolean = false

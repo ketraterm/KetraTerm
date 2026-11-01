@@ -32,6 +32,17 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingSettingsTest {
+    @Test
+    fun `sticky headers are independent copied settings and participate in equality`() {
+        val defaults = SwingSettings.create { it.promptDecoration = SwingPromptDecoration.NONE }
+        assertTrue(defaults.stickyCommandHeadersEnabled)
+        val disabled = defaults.copy { it.stickyCommandHeadersEnabled = false }
+        assertFalse(disabled.stickyCommandHeadersEnabled)
+        assertNotEquals(defaults, disabled)
+        assertEquals(disabled, disabled.copy {})
+        assertEquals(disabled.hashCode(), disabled.copy {}.hashCode())
+    }
+
     private val chrome = SwingTerminalChrome()
 
     @Test

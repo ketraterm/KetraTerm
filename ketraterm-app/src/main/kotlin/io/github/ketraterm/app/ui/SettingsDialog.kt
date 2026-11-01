@@ -216,6 +216,10 @@ internal class SettingsDialog(
                         }
                 }
         }
+    private val stickyCommandHeadersCheckbox =
+        JCheckBox(appMessages.text("settings.stickyCommandHeaders"), settings.config.stickyCommandHeadersEnabled).apply {
+            toolTipText = appMessages.text("settings.stickyCommandHeaders.tooltip")
+        }
     private val themeCombo = createComboBox(TerminalTheme.entries.toTypedArray(), settings.theme, 220)
 
     // Form Controls - Behavior
@@ -358,6 +362,7 @@ internal class SettingsDialog(
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
         registerChangeListener(promptDecorationCombo, updateApplyState)
+        registerChangeListener(stickyCommandHeadersCheckbox, updateApplyState)
         sidebarPanel.preferredSize =
             Dimension(maxOf(180, sidebarPanel.minimumSize.width), sidebarPanel.preferredSize.height)
         pack()
@@ -574,6 +579,7 @@ internal class SettingsDialog(
         addFormRow(windowSection, 0, appMessages.text("settings.columns"), layoutGridWrapper)
         addFormRow(windowSection, 1, appMessages.text("settings.scrollback"), scrollbackSpinner)
         addFormRow(windowSection, 2, appMessages.text("settings.promptStyle"), promptDecorationCombo)
+        addFormRow(windowSection, 3, "", stickyCommandHeadersCheckbox)
         panel.add(windowSection)
 
         return panel
@@ -866,6 +872,7 @@ internal class SettingsDialog(
         cursorBlinkSpinner.value = KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = KetraTermConfig.DEFAULT_CURSOR_SHAPE
         promptDecorationCombo.selectedItem = KetraTermConfig.DEFAULT_PROMPT_DECORATION
+        stickyCommandHeadersCheckbox.isSelected = true
 
         clipboardWriteCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_WRITE
         clipboardReadCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_READ
@@ -977,6 +984,7 @@ internal class SettingsDialog(
             useSystemFallbackFonts = useSystemFallbackCheckbox.isSelected,
             cursorShape = cursorShapeCombo.selectedItem as? String ?: "",
             promptDecoration = promptDecorationCombo.selectedItem as? SwingPromptDecoration ?: KetraTermConfig.DEFAULT_PROMPT_DECORATION,
+            stickyCommandHeadersEnabled = stickyCommandHeadersCheckbox.isSelected,
             shellPath = nextShellPath.ifBlank { KetraTermConfig.DEFAULT_SHELL_PATH },
             startDirectory = startDirectoryField.text,
             startupCommand = startupCommandField.text,

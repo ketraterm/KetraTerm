@@ -183,6 +183,9 @@ public class SwingSettings private constructor(
      */
     public val promptDecoration: SwingPromptDecoration = builder.promptDecoration
 
+    /** Repeats the original styled prompt/input row above output when that input has scrolled away. */
+    public val stickyCommandHeadersEnabled: Boolean = builder.stickyCommandHeadersEnabled
+
     public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
     public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
     public val shellIntegrationFailedPromptDotColor: Int = builder.shellIntegrationFailedPromptDotColor
@@ -434,6 +437,9 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.promptDecoration]. */
         public var promptDecoration: SwingPromptDecoration = source?.promptDecoration ?: SwingPromptDecoration.GUTTER
 
+        /** Draft value for [SwingSettings.stickyCommandHeadersEnabled]. Defaults to true. */
+        public var stickyCommandHeadersEnabled: Boolean = source?.stickyCommandHeadersEnabled ?: true
+
         /** Draft value for [SwingSettings.shellIntegrationPromptDotsVisible]. */
         public var shellIntegrationPromptDotsVisible: Boolean = source?.shellIntegrationPromptDotsVisible ?: true
 
@@ -563,6 +569,7 @@ public class SwingSettings private constructor(
             visualBellDurationMillis == other.visualBellDurationMillis &&
             visualBellEdgeThicknessPixels == other.visualBellEdgeThicknessPixels &&
             promptDecoration == other.promptDecoration &&
+            stickyCommandHeadersEnabled == other.stickyCommandHeadersEnabled &&
             shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
             shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
             shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
@@ -621,6 +628,7 @@ public class SwingSettings private constructor(
         result = 31 * result + visualBellDurationMillis.hashCode()
         result = 31 * result + visualBellEdgeThicknessPixels.hashCode()
         result = 31 * result + promptDecoration.hashCode()
+        result = 31 * result + stickyCommandHeadersEnabled.hashCode()
         result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
         result = 31 * result + shellIntegrationPromptDotColor.hashCode()
         result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()

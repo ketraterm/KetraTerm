@@ -26,7 +26,9 @@ owns cache storage and reader leases; consumers access it through the session.
 One publication viewport is retained per session.
 
 `TerminalShellIntegration` and its factory define the neutral producer boundary.
-`TerminalShellIntegrationState` stores bounded metadata;
+`TerminalShellIntegrationState` stores bounded metadata and immutable styled prompt
+rows, and exposes allocation-free output ownership separately from completed-command
+selection;
 `TerminalShellCommandLineState` serializes host editing revisions with conditional
 admission. Optional OSC interpretation and grid extraction belong to
 `ketraterm-shell-integration`, which this module does not depend on.

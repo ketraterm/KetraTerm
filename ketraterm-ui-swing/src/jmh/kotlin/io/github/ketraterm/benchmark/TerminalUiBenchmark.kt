@@ -21,7 +21,10 @@ import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
+import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.CellSelection
@@ -163,6 +166,9 @@ open class SwingPaintBenchmark {
     @Param("false", "true")
     var selected: Boolean = false
 
+    @Param("false", "true")
+    var stickyHeaders: Boolean = false
+
     private lateinit var terminal: TerminalRenderBuffer
     private lateinit var session: TerminalSession
     private lateinit var component: SwingTerminal
@@ -185,6 +191,11 @@ open class SwingPaintBenchmark {
     @Setup
     open fun setup() {
         terminal = TerminalBuffers.create(columns, rows, maxHistory = rows)
+        for (char in "PS C:\\work> ./gradlew build".take(columns)) terminal.writeCodepoint(char.code)
+        var prompt: TerminalRenderRowSnapshot? = null
+        terminal.readRenderFrame { prompt = TerminalRenderRowSnapshot.copyOf(it, 0) }
+        repeat(rows) { terminal.newLine() }
+
         when (workload) {
             "ascii" -> writeAsciiViewport(terminal, rows, columns)
             "styled" -> writeStyledViewport(terminal, rows, columns)
@@ -192,7 +203,19 @@ open class SwingPaintBenchmark {
             else -> error("unknown workload: $workload")
         }
 
-        session = benchmarkSession(terminal)
+        val shellState = TerminalShellIntegrationState()
+        val capturedPrompt = requireNotNull(prompt)
+        shellState.recordPromptStart(capturedPrompt.lineId(0))
+        shellState.recordPromptEnd(capturedPrompt.lineId(0))
+        terminal.readRenderFrame { frame ->
+            shellState.recordCommandStart(frame.lineId(0), true, "./gradlew build", null, capturedPrompt)
+        }
+        session =
+            TerminalSession.create(
+                terminal = terminal,
+                connector = NoOpTerminalConnector,
+                shellIntegration = TerminalShellIntegrationFactory.host(shellState),
+            )
         session.requestRender(0)
         kotlinx.coroutines.runBlocking { session.renderGeneration.first { it > 0 } }
 
@@ -204,6 +227,7 @@ open class SwingPaintBenchmark {
                             draft.columns = columns
                             draft.rows = rows
                             draft.cursorBlinkMillis = 0
+                            draft.stickyCommandHeadersEnabled = stickyHeaders
                             draft.useSystemFallbackFonts = false
                         }
                     },
