@@ -93,7 +93,7 @@ open class TerminalPromptDecorationBenchmark {
         for (row in 0..2) {
             painter.paint(graphics, settings, metrics, decorations, 20, row, hovered, settings.palette)
         }
-        painter.paintDivider(graphics, settings, metrics, 4, 640, hovered, settings.palette)
+        painter.paintDivider(graphics, settings, metrics, 4, 640, hovered, settings.palette, interactive = true)
         return image.getRGB(10, 10) xor image.getRGB(21, 69)
     }
 

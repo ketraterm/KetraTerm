@@ -36,6 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Cursor
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.ComponentEvent
@@ -57,13 +58,11 @@ class SwingTerminalPromptDividerTest {
     ) = edt {
         Fixture(mode).use { f ->
             f.prompt(">one")
-            if (failed) {
-                f.session.readRenderFrame {
-                    f.state.recordCommandStart(it.lineId(0), includeLine = true)
-                    f.state.recordCommandFinished(it.lineId(0), exitCode = 1)
-                }
-                f.flush()
+            f.session.readRenderFrame {
+                f.state.recordCommandStart(it.lineId(0), includeLine = true)
+                f.state.recordCommandFinished(it.lineId(0), exitCode = if (failed) 1 else 0)
             }
+            f.flush()
             val red = 0xffff0000.toInt()
             val green = 0xff00ff00.toInt()
             val blue = 0xff0000ff.toInt()
@@ -109,7 +108,7 @@ class SwingTerminalPromptDividerTest {
             val grid = f.component.visibleGridSize()
             f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, x, y, 0, false))
             assertEquals(if (failed) WHITE else green, color())
-            assertEquals(java.awt.Cursor.HAND_CURSOR, f.component.cursor.type)
+            assertEquals(Cursor.HAND_CURSOR, f.component.cursor.type)
 
             f.settings =
                 f.settings.copy {
@@ -133,6 +132,82 @@ class SwingTerminalPromptDividerTest {
             assertEquals(if (failed) blue else red, color())
         }
     }
+
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class, names = ["GUTTER", "DIVIDER"])
+    fun `unfinished prompt decorations ignore hover and clicks until command completion`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode).use { f ->
+                f.prompt(">one")
+                f.settings =
+                    f.settings.copy {
+                        it.shellIntegrationPromptDotColor = WHITE
+                        it.shellIntegrationPromptDotHoverColor = 0xffff0000.toInt()
+                        it.shellIntegrationPromptDotHoverHaloColor = 0xff00ff00.toInt()
+                        it.shellIntegrationPromptDividerColor = WHITE
+                        it.shellIntegrationPromptDividerHoverColor = 0xffff0000.toInt()
+                    }
+                f.component.reloadSettings()
+                f.flush()
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 else f.component.width / 2
+                val y = if (mode == SwingPromptDecoration.GUTTER) bounds.y + f.cellHeight / 2 else bounds.y - (f.cellHeight + 4) / 2 + 1
+                val grid = f.component.visibleGridSize()
+                val resizes = f.connector.resizes.toList()
+                val inactiveCenterColor = if (mode == SwingPromptDecoration.GUTTER) BLACK else WHITE
+
+                for (running in booleanArrayOf(false, true)) {
+                    if (running) {
+                        f.session.readRenderFrame { f.state.recordCommandStart(it.lineId(0), includeLine = true) }
+                        f.flush()
+                    }
+                    assertTrue(f.component.selectAll())
+                    val selection = f.component.currentSelectionRange()
+                    val before = f.paint()
+                    assertEquals(inactiveCenterColor, before.getRGB(x, y), "Idle gutters are hollow; dividers remain solid lines")
+                    val edgeY = if (mode == SwingPromptDecoration.GUTTER) y - f.settings.shellIntegrationPromptDotDiameter / 2 else y
+                    assertNotEquals(BLACK, before.getRGB(x, edgeY), "Unfinished marker remains visible")
+                    f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, x, y, 0, false))
+                    assertEquals(Cursor.DEFAULT_CURSOR, f.component.cursor.type)
+                    val after = f.paint()
+                    assertContentEquals(
+                        before.getRGB(0, 0, before.width, before.height, null, 0, before.width),
+                        after.getRGB(0, 0, after.width, after.height, null, 0, after.width),
+                        "Unfinished markers ignore hover colors and halos",
+                    )
+                    f.feed("\u001B[?1003h\u001B[?1006h")
+                    f.connector.writes.clear()
+                    f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, x, y, 0, false))
+                    f.mouse(MouseEvent.MOUSE_PRESSED, x, y)
+                    f.mouse(MouseEvent.MOUSE_DRAGGED, bounds.x + 1, bounds.y + 1)
+                    f.mouse(MouseEvent.MOUSE_RELEASED, bounds.x + 1, bounds.y + 1)
+                    f.flush()
+                    assertEquals(selection, f.component.currentSelectionRange())
+                    assertEquals(emptyList(), f.connector.writes)
+                    f.feed("\u001B[?1003l\u001B[?1006l")
+                }
+
+                f.component.clearSelection()
+                f.session.readRenderFrame { f.state.recordCommandFinished(it.lineId(0), exitCode = 0) }
+                f.flush()
+                assertEquals(WHITE, f.paint().getRGB(x, y), "Finished marker is filled")
+                f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, x, y, 0, false))
+                assertEquals(Cursor.HAND_CURSOR, f.component.cursor.type)
+                f.mouse(MouseEvent.MOUSE_PRESSED, x, y)
+                f.mouse(MouseEvent.MOUSE_RELEASED, x, y)
+                f.flush()
+                assertNotNull(f.component.currentSelection())
+                assertEquals(grid, f.component.visibleGridSize())
+                assertEquals(resizes, f.connector.resizes)
+
+                f.state.clear()
+                f.session.readRenderFrame { f.state.recordPromptStart(it.lineId(0)) }
+                f.flush()
+                assertEquals(Cursor.DEFAULT_CURSOR, f.component.cursor.type, "Metadata replacement clears stale marker hover")
+                assertEquals(inactiveCenterColor, f.paint().getRGB(x, y))
+            }
+        }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -214,7 +289,14 @@ class SwingTerminalPromptDividerTest {
                     } finally {
                         graphics.dispose()
                     }
-                    assertNotEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                    assertEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                    assertNotEquals(
+                        BLACK,
+                        image.getRGB(
+                            bounds.x / 2,
+                            bounds.y + f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2,
+                        ),
+                    )
                 }
                 f.feed("\u001B[?1049hALT")
                 assertTrue(f.component.copyCellBounds(0, 0, bounds))
@@ -232,6 +314,11 @@ class SwingTerminalPromptDividerTest {
         edt {
             Fixture().use { f ->
                 f.prompt(">one")
+                f.session.readRenderFrame {
+                    f.state.recordCommandStart(it.lineId(0), includeLine = true)
+                    f.state.recordCommandFinished(it.lineId(0), exitCode = 0)
+                }
+                f.flush()
                 val h = f.cellHeight
                 val bounds = Rectangle()
                 assertTrue(f.component.copyCellBounds(0, 0, bounds))
@@ -426,7 +513,8 @@ class SwingTerminalPromptDividerTest {
                 } finally {
                     graphics.dispose()
                 }
-                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2))
+                assertEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2))
+                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2))
                 val resizes = f.connector.resizes.toList()
                 f.state.clear()
                 f.flush()
@@ -475,7 +563,14 @@ class SwingTerminalPromptDividerTest {
                 } finally {
                     graphics.dispose()
                 }
-                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                assertEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                assertNotEquals(
+                    BLACK,
+                    image.getRGB(
+                        bounds.x / 2,
+                        bounds.y + f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2,
+                    ),
+                )
             }
         }
 
@@ -885,6 +980,17 @@ class SwingTerminalPromptDividerTest {
             feed(text)
             session.readRenderFrame { frame -> state.recordPromptStart(frame.lineId(frame.cursor.row)) }
             flush()
+        }
+
+        fun paint(): BufferedImage {
+            val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
+            val graphics = image.createGraphics()
+            try {
+                component.paint(graphics)
+            } finally {
+                graphics.dispose()
+            }
+            return image
         }
 
         fun feed(text: String) {

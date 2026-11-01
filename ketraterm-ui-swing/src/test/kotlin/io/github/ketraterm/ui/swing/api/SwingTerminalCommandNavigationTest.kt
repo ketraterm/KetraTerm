@@ -108,6 +108,11 @@ class SwingTerminalCommandNavigationTest {
                 assertTrue(fixture.repaints.count > repaints)
                 fixture.moveToPromptGutter()
 
+                assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
+                state.recordCommandStart(lineIdForAbsoluteRow(6), includeLine = true)
+                state.recordCommandFinished(lineIdForAbsoluteRow(6), exitCode = 0)
+                fixture.flush()
+                fixture.moveToPromptGutter()
                 assertEquals(Cursor.HAND_CURSOR, fixture.component.cursor.type)
                 val activatedGeneration = fixture.session.renderGeneration.value
                 assertTrue(activatedGeneration > generation)

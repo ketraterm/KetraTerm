@@ -557,8 +557,10 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight + metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(12, metrics.cellHeight / 2))
-        assertEquals(GREEN, image.getRGB(12, nodeCenterY))
+        assertEquals(BLACK, image.getRGB(12, metrics.cellHeight / 2))
+        assertEquals(BLACK, image.getRGB(12, nodeCenterY))
+        assertNotEquals(BLACK, image.getRGB(12, metrics.cellHeight / 2 - 3))
+        assertNotEquals(BLACK, image.getRGB(12, nodeCenterY - 3))
         assertEquals(BLACK, image.getRGB(0, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
@@ -632,6 +634,8 @@ class GridPainterTest {
         cache.updateFrom(TextRowsFrame(lines = arrayOf("   "), palette = settings.palette))
         val state = TerminalShellIntegrationState()
         state.recordPromptStart(1)
+        state.recordCommandStart(1, includeLine = true)
+        state.recordCommandFinished(1, exitCode = 0)
         val decorations = TerminalShellIntegrationViewportDecorations()
         decorations.updateFrom(state, cache)
 
@@ -704,6 +708,8 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight / 2
+        val nodeCenterX = settings.padding.left + settings.shellIntegrationDecorationGutterWidth / 2
+        assertEquals(BLACK, image.getRGB(nodeCenterX, nodeCenterY))
         assertNotEquals(BLACK, image.getRGB(12, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }

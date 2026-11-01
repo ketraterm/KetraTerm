@@ -21,8 +21,10 @@ import io.github.ketraterm.ui.swing.render.TerminalShellIntegrationViewportDecor
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import java.awt.BasicStroke
 import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.awt.geom.Ellipse2D
 
 /**
  * Paints shell-integration gutter markers and prompt divider rules.
@@ -30,6 +32,8 @@ import java.awt.RenderingHints
 internal class TerminalShellIntegrationDecorationPainter(
     private val colorCache: AwtColorCache,
 ) {
+    private val promptOutline = Ellipse2D.Double()
+
     /**
      * Paints shell-integration decorations for one visible row.
      */
@@ -59,6 +63,8 @@ internal class TerminalShellIntegrationDecorationPainter(
         val diameter = minOf(settings.shellIntegrationPromptDotDiameter, gutterWidth, metrics.cellHeight)
         val dotX = centerX - diameter / 2
         val dotY = y + (metrics.cellHeight - diameter) / 2
+        val interactive = decorations.isPromptMarkerInteractiveAt(row)
+        val showHover = hovered && interactive
         val failed = decorations.commandLifecycleAt(row) == TerminalShellIntegrationCommandLifecycle.FAILED
         val normalMarkerColor =
             if (failed) {
@@ -72,11 +78,11 @@ internal class TerminalShellIntegrationDecorationPainter(
             }
         val hoverMarkerColor =
             if (failed) settings.shellIntegrationFailedPromptDotHoverColor else settings.shellIntegrationPromptDotHoverColor
-        val markerColor = if (hovered) hoverMarkerColor ?: normalMarkerColor else normalMarkerColor
+        val markerColor = if (showHover) hoverMarkerColor ?: normalMarkerColor else normalMarkerColor
         val previousAntialiasing = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         try {
-            if (hovered) {
+            if (showHover) {
                 val haloOverride =
                     if (failed) settings.shellIntegrationFailedPromptDotHoverHaloColor else settings.shellIntegrationPromptDotHoverHaloColor
                 val haloColor = haloOverride ?: withAlpha(markerColor, HOVER_HALO_ALPHA)
@@ -90,10 +96,38 @@ internal class TerminalShellIntegrationDecorationPainter(
             }
             if (markerColor ushr 24 != 0) {
                 g.color = colorCache.color(markerColor)
-                g.fillOval(dotX, dotY, diameter, diameter)
+                if (interactive) {
+                    g.fillOval(dotX, dotY, diameter, diameter)
+                } else {
+                    paintPromptOutline(g, dotX, dotY, diameter)
+                }
             }
         } finally {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, previousAntialiasing ?: RenderingHints.VALUE_ANTIALIAS_DEFAULT)
+        }
+    }
+
+    private fun paintPromptOutline(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        diameter: Int,
+    ) {
+        if (diameter <= 2) {
+            g.fillOval(x, y, diameter, diameter)
+            return
+        }
+        val previousStroke = g.stroke
+        val previousStrokeControl = g.getRenderingHint(RenderingHints.KEY_STROKE_CONTROL)
+        val inset = PROMPT_OUTLINE_STROKE.lineWidth / 2.0
+        promptOutline.setFrame(x + inset, y + inset, diameter - inset * 2, diameter - inset * 2)
+        g.stroke = PROMPT_OUTLINE_STROKE
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+        try {
+            g.draw(promptOutline)
+        } finally {
+            g.stroke = previousStroke
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, previousStrokeControl ?: RenderingHints.VALUE_STROKE_DEFAULT)
         }
     }
 
@@ -106,10 +140,12 @@ internal class TerminalShellIntegrationDecorationPainter(
         contentWidth: Int,
         hovered: Boolean,
         palette: TerminalColorPalette,
+        interactive: Boolean,
     ) {
         if (contentWidth <= 0) return
-        val override = if (hovered) settings.shellIntegrationPromptDividerHoverColor else settings.shellIntegrationPromptDividerColor
-        val color = override ?: withAlpha(palette.defaultForeground, if (hovered) 0x70 else 0x30)
+        val showHover = hovered && interactive
+        val override = if (showHover) settings.shellIntegrationPromptDividerHoverColor else settings.shellIntegrationPromptDividerColor
+        val color = override ?: withAlpha(palette.defaultForeground, if (showHover) 0x70 else 0x30)
         if (color ushr 24 == 0) return
         g.color = colorCache.color(color)
         val thickness = minOf(2, metrics.cellHeight)
@@ -148,6 +184,7 @@ internal class TerminalShellIntegrationDecorationPainter(
 
     private companion object {
         private const val HOVER_HALO_ALPHA = 0x52
+        private val PROMPT_OUTLINE_STROKE = BasicStroke(1.5f)
 
         private fun withAlpha(
             argb: Int,

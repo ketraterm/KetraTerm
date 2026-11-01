@@ -89,6 +89,10 @@ results without changing the query, active match, or session palette.
 
 Choose `promptDecoration = SwingPromptDecoration.GUTTER`, `DIVIDER`, or `NONE`.
 Decorations require shell metadata and appear only on the primary screen.
+Prompts without a completed command block use a hollow gutter circle. Dividers
+always remain solid lines. Both styles ignore hover and clicks while a command
+is pending, running, or abandoned. Completed commands use filled gutter circles
+and enable hover styling and click-to-select command blocks for both styles.
 Color overrides belong to `SwingSettings`; reload a new snapshot on the EDT to
 repaint existing decorations without changing shell records or grid dimensions.
 
@@ -132,8 +136,8 @@ permitted terminal palette changes. Explicit overrides stay fixed. Transparent
 colors retain the decoration's hit target and space: a hidden divider rule still
 reserves its band. Use `promptDecoration = NONE` to remove decoration space, or
 `shellIntegrationPromptDotsVisible = false` to suppress dots and their halos while
-retaining any configured failure rails. Hover follows the full existing gutter
-or divider hit target, not just the painted dot or rule.
+retaining any configured failure rails. For completed commands, hover follows
+the full existing gutter or divider hit target, not just the painted dot or rule.
 
 ## Search controls
 
