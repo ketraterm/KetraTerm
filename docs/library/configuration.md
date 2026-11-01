@@ -60,7 +60,9 @@ Message patterns use JDK `MessageFormat`; formatted literal apostrophes must
 be doubled. Components capture their message provider at construction, so
 recreate chrome to change that captured language.
 
-Search chrome accepts immutable `SwingTerminalSearchColors` snapshots.
+Search chrome accepts immutable `SwingTerminalSearchColors` snapshots, including
+independent error/no-match status and border colors and query-field selection colors;
+see [search colors and defaults](../../ketraterm-ui-swing-host/README.md#search-colors).
 Terminal selection colors are configured through `SwingSettings.selectionStyle`
 and `inactiveSelectionStyle`. `searchMatchStyle` and `searchActiveMatchStyle`
 configure match backgrounds, foregrounds, and optional borders independently.

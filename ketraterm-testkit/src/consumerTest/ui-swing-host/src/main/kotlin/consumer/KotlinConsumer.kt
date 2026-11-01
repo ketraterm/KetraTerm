@@ -109,12 +109,25 @@ fun main() =
                     val light = JavaConsumer.lightSearchColors()
                     searchBar.refreshColors(light)
                     check(searchBar.component.foreground == Color.BLACK)
-                    searchBar.refreshColors(
+                    val themedSearch =
                         light.copy {
                             it.foreground = Color.WHITE
                             it.panelBackground = Color.BLACK
-                        },
-                    )
+                            it.counterErrorForeground = Color(0xFFEF5350.toInt(), true)
+                            it.counterNoMatchForeground = Color(0xFFFFB74D.toInt(), true)
+                            it.textFieldErrorBorder = Color(0xFFEF5350.toInt(), true)
+                            it.textFieldNoMatchBorder = Color(0xFFFFB74D.toInt(), true)
+                            it.textFieldSelectionBackground = Color(0xFF355FA8.toInt(), true)
+                            it.textFieldSelectionForeground = Color.WHITE
+                        }
+                    check(themedSearch.counterErrorForeground?.rgb == 0xFFEF5350.toInt())
+                    check(themedSearch.counterNoMatchForeground?.rgb == 0xFFFFB74D.toInt())
+                    check(themedSearch.textFieldErrorBorder?.rgb == 0xFFEF5350.toInt())
+                    check(themedSearch.textFieldNoMatchBorder?.rgb == 0xFFFFB74D.toInt())
+                    check(themedSearch.textFieldSelectionBackground?.rgb == 0xFF355FA8.toInt())
+                    check(themedSearch.textFieldSelectionForeground == Color.WHITE)
+                    check(themedSearch.copy { it.counterErrorForeground = null }.counterErrorForeground == null)
+                    searchBar.refreshColors(themedSearch)
                     searchBar.refreshColors()
                     check(searchBar.component.foreground == Color.WHITE)
                 }

@@ -342,14 +342,15 @@ public class SwingTerminalSearchBar
             queryField.isOpaque = false
             queryField.foreground = colors.foreground
             queryField.caretColor = colors.foreground
+            queryField.refreshSelectionColors()
             queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, toggles.sumOf { it.preferredSize.width } + 10)
-            counterLabel.foreground = colors.counterForeground
             previousButton.foreground = colors.foreground
             nextButton.foreground = colors.foreground
             closeButton.foreground = colors.foreground
             for (toggle in toggles) {
                 toggle.foreground = if (toggle.isSelected) colors.buttonSelectedForeground else colors.foreground
             }
+            refreshCounter()
             component.repaint()
         }
 
@@ -371,6 +372,20 @@ public class SwingTerminalSearchBar
 
         private fun refreshCounter() {
             val state = terminal.currentSearchState()
+            when {
+                state.failure != null -> {
+                    counterLabel.foreground = colors.counterErrorForeground ?: colors.counterForeground
+                    queryField.statusBorderColor = colors.textFieldErrorBorder
+                }
+                state.query.isNotEmpty() && !state.isSearching && state.resultCount == 0 -> {
+                    counterLabel.foreground = colors.counterNoMatchForeground ?: colors.counterForeground
+                    queryField.statusBorderColor = colors.textFieldNoMatchBorder
+                }
+                else -> {
+                    counterLabel.foreground = colors.counterForeground
+                    queryField.statusBorderColor = null
+                }
+            }
             counterLabel.text =
                 when {
                     state.failure is PatternSyntaxException -> messages.message("search.invalidRegex")
@@ -610,6 +625,23 @@ public class SwingTerminalSearchBar
         private inner class SearchTextField(
             columns: Int,
         ) : JTextField(columns) {
+            private val initialSelectionBackground = Color(selectionColor.rgb, true)
+            private val initialSelectionForeground = Color(selectedTextColor.rgb, true)
+            var statusBorderColor: Color? = null
+                set(value) {
+                    if (field == value) return
+                    field = value
+                    repaint()
+                }
+
+            /** Resolve look-and-feel colors outside painting, including when overrides are cleared. */
+            fun refreshSelectionColors() {
+                selectionColor = colors.textFieldSelectionBackground
+                    ?: Color((UIManager.getColor("TextField.selectionBackground") ?: initialSelectionBackground).rgb, true)
+                selectedTextColor = colors.textFieldSelectionForeground
+                    ?: Color((UIManager.getColor("TextField.selectionForeground") ?: initialSelectionForeground).rgb, true)
+            }
+
             init {
                 isOpaque = false
                 caretColor = colors.foreground
@@ -638,7 +670,7 @@ public class SwingTerminalSearchBar
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                     g.color = colors.textFieldBackground
                     g.fillRoundRect(1, 1, width - 2, height - 2, 8, 8)
-                    g.color = if (isFocusOwner) colors.textFieldFocusBorder else colors.textFieldBorder
+                    g.color = statusBorderColor ?: if (isFocusOwner) colors.textFieldFocusBorder else colors.textFieldBorder
                     g.drawRoundRect(1, 1, width - 2, height - 2, 8, 8)
                 } finally {
                     g.dispose()

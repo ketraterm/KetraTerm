@@ -130,6 +130,14 @@ reserves its band. Use `promptDecoration = NONE` to remove decoration space, or
 retaining any configured failure rails. Hover follows the full existing gutter
 or divider hit target, not just the painted dot or rule.
 
+## Search controls
+
+The optional host search bar uses a separate immutable `SwingTerminalSearchColors`
+snapshot. It supports independent failure/no-match counter and query-border colors,
+plus query-field selection background and foreground. Configure those roles with
+`SwingTerminalSearchBar.refreshColors`, not `SwingSettings`. See
+[search chrome colors and defaults](../../ketraterm-ui-swing-host/README.md#search-colors).
+
 ## Terminal overrides and precedence
 
 Host styles are presentation defaults. Permitted OSC 21 selection overrides in
