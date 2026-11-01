@@ -23,6 +23,6 @@ public enum class SwingPromptDecoration {
     /** Prompt dots and failed-command rails in the reserved left gutter. */
     GUTTER,
 
-    /** A horizontal rule in a one-cell-high visual band before each known prompt. */
+    /** Horizontal rules before prompts, with failed-command rails in the same reserved gutter as [GUTTER]. */
     DIVIDER,
 }

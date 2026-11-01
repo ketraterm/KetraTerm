@@ -87,7 +87,7 @@ import java.util.*
  * @property shellIntegrationDecorationGutterWidth pixels reserved between the
  * primary-screen left margin and terminal grid when the bound session has
  * shell-integration decorations.
- * @property shellIntegrationFailedCommandRailsVisible whether failed-command output draws a vertical gutter rail.
+ * @property shellIntegrationFailedCommandRailsVisible whether failed commands draw a left rail in gutter or divider mode.
  * @property shellIntegrationFailedCommandRailColor packed ARGB color for failed-command rails.
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
  * @property padding primary-screen visual inset around the terminal grid in
@@ -227,7 +227,7 @@ public class SwingSettings private constructor(
     public val alternateScreenPadding: SwingPadding =
         builder.resolvedAlternatePadding ?: balancedAlternatePadding(
             builder.padding,
-            if (builder.promptDecoration == SwingPromptDecoration.GUTTER) builder.shellIntegrationDecorationGutterWidth else 0,
+            if (builder.promptDecoration != SwingPromptDecoration.NONE) builder.shellIntegrationDecorationGutterWidth else 0,
         )
     private val alternateScreenPaddingWithoutPromptGutter: SwingPadding =
         if (automaticAlternateScreenPadding) balancedAlternatePadding(padding, 0) else alternateScreenPadding
@@ -330,7 +330,7 @@ public class SwingSettings private constructor(
                     alternateScreenPadding == source.alternateScreenPadding
 
         internal val resolvedAlternatePadding: SwingPadding?
-            get() = if (usesAutomaticAlternatePadding && source?.promptDecoration != promptDecoration) null else alternateScreenPadding
+            get() = if (usesAutomaticAlternatePadding) null else alternateScreenPadding
 
         /** Draft value for [SwingSettings.font]; validated when [build] is called. */
         public var font: Font = source?.font ?: defaultTerminalFont()
@@ -467,7 +467,7 @@ public class SwingSettings private constructor(
         public var shellIntegrationPromptDotDiameter: Int = source?.shellIntegrationPromptDotDiameter ?: 8
 
         /** Draft value for [SwingSettings.shellIntegrationDecorationGutterWidth]; validated when [build] is called. */
-        public var shellIntegrationDecorationGutterWidth: Int = source?.shellIntegrationDecorationGutterWidth ?: 16
+        public var shellIntegrationDecorationGutterWidth: Int = source?.shellIntegrationDecorationGutterWidth ?: 10
 
         /** Draft value for [SwingSettings.shellIntegrationFailedCommandRailsVisible]; validated when [build] is called. */
         public var shellIntegrationFailedCommandRailsVisible: Boolean = source?.shellIntegrationFailedCommandRailsVisible ?: true
@@ -480,7 +480,7 @@ public class SwingSettings private constructor(
         public var shellIntegrationFailedCommandRailWidth: Int = source?.shellIntegrationFailedCommandRailWidth ?: 3
 
         /** Draft value for [SwingSettings.padding]; validated when [build] is called. */
-        public var padding: SwingPadding = source?.padding ?: SwingPadding(0, 4, 4, 6)
+        public var padding: SwingPadding = source?.padding ?: SwingPadding(0, 2, 4, 6)
 
         /**
          * Explicit alternate padding, or null to balance the final [padding] and gutter at build time.

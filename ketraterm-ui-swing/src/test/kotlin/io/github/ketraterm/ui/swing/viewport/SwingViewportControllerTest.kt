@@ -51,7 +51,7 @@ class SwingViewportControllerTest {
             SwingSettings.create { draft ->
                 draft.padding = SwingPadding(3, 5, 7, 10)
             }
-        assertEquals(SwingPadding(3, 15, 7, 16), settings.alternateScreenPadding)
+        assertEquals(SwingPadding(3, 12, 7, 13), settings.alternateScreenPadding)
         val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
         for (width in 1..250) {
             val primary = controller.visibleGridSizeOnEdt(settings, metrics, width, 130, TerminalRenderBufferKind.PRIMARY)

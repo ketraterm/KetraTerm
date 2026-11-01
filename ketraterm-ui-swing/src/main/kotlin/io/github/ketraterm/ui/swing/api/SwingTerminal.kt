@@ -725,7 +725,7 @@ public class SwingTerminal
             val paddingLeft = chrome.left(settings, renderCache.activeBuffer)
             if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) {
                 val right = width - chrome.right(settings, renderCache.activeBuffer)
-                if (x !in paddingLeft until right) return NO_PROMPT_MARKER_ROW
+                if (x !in 0 until right) return NO_PROMPT_MARKER_ROW
                 return visualGeometry.dividerRowAtComponentY(y, chrome.top(settings, renderCache.activeBuffer))
             }
             val gutterWidth = chrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
@@ -3402,7 +3402,7 @@ public class SwingTerminal
                 if (gutterActivated) {
                     viewportController.finishScroll()
                     chrome.promptDecorationsAvailable = true
-                    if (settings.promptDecoration == SwingPromptDecoration.GUTTER) {
+                    if (settings.promptDecoration != SwingPromptDecoration.NONE) {
                         resizeSessionToVisibleGridOnEdt()
                         preferredSize = preferredGridSize(settings.columns, settings.rows)
                         revalidate()
@@ -3416,7 +3416,7 @@ public class SwingTerminal
         }
 
         private fun canActivatePromptGutter(): Boolean {
-            if (settings.promptDecoration != SwingPromptDecoration.GUTTER ||
+            if (settings.promptDecoration == SwingPromptDecoration.NONE ||
                 renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE
             ) {
                 return true

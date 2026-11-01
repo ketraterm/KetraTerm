@@ -321,6 +321,45 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `command prompt on the start line does not truncate its output or failure rails`() {
+        val state = TerminalShellIntegrationState()
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(13, exitCode = 1)
+        state.recordPromptStart(13)
+        val recordId = state.commandRecordIdAtLine(10)
+        val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
+        assertTrue(state.copyCommandOutputRange(recordId, range))
+        assertContentEquals(longArrayOf(10, 12, 0), range)
+        val rails = BooleanArray(4)
+        val ids = IntArray(4)
+        val lifecycles = IntArray(4)
+        state.copyViewport(
+            lineIds = longArrayOf(10, 11, 12, 13),
+            rowCount = 4,
+            promptStarts = BooleanArray(4),
+            commandStarts = BooleanArray(4),
+            commandEnds = BooleanArray(4),
+            commandRecordIds = ids,
+            commandLifecycleStates = lifecycles,
+            failedCommandRails = rails,
+        )
+        assertContentEquals(booleanArrayOf(false, true, true, false), rails)
+        val records = RecordColumns(capacity = 2).apply { copyFrom(state) }
+        assertContentEquals(intArrayOf(recordId, recordId, recordId, records.recordIds[1]), ids)
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+            ),
+            lifecycles,
+        )
+    }
+
+    @Test
     fun `copy command output range excludes next prompt line using the same output boundary as failed rails`() {
         val state = TerminalShellIntegrationState()
         val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)

@@ -557,10 +557,10 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight + metrics.cellHeight / 2
-        assertEquals(BLACK, image.getRGB(12, metrics.cellHeight / 2))
-        assertEquals(BLACK, image.getRGB(12, nodeCenterY))
-        assertNotEquals(BLACK, image.getRGB(12, metrics.cellHeight / 2 - 3))
-        assertNotEquals(BLACK, image.getRGB(12, nodeCenterY - 3))
+        assertEquals(BLACK, image.getRGB(11, metrics.cellHeight / 2))
+        assertEquals(BLACK, image.getRGB(11, nodeCenterY))
+        assertNotEquals(BLACK, image.getRGB(11, metrics.cellHeight / 2 - 3))
+        assertNotEquals(BLACK, image.getRGB(11, nodeCenterY - 3))
         assertEquals(BLACK, image.getRGB(0, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
@@ -653,7 +653,7 @@ class GridPainterTest {
         g.dispose()
 
         val centerY = metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(18, centerY))
+        assertEquals(GREEN, image.getRGB(16, centerY))
         assertTrue(image.getRGB(13, centerY) != BLACK)
         var y = 0
         while (y < metrics.cellHeight) {
@@ -675,6 +675,7 @@ class GridPainterTest {
                         defaultBackground = BLACK,
                     )
                 draft.shellIntegrationPromptDotColor = GREEN
+                draft.shellIntegrationDecorationGutterWidth = 16
                 draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
                 draft.padding = SwingPadding(0, 8, 0, 0)
             }
@@ -708,9 +709,9 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight / 2
-        val nodeCenterX = settings.padding.left + settings.shellIntegrationDecorationGutterWidth / 2
+        val nodeCenterX = settings.padding.left + settings.shellIntegrationDecorationGutterWidth / 2 - 2
         assertEquals(BLACK, image.getRGB(nodeCenterX, nodeCenterY))
-        assertNotEquals(BLACK, image.getRGB(12, nodeCenterY))
+        assertNotEquals(BLACK, image.getRGB(10, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
 

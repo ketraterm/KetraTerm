@@ -96,6 +96,22 @@ and enable hover styling and click-to-select command blocks for both styles.
 Color overrides belong to `SwingSettings`; reload a new snapshot on the EDT to
 repaint existing decorations without changing shell records or grid dimensions.
 
+Gutter and divider modes share the same left padding and
+`shellIntegrationDecorationGutterWidth`. Switching between these styles preserves
+the text's horizontal position. Defaults reserve 10 logical pixels for the gutter
+plus 2 pixels of left padding, for a compact 12-pixel total inset in both idle and
+failed-command views. Explicit widths and padding remain authoritative.
+Dots and rails share an axis slightly left of
+the gutter's center, leaving more space before text. Failed-command rails appear
+in both modes; in divider mode they span the failed prompt and output between
+divider bands. Rails and divider rules align their thickness to device pixels
+at fractional display scales, and adjacent rail segments join without seams.
+Configure the same
+`shellIntegrationFailedCommandRailColor`, `shellIntegrationFailedCommandRailWidth`,
+and `shellIntegrationFailedCommandRailsVisible` settings for either style.
+Disabling rails preserves the shared gutter; alternate screens and
+`promptDecoration = NONE` do not paint rails. `NONE` also removes the gutter.
+
 ```kotlin
 val settings = SwingSettings.create {
     it.promptDecoration = SwingPromptDecoration.GUTTER

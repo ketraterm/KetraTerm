@@ -51,6 +51,34 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
     @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class, names = ["GUTTER", "DIVIDER"])
+    fun `default left inset stays compact before and after a command fails`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode, OscShellIntegration.configured(true)).use { f ->
+                val defaults = SwingSettings()
+                f.settings =
+                    f.settings.copy {
+                        it.padding = defaults.padding
+                        it.shellIntegrationDecorationGutterWidth = defaults.shellIntegrationDecorationGutterWidth
+                    }
+                f.component.reloadSettings()
+                f.resize(16, 8)
+                f.flush()
+                f.feed("\u001B]133;A\u0007>ready\u001B]133;B\u0007")
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(12, bounds.x, "Idle prompt keeps a compact left inset")
+                val resizes = f.connector.resizes.toList()
+                f.feed("x\u001B]133;C\u0007\r\nerror\u001B]133;D;1\u0007\r\n\u001B]133;A\u0007>next\u001B]133;B\u0007")
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(12, bounds.x, "Failure leaves the text in the same column")
+                assertEquals(resizes, f.connector.resizes)
+                assertTrue(f.component.copyCellBounds(0, 1, bounds))
+                assertEquals(f.settings.shellIntegrationFailedCommandRailColor, f.paint().getRGB(6, bounds.y + bounds.height / 2))
+            }
+        }
+
+    @ParameterizedTest
     @CsvSource("GUTTER,false", "GUTTER,true", "DIVIDER,false")
     fun `prompt colors follow pointer hover and reload without changing metadata or grid geometry`(
         mode: SwingPromptDecoration,
@@ -81,7 +109,7 @@ class SwingTerminalPromptDividerTest {
             f.flush()
             val bounds = Rectangle()
             assertTrue(f.component.copyCellBounds(0, 0, bounds))
-            val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 else 1
+            val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 - 2 else 1
             val y =
                 if (mode ==
                     SwingPromptDecoration.GUTTER
@@ -151,7 +179,7 @@ class SwingTerminalPromptDividerTest {
                 f.flush()
                 val bounds = Rectangle()
                 assertTrue(f.component.copyCellBounds(0, 0, bounds))
-                val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 else f.component.width / 2
+                val x = if (mode == SwingPromptDecoration.GUTTER) bounds.x / 2 - 2 else f.component.width / 2
                 val y = if (mode == SwingPromptDecoration.GUTTER) bounds.y + f.cellHeight / 2 else bounds.y - (f.cellHeight + 4) / 2 + 1
                 val grid = f.component.visibleGridSize()
                 val resizes = f.connector.resizes.toList()
@@ -269,7 +297,12 @@ class SwingTerminalPromptDividerTest {
                 assertEquals(0, f.session.shellIntegrationState.recordCount())
                 val bounds = Rectangle()
                 assertTrue(f.component.copyCellBounds(0, 0, bounds))
-                val expectedLeft = if (mode == SwingPromptDecoration.GUTTER) f.settings.shellIntegrationDecorationGutterWidth else 0
+                val expectedLeft =
+                    when (mode) {
+                        SwingPromptDecoration.GUTTER -> f.settings.shellIntegrationDecorationGutterWidth
+                        SwingPromptDecoration.DIVIDER -> f.settings.shellIntegrationDecorationGutterWidth
+                        SwingPromptDecoration.NONE -> 0
+                    }
                 assertEquals(expectedLeft, bounds.x)
                 assertEquals(8, f.component.visibleGridSize().width)
                 val resizes = f.connector.resizes.toList()
@@ -289,11 +322,11 @@ class SwingTerminalPromptDividerTest {
                     } finally {
                         graphics.dispose()
                     }
-                    assertEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                    assertEquals(BLACK, image.getRGB(bounds.x / 2 - 2, bounds.y + f.cellHeight / 2))
                     assertNotEquals(
                         BLACK,
                         image.getRGB(
-                            bounds.x / 2,
+                            bounds.x / 2 - 2,
                             bounds.y + f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2,
                         ),
                     )
@@ -306,6 +339,88 @@ class SwingTerminalPromptDividerTest {
                 assertEquals(resizes, f.connector.resizes)
                 assertTrue(f.component.copyCellBounds(0, 0, bounds))
                 assertEquals(expectedLeft, bounds.x)
+            }
+        }
+
+    @Test
+    fun `divider failure rails span prompt and output between bands at the far left`() =
+        edt {
+            Fixture(SwingPromptDecoration.DIVIDER, OscShellIntegration.configured(true)).use { f ->
+                val red = 0xffff0000.toInt()
+                val blue = 0xff0000ff.toInt()
+                f.settings =
+                    f.settings.copy {
+                        it.shellIntegrationFailedCommandRailColor = red
+                        it.shellIntegrationPromptDividerColor = WHITE
+                    }
+                f.component.reloadSettings()
+                f.resize(16, 8)
+                f.flush()
+                val resizes = f.connector.resizes.toList()
+                f.feed(
+                    "\u001B]133;A\u0007>bad\u001B]133;B\u0007x\u001B]133;C\u0007\r\nerr\r\nmore\u001B]133;D;1\u0007\r\n\u001B]133;A\u0007>next\u001B]133;B\u0007",
+                )
+                val h = f.cellHeight
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(16, bounds.x)
+                assertEquals(h, bounds.y)
+                assertEquals(resizes, f.connector.resizes, "Command failure must not shift or resize the grid")
+                val image = f.paint()
+                for (row in 0..2) {
+                    val y = (row + 1) * h + h / 2
+                    assertEquals(red, image.getRGB(6, y), "Rail covers prompt and output row $row")
+                    for (edgeX in 0 until 5) assertEquals(BLACK, image.getRGB(edgeX, y), "Rail stays inset from the left edge")
+                    for (gapX in 8 until bounds.x) assertEquals(BLACK, image.getRGB(gapX, y), "Rail-to-text padding stays clear")
+                    assertFalse(f.component.copyCellPositionAt(6, y, Point()), "Rail has no terminal cell")
+                }
+                assertEquals(WHITE, image.getRGB(6, h / 2))
+                assertEquals(WHITE, image.getRGB(6, 4 * h + h / 2))
+                assertEquals(BLACK, image.getRGB(6, 5 * h + h / 2), "The next prompt has no failure rail")
+                assertEquals(WHITE, image.getRGB(1, (h - 2) / 2), "Divider spans the rail margin")
+                f.component.dispatchEvent(MouseEvent(f.component, MouseEvent.MOUSE_MOVED, 0, 0, 1, h / 2, 0, false))
+                assertEquals(Cursor.HAND_CURSOR, f.component.cursor.type)
+                assertEquals(red, f.paint().getRGB(6, h + h / 2))
+                f.settings = f.settings.copy { it.shellIntegrationFailedCommandRailColor = blue }
+                f.component.reloadSettings()
+                f.flush()
+                assertEquals(blue, f.paint().getRGB(6, h + h / 2))
+                val sharedColumns = f.component.visibleGridSize().width
+                val sharedResizes = f.connector.resizes.toList()
+                f.settings = f.settings.copy { it.promptDecoration = SwingPromptDecoration.GUTTER }
+                f.component.reloadSettings()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(16, bounds.x)
+                assertEquals(sharedColumns, f.component.visibleGridSize().width)
+                f.settings = f.settings.copy { it.promptDecoration = SwingPromptDecoration.DIVIDER }
+                f.component.reloadSettings()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(16, bounds.x)
+                assertEquals(sharedResizes, f.connector.resizes, "Switching decoration styles preserves grid geometry")
+                f.resize(16, 3)
+                f.flush()
+                f.component.scrollFromScrollbar(f.component.viewportState().historySize, true)
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(blue, f.paint().getRGB(6, bounds.y + h / 2), "Rail follows the scrolled prompt")
+                f.resize(16, 8)
+                f.flush()
+                f.feed("\u001B[?1049hALT")
+                val alternate = f.paint()
+                for (y in 0 until alternate.height) {
+                    for (x in 0 until alternate.width) {
+                        assertNotEquals(blue, alternate.getRGB(x, y), "Alternate screen has no failure rails")
+                    }
+                }
+                f.feed("\u001B[?1049l")
+                assertEquals(blue, f.paint().getRGB(6, h + h / 2))
+                f.settings = f.settings.copy { it.shellIntegrationFailedCommandRailsVisible = false }
+                f.component.reloadSettings()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(16, bounds.x)
             }
         }
 
@@ -513,8 +628,8 @@ class SwingTerminalPromptDividerTest {
                 } finally {
                     graphics.dispose()
                 }
-                assertEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2))
-                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2))
+                assertEquals(BLACK, image.getRGB(bounds.x / 2 - 2, f.cellHeight / 2))
+                assertNotEquals(BLACK, image.getRGB(bounds.x / 2 - 2, f.cellHeight / 2 - f.settings.shellIntegrationPromptDotDiameter / 2))
                 val resizes = f.connector.resizes.toList()
                 f.state.clear()
                 f.flush()
@@ -563,7 +678,7 @@ class SwingTerminalPromptDividerTest {
                 } finally {
                     graphics.dispose()
                 }
-                assertEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                assertEquals(BLACK, image.getRGB(bounds.x / 2 - 2, bounds.y + f.cellHeight / 2))
                 assertNotEquals(
                     BLACK,
                     image.getRGB(
@@ -943,6 +1058,7 @@ class SwingTerminalPromptDividerTest {
             SwingSettings.create {
                 it.padding = SwingPadding(0, 0, 0, 0)
                 it.promptDecoration = mode
+                it.shellIntegrationDecorationGutterWidth = 16
                 it.cursorBlinkMillis = 0
                 it.useSystemFallbackFonts = false
                 it.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)

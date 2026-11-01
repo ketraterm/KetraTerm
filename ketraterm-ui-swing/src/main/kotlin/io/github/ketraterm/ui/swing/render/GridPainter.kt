@@ -182,10 +182,11 @@ internal class GridPainter(
                             settings,
                             metrics,
                             row,
-                            contentWidth,
+                            contentWidth + paddingLeft,
                             row == hoveredPromptMarkerRow,
                             palette,
                             interactive = shellDecorations?.isPromptMarkerInteractiveAt(row) == true,
+                            left = -paddingLeft,
                         )
                     }
                     val bidi = cellGeometry.row(cache, row)
