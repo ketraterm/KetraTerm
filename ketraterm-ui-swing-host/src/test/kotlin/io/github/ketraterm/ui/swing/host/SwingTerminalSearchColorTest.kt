@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -27,9 +29,12 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import java.awt.*
 import java.awt.image.BufferedImage
 import java.util.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.PatternSyntaxException
 import javax.swing.JLabel
 import javax.swing.JTextField
+import javax.swing.SwingUtilities
 import javax.swing.UIManager
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -87,6 +92,20 @@ class SwingTerminalSearchColorTest {
     }
 
     @Test
+    fun `pending zero match search retains normal colors until analysis completes`() =
+        fixture { f ->
+            f.bar.refreshColors(palette())
+            f.withPendingSearch("absent") {
+                assertTrue(f.terminal.currentSearchState().isSearching)
+                assertEquals(0, f.terminal.currentSearchState().resultCount)
+                f.assertColors(Color.WHITE, Color.BLUE)
+            }
+            f.settle()
+            assertFalse(f.terminal.currentSearchState().isSearching)
+            f.assertColors(Color.ORANGE, Color.YELLOW)
+        }
+
+    @Test
     fun `error and no match colors follow completed state and recover without another edit`() =
         fixture { f ->
             val colors = palette()
@@ -94,8 +113,6 @@ class SwingTerminalSearchColorTest {
             f.assertColors(Color.WHITE, Color.BLUE)
 
             f.field.text = "absent"
-            assertTrue(f.terminal.currentSearchState().isSearching)
-            f.assertColors(Color.WHITE, Color.BLUE)
             f.settle()
             assertFalse(f.terminal.currentSearchState().isSearching)
             assertEquals(0, f.terminal.currentSearchState().resultCount)
@@ -305,9 +322,21 @@ class SwingTerminalSearchColorTest {
     private class Fixture {
         val dispatcher = StandardTestDispatcher()
         private val buffer = TerminalBuffers.create(80, 3).apply { writeText("needle") }
+        private val beforeFrameRead = AtomicReference<(() -> Unit)?>(null)
+        private val renderReader =
+            object : TerminalRenderFrameReader by buffer {
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    beforeFrameRead.getAndSet(null)?.invoke()
+                    buffer.readRenderFrame(scrollbackOffset, consumer)
+                }
+            }
         val session =
             TerminalSession.create(
                 buffer,
+                renderReader,
                 MockConnector(),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
@@ -334,6 +363,27 @@ class SwingTerminalSearchColorTest {
 
         init {
             terminal.size = terminal.preferredSize
+        }
+
+        suspend fun withPendingSearch(
+            query: String,
+            assertions: () -> Unit,
+        ) {
+            val entered = CompletableDeferred<Unit>()
+            val release = CountDownLatch(1)
+            beforeFrameRead.set {
+                check(!SwingUtilities.isEventDispatchThread()) { "Search analysis must read the source off the EDT" }
+                entered.complete(Unit)
+                release.await()
+            }
+            try {
+                field.text = query
+                withTimeout(10.seconds) { entered.await() }
+                assertions()
+            } finally {
+                beforeFrameRead.set(null)
+                release.countDown()
+            }
         }
 
         suspend fun settle() {
