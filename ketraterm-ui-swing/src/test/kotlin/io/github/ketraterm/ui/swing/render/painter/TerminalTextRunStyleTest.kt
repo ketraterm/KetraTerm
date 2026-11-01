@@ -24,6 +24,8 @@ import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -34,6 +36,125 @@ import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
     private val settings = SwingSettings()
+
+    @Test
+    fun `search text splits runs at match boundaries and active null preserves underlying text`() {
+        val cache = renderCache(TestRenderFrame.text("AAAA"))
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 1, 2, false)
+                add(0, 2, 3, true)
+                finish()
+            }
+        val configured =
+            settings.copy {
+                it.searchMatchStyle = SwingSearchMatchStyle(0, foreground = TEST_RED)
+                it.searchActiveMatchStyle = SwingSearchMatchStyle(0)
+            }
+        val run = TerminalTextRunStyle()
+        run.configureRow(true, cache.hyperlinkIds, null, configured, searchHighlights = highlights, columns = 4)
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(cache.palette.defaultForeground, run.foreground)
+        assertFalse(run.matches(cache, cache.palette, 0, 1))
+        run.begin(cache, cache.palette, 0, 1)
+        assertEquals(TEST_RED, run.foreground)
+        assertFalse(run.matches(cache, cache.palette, 0, 2))
+        run.begin(cache, cache.palette, 0, 2)
+        assertEquals(cache.palette.defaultForeground, run.foreground)
+        assertTrue(run.matches(cache, cache.palette, 0, 3))
+
+        val reloaded = configured.copy { it.searchActiveMatchStyle = SwingSearchMatchStyle(0, foreground = TEST_GREEN) }
+        run.configureRow(true, cache.hyperlinkIds, null, reloaded, searchHighlights = highlights, columns = 4)
+        run.begin(cache, cache.palette, 0, 2)
+        assertEquals(TEST_GREEN, run.foreground)
+        highlights.reset(1)
+        run.configureRow(true, cache.hyperlinkIds, null, reloaded, searchHighlights = highlights, columns = 4)
+        run.begin(cache, cache.palette, 0, 2)
+        assertEquals(cache.palette.defaultForeground, run.foreground)
+        run.configureRow(true, cache.hyperlinkIds, null, settings, searchHighlights = highlights, columns = 4)
+        run.begin(cache, cache.palette, 0, 1)
+        assertEquals(cache.palette.defaultForeground, run.foreground)
+    }
+
+    @Test
+    fun `search foreground replaces link text while selection and application roles retain priority`() {
+        val cache = renderCache(TestRenderFrame.text("A"))
+        cache.hyperlinkIds.fill(1)
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, 1, false)
+                finish()
+            }
+        val configured =
+            settings.copy {
+                it.osc8HyperlinkPresentation =
+                    SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(foregroundArgb = TEST_GREEN), isVisible = true)
+                it.searchMatchStyle = SwingSearchMatchStyle(TEST_BLACK, foreground = TEST_RED)
+                it.selectionStyle = SwingSelectionStyle(TEST_BLACK, foreground = TEST_BLUE)
+            }
+        val run = TerminalTextRunStyle()
+        run.configureRow(true, cache.hyperlinkIds, null, configured, searchHighlights = highlights, columns = 1)
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(TEST_RED, run.foreground)
+        run.configureRow(
+            true,
+            cache.hyperlinkIds,
+            null,
+            configured,
+            searchHighlights = highlights,
+            columns = 1,
+            selectionRange = CellSelection.packRange(0, 1),
+        )
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(TEST_BLUE, run.foreground)
+        val applicationPalette =
+            cache.palette.copyWithColorBehavior(
+                TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND,
+                selectionForeground = TEST_WHITE,
+            )
+        run.begin(cache, applicationPalette, 0, 0)
+        assertEquals(TEST_WHITE, run.foreground)
+        run.configureRow(
+            true,
+            cache.hyperlinkIds,
+            null,
+            configured.copy { it.selectionStyle = SwingSelectionStyle(TEST_BLACK) },
+            searchHighlights = highlights,
+            columns = 1,
+            selectionRange = CellSelection.packRange(0, 1),
+        )
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(TEST_RED, run.foreground, "Inherited selection text keeps the underlying search color")
+    }
+
+    @Test
+    fun `search foreground receives opt in contrast without making concealed or blink hidden text visible`() {
+        val cache = renderCache(TestRenderFrame.text("A"))
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, 1, true)
+                finish()
+            }
+        val configured =
+            settings.copy {
+                it.searchActiveMatchStyle = SwingSearchMatchStyle(TEST_WHITE, foreground = TEST_WHITE)
+                it.minimumContrastRatio = 4.5
+            }
+        val run = TerminalTextRunStyle()
+        run.configureRow(true, cache.hyperlinkIds, null, configured, searchHighlights = highlights, columns = 1)
+        run.begin(cache, cache.palette, 0, 0)
+        assertTrue(SwingColors.contrastRatio(run.foreground, TEST_WHITE) >= 4.5)
+        cache.attrWords[0] = TerminalRenderAttrs.pack(invisible = true)
+        run.begin(cache, cache.palette, 0, 0)
+        assertTrue(run.textHidden)
+        cache.attrWords[0] = TerminalRenderAttrs.pack(blink = true)
+        run.configureRow(false, cache.hyperlinkIds, null, configured, searchHighlights = highlights, columns = 1)
+        run.begin(cache, cache.palette, 0, 0)
+        assertTrue(run.textHidden)
+    }
 
     @Test
     fun `contrast uses search and selection layers and changes cleanly on settings reload`() {

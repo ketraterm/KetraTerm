@@ -147,15 +147,28 @@ public class SwingSettings private constructor(
 
     /**
      * Faint text intensity, finite and in 0..1. Default 0.5 blends text halfway toward its
-     * displayed background; 1 disables faintness. Explicit link/selection text colors replace
+     * displayed background; 1 disables faintness. Explicit link/search/selection text colors replace
      * faint text. Enabled minimum contrast is applied afterwards and can increase visibility.
      */
     public val faintOpacity: Double = if (builder.faintOpacity == 0.0) 0.0 else builder.faintOpacity
 
     /** Convenience access to [selectionStyle]'s exact background ARGB value. */
     public val selectionBackground: Int get() = selectionStyle.background
-    public val searchMatchBackground: Int = builder.searchMatchBackground
-    public val searchActiveMatchBackground: Int = builder.searchActiveMatchBackground
+
+    /** Normal search matches. By default only the existing translucent yellow fill is applied. */
+    public val searchMatchStyle: SwingSearchMatchStyle = builder.searchMatchStyle
+
+    /**
+     * Active search result, independent of [searchMatchStyle]. Null text/border colors inherit
+     * underlying text/omit the border; they do not inherit the normal match's overrides.
+     */
+    public val searchActiveMatchStyle: SwingSearchMatchStyle = builder.searchActiveMatchStyle
+
+    /** Convenience access to [searchMatchStyle]'s background ARGB value. */
+    public val searchMatchBackground: Int get() = searchMatchStyle.background
+
+    /** Convenience access to [searchActiveMatchStyle]'s background ARGB value. */
+    public val searchActiveMatchBackground: Int get() = searchActiveMatchStyle.background
     public val visualBellEnabled: Boolean = builder.visualBellEnabled
     public val visualBellColor: Int = builder.visualBellColor
     public val visualBellDurationMillis: Int = builder.visualBellDurationMillis
@@ -339,10 +352,26 @@ public class SwingSettings private constructor(
         public var faintOpacity: Double = source?.faintOpacity ?: 0.5
 
         /** Draft value for [SwingSettings.searchMatchBackground]; validated when [build] is called. */
-        public var searchMatchBackground: Int = source?.searchMatchBackground ?: DEFAULT_SEARCH_MATCH_BACKGROUND
+        public var searchMatchBackground: Int
+            get() = searchMatchStyle.background
+            set(value) {
+                searchMatchStyle = searchMatchStyle.copy(background = value)
+            }
 
         /** Draft value for [SwingSettings.searchActiveMatchBackground]; validated when [build] is called. */
-        public var searchActiveMatchBackground: Int = source?.searchActiveMatchBackground ?: DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND
+        public var searchActiveMatchBackground: Int
+            get() = searchActiveMatchStyle.background
+            set(value) {
+                searchActiveMatchStyle = searchActiveMatchStyle.copy(background = value)
+            }
+
+        /** Draft value for [SwingSettings.searchMatchStyle]. */
+        public var searchMatchStyle: SwingSearchMatchStyle =
+            source?.searchMatchStyle ?: SwingSearchMatchStyle(DEFAULT_SEARCH_MATCH_BACKGROUND)
+
+        /** Draft value for [SwingSettings.searchActiveMatchStyle]. */
+        public var searchActiveMatchStyle: SwingSearchMatchStyle =
+            source?.searchActiveMatchStyle ?: SwingSearchMatchStyle(DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND)
 
         /** Draft value for [SwingSettings.visualBellEnabled]; validated when [build] is called. */
         public var visualBellEnabled: Boolean = source?.visualBellEnabled ?: true
@@ -462,8 +491,8 @@ public class SwingSettings private constructor(
             inactiveSelectionStyle == other.inactiveSelectionStyle &&
             minimumContrastRatio == other.minimumContrastRatio &&
             faintOpacity == other.faintOpacity &&
-            searchMatchBackground == other.searchMatchBackground &&
-            searchActiveMatchBackground == other.searchActiveMatchBackground &&
+            searchMatchStyle == other.searchMatchStyle &&
+            searchActiveMatchStyle == other.searchActiveMatchStyle &&
             visualBellEnabled == other.visualBellEnabled &&
             visualBellColor == other.visualBellColor &&
             visualBellDurationMillis == other.visualBellDurationMillis &&
@@ -513,8 +542,8 @@ public class SwingSettings private constructor(
         result = 31 * result + inactiveSelectionStyle.hashCode()
         result = 31 * result + minimumContrastRatio.hashCode()
         result = 31 * result + faintOpacity.hashCode()
-        result = 31 * result + searchMatchBackground.hashCode()
-        result = 31 * result + searchActiveMatchBackground.hashCode()
+        result = 31 * result + searchMatchStyle.hashCode()
+        result = 31 * result + searchActiveMatchStyle.hashCode()
         result = 31 * result + visualBellEnabled.hashCode()
         result = 31 * result + visualBellColor.hashCode()
         result = 31 * result + visualBellDurationMillis.hashCode()

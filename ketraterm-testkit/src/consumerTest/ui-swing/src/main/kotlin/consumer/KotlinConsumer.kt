@@ -38,6 +38,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingPasteSource
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
@@ -83,6 +84,13 @@ fun main() =
                 it.columnSpacing = -1
                 it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
                 it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
+                it.searchMatchStyle = SwingSearchMatchStyle(background = 0x554B6EAF, border = 0xFF4B6EAF.toInt())
+                it.searchActiveMatchStyle =
+                    SwingSearchMatchStyle(
+                        background = 0xFFFFC857.toInt(),
+                        foreground = 0xFF161616.toInt(),
+                        border = 0xFFFFFFFF.toInt(),
+                    )
                 it.minimumContrastRatio = 4.5
                 it.faintOpacity = 0.75
             }
@@ -90,6 +98,12 @@ fun main() =
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)
+        check(interactionSettings.searchMatchBackground == interactionSettings.searchMatchStyle.background)
+        check(interactionSettings.searchActiveMatchStyle.foreground == 0xFF161616.toInt())
+        check(
+            interactionSettings.copy { it.searchMatchBackground = 0 }.searchMatchStyle ==
+                interactionSettings.searchMatchStyle.copy(background = 0),
+        )
         check(interactionSettings.hashCode() == interactionSettings.copy {}.hashCode())
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)

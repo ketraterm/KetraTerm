@@ -211,8 +211,8 @@ internal class GridPainter(
                         metrics = metrics,
                         row = row,
                         highlights = searchHighlights,
-                        matchBackground = settings.searchMatchBackground,
-                        activeMatchBackground = settings.searchActiveMatchBackground,
+                        matchStyle = settings.searchMatchStyle,
+                        activeMatchStyle = settings.searchActiveMatchStyle,
                         bidi = bidi,
                     )
                     selectionPainter.paint(g, cache, metrics, row, selection, selectionStyle, palette, bidi)

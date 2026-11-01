@@ -128,6 +128,8 @@ public final class JavaConsumer {
             draft.setColumnSpacing(-1);
             draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
             draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
+            draft.setSearchMatchStyle(new io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle(0x554B6EAF));
+            draft.setSearchActiveMatchStyle(new io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle(0xFFFFC857, 0xFF161616, 0xFFFFFFFF));
             draft.setMinimumContrastRatio(4.5);
             draft.setFaintOpacity(0.75);
         });
@@ -136,6 +138,15 @@ public final class JavaConsumer {
             || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
             || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
             throw new AssertionError("Java color policies did not survive copying");
+        if (copiedSettings.getSearchMatchBackground() != copiedSettings.getSearchMatchStyle().getBackground()
+            || copiedSettings.getSearchActiveMatchStyle().getForeground() != 0xFF161616
+            || copiedSettings.getSearchActiveMatchStyle().getBorder() != 0xFFFFFFFF)
+            throw new AssertionError("Java search match colors did not survive copying");
+        var searchSettings = copiedSettings.copy(draft -> draft.setSearchActiveMatchBackground(0));
+        if (searchSettings.getSearchActiveMatchBackground() != 0
+            || !searchSettings.getSearchActiveMatchStyle().getForeground().equals(copiedSettings.getSearchActiveMatchStyle().getForeground())
+            || !searchSettings.getSearchActiveMatchStyle().getBorder().equals(copiedSettings.getSearchActiveMatchStyle().getBorder()))
+            throw new AssertionError("Java search background accessor discarded text or border colors");
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
             || copiedSettings.getAlternateScreenWheelToArrowEnabled()
             || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1

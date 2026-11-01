@@ -36,6 +36,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
+import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -43,6 +44,50 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
+    @Test
+    fun `search style reload repaints existing matches and preserves search and session palette`() =
+        fixture {
+            feed("\rAA AA\u001b[?25l")
+            settings =
+                settings.copy {
+                    it.searchMatchStyle = SwingSearchMatchStyle(0xff0000ff.toInt(), border = 0xffff0000.toInt())
+                    it.searchActiveMatchStyle = SwingSearchMatchStyle(0xff00ff00.toInt(), border = 0xffffffff.toInt())
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            view.search("AA")
+            dispatcher.scheduler.runCurrent()
+            val state = view.currentSearchState()
+            assertEquals(2, state.resultCount)
+            var palette = settings.palette
+            session.readRenderFrame { palette = it.palette }
+            val cellWidth = view.preferredGridSize(10, 2).width / 10
+
+            fun borderColors(): List<Int> {
+                val image = BufferedImage(view.width, view.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    view.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                return listOf(image.getRGB(0, 0), image.getRGB(cellWidth * 3, 0))
+            }
+            assertEquals(listOf(0xffffffff.toInt(), 0xffff0000.toInt()), borderColors())
+
+            settings =
+                settings.copy {
+                    it.searchMatchStyle = it.searchMatchStyle.copy(border = 0xff00ff00.toInt())
+                    it.searchActiveMatchStyle = it.searchActiveMatchStyle.copy(border = 0xffff0000.toInt())
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(listOf(0xffff0000.toInt(), 0xff00ff00.toInt()), borderColors())
+            assertEquals(state, view.currentSearchState())
+            session.readRenderFrame { assertEquals(palette, it.palette) }
+        }
+
     @Test
     fun `selection and readability reloads preserve application color overrides until protocol reset`() =
         fixture {

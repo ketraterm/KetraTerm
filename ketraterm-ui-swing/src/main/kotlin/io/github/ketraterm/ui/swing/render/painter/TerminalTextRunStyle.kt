@@ -78,11 +78,16 @@ internal class TerminalTextRunStyle {
     private val contrast = TextContrastCache()
     private var faintOpacity = 0.5
     private var searchBackgrounds = IntArray(0)
+    private var searchForegrounds = IntArray(0)
     private var hasSearchBackgrounds = false
+    private var hasSearchForegrounds = false
 
     /** Reserve row scratch when a frame is installed, before the component paints it. */
     fun prepareColumns(columns: Int) {
-        if (searchBackgrounds.size < columns) searchBackgrounds = IntArray(columns)
+        if (searchBackgrounds.size < columns) {
+            searchBackgrounds = IntArray(columns)
+            searchForegrounds = IntArray(columns)
+        }
     }
 
     fun configureRow(
@@ -116,16 +121,22 @@ internal class TerminalTextRunStyle {
         contrast.configure(settings.minimumContrastRatio)
         val segmentCount = searchHighlights?.segmentCountForRow(row) ?: 0
         hasSearchBackgrounds = segmentCount > 0 && columns > 0
+        hasSearchForegrounds = hasSearchBackgrounds &&
+            (settings.searchMatchStyle.foreground != null || settings.searchActiveMatchStyle.foreground != null)
         if (hasSearchBackgrounds && searchHighlights != null) {
             prepareColumns(columns)
             searchBackgrounds.fill(0, 0, columns)
+            if (hasSearchForegrounds) searchForegrounds.fill(0, 0, columns)
             val first = searchHighlights.firstSegmentForRow(row)
             for (segment in first until first + segmentCount) {
-                val color = if (searchHighlights.isActive(segment)) settings.searchActiveMatchBackground else settings.searchMatchBackground
+                val style = if (searchHighlights.isActive(segment)) settings.searchActiveMatchStyle else settings.searchMatchStyle
+                val color = style.background
+                val foreground = style.foreground ?: 0
                 var column = searchHighlights.startColumn(segment).coerceIn(0, columns)
                 val end = searchHighlights.endColumn(segment).coerceIn(0, columns)
                 while (column < end) {
                     searchBackgrounds[column] = SwingColors.blendOver(color, searchBackgrounds[column])
+                    if (hasSearchForegrounds) searchForegrounds[column] = foreground
                     column++
                 }
             }
@@ -193,14 +204,19 @@ internal class TerminalTextRunStyle {
         if (hasSearchBackgrounds) background = SwingColors.blendOver(searchBackgrounds[column], background)
         if (selected) background = SwingColors.blendOver(SelectionColors.background(palette, selectionStyle, attr), background)
         if (TerminalRenderAttrs.isInvisible(attr)) return background
+        val searchForeground = if (hasSearchForegrounds) searchForegrounds[column] else 0
         val inherited =
-            hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(
-                palette,
-                attr,
-                codePoint,
-                faintOpacity = faintOpacity,
-                background = background,
-            )
+            if (searchForeground != 0) {
+                searchForeground
+            } else {
+                hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(
+                    palette,
+                    attr,
+                    codePoint,
+                    faintOpacity = faintOpacity,
+                    background = background,
+                )
+            }
         val foreground =
             if (selected) {
                 SelectionColors.foreground(palette, selectionStyle, attr, inherited)

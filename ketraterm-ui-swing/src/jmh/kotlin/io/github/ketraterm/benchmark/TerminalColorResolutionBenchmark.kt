@@ -23,6 +23,7 @@ import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.render.cache.TextContrastCache
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.openjdk.jmh.annotations.*
 import java.lang.management.ManagementFactory
@@ -63,10 +64,16 @@ open class TerminalColorResolutionBenchmark {
                 faint = true,
             ),
         )
-        settings = SwingSettings.create { it.minimumContrastRatio = ratio }
+        settings =
+            SwingSettings.create {
+                it.minimumContrastRatio = ratio
+                it.searchMatchStyle = SwingSearchMatchStyle(0x55ffd54f, 0xff123456.toInt(), 0xffffd54f.toInt())
+                it.searchActiveMatchStyle = SwingSearchMatchStyle(0xaaff8c00.toInt(), 0xfffefefe.toInt(), 0xffff8c00.toInt())
+            }
         style.prepareColumns(80)
         search.reset(1)
-        search.add(0, 20, 60, true)
+        search.add(0, 20, 40, false)
+        search.add(0, 40, 60, true)
         search.finish()
         contrast.configure(ratio)
         allocationBean = (ManagementFactory.getThreadMXBean() as ThreadMXBean).apply { isThreadAllocatedMemoryEnabled = true }

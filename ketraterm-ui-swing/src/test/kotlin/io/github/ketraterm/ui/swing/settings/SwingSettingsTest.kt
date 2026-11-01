@@ -35,6 +35,47 @@ class SwingSettingsTest {
     private val chrome = SwingTerminalChrome()
 
     @Test
+    fun `search styles retain defaults and background convenience setters preserve other roles`() {
+        val original = SwingSettings()
+        assertEquals(0x55FFD54F, original.searchMatchStyle.background)
+        assertEquals(0xAAFF8C00.toInt(), original.searchActiveMatchStyle.background)
+        assertNull(original.searchMatchStyle.foreground)
+        assertNull(original.searchMatchStyle.border)
+        assertNull(original.searchActiveMatchStyle.foreground)
+        assertNull(original.searchActiveMatchStyle.border)
+        val draft =
+            original.toBuilder().apply {
+                searchMatchStyle = SwingSearchMatchStyle(0, 0xff123456.toInt(), 0x80123456.toInt())
+                searchActiveMatchStyle = SwingSearchMatchStyle(0, 0xff654321.toInt(), 0x80654321.toInt())
+                searchMatchBackground = 0x55112233
+                searchActiveMatchBackground = 0x55445566
+            }
+        val configured = draft.build()
+        assertEquals(SwingSearchMatchStyle(0x55112233, 0xff123456.toInt(), 0x80123456.toInt()), configured.searchMatchStyle)
+        assertEquals(SwingSearchMatchStyle(0x55445566, 0xff654321.toInt(), 0x80654321.toInt()), configured.searchActiveMatchStyle)
+        assertEquals(configured.searchMatchStyle.background, configured.searchMatchBackground)
+        assertEquals(configured.searchActiveMatchStyle.background, configured.searchActiveMatchBackground)
+        draft.searchMatchStyle = SwingSearchMatchStyle(0)
+        assertNotEquals(draft.build(), configured)
+        assertEquals(configured, configured.copy {})
+        assertEquals(configured.hashCode(), configured.copy {}.hashCode())
+        assertNotEquals(configured, configured.copy { it.searchMatchStyle = it.searchMatchStyle.copy(foreground = null) })
+        assertNotEquals(configured, configured.copy { it.searchActiveMatchStyle = it.searchActiveMatchStyle.copy(border = null) })
+    }
+
+    @Test
+    fun `search styles accept every fill and border alpha but require opaque or inherited text`() {
+        for (alpha in 0..255) {
+            val argb = alpha shl 24 or 0x123456
+            val style = SwingSearchMatchStyle(background = argb, border = argb)
+            assertEquals(argb, style.background)
+            assertEquals(argb, style.border)
+            if (alpha != 255) assertFailsWith<IllegalArgumentException> { style.copy(foreground = argb) }
+        }
+        assertEquals(0xff000000.toInt(), SwingSearchMatchStyle(0, foreground = 0xff000000.toInt()).foreground)
+    }
+
+    @Test
     fun `contrast and faintness validate finite bounds and freeze settings drafts`() {
         assertEquals(1.0, SwingSettings().minimumContrastRatio)
         assertEquals(0.5, SwingSettings().faintOpacity)

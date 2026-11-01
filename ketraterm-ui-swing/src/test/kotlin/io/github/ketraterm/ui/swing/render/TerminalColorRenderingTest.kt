@@ -17,8 +17,11 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.ui.swing.api.CellSelection
+import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -36,6 +39,90 @@ class TerminalColorRenderingTest {
     private val fixedSelection = TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND or TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
     private val dynamicSelection =
         fixedSelection or TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND or TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND
+
+    @ParameterizedTest
+    @CsvSource("ASCII,false", "ASCII,true", "RTL,false", "RTL,true", "COMBINING,false", "COMBINING,true", "WIDE,false", "WIDE,true")
+    fun `normal and active search styles share text geometry across rendering paths`(
+        shape: String,
+        antialiased: Boolean,
+    ) {
+        val cells =
+            when (shape) {
+                "RTL" -> textCells("\u05d0\u05d1\u05d2")
+                "COMBINING" -> Array(3) { TestCell(flags = TerminalRenderCellFlags.CLUSTER, cluster = "e\u0301") }
+                "WIDE" ->
+                    arrayOf(
+                        TestCell('A'.code, TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING),
+                        TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                        TestCell(' '.code, TerminalRenderCellFlags.CODEPOINT),
+                        TestCell('A'.code, TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING),
+                        TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                    )
+                else -> textCells("AAA")
+            }
+        val span = if (shape == "WIDE") 2 else 1
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, span, false)
+                add(0, cells.size - span, cells.size, true)
+                finish()
+            }
+        val actual =
+            paint(cells, basePalette, antialiased = antialiased, searchHighlights = highlights) {
+                it.searchMatchStyle = SwingSearchMatchStyle(TEST_BLUE, TEST_RED)
+                it.searchActiveMatchStyle = SwingSearchMatchStyle(TEST_GREEN, TEST_BLACK)
+            }
+        val referenceCells =
+            Array(cells.size) { column ->
+                val foreground = if (column < span) TEST_RED else TEST_BLACK
+                val background = if (column < span) TEST_BLUE else TEST_GREEN
+                if (column in span until cells.size - span) {
+                    cells[column]
+                } else {
+                    cells[column].copy(
+                        attr =
+                            TerminalRenderAttrs.pack(
+                                foregroundKind = TerminalRenderColorKind.RGB,
+                                foregroundValue = foreground and 0xffffff,
+                                backgroundKind = TerminalRenderColorKind.RGB,
+                                backgroundValue = background and 0xffffff,
+                            ),
+                    )
+                }
+            }
+        val expected = paint(referenceCells, basePalette, antialiased = antialiased)
+        for (y in 0 until actual.height) {
+            for (x in 0 until actual.width) {
+                assertEquals(expected.getRGB(x, y), actual.getRGB(x, y), "Pixel ($x, $y), $shape")
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selection and block cursor paint over search borders`(cursor: Boolean) {
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, 1, true)
+                finish()
+            }
+        val image =
+            paint(
+                textCells(" "),
+                basePalette.copy(cursorBackground = TEST_BLUE, cursorForeground = TEST_RED),
+                selection = if (cursor) null else CellSelection(0, 0, 1, 0),
+                selectionStyle = SwingSelectionStyle(TEST_GREEN),
+                cursor = TerminalRenderCursor(0, 0, cursor, false, TerminalRenderCursorShape.BLOCK, 1),
+                searchHighlights = highlights,
+            ) { it.searchActiveMatchStyle = SwingSearchMatchStyle(TEST_BLACK, TEST_WHITE, TEST_RED) }
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                assertEquals(if (cursor) TEST_BLUE else TEST_GREEN, image.getRGB(x, y), "Pixel ($x, $y)")
+            }
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -320,6 +407,8 @@ class TerminalColorRenderingTest {
         antialiased: Boolean = false,
         selectionStyle: SwingSelectionStyle = SwingSelectionStyle(TEST_GREEN),
         inactiveStyle: SwingSelectionStyle? = null,
+        searchHighlights: TerminalSearchViewportHighlights? = null,
+        configure: (SwingSettings.Builder) -> Unit = {},
     ): BufferedImage {
         val image = BufferedImage(cells.size * metrics.cellWidth, metrics.cellHeight, BufferedImage.TYPE_INT_ARGB)
         val frame =
@@ -334,6 +423,7 @@ class TerminalColorRenderingTest {
                 draft.shellIntegrationDecorationGutterWidth = 0
                 draft.textAntialiasing =
                     if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                configure(draft)
             }
         val graphics = image.createGraphics()
         try {
@@ -347,6 +437,7 @@ class TerminalColorRenderingTest {
                 true,
                 terminalFocused = focused,
                 selection = selection,
+                searchHighlights = searchHighlights,
             )
         } finally {
             graphics.dispose()

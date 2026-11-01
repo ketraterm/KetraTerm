@@ -17,7 +17,7 @@ val settings = SwingSettings.create {
         background = 0x804B6EAF.toInt(),
         foreground = 0xFFFFFFFF.toInt(),
     )
-    // Preserve terminal/link text colors in the unfocused view.
+    // Preserve terminal/link/search text colors in the unfocused view.
     it.inactiveSelectionStyle = SwingSelectionStyle(background = 0x404B6EAF)
 }
 ```
@@ -25,7 +25,7 @@ val settings = SwingSettings.create {
 | Value | Meaning |
 | --- | --- |
 | `background` | Exact ARGB fill, blended over the existing cell/search/link background. Zero alpha leaves that background visible. Default: `0x66FFFFFF`. |
-| `foreground = null` | Preserve ordinary terminal/link text presentation. |
+| `foreground = null` | Preserve terminal/link/search text presentation. |
 | Opaque `foreground` | Replace selected text color. Transparent text overrides are rejected. |
 | `reverseVideo = true` | Swap each selected cell's original terminal foreground/background after inverse attributes. Configured foreground/background are unused in this mode. Images are not inverted. |
 
@@ -38,6 +38,48 @@ view's normal selection geometry. Concealed and blink-hidden text stays hidden.
 property preserves the style's foreground and reverse-video choice. For example,
 changing a reversed selection's fill requires first disabling `reverseVideo`.
 
+## Search matches
+
+`searchMatchStyle` and `searchActiveMatchStyle` independently configure ordinary
+matches and the active navigation result. Each immutable `SwingSearchMatchStyle`
+has a required background and optional foreground and border. The active style
+does not inherit any roles from the ordinary style.
+
+```kotlin
+val settings = SwingSettings.create {
+    it.searchMatchStyle = SwingSearchMatchStyle(
+        background = 0x554B6EAF,
+        border = 0xFF4B6EAF.toInt(),
+    )
+    it.searchActiveMatchStyle = SwingSearchMatchStyle(
+        background = 0xFFFFC857.toInt(),
+        foreground = 0xFF161616.toInt(),
+        border = 0xFFFFFFFF.toInt(),
+    )
+}
+```
+
+| Value | Meaning |
+| --- | --- |
+| `background` | Exact ARGB fill blended over terminal/link backgrounds. Zero alpha gives a border-only or text-only highlight. |
+| `foreground = null` | Preserve underlying terminal/link text, including faint presentation. |
+| Opaque `foreground` | Replace matched text color before selection and minimum contrast. Transparent text overrides are rejected. |
+| `border = null` | No outline. A supplied ARGB color adds a one-logical-pixel outline inside each visible contiguous match segment; zero alpha is invisible. |
+
+Wrapped matches have an outline on each physical row. Bidirectional matches may
+split into separate visual segments; each segment has its own outline. Borders
+use the same cell geometry as the fill, consume no layout space, and never extend
+into neighboring cells. Selection, glyphs, and the cursor paint over search
+borders. Concealed and blink-hidden text stays hidden; intrinsic color emoji and
+images are not recolored.
+
+Defaults retain the existing background-only appearance: normal `0x55FFD54F`,
+active `0xAAFF8C00`, both foregrounds and borders null. Existing
+`searchMatchBackground` and `searchActiveMatchBackground` accessors remain
+convenience aliases for their style's background. Assigning either preserves
+that style's foreground and border. Reloading search styles repaints existing
+results without changing the query, active match, or session palette.
+
 ## Terminal overrides and precedence
 
 Host styles are presentation defaults. Permitted OSC 21 selection overrides in
@@ -48,10 +90,12 @@ fields without explicit selection-override flags do not replace host styles.
 The [protocol contract](../../docs/reference/protocol.md#kitty-colors)
 describes permissions, queries, and reset behavior.
 
-Cell/link backgrounds are painted first, followed by search fills, selection
-fills, text, and the cursor. A fixed selection foreground overrides link text
-styling; a null foreground preserves it. Application-supplied underline colors
-remain authoritative.
+Cell/link backgrounds are painted first, followed by search fills and borders,
+selection fills, text, and the cursor. Text color resolves from terminal/link
+styling, then an explicit search foreground, then a selection foreground override,
+then enabled minimum contrast. A null selection foreground preserves the
+terminal/link/search text. Application-supplied underline colors remain
+authoritative.
 
 ## Contrast and faint text
 
@@ -70,7 +114,7 @@ OSC color queries therefore still report the session's original palette values.
 
 `faintOpacity` accepts finite values from `0.0` through `1.0`, defaulting to `0.5`.
 SGR faint text blends toward its displayed background: zero reaches that background,
-half blends equally, and one disables dimming. Explicit selection/link foregrounds
+half blends equally, and one disables dimming. Explicit selection/search/link foregrounds
 replace this inherited faint presentation. Contrast adjustment runs afterwards;
 when enabled it can brighten or darken faint text to restore readability.
 
@@ -82,7 +126,7 @@ val settings = SwingSettings.create {
 val exactColors = settings.copy { it.minimumContrastRatio = 1.0 }
 ```
 
-Configured selection colors and permitted terminal selection overrides are inputs
+Configured selection/search colors and permitted terminal selection overrides are inputs
 to the same opt-in contrast policy. Disable contrast adjustment when their exact
 foreground colors must be retained. Concealed/blink-hidden text remains hidden.
 Box drawing, block elements, geometric shading, and braille retain their color

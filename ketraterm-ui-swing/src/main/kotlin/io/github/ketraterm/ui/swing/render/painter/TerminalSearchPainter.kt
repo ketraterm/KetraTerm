@@ -20,6 +20,7 @@ import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import java.awt.Graphics2D
 
 /**
@@ -33,8 +34,8 @@ internal class TerminalSearchPainter(
         metrics: SwingMetrics,
         row: Int,
         highlights: TerminalSearchViewportHighlights?,
-        matchBackground: Int,
-        activeMatchBackground: Int,
+        matchStyle: SwingSearchMatchStyle,
+        activeMatchStyle: SwingSearchMatchStyle,
         bidi: TerminalBidiLayout.Row? = null,
     ) {
         if (highlights == null || highlights.segmentCount == 0) return
@@ -47,10 +48,7 @@ internal class TerminalSearchPainter(
         while (segment < end) {
             val startColumn = highlights.startColumn(segment)
             val endColumn = highlights.endColumn(segment)
-            g.color =
-                colorCache.color(
-                    if (highlights.isActive(segment)) activeMatchBackground else matchBackground,
-                )
+            val style = if (highlights.isActive(segment)) activeMatchStyle else matchStyle
             forEachVisualCellSpan(bidi, startColumn, endColumn) { visualStart, visualEnd ->
                 val x = visualStart * metrics.cellWidth
                 val y = row * metrics.cellHeight
@@ -59,12 +57,36 @@ internal class TerminalSearchPainter(
                 // edges at fractional scales. Clip to the cells that own the overlay.
                 g.clipRect(x, y, width, metrics.cellHeight)
                 try {
-                    g.fillRect(x, y, width, metrics.cellHeight)
+                    if (style.background ushr 24 != 0) {
+                        g.color = colorCache.color(style.background)
+                        g.fillRect(x, y, width, metrics.cellHeight)
+                    }
+                    val border = style.border
+                    if (border != null && border ushr 24 != 0 && width > 0) {
+                        g.color = colorCache.color(border)
+                        paintBorder(g, x, y, width, metrics.cellHeight)
+                    }
                 } finally {
                     g.clip = originalClip
                 }
             }
             segment++
+        }
+    }
+
+    /** Disjoint fills avoid double alpha blending at corners and work for one-pixel spans. */
+    private fun paintBorder(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) {
+        g.fillRect(x, y, width, 1)
+        if (height > 1) g.fillRect(x, y + height - 1, width, 1)
+        if (height > 2) {
+            g.fillRect(x, y + 1, 1, height - 2)
+            if (width > 1) g.fillRect(x + width - 1, y + 1, 1, height - 2)
         }
     }
 }
