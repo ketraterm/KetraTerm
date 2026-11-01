@@ -18,7 +18,7 @@ import me.champeau.jmh.JmhBytecodeGeneratorTask
 
 plugins {
     kotlin("jvm")
-    id("me.champeau.jmh") version "0.7.3"
+    id("me.champeau.jmh") version "0.7.4"
 }
 
 repositories {
