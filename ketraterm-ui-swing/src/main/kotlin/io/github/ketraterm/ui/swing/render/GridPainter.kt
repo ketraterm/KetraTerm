@@ -59,7 +59,10 @@ internal class GridPainter(
     private val clipScratch = Rectangle()
     private val graphicsPainter = GraphicsPainter()
 
-    fun prepareImages(cache: TerminalRenderCache) = graphicsPainter.prepare(cache.images)
+    fun prepareFrame(cache: TerminalRenderCache) {
+        graphicsPainter.prepare(cache.images)
+        textPainter.prepareColumns(cache.columns)
+    }
 
     fun clearImages() = graphicsPainter.clear()
 
@@ -99,6 +102,7 @@ internal class GridPainter(
         followedHyperlinkId: Int = 0,
     ) {
         val palette = cache.palette
+        val selectionStyle = if (terminalFocused) settings.selectionStyle else settings.inactiveSelectionStyle ?: settings.selectionStyle
         chrome.updateLayout(settings, metrics, width, height, cache.columns, cache.rows)
         textPainter.updateSettings(settings)
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
@@ -211,7 +215,7 @@ internal class GridPainter(
                         activeMatchBackground = settings.searchActiveMatchBackground,
                         bidi = bidi,
                     )
-                    selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground, palette, bidi)
+                    selectionPainter.paint(g, cache, metrics, row, selection, selectionStyle, palette, bidi)
                     textPainter.paintRow(
                         g = g,
                         cache = cache,
@@ -225,6 +229,8 @@ internal class GridPainter(
                         hyperlinkPresentations = hyperlinkPresentations,
                         followedHyperlinkId = followedHyperlinkId,
                         selection = selection,
+                        selectionStyle = selectionStyle,
+                        searchHighlights = searchHighlights,
                     )
                 } finally {
                     if (rowOffset != 0) g.translate(0, -rowOffset)

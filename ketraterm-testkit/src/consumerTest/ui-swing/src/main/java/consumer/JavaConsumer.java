@@ -126,8 +126,16 @@ public final class JavaConsumer {
             draft.setMiddleClickPaste(true);
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
             draft.setColumnSpacing(-1);
+            draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
+            draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
+            draft.setMinimumContrastRatio(4.5);
+            draft.setFaintOpacity(0.75);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getMinimumContrastRatio() != 4.5 || copiedSettings.getFaintOpacity() != 0.75
+            || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
+            || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
+            throw new AssertionError("Java color policies did not survive copying");
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
             || copiedSettings.getAlternateScreenWheelToArrowEnabled()
             || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1

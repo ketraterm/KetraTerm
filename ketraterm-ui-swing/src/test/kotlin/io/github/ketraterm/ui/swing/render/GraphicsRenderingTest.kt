@@ -401,7 +401,7 @@ class GraphicsRenderingTest {
                 )
                 val cache = TerminalRenderCache(10, 4).apply { updateFrom(terminal as TerminalRenderFrameReader) }
                 val painter = GridPainter()
-                painter.prepareImages(cache)
+                painter.prepareFrame(cache)
                 painter.paint(graphics, cache, settings, metrics, canvas.width, canvas.height, false)
                 assertEquals(0xff00807f.toInt(), canvas.getRGB(metrics.cellWidth / 2, metrics.cellHeight / 2))
                 assertEquals(settings.palette.defaultBackground, canvas.getRGB(metrics.cellWidth + 1, metrics.cellHeight / 2))
@@ -438,7 +438,7 @@ class GraphicsRenderingTest {
                 val pinned = checkNotNull(publisher.acquireFrontLease())
                 try {
                     cache.updateFrom(pinned)
-                    painter.prepareImages(cache)
+                    painter.prepareFrame(cache)
                     painter.paint(graphics, cache, settings, metrics, canvas.width, canvas.height, false)
                     assertEquals(0xffff0000.toInt(), canvas.getRGB(metrics.cellWidth, metrics.cellHeight))
                     upload("AP8A")
@@ -447,13 +447,13 @@ class GraphicsRenderingTest {
                     pinned.images.image(0).copyArgb(pixel)
                     assertEquals(0xffff0000.toInt(), pixel[0])
                     publisher.readCurrent { cache.updateFrom(it) }
-                    painter.prepareImages(cache)
+                    painter.prepareFrame(cache)
                     painter.paint(graphics, cache, settings, metrics, canvas.width, canvas.height, false)
                     assertEquals(0xff00ff00.toInt(), canvas.getRGB(metrics.cellWidth, metrics.cellHeight))
                     parser.accept("\u001b_Ga=d,d=I,i=7;\u001b\\".encodeToByteArray())
                     publisher.updateAndPublish(terminal)
                     publisher.readCurrent { cache.updateFrom(it) }
-                    painter.prepareImages(cache)
+                    painter.prepareFrame(cache)
                     painter.paint(graphics, cache, settings, metrics, canvas.width, canvas.height, false)
                     assertEquals(settings.palette.defaultBackground, canvas.getRGB(metrics.cellWidth, metrics.cellHeight))
                 } finally {
@@ -490,7 +490,7 @@ class GraphicsRenderingTest {
                     )
                     val cache = TerminalRenderCache(10, 4).apply { updateFrom(terminal as TerminalRenderFrameReader) }
                     val painter = GridPainter()
-                    painter.prepareImages(cache)
+                    painter.prepareFrame(cache)
                     painter.paint(graphics, cache, settings, metrics, canvas.width, canvas.height, false)
                     assertEquals(
                         if (z <

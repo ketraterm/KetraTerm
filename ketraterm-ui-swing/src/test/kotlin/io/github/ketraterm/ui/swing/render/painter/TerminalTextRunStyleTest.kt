@@ -22,10 +22,8 @@ import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
-import io.github.ketraterm.ui.swing.render.TestRenderFrame
-import io.github.ketraterm.ui.swing.render.hyperlinkHover
-import io.github.ketraterm.ui.swing.render.renderCache
-import io.github.ketraterm.ui.swing.render.styleFor
+import io.github.ketraterm.ui.swing.render.*
+import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -36,6 +34,73 @@ import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
     private val settings = SwingSettings()
+
+    @Test
+    fun `contrast uses search and selection layers and changes cleanly on settings reload`() {
+        val cache = renderCache(TestRenderFrame.text("AA"))
+        val palette = cache.palette.copy(defaultForeground = 0xff888888.toInt(), defaultBackground = 0xff000000.toInt())
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, 1, active = false)
+                finish()
+            }
+        val configured =
+            settings.copy {
+                it.minimumContrastRatio = 4.5
+                it.searchMatchBackground = 0xffffffff.toInt()
+                it.selectionBackground = 0x80000000.toInt()
+            }
+        val style = TerminalTextRunStyle()
+        style.configureRow(
+            true,
+            cache.hyperlinkIds,
+            null,
+            configured,
+            selectionRange = CellSelection.packRange(0, 1),
+            searchHighlights = highlights,
+            columns = 2,
+        )
+        style.begin(cache, palette, 0, 0)
+        val background = SwingColors.blendOver(0x80000000.toInt(), 0xffffffff.toInt())
+        assertTrue(SwingColors.contrastRatio(style.foreground, background) >= 4.5)
+        assertFalse(style.matches(cache, palette, 0, 1), "Different visible backgrounds can split a text run")
+
+        style.configureRow(
+            true,
+            cache.hyperlinkIds,
+            null,
+            configured.copy { it.minimumContrastRatio = 1.0 },
+            selectionRange = CellSelection.packRange(0, 1),
+            searchHighlights = highlights,
+            columns = 2,
+        )
+        style.begin(cache, palette, 0, 0)
+        assertEquals(palette.defaultForeground, style.foreground)
+        assertTrue(style.matches(cache, palette, 0, 1))
+    }
+
+    @Test
+    fun `contrast uses hyperlink fill and cannot reveal concealed text`() {
+        val cache = renderCache(TestRenderFrame.text("A"))
+        cache.hyperlinkIds.fill(1)
+        val configured =
+            settings.copy {
+                it.minimumContrastRatio = 7.0
+                it.osc8HyperlinkPresentation =
+                    SwingHyperlinkPresentation(
+                        normal = SwingHyperlinkStyle(foregroundArgb = 0xffeeeeee.toInt(), backgroundArgb = 0xffffffff.toInt()),
+                        isVisible = true,
+                    )
+            }
+        val style = TerminalTextRunStyle()
+        style.configureRow(true, cache.hyperlinkIds, null, configured)
+        style.begin(cache, cache.palette, 0, 0)
+        assertTrue(SwingColors.contrastRatio(style.foreground, 0xffffffff.toInt()) >= 7.0)
+        cache.attrWords[0] = TerminalRenderAttrs.pack(invisible = true)
+        style.begin(cache, cache.palette, 0, 0)
+        assertTrue(style.textHidden)
+    }
 
     @Test
     fun `selection foreground override is independent of fill and does not leak between rows`() {

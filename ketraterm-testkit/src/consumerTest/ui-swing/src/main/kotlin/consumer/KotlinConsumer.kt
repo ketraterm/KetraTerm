@@ -38,6 +38,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingPasteSource
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
@@ -80,8 +81,15 @@ fun main() =
                 it.middleClickPaste = true
                 it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
                 it.columnSpacing = -1
+                it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
+                it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
+                it.minimumContrastRatio = 4.5
+                it.faintOpacity = 0.75
             }
         check(interactionSettings == interactionSettings.copy {})
+        check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
+        check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
+        check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)
         check(interactionSettings.hashCode() == interactionSettings.copy {}.hashCode())
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)

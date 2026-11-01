@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.render
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -35,6 +36,67 @@ class TerminalColorRenderingTest {
     private val fixedSelection = TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND or TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
     private val dynamicSelection =
         fixedSelection or TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND or TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `focused and unfocused selection independently preserve or replace text`(focused: Boolean) {
+        val image =
+            paint(
+                textCells("A"),
+                basePalette,
+                CellSelection(0, 0, 1, 0),
+                focused = focused,
+                selectionStyle = SwingSelectionStyle(TEST_BLUE, TEST_GREEN),
+                inactiveStyle = SwingSelectionStyle(TEST_RED),
+            )
+        assertEquals(if (focused) TEST_BLUE else TEST_RED, image.getRGB(0, 0))
+        assertTrue(image.containsColor(if (focused) TEST_GREEN else TEST_WHITE))
+    }
+
+    @Test
+    fun `missing inactive style inherits active selection and zero alpha keeps cell fill`() {
+        val image =
+            paint(
+                textCells("A"),
+                basePalette,
+                CellSelection(0, 0, 1, 0),
+                focused = false,
+                selectionStyle = SwingSelectionStyle(0, TEST_GREEN),
+            )
+        assertEquals(TEST_BLACK, image.getRGB(0, 0))
+        assertTrue(image.containsColor(TEST_GREEN))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `host reverse selection uses the leading wide cell for either selected half`(trailing: Boolean) {
+        val image =
+            paint(
+                wideCells(),
+                basePalette,
+                CellSelection(if (trailing) 1 else 0, 0, if (trailing) 2 else 1, 0),
+                selectionStyle = SwingSelectionStyle(reverseVideo = true),
+            )
+        assertEquals(TEST_RED, image.getRGB((if (trailing) 1 else 0) * metrics.cellWidth, 0))
+        if (!trailing) assertTrue(image.containsColor(TEST_GREEN))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `application role overrides take precedence over either host style`(focused: Boolean) {
+        val palette = basePalette.copyWithColorBehavior(fixedSelection, selectionForeground = TEST_GREEN, selectionBackground = TEST_RED)
+        val image =
+            paint(
+                textCells("A"),
+                palette,
+                CellSelection(0, 0, 1, 0),
+                focused = focused,
+                selectionStyle = SwingSelectionStyle(TEST_BLUE, TEST_WHITE),
+                inactiveStyle = SwingSelectionStyle(reverseVideo = true),
+            )
+        assertEquals(TEST_RED, image.getRGB(0, 0))
+        assertTrue(image.containsColor(TEST_GREEN))
+    }
 
     @Test
     fun `host selection appearance remains unchanged without application overrides`() {
@@ -256,6 +318,8 @@ class TerminalColorRenderingTest {
         cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1),
         focused: Boolean = true,
         antialiased: Boolean = false,
+        selectionStyle: SwingSelectionStyle = SwingSelectionStyle(TEST_GREEN),
+        inactiveStyle: SwingSelectionStyle? = null,
     ): BufferedImage {
         val image = BufferedImage(cells.size * metrics.cellWidth, metrics.cellHeight, BufferedImage.TYPE_INT_ARGB)
         val frame =
@@ -265,7 +329,8 @@ class TerminalColorRenderingTest {
         val settings =
             defaultTestSettings().copy { draft ->
                 draft.palette = palette
-                draft.selectionBackground = TEST_GREEN
+                draft.selectionStyle = selectionStyle
+                draft.inactiveSelectionStyle = inactiveStyle
                 draft.shellIntegrationDecorationGutterWidth = 0
                 draft.textAntialiasing =
                     if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF

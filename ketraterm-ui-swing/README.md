@@ -18,6 +18,7 @@ later.
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
@@ -37,6 +38,10 @@ fun createUnboundTerminalView(
         it.font = Font("Cascadia Mono", Font.PLAIN, 15)
         it.columns = 80
         it.rows = 24
+        it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
+        it.inactiveSelectionStyle = SwingSelectionStyle(background = 0x404B6EAF)
+        it.minimumContrastRatio = 4.5 // Optional readability policy; 1.0 preserves exact colors.
+        it.faintOpacity = 0.5
     }
 
     return SwingTerminal(settingsProvider = { settings }).apply {
@@ -46,6 +51,8 @@ fun createUnboundTerminalView(
 ```
 
 The font name is a host choice; use a font available in your environment.
+Selection styling, terminal color precedence, and migration notes are explained in
+[Color customization](docs/color-customization.md).
 `columns` and `rows` set the preferred size. Once laid out, the visible cell
 dimensions determine the live session's grid and connector size. Settings and
 session geometry require at least two columns and one row. A narrower component

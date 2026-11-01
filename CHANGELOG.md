@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## Unreleased
 
+- Added `SwingSelectionStyle` for independent focused/unfocused selection colors, preserved text, exact ARGB fills, and cell-based reverse video. Existing `selectionBackground` accessors configure the active style. Permitted OSC selection overrides retain per-role precedence. Added renderer-local `minimumContrastRatio` (default `1.0`, adjustment disabled) and `faintOpacity` (default `0.5`), with contrast resolved against composed link/search/selection backgrounds. Selection fills are no longer silently substituted; faint text now blends toward its displayed background. See [configuration and migration](ketraterm-ui-swing/docs/color-customization.md).
 - Typing, editing keys, and accepted paste now immediately reveal the live viewport and cancel pending scroll animation. Local shortcuts, modifiers, focus changes, and key releases preserve scrollback. `SwingSettings.scrollOnOutput` now defaults to `false`, keeping scrolled content anchored while output continues; explicitly enabled output following is preserved.
 
 ## [0.4.0] - 2026-10-31

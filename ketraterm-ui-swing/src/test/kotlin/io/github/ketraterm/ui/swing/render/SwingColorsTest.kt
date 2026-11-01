@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.ui.swing.render.cache.TextContrastCache
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -24,8 +25,60 @@ import kotlin.test.assertTrue
 
 class SwingColorsTest {
     @Test
+    fun `disabled contrast preserves exact truecolor and opaque endpoints have known ratios`() {
+        assertEquals(21.0, SwingColors.contrastRatio(0xff000000.toInt(), 0xffffffff.toInt()))
+        assertEquals(1.0, SwingColors.contrastRatio(0xff123456.toInt(), 0xff123456.toInt()))
+        for (color in intArrayOf(0xff000000.toInt(), 0xff010101.toInt(), 0xff888888.toInt(), 0xffffffff.toInt())) {
+            assertEquals(color, SwingColors.ensureContrast(color, color, 1.0))
+        }
+    }
+
+    @Test
+    fun `contrast meets every achievable target across light dark and intermediate backgrounds`() {
+        for (level in 0..255) {
+            val background = 0xff000000.toInt() or (level * 0x010101)
+            val possible =
+                maxOf(SwingColors.contrastRatio(0xff000000.toInt(), background), SwingColors.contrastRatio(0xffffffff.toInt(), background))
+            for (ratio in doubleArrayOf(1.1, 3.0, 4.5, 7.0, 21.0)) {
+                for (foreground in intArrayOf(background, 0xff112233.toInt(), 0xffaa5500.toInt())) {
+                    val adjusted = SwingColors.ensureContrast(foreground, background, ratio)
+                    val actual = SwingColors.contrastRatio(adjusted, background)
+                    assertTrue(actual + 1e-12 >= minOf(possible, ratio), "bg=$level target=$ratio achieved=$actual possible=$possible")
+                    if (SwingColors.contrastRatio(foreground, background) >= ratio) assertEquals(foreground, adjusted)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `faint intensity blends toward displayed background and can be disabled`() {
+        val palette = TerminalColorPalette(defaultForeground = 0xff808080.toInt(), defaultBackground = 0xffffffff.toInt())
+        val attr = TerminalRenderAttrs.pack(faint = true)
+        assertEquals(0xffffffff.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.0))
+        assertEquals(0xffbfbfbf.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.5))
+        assertEquals(0xff808080.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 1.0))
+        assertEquals(0xff404040.toInt(), SwingColors.foreground(palette, attr, background = 0xff000000.toInt()))
+    }
+
+    @Test
+    fun `contrast cache isolates renderers and invalidates on ratio changes`() {
+        val first = TextContrastCache()
+        val second = TextContrastCache()
+        val gray = 0xff777777.toInt()
+        first.configure(4.5)
+        val adjusted = first.resolve(gray, gray)
+        repeat(10) { assertEquals(adjusted, first.resolve(gray, gray)) }
+        assertEquals(gray, second.resolve(gray, gray))
+        first.configure(1.0)
+        assertEquals(gray, first.resolve(gray, gray))
+        first.configure(7.0)
+        assertEquals(SwingColors.ensureContrast(gray, gray, 7.0), first.resolve(gray, gray))
+        assertEquals(SwingColors.ensureContrast(gray, 0xffffffff.toInt(), 7.0), first.resolve(gray, 0xffffffff.toInt()))
+    }
+
+    @Test
     fun foregroundAppliesSwingFaintPolicy() {
-        // Use a white background so the faint color 0xFF112233 has high contrast and is not adjusted
+        // Faint text blends toward its background, including on light themes.
         val palette =
             TerminalColorPalette(
                 defaultForeground = 0xFF224466.toInt(),
@@ -33,7 +86,7 @@ class SwingColorsTest {
             )
         val attrs = TerminalRenderAttrs.pack(faint = true)
 
-        assertEquals(0xFF112233.toInt(), SwingColors.foreground(palette, attrs))
+        assertEquals(0xFF90A1B2.toInt(), SwingColors.foreground(palette, attrs))
     }
 
     @Test
@@ -66,7 +119,7 @@ class SwingColorsTest {
                 defaultForeground = 0xFF220000.toInt(), // Very dark red
                 defaultBackground = 0xFF000000.toInt(), // Black
             )
-        val adjusted = SwingColors.foreground(paletteLowContrast, attrs)
+        val adjusted = SwingColors.foreground(paletteLowContrast, attrs, minimumContrastRatio = 3.0)
         assertNotEquals(0xFF220000.toInt(), adjusted)
         assertTrue(SwingColors.contrastRatio(adjusted, 0xFF000000.toInt()) >= 3.0)
     }
@@ -81,7 +134,7 @@ class SwingColorsTest {
                 defaultForeground = 0xFFFFFF00.toInt(), // Yellow
                 defaultBackground = 0xFFFFFFFF.toInt(), // White
             )
-        val adjusted = SwingColors.foreground(palette, attrs)
+        val adjusted = SwingColors.foreground(palette, attrs, minimumContrastRatio = 3.0)
         assertNotEquals(0xFFFFFF00.toInt(), adjusted)
         assertTrue(SwingColors.contrastRatio(adjusted, 0xFFFFFFFF.toInt()) >= 3.0)
     }
@@ -98,7 +151,7 @@ class SwingColorsTest {
             )
 
         // Standard lookup / default codePoint should be adjusted
-        val adjustedNormal = SwingColors.foreground(palette, attrs, codePoint = 0)
+        val adjustedNormal = SwingColors.foreground(palette, attrs, codePoint = 0, minimumContrastRatio = 3.0)
         assertNotEquals(0xFF220000.toInt(), adjustedNormal)
 
         // Box drawing character (e.g. U+2500) must bypass adjustment and keep original color

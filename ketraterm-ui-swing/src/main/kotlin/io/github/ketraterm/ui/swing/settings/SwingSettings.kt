@@ -130,7 +130,30 @@ public class SwingSettings private constructor(
     public val textAntialiasing: Any = builder.textAntialiasing
     public val fractionalMetrics: Any = builder.fractionalMetrics
     public val hyperlinkActivationForeground: Int = builder.hyperlinkActivationForeground
-    public val selectionBackground: Int = builder.selectionBackground
+
+    /** Focused selection colors. Permitted terminal overrides take precedence per color role. */
+    public val selectionStyle: SwingSelectionStyle = builder.selectionStyle
+
+    /** Unfocused selection colors; null inherits [selectionStyle], including text preservation. */
+    public val inactiveSelectionStyle: SwingSelectionStyle? = builder.inactiveSelectionStyle
+
+    /**
+     * Minimum text contrast against the composed cell background, finite and in 1..21.
+     * The default 1 disables adjustment. Higher values adjust text toward black/white,
+     * using the best achievable contrast when the requested ratio is impossible.
+     * Concealed text, graphical shading, images, and intrinsic emoji colors are preserved.
+     */
+    public val minimumContrastRatio: Double = builder.minimumContrastRatio
+
+    /**
+     * Faint text intensity, finite and in 0..1. Default 0.5 blends text halfway toward its
+     * displayed background; 1 disables faintness. Explicit link/selection text colors replace
+     * faint text. Enabled minimum contrast is applied afterwards and can increase visibility.
+     */
+    public val faintOpacity: Double = if (builder.faintOpacity == 0.0) 0.0 else builder.faintOpacity
+
+    /** Convenience access to [selectionStyle]'s exact background ARGB value. */
+    public val selectionBackground: Int get() = selectionStyle.background
     public val searchMatchBackground: Int = builder.searchMatchBackground
     public val searchActiveMatchBackground: Int = builder.searchActiveMatchBackground
     public val visualBellEnabled: Boolean = builder.visualBellEnabled
@@ -297,7 +320,23 @@ public class SwingSettings private constructor(
         public var hyperlinkActivationForeground: Int = source?.hyperlinkActivationForeground ?: DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND
 
         /** Draft value for [SwingSettings.selectionBackground]; validated when [build] is called. */
-        public var selectionBackground: Int = source?.selectionBackground ?: DEFAULT_SELECTION_BACKGROUND
+        public var selectionBackground: Int
+            get() = selectionStyle.background
+            set(value) {
+                selectionStyle = selectionStyle.copy(background = value)
+            }
+
+        /** Draft value for [SwingSettings.selectionStyle]. */
+        public var selectionStyle: SwingSelectionStyle = source?.selectionStyle ?: SwingSelectionStyle()
+
+        /** Draft value for [SwingSettings.inactiveSelectionStyle]. */
+        public var inactiveSelectionStyle: SwingSelectionStyle? = source?.inactiveSelectionStyle
+
+        /** Draft value for [SwingSettings.minimumContrastRatio]. */
+        public var minimumContrastRatio: Double = source?.minimumContrastRatio ?: 1.0
+
+        /** Draft value for [SwingSettings.faintOpacity]. */
+        public var faintOpacity: Double = source?.faintOpacity ?: 0.5
 
         /** Draft value for [SwingSettings.searchMatchBackground]; validated when [build] is called. */
         public var searchMatchBackground: Int = source?.searchMatchBackground ?: DEFAULT_SEARCH_MATCH_BACKGROUND
@@ -419,7 +458,10 @@ public class SwingSettings private constructor(
             textAntialiasing == other.textAntialiasing &&
             fractionalMetrics == other.fractionalMetrics &&
             hyperlinkActivationForeground == other.hyperlinkActivationForeground &&
-            selectionBackground == other.selectionBackground &&
+            selectionStyle == other.selectionStyle &&
+            inactiveSelectionStyle == other.inactiveSelectionStyle &&
+            minimumContrastRatio == other.minimumContrastRatio &&
+            faintOpacity == other.faintOpacity &&
             searchMatchBackground == other.searchMatchBackground &&
             searchActiveMatchBackground == other.searchActiveMatchBackground &&
             visualBellEnabled == other.visualBellEnabled &&
@@ -467,7 +509,10 @@ public class SwingSettings private constructor(
         result = 31 * result + textAntialiasing.hashCode()
         result = 31 * result + fractionalMetrics.hashCode()
         result = 31 * result + hyperlinkActivationForeground.hashCode()
-        result = 31 * result + selectionBackground.hashCode()
+        result = 31 * result + selectionStyle.hashCode()
+        result = 31 * result + inactiveSelectionStyle.hashCode()
+        result = 31 * result + minimumContrastRatio.hashCode()
+        result = 31 * result + faintOpacity.hashCode()
         result = 31 * result + searchMatchBackground.hashCode()
         result = 31 * result + searchActiveMatchBackground.hashCode()
         result = 31 * result + visualBellEnabled.hashCode()
@@ -525,6 +570,12 @@ public class SwingSettings private constructor(
         )
 
     init {
+        require(minimumContrastRatio.isFinite() && minimumContrastRatio in 1.0..21.0) {
+            "minimumContrastRatio must be finite and in 1..21, was $minimumContrastRatio"
+        }
+        require(faintOpacity.isFinite() && faintOpacity in 0.0..1.0) {
+            "faintOpacity must be finite and in 0..1, was $faintOpacity"
+        }
         require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be >= ${TerminalBuffers.MIN_WIDTH}, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(cursorBlinkMillis >= 0) {
@@ -577,7 +628,6 @@ public class SwingSettings private constructor(
 
         private const val DEFAULT_FONT_SIZE = 16
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
-        private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
         private const val DEFAULT_SEARCH_MATCH_BACKGROUND = 0x55FFD54F
         private const val DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND = 0xAAFF8C00.toInt()
         private const val DEFAULT_VISUAL_BELL_COLOR = 0x664DA3FF

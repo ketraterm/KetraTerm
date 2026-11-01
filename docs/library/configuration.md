@@ -61,6 +61,9 @@ be doubled. Components capture their message provider at construction, so
 recreate chrome to change that captured language.
 
 Search chrome accepts immutable `SwingTerminalSearchColors` snapshots.
+Terminal selection colors are configured through `SwingSettings.selectionStyle`
+and `inactiveSelectionStyle`. `minimumContrastRatio` and `faintOpacity` control
+text readability; see [color customization](../../ketraterm-ui-swing/docs/color-customization.md).
 Completion adapters accept source-ID-to-display-label maps. Neither changes
 terminal data, source identity, ranking, or feedback routing. Localized command
 catalogs change descriptions while preserving command and option tokens.

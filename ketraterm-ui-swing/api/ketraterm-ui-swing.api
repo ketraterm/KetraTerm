@@ -555,6 +555,25 @@ public final class io/github/ketraterm/ui/swing/settings/SwingPromptDecoration :
 	public static fun values ()[Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
 }
 
+public final class io/github/ketraterm/ui/swing/settings/SwingSelectionStyle {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public fun <init> (ILjava/lang/Integer;)V
+	public fun <init> (ILjava/lang/Integer;Z)V
+	public synthetic fun <init> (ILjava/lang/Integer;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Z
+	public final fun copy (ILjava/lang/Integer;Z)Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;ILjava/lang/Integer;ZILjava/lang/Object;)Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackground ()I
+	public final fun getForeground ()Ljava/lang/Integer;
+	public final fun getReverseVideo ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public static final field Companion Lio/github/ketraterm/ui/swing/settings/SwingSettings$Companion;
 	public fun <init> ()V
@@ -573,13 +592,16 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getCopyOnSelection ()Z
 	public final fun getCursorBlinkMillis ()I
 	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun getFaintOpacity ()D
 	public final fun getFallbackFonts ()Lkotlinx/collections/immutable/ImmutableList;
 	public final fun getFont ()Ljava/awt/Font;
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
+	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public final fun getMinimumContrastRatio ()D
 	public static final fun getMonospaceFontFamilies ()Ljava/util/List;
 	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
@@ -593,6 +615,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getSearchActiveMatchBackground ()I
 	public final fun getSearchMatchBackground ()I
 	public final fun getSelectionBackground ()I
+	public final fun getSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
 	public final fun getShellIntegrationDecorationGutterWidth ()I
 	public final fun getShellIntegrationFailedCommandRailColor ()I
 	public final fun getShellIntegrationFailedCommandRailWidth ()I
@@ -625,13 +648,16 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getCopyOnSelection ()Z
 	public final fun getCursorBlinkMillis ()I
 	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun getFaintOpacity ()D
 	public final fun getFallbackFonts ()Ljava/util/List;
 	public final fun getFont ()Ljava/awt/Font;
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
+	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public final fun getMinimumContrastRatio ()D
 	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
 	public final fun getOsc8HyperlinkPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
@@ -644,6 +670,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getSearchActiveMatchBackground ()I
 	public final fun getSearchMatchBackground ()I
 	public final fun getSelectionBackground ()I
+	public final fun getSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
 	public final fun getShellIntegrationDecorationGutterWidth ()I
 	public final fun getShellIntegrationFailedCommandRailColor ()I
 	public final fun getShellIntegrationFailedCommandRailWidth ()I
@@ -669,13 +696,16 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setCopyOnSelection (Z)V
 	public final fun setCursorBlinkMillis (I)V
 	public final fun setCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
+	public final fun setFaintOpacity (D)V
 	public final fun setFallbackFonts (Ljava/util/List;)V
 	public final fun setFont (Ljava/awt/Font;)V
 	public final fun setFractionalMetrics (Ljava/lang/Object;)V
 	public final fun setHyperlinkActivationForeground (I)V
+	public final fun setInactiveSelectionStyle (Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;)V
 	public final fun setLineHeight (F)V
 	public final fun setMiddleClickPaste (Z)V
 	public final fun setMiddleClickPasteSource (Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;)V
+	public final fun setMinimumContrastRatio (D)V
 	public final fun setMouseReportingEnabled (Z)V
 	public final fun setOsc8HyperlinkActivation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)V
 	public final fun setOsc8HyperlinkPresentation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;)V
@@ -688,6 +718,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setSearchActiveMatchBackground (I)V
 	public final fun setSearchMatchBackground (I)V
 	public final fun setSelectionBackground (I)V
+	public final fun setSelectionStyle (Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;)V
 	public final fun setShellIntegrationDecorationGutterWidth (I)V
 	public final fun setShellIntegrationFailedCommandRailColor (I)V
 	public final fun setShellIntegrationFailedCommandRailWidth (I)V

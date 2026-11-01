@@ -35,6 +35,62 @@ class SwingSettingsTest {
     private val chrome = SwingTerminalChrome()
 
     @Test
+    fun `contrast and faintness validate finite bounds and freeze settings drafts`() {
+        assertEquals(1.0, SwingSettings().minimumContrastRatio)
+        assertEquals(0.5, SwingSettings().faintOpacity)
+        for (invalid in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0.999, 21.001)) {
+            assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.minimumContrastRatio = invalid } }
+        }
+        for (invalid in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -0.001, 1.001)) {
+            assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.faintOpacity = invalid } }
+        }
+        val draft =
+            SwingSettings.builder().apply {
+                minimumContrastRatio = 21.0
+                faintOpacity = 0.0
+            }
+        val snapshot = draft.build()
+        draft.minimumContrastRatio = 1.0
+        draft.faintOpacity = 1.0
+        assertEquals(21.0, snapshot.minimumContrastRatio)
+        assertEquals(0.0, snapshot.faintOpacity)
+        assertEquals(snapshot, snapshot.copy {})
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertNotEquals(snapshot, snapshot.copy { it.minimumContrastRatio = 1.0 })
+        val negativeZero = snapshot.copy { it.faintOpacity = -0.0 }
+        assertEquals(snapshot, negativeZero)
+        assertEquals(snapshot.hashCode(), negativeZero.hashCode())
+    }
+
+    @Test
+    fun `selection background convenience and style have one authoritative value`() {
+        val settings =
+            SwingSettings.create {
+                it.selectionStyle = SwingSelectionStyle(background = 0xff123456.toInt(), foreground = 0xffffffff.toInt())
+                it.selectionBackground = 0x66FFFFFF
+                it.inactiveSelectionStyle = SwingSelectionStyle(background = 0)
+            }
+        assertEquals(0x66FFFFFF, settings.selectionStyle.background)
+        assertEquals(settings.selectionStyle.background, settings.selectionBackground)
+        assertEquals(0xffffffff.toInt(), settings.selectionStyle.foreground)
+        assertEquals(settings, settings.copy {})
+        assertEquals(settings.hashCode(), settings.copy {}.hashCode())
+        val changed = settings.copy { it.inactiveSelectionStyle = null }
+        assertNotEquals(settings, changed)
+        assertNull(changed.inactiveSelectionStyle)
+        assertEquals(settings.selectionStyle, changed.selectionStyle)
+    }
+
+    @Test
+    fun `selection accepts every fill alpha but rejects translucent text`() {
+        for (alpha in 0..255) {
+            assertEquals(alpha shl 24, SwingSelectionStyle(background = alpha shl 24).background)
+            if (alpha != 255) assertFailsWith<IllegalArgumentException> { SwingSelectionStyle(foreground = alpha shl 24) }
+        }
+        assertNull(SwingSelectionStyle().foreground)
+    }
+
+    @Test
     fun `output following is opt in and survives settings copies`() {
         assertFalse(SwingSettings().scrollOnOutput)
         val enabled = SwingSettings.create { it.scrollOnOutput = true }

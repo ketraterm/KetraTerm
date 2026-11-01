@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import kotlin.math.pow
 
 /**
  * Swing-specific visual interpretation of render colors.
@@ -28,13 +29,9 @@ internal object SwingColors {
             if (normalized <= 0.03928) {
                 normalized / 12.92
             } else {
-                Math.pow((normalized + 0.055) / 1.055, 2.4)
+                ((normalized + 0.055) / 1.055).pow(2.4)
             }
         }
-
-    private var lastFg = 0
-    private var lastBg = 0
-    private var lastAdjusted = 0
 
     fun relativeLuminance(color: Int): Double {
         val r = (color ushr 16) and 0xFF
@@ -73,7 +70,18 @@ internal object SwingColors {
         fgColor: Int,
         bgColor: Int,
     ): Int {
+        if (fgColor ushr 24 == 0) return bgColor
+        if (fgColor ushr 24 == 255) return fgColor
+        if (bgColor ushr 24 == 0) return fgColor
         val alpha = ((fgColor ushr 24) and 0xFF) / 255.0
+        if (bgColor ushr 24 != 255) {
+            val backgroundAlpha = (bgColor ushr 24) / 255.0 * (1.0 - alpha)
+            val combined = alpha + backgroundAlpha
+            val red = (((fgColor ushr 16) and 255) * alpha + ((bgColor ushr 16) and 255) * backgroundAlpha) / combined
+            val green = (((fgColor ushr 8) and 255) * alpha + ((bgColor ushr 8) and 255) * backgroundAlpha) / combined
+            val blue = ((fgColor and 255) * alpha + (bgColor and 255) * backgroundAlpha) / combined
+            return ((combined * 255).toInt() shl 24) or (red.toInt() shl 16) or (green.toInt() shl 8) or blue.toInt()
+        }
         val r = (((fgColor ushr 16) and 0xFF) * alpha + ((bgColor ushr 16) and 0xFF) * (1.0 - alpha)).toInt()
         val g = (((fgColor ushr 8) and 0xFF) * alpha + ((bgColor ushr 8) and 0xFF) * (1.0 - alpha)).toInt()
         val b = ((fgColor and 0xFF) * alpha + (bgColor and 0xFF) * (1.0 - alpha)).toInt()
@@ -83,48 +91,37 @@ internal object SwingColors {
     fun ensureContrast(
         fg: Int,
         bg: Int,
+        minimumRatio: Double,
     ): Int {
-        if (fg == lastFg && bg == lastBg) {
-            return lastAdjusted
-        }
-        val adjusted = calculateContrastAdjusted(fg, bg)
-        lastFg = fg
-        lastBg = bg
-        lastAdjusted = adjusted
-        return adjusted
-    }
-
-    private fun calculateContrastAdjusted(
-        fg: Int,
-        bg: Int,
-    ): Int {
-        val fgLum = relativeLuminance(fg)
+        if (minimumRatio <= 1.0) return fg
+        val visibleForeground = if (fg ushr 24 == 255) fg else blendOver(fg, bg)
+        val fgLum = relativeLuminance(visibleForeground)
         val bgLum = relativeLuminance(bg)
         val lighter = maxOf(fgLum, bgLum)
         val darker = minOf(fgLum, bgLum)
         val ratio = (lighter + 0.05) / (darker + 0.05)
 
-        if (ratio >= 3.0) {
+        if (ratio >= minimumRatio) {
             return fg
         }
-
-        // Adjust fg towards white or black
-        val target = if (bgLum < 0.5) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-
-        // Stepwise blend
-        for (step in 1..5) {
-            val weight = step * 0.2
-            val candidate = blend(target, fg, weight)
-            val candLum = relativeLuminance(candidate)
-            val candLighter = maxOf(candLum, bgLum)
-            val candDarker = minOf(candLum, bgLum)
-            val candRatio = (candLighter + 0.05) / (candDarker + 0.05)
-            if (candRatio >= 3.0) {
-                return candidate
+        val blackRatio = (bgLum + 0.05) / 0.05
+        val whiteRatio = 1.05 / (bgLum + 0.05)
+        val lighten =
+            when {
+                fgLum > bgLum && whiteRatio >= minimumRatio -> true
+                fgLum < bgLum && blackRatio >= minimumRatio -> false
+                else -> whiteRatio >= blackRatio
             }
+        val target = if (lighten) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        if (maxOf(blackRatio, whiteRatio) < minimumRatio) return target
+        var low = 0
+        var high = 255
+        while (low + 1 < high) {
+            val middle = (low + high) ushr 1
+            val candidate = blend(target, visibleForeground, middle / 255.0)
+            if (contrastRatio(candidate, bg) >= minimumRatio) high = middle else low = middle
         }
-
-        return target
+        return blend(target, visibleForeground, high / 255.0)
     }
 
     /**
@@ -134,21 +131,23 @@ internal object SwingColors {
         palette: TerminalColorPalette,
         attrWord: Long,
         codePoint: Int = 0,
+        minimumContrastRatio: Double = 1.0,
+        faintOpacity: Double = 0.5,
+        background: Int = palette.background(attrWord),
     ): Int {
         if (TerminalRenderAttrs.isInvisible(attrWord)) {
-            return background(palette, attrWord)
+            return background
         }
 
         val color = palette.foreground(attrWord)
-        val fg = if (TerminalRenderAttrs.isFaint(attrWord)) dim(color) else color
+        val fg = if (TerminalRenderAttrs.isFaint(attrWord)) blend(color, background, faintOpacity) else color
         if (isGraphicCodePoint(codePoint)) {
             return fg
         }
-        val bg = background(palette, attrWord)
-        return ensureContrast(fg, bg)
+        return ensureContrast(fg, background, minimumContrastRatio)
     }
 
-    private fun isGraphicCodePoint(codePoint: Int): Boolean {
+    fun isGraphicCodePoint(codePoint: Int): Boolean {
         // Box Drawing: U+2500..U+257F
         // Block Elements: U+2580..U+259F
         // Geometric Shapes: U+25A0..U+25FF
@@ -163,15 +162,4 @@ internal object SwingColors {
         palette: TerminalColorPalette,
         attrWord: Long,
     ): Int = palette.background(attrWord)
-
-    /**
-     * Applies Swing's current faint rendering policy to a packed ARGB color.
-     */
-    fun dim(color: Int): Int {
-        val alpha = color and 0xFF000000.toInt()
-        val red = ((color ushr 16) and 0xFF) / 2
-        val green = ((color ushr 8) and 0xFF) / 2
-        val blue = (color and 0xFF) / 2
-        return alpha or (red shl 16) or (green shl 8) or blue
-    }
 }

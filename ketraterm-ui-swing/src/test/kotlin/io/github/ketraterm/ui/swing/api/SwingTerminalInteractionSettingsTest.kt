@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
@@ -42,6 +43,33 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
+    @Test
+    fun `selection and readability reloads preserve application color overrides until protocol reset`() =
+        fixture {
+            feed("\u001b]21;selection_foreground=#00ff00;selection_background=#0000ff\u001b\\")
+            val selectionFlags = TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND or TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
+            session.readRenderFrame { assertEquals(selectionFlags, it.palette.colorBehavior and selectionFlags) }
+
+            settings =
+                settings.copy {
+                    it.selectionStyle = SwingSelectionStyle(background = 0xff123456.toInt(), foreground = 0xffffffff.toInt())
+                    it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
+                    it.minimumContrastRatio = 4.5
+                    it.faintOpacity = 0.25
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            session.readRenderFrame {
+                assertEquals(0xff00ff00.toInt(), it.palette.selectionForeground)
+                assertEquals(0xff0000ff.toInt(), it.palette.selectionBackground)
+                assertEquals(selectionFlags, it.palette.colorBehavior and selectionFlags)
+            }
+            feed("\u001b]21;selection_foreground;selection_background\u001b\\")
+            session.readRenderFrame { assertEquals(0, it.palette.colorBehavior and selectionFlags) }
+            assertTrue(settings.inactiveSelectionStyle?.reverseVideo == true)
+        }
+
     @ParameterizedTest
     @ValueSource(
         ints = [
