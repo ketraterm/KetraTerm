@@ -47,7 +47,7 @@ byte, cell, or key.</p>
 <p>The full warmed suite is available through:</p>
 <pre><code class="language-text">./gradlew :ketraterm-benchmarks:jmh
 </code></pre>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/build.gradle.kts">Gradle configuration</a> defines suite defaults and excludes
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/build.gradle.kts">Gradle configuration</a> defines suite defaults and excludes
 the first-input benchmark. Direct JAR runs use annotations unless overridden.</p>
 <h2 id="select-a-measurement-boundary">Select a measurement boundary</h2>
 <div class="table-scroll"><table>
@@ -101,14 +101,29 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.</p
 <td>Swing text, search, hyperlinks, and painting</td>
 <td><code>TerminalTextRenderingBenchmark</code>, <code>TerminalSearchScanBenchmark</code>, <code>TerminalSearchRefreshBenchmark</code>, <code>TerminalHyperlinkDiscoveryBenchmark</code>, <code>SwingPaintBenchmark</code></td>
 </tr>
+<tr>
+<td>Color-policy resolution without Java2D</td>
+<td><code>TerminalColorResolutionBenchmark</code>; warmed reusable row buffers, selection/search foregrounds and contrast-cache hits or changing truecolor. <code>ratio=1.0,3.0,4.5</code> includes disabled, default and stronger contrast. Its owner-thread allocation counter excludes Swing dispatch and painting.</td>
+</tr>
+<tr>
+<td>Prompt decoration software painting</td>
+<td><code>TerminalPromptDecorationBenchmark</code>; warmed default/custom colors with identical alpha values. Includes Java2D antialiasing/compositing allocation, excluding fixture construction.</td>
+</tr>
 </tbody></table></div>
 <p>Read the selected fixture before interpreting a result. Isolated parsing uses a
 no-op command sink; frame publication is separate from painting; directory scans
 use a temporary directory on the filesystem selected by the JVM. These workloads
 measure different boundaries and cannot substitute for an end-to-end terminal
 measurement.</p>
+<p>For complete component painting, <code>SwingPaintBenchmark.paintPublishedFrame</code>
+paints 64 frames per invocation on the EDT and reports operations per frame.
+The GC profiler includes painting, amortized EDT dispatch, and other JVM-thread
+allocation. A zero allocation result from the color-policy helper is not a
+zero allocation claim for a complete frame. For example:</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*SwingPaintBenchmark.paintPublishedFrame&quot; -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=true -wi 3 -i 5 -w 1s -r 1s -f 1 -t 1 -prof gc
+</code></pre>
 <h3 id="reverse-wrap-cursor-motion">Reverse-wrap cursor motion</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalReverseWrapBenchmark.kt">TerminalReverseWrapBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalReverseWrapBenchmark.kt">TerminalReverseWrapBenchmark</a>
 measures direct core and parser/host CUB with <code>Int.MAX_VALUE</code> on a fixed 80×24
 soft-wrapped screen. <code>mode=0</code> measures ordinary clamping, <code>45</code> checks wrapped
 rows, and <code>1045</code> cycles using cell-offset arithmetic. Each operation includes
@@ -117,7 +132,7 @@ outside measurement. Trial teardown verifies the final cursor and history.</p>
 <pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalReverseWrapBenchmark.*&quot; -p mode=0,45,1045 -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff reverse-wrap.json
 </code></pre>
 <h3 id="application-mouse-behavior">Application mouse behavior</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalMouseBehaviorBenchmark.kt">TerminalMouseBehaviorBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalMouseBehaviorBenchmark.kt">TerminalMouseBehaviorBenchmark</a>
 measures one packed routing-state read or four parser/host preference changes.
 The terminal, parser, and bytes are constructed before measurement. Trial
 teardown verifies the resulting flags and untouched cursor/history. The GC
@@ -126,7 +141,7 @@ construction or an entire painted frame.</p>
 <pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalMouseBehaviorBenchmark.*&quot; -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff mouse-behavior.json
 </code></pre>
 <h3 id="first-parser-input">First parser input</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt">TerminalParserFirstInputBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt">TerminalParserFirstInputBenchmark</a>
 measures one parser input in each fresh JVM fork. Parser construction and payload
 encoding happen before timing; lazy initialization triggered by the first input
 is included. Its setup requires single-shot mode, one thread, no warmup, one
@@ -136,7 +151,7 @@ measurement iteration, and a batch size of one.</p>
 <p>GC-profiler results include harness activity and do not isolate Unicode table
 initialization allocation.</p>
 <h3 id="storage-lifecycle">Storage lifecycle</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalStorageLifecycleBenchmark.kt">TerminalStorageLifecycleBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalStorageLifecycleBenchmark.kt">TerminalStorageLifecycleBenchmark</a>
 uses public core operations on a 120×24 terminal. <code>discardHistory</code> measures ED 3
 while preserving visible content and the cursor; <code>clearAll</code> also clears the
 viewport and homes the cursor. Both are single-shot measurements with 10,000
@@ -163,7 +178,7 @@ viewport; trial teardown verifies default attributes and the resulting cells.</p
 <pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalStorageLifecycleBenchmark.(writeShiftErase|clearScreen)&quot; -wi 3 -i 5 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff storage-steady.json
 </code></pre>
 <h3 id="fresh-terminal-log-ingestion">Fresh-terminal log ingestion</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt">TerminalLogIngestionBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt">TerminalLogIngestionBenchmark</a>
 ingests a fixed 6,000-line ASCII log into a fresh fixture for each shot. Its
 <code>pipeline</code> parameter selects direct core writes, isolated parsing, or parser-to-core
 ingestion. Core and host variants verify retained cells, wrapping, history
@@ -194,7 +209,7 @@ after JMH warmup. Trial teardown verifies every payload and cursor placement.
 <code>resizeClusters -p length=32</code> alternates 2- and 32-codepoint payloads across that
 viewport to force dead regions and compaction. Its payloads are also prebuilt;
 the final retained prefix is verified outside the measured loop.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/ketraterm-benchmarks/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/ketraterm-benchmarks/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

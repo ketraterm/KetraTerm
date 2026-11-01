@@ -99,13 +99,22 @@ English. IntelliJ uses its platform message system.</p>
 <p>Message patterns use JDK <code>MessageFormat</code>; formatted literal apostrophes must
 be doubled. Components capture their message provider at construction, so
 recreate chrome to change that captured language.</p>
-<p>Search chrome accepts immutable <code>SwingTerminalSearchColors</code> snapshots.
+<p>Search chrome accepts immutable <code>SwingTerminalSearchColors</code> snapshots, including
+independent error/no-match status and border colors and query-field selection colors;
+see <a href="../../ketraterm-ui-swing-host/README.html#search-colors">search colors and defaults</a>.
+Terminal selection colors are configured through <code>SwingSettings.selectionStyle</code>
+and <code>inactiveSelectionStyle</code>. <code>searchMatchStyle</code> and <code>searchActiveMatchStyle</code>
+configure match backgrounds, foregrounds, and optional borders independently.
+Prompt decorations accept independent divider normal/hover colors and normal/failed
+dot hover and halo colors through the <code>shellIntegration*Color</code> settings.
+<code>minimumContrastRatio</code> and <code>faintOpacity</code> control
+text readability; see <a href="../../ketraterm-ui-swing/docs/color-customization.html">color customization</a>.
 Completion adapters accept source-ID-to-display-label maps. Neither changes
 terminal data, source identity, ranking, or feedback routing. Localized command
 catalogs change descriptions while preserving command and option tokens.</p>
 <p>See <a href="../../ketraterm-ui-swing-host/README.html#localization-and-host-settings">host localization and settings</a>
 and <a href="../../ketraterm-completion/README.html#customize-the-engine">completion customization</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/05bc4969cfbf9c298b87e80f749d96d1bd436156/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/8e57a15bb0bfab739919696b8b2b9a8173e9e891/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
