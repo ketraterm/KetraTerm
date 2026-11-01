@@ -230,6 +230,13 @@ numeric typing in application keypad mode. Unsupported or headless toolkits
 retain existing keypad behavior without inferring lock state or repeatedly
 querying an unavailable facility.
 
+Admitted typing, editing keys, and paste immediately return to the live viewport
+and cancel pending scroll animation. Local shortcuts, modifier and lock keys,
+focus changes, and key releases preserve the scrollback position. New output
+keeps scrolled content anchored by default; set `SwingSettings.Builder.scrollOnOutput`
+to `true` to return to live output when new rows enter history. Input rejected by
+session startup, closure, or capacity limits does not move the viewport.
+
 `mouseReportingEnabled` controls application mouse reporting.
 `alternateScreenWheelToArrowEnabled` independently controls wheel-to-arrow input
 in the alternate screen. Both default to `true`; mode 1007 must also be enabled

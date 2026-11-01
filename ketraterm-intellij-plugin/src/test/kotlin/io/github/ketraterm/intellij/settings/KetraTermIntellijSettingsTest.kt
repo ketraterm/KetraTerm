@@ -414,11 +414,11 @@ class KetraTermIntellijSettingsTest {
     fun `scroll on output setting maps to swing settings`() {
         val enabled =
             KetraTermIntellijSettingsMapper.toSwingSettings(
-                KetraTermIntellijSettings.State(themeId = "nord"),
+                KetraTermIntellijSettings.State(themeId = "nord", scrollOnOutput = true),
             )
         val disabled =
             KetraTermIntellijSettingsMapper.toSwingSettings(
-                KetraTermIntellijSettings.State(themeId = "nord", scrollOnOutput = false),
+                KetraTermIntellijSettings.State(themeId = "nord"),
             )
 
         assertTrue(enabled.scrollOnOutput)

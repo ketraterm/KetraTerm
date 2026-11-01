@@ -1,5 +1,9 @@
 # KetraTerm IntelliJ Plugin Changelog
 
+## Unreleased
+
+- Typing and accepted paste return to live input immediately. Scroll on output now defaults to off so incoming output preserves the reader's position; explicitly saved preferences remain effective.
+
 ## [0.4.0] - 2026-10-31
 
 - Applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and status in tooltips and the selected tool-window title. Progress works independently of title permission, with no progress setting.

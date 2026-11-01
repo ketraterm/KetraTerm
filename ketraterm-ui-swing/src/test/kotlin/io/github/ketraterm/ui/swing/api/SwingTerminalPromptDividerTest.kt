@@ -527,33 +527,45 @@ class SwingTerminalPromptDividerTest {
         }
 
     @ParameterizedTest
-    @EnumSource(SwingPromptDecoration::class)
-    fun `narrowing a scrolled viewport preserves the viewed line identity`(mode: SwingPromptDecoration) =
-        edt {
-            Fixture(mode).use { f ->
-                repeat(8) { index ->
-                    f.prompt(">$index abc")
-                    f.feed("\r\n")
-                }
-                f.component.scrollFromScrollbar(8, true)
+    @CsvSource("NONE,false", "GUTTER,false", "DIVIDER,false", "NONE,true", "GUTTER,true", "DIVIDER,true")
+    fun `narrowing a scrolled viewport preserves the viewed line identity`(
+        mode: SwingPromptDecoration,
+        scrollOnOutput: Boolean,
+    ) = edt {
+        Fixture(mode).use { f ->
+            f.settings = f.settings.copy { it.scrollOnOutput = scrollOnOutput }
+            f.component.reloadSettings()
+            f.flush()
+            repeat(8) { index ->
+                f.prompt(">$index abc")
+                f.feed("\r\n")
+            }
+            f.component.scrollFromScrollbar(8, true)
+            f.flush()
+            val offset = f.component.viewportState().renderOffset
+            var lineId = 0L
+            f.session.readRenderFrame(offset, 3) { lineId = it.lineId(0) }
+            assertTrue(offset > 0)
+            for ((columns, rows) in listOf(4 to 3, 8 to 3, 5 to 2, 8 to 4)) {
+                f.resize(columns, rows)
                 f.flush()
-                val offset = f.component.viewportState().renderOffset
-                var lineId = 0L
-                f.session.readRenderFrame(offset, 3) { lineId = it.lineId(0) }
-                assertTrue(offset > 0)
-                for ((columns, rows) in listOf(4 to 3, 8 to 3, 5 to 2, 8 to 4)) {
-                    f.resize(columns, rows)
-                    f.flush()
-                    assertTrue(f.component.viewportState().renderOffset > 0, "mode=$mode grid=$columns,$rows")
-                    f.session.readRenderFrame(f.component.viewportState().renderOffset, rows) {
-                        assertEquals(lineId, it.lineId(0), "mode=$mode grid=$columns,$rows")
-                    }
+                assertTrue(f.component.viewportState().renderOffset > 0, "mode=$mode grid=$columns,$rows")
+                f.session.readRenderFrame(f.component.viewportState().renderOffset, rows) {
+                    assertEquals(lineId, it.lineId(0), "mode=$mode grid=$columns,$rows")
                 }
-                // Real output after resize must still honor the default scroll-on-output policy.
-                f.feed("new output\r\nnext output\r\n")
+            }
+            // Real output after resize must honor the independently chosen output policy.
+            f.feed("new output\r\nnext output\r\n")
+            if (scrollOnOutput) {
                 assertEquals(0, f.component.viewportState().renderOffset)
+            } else {
+                assertTrue(f.component.viewportState().renderOffset > 0)
+                f.session.readRenderFrame(f.component.viewportState().renderOffset, 4) {
+                    assertEquals(lineId, it.lineId(0), "New output must preserve the viewed line")
+                }
             }
         }
+    }
 
     @ParameterizedTest
     @CsvSource("NONE,false", "GUTTER,false", "DIVIDER,false", "NONE,true", "GUTTER,true", "DIVIDER,true")

@@ -16,6 +16,9 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalFocusEvent
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.session.TerminalInputAdmission
 import java.awt.event.*
 
 internal val hyperlinkNavigationModifierMask =
@@ -74,7 +77,7 @@ internal class SwingTerminalInputController(
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
                 host.invalidateShellSuggestions()
-                host.session?.encodeKey(keyEvent)
+                submitKey(keyEvent)
                 event.consume()
             }
 
@@ -97,10 +100,26 @@ internal class SwingTerminalInputController(
                 }
                 val keyEvent = keyMapper.keyTyped(event) ?: return
                 host.invalidateShellSuggestions()
-                host.session?.encodeKey(keyEvent)
+                submitKey(keyEvent)
                 event.consume()
             }
         }
+
+    private fun submitKey(event: TerminalKeyEvent) {
+        if (host.session?.submitInput(event) != TerminalInputAdmission.ACCEPTED) return
+        val key = event.key
+        if (key != null &&
+            (
+                key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal ||
+                    key == TerminalKey.CAPS_LOCK ||
+                    key == TerminalKey.NUM_LOCK ||
+                    key == TerminalKey.SCROLL_LOCK
+            )
+        ) {
+            return
+        }
+        host.scrollToLiveViewport()
+    }
 
     val focusListener =
         object : FocusAdapter() {

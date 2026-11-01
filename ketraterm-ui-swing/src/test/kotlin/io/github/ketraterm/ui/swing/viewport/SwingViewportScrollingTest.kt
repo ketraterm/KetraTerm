@@ -70,6 +70,28 @@ class SwingViewportScrollingTest {
         }
 
     @Test
+    fun `return to live cancels animation and partial wheel input`() =
+        withViewport { fixture ->
+            val controller = fixture.controller
+            controller.jumpToRow(2)
+            assertTrue(controller.scrollByRows(4))
+            assertTrue(controller.scrollByPreciseRows(0.75))
+
+            controller.scrollTo(0.0, historySize = 10)
+
+            assertEquals(0.0, controller.preciseOffset)
+            assertEquals(0, controller.requestedOffset)
+            fixture.notifications.clear()
+            controller.advanceScroll(System.nanoTime() + 1_000_000_000L)
+            controller.finishScroll()
+            assertEquals(0.0, controller.preciseOffset)
+            assertTrue(fixture.notifications.isEmpty())
+            controller.scrollByPreciseRows(0.25)
+            controller.finishScroll()
+            assertEquals(0.0, controller.preciseOffset, "Old wheel fractions must not restart scrolling")
+        }
+
+    @Test
     fun `history publication rebases pending animation before the next timer tick`() =
         withViewport { fixture ->
             val controller = fixture.controller

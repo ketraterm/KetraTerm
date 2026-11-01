@@ -454,6 +454,10 @@ public class SwingTerminal
                         if (resetCursorBlinkOnEdt()) renderFrameController.repaintBlinkState()
                     }
 
+                    override fun scrollToLiveViewport() {
+                        scrollViewportToOnEdt(0)
+                    }
+
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
                         if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
@@ -2583,8 +2587,13 @@ public class SwingTerminal
         ): Boolean {
             if (text.isEmpty() || !isCurrentPasteBinding(boundSession, identity)) return false
             invalidateShellSuggestionsOnEdt()
-            return isCurrentPasteBinding(boundSession, identity) &&
-                boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
+            if (!isCurrentPasteBinding(boundSession, identity) ||
+                boundSession.submitInput(TerminalPasteEvent(text)) != TerminalInputAdmission.ACCEPTED
+            ) {
+                return false
+            }
+            scrollViewportToOnEdt(0)
+            return true
         }
 
         private fun isCurrentPasteBinding(
@@ -2645,6 +2654,7 @@ public class SwingTerminal
          * does not mutate the render buffer directly, because clearing the
          * emulator display behind the PTY would desynchronize shells and TUIs
          * from their cursor and prompt model.
+         * Accepted requests immediately return to the live viewport.
          *
          * @return `true` when a bound session accepted the input request.
          */
@@ -2654,7 +2664,9 @@ public class SwingTerminal
             selectionController.clearSelection()
             searchController.clear()
             invalidateShellSuggestionsOnEdt()
-            return boundSession.submitInput(CLEAR_SCREEN_KEY_EVENT) == TerminalInputAdmission.ACCEPTED
+            if (boundSession.submitInput(CLEAR_SCREEN_KEY_EVENT) != TerminalInputAdmission.ACCEPTED) return false
+            scrollViewportToOnEdt(0)
+            return true
         }
 
         private fun invalidateShellSuggestionsOnEdt() {

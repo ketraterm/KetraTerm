@@ -28,6 +28,9 @@ internal interface SwingTerminalInputHost {
     /** Restarts the shared blink phase and repaints cursor/text regions whose visibility changed. */
     fun resetCursorBlink()
 
+    /** Reveals admitted user input immediately, cancelling pending viewport motion. */
+    fun scrollToLiveViewport()
+
     fun setTerminalFocused(focused: Boolean)
 
     fun repaintCursorState()

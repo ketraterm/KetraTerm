@@ -30,6 +30,18 @@ import kotlin.test.*
 
 class KetraTermConfigTest {
     @Test
+    fun `output scrolling defaults off and preserves explicit saved preferences`(
+        @TempDir directory: Path,
+    ) {
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
+        assertFalse(manager.load().scrollOnOutput)
+        for (enabled in listOf(true, false)) {
+            manager.save(KetraTermConfig(scrollOnOutput = enabled))
+            assertEquals(enabled, manager.load().scrollOnOutput)
+        }
+    }
+
+    @Test
     fun `command finished alerts default off and round trip their threshold`(
         @TempDir directory: Path,
     ) {
