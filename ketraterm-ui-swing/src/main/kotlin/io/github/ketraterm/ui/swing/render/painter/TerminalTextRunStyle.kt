@@ -75,6 +75,7 @@ internal class TerminalTextRunStyle {
     private var selectionEnd = 0
     private var selectionBidi: TerminalBidiLayout.Row? = null
     private var selectionStyle = SwingSelectionStyle()
+    private var selectionBackground = selectionStyle.background
     private val contrast = TextContrastCache()
     private var faintOpacity = 0.5
     private var searchBackgrounds = IntArray(0)
@@ -101,6 +102,7 @@ internal class TerminalTextRunStyle {
         selectionRange: Long = CellSelection.NO_RANGE,
         selectionBidi: TerminalBidiLayout.Row? = null,
         selectionStyle: SwingSelectionStyle = settings.selectionStyle,
+        selectionBackground: Int = selectionStyle.background,
         searchHighlights: TerminalSearchViewportHighlights? = null,
         columns: Int = 0,
     ) {
@@ -117,6 +119,7 @@ internal class TerminalTextRunStyle {
         selectionEnd = if (selectionRange == CellSelection.NO_RANGE) 0 else CellSelection.rangeEnd(selectionRange)
         this.selectionBidi = selectionBidi
         this.selectionStyle = selectionStyle
+        this.selectionBackground = selectionBackground
         faintOpacity = settings.faintOpacity
         contrast.configure(settings.minimumContrastRatio)
         val segmentCount = searchHighlights?.segmentCountForRow(row) ?: 0
@@ -202,7 +205,10 @@ internal class TerminalTextRunStyle {
         val linkBackground = hyperlinkStyle?.backgroundArgb
         if (linkBackground != null && !isTextHidden(attr, textBlinkVisible)) background = SwingColors.blendOver(linkBackground, background)
         if (hasSearchBackgrounds) background = SwingColors.blendOver(searchBackgrounds[column], background)
-        if (selected) background = SwingColors.blendOver(SelectionColors.background(palette, selectionStyle, attr), background)
+        if (selected) {
+            background =
+                SwingColors.blendOver(SelectionColors.background(palette, selectionStyle, attr, selectionBackground), background)
+        }
         if (TerminalRenderAttrs.isInvisible(attr)) return background
         val searchForeground = if (hasSearchForegrounds) searchForegrounds[column] else 0
         val inherited =

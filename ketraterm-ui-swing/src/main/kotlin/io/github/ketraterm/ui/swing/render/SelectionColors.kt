@@ -21,6 +21,15 @@ import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 
 /** One precedence rule shared by selection fills and text-run resolution. */
 internal object SelectionColors {
+    /** The historical palette-aware selection fill, resolved once per paint for untouched settings. */
+    fun defaultBackground(palette: TerminalColorPalette): Int {
+        val configured = palette.selectionBackground
+        val fill = if (configured ushr 24 == 0xFF) (configured and 0x00FFFFFF) or 0x66000000 else configured
+        val background = palette.defaultBackground
+        if (SwingColors.contrastRatio(SwingColors.blendOver(fill, background), background) >= 1.15) return fill
+        return if (SwingColors.relativeLuminance(background) < 0.5) 0x66FFFFFF else 0x33000000
+    }
+
     fun dynamicBackground(
         palette: TerminalColorPalette,
         style: SwingSelectionStyle,
@@ -35,11 +44,12 @@ internal object SelectionColors {
         palette: TerminalColorPalette,
         style: SwingSelectionStyle,
         attr: Long,
+        fixedBackground: Int = style.background,
     ): Int =
         when {
             dynamicBackground(palette, style) -> palette.foreground(attr)
             palette.colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND != 0 -> palette.selectionBackground
-            else -> style.background
+            else -> fixedBackground
         }
 
     fun foreground(

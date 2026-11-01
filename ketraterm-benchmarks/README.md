@@ -58,12 +58,24 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Allocation-permitted image replacement | `TerminalGraphicsReplacementBenchmark`; alternating raw RGBA uploads replace one image ID, publish/copy the new frame and construct a new Swing raster. Includes Base64 parsing, transfer staging, canonical pixels and cache-pressure eviction; excludes fixture encoding, PNG/zlib decoding and painting. `side=64,512` selects the source dimensions. |
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
 | Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchScanBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |
+| Color-policy resolution without Java2D | `TerminalColorResolutionBenchmark`; warmed reusable row buffers, selection/search foregrounds and contrast-cache hits or changing truecolor. `ratio=1.0,3.0,4.5` includes disabled, default and stronger contrast. Its owner-thread allocation counter excludes Swing dispatch and painting. |
+| Prompt decoration software painting | `TerminalPromptDecorationBenchmark`; warmed default/custom colors with identical alpha values. Includes Java2D antialiasing/compositing allocation, excluding fixture construction. |
 
 Read the selected fixture before interpreting a result. Isolated parsing uses a
 no-op command sink; frame publication is separate from painting; directory scans
 use a temporary directory on the filesystem selected by the JVM. These workloads
 measure different boundaries and cannot substitute for an end-to-end terminal
 measurement.
+
+For complete component painting, `SwingPaintBenchmark.paintPublishedFrame`
+paints 64 frames per invocation on the EDT and reports operations per frame.
+The GC profiler includes painting, amortized EDT dispatch, and other JVM-thread
+allocation. A zero allocation result from the color-policy helper is not a
+zero allocation claim for a complete frame. For example:
+
+```text
+java -jar <jmh-jar> ".*SwingPaintBenchmark.paintPublishedFrame" -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=true -wi 3 -i 5 -w 1s -r 1s -f 1 -t 1 -prof gc
+```
 
 ### Reverse-wrap cursor motion
 

@@ -131,15 +131,17 @@ public class SwingSettings private constructor(
     public val fractionalMetrics: Any = builder.fractionalMetrics
     public val hyperlinkActivationForeground: Int = builder.hyperlinkActivationForeground
 
-    /** Focused selection colors. Permitted terminal overrides take precedence per color role. */
+    /** Focused selection colors. An untouched default uses the palette-aware selection fill. Permitted terminal overrides take precedence per role. */
     public val selectionStyle: SwingSelectionStyle = builder.selectionStyle
+
+    internal val selectionStyleConfigured: Boolean = builder.selectionStyleConfigured
 
     /** Unfocused selection colors; null inherits [selectionStyle], including text preservation. */
     public val inactiveSelectionStyle: SwingSelectionStyle? = builder.inactiveSelectionStyle
 
     /**
      * Minimum text contrast against the composed cell background, finite and in 1..21.
-     * The default 1 disables adjustment. Higher values adjust text toward black/white,
+     * The default 3 preserves the prior adjustment. Set 1 to disable it. Higher values adjust text toward black/white,
      * using the best achievable contrast when the requested ratio is impossible.
      * Concealed text, graphical shading, images, and intrinsic emoji colors are preserved.
      */
@@ -152,7 +154,7 @@ public class SwingSettings private constructor(
      */
     public val faintOpacity: Double = if (builder.faintOpacity == 0.0) 0.0 else builder.faintOpacity
 
-    /** Convenience access to [selectionStyle]'s exact background ARGB value. */
+    /** Convenience access to [selectionStyle]'s background ARGB value; the untouched default is palette-aware when painted. */
     public val selectionBackground: Int get() = selectionStyle.background
 
     /** Normal search matches. By default only the existing translucent yellow fill is applied. */
@@ -370,14 +372,27 @@ public class SwingSettings private constructor(
                 selectionStyle = selectionStyle.copy(background = value)
             }
 
-        /** Draft value for [SwingSettings.selectionStyle]. */
+        internal var selectionStyleConfigured: Boolean = source?.selectionStyleConfigured ?: false
+            private set
+
+        /** Draft value for [SwingSettings.selectionStyle]. Assigning it makes its background exact. */
         public var selectionStyle: SwingSelectionStyle = source?.selectionStyle ?: SwingSelectionStyle()
+            set(value) {
+                field = value
+                selectionStyleConfigured = true
+            }
+
+        /** Restores the palette-aware focused selection default; leaves [inactiveSelectionStyle] unchanged. */
+        public fun resetSelectionStyle() {
+            selectionStyle = SwingSelectionStyle()
+            selectionStyleConfigured = false
+        }
 
         /** Draft value for [SwingSettings.inactiveSelectionStyle]. */
         public var inactiveSelectionStyle: SwingSelectionStyle? = source?.inactiveSelectionStyle
 
         /** Draft value for [SwingSettings.minimumContrastRatio]. */
-        public var minimumContrastRatio: Double = source?.minimumContrastRatio ?: 1.0
+        public var minimumContrastRatio: Double = source?.minimumContrastRatio ?: 3.0
 
         /** Draft value for [SwingSettings.faintOpacity]. */
         public var faintOpacity: Double = source?.faintOpacity ?: 0.5
@@ -537,6 +552,7 @@ public class SwingSettings private constructor(
             fractionalMetrics == other.fractionalMetrics &&
             hyperlinkActivationForeground == other.hyperlinkActivationForeground &&
             selectionStyle == other.selectionStyle &&
+            selectionStyleConfigured == other.selectionStyleConfigured &&
             inactiveSelectionStyle == other.inactiveSelectionStyle &&
             minimumContrastRatio == other.minimumContrastRatio &&
             faintOpacity == other.faintOpacity &&
@@ -594,6 +610,7 @@ public class SwingSettings private constructor(
         result = 31 * result + fractionalMetrics.hashCode()
         result = 31 * result + hyperlinkActivationForeground.hashCode()
         result = 31 * result + selectionStyle.hashCode()
+        result = 31 * result + selectionStyleConfigured.hashCode()
         result = 31 * result + inactiveSelectionStyle.hashCode()
         result = 31 * result + minimumContrastRatio.hashCode()
         result = 31 * result + faintOpacity.hashCode()

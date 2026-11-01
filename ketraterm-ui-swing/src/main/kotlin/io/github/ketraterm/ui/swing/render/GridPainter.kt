@@ -103,6 +103,12 @@ internal class GridPainter(
     ) {
         val palette = cache.palette
         val selectionStyle = if (terminalFocused) settings.selectionStyle else settings.inactiveSelectionStyle ?: settings.selectionStyle
+        val selectionBackground =
+            if (selection != null && !settings.selectionStyleConfigured && (terminalFocused || settings.inactiveSelectionStyle == null)) {
+                SelectionColors.defaultBackground(palette)
+            } else {
+                selectionStyle.background
+            }
         chrome.updateLayout(settings, metrics, width, height, cache.columns, cache.rows)
         textPainter.updateSettings(settings)
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
@@ -216,7 +222,7 @@ internal class GridPainter(
                         activeMatchStyle = settings.searchActiveMatchStyle,
                         bidi = bidi,
                     )
-                    selectionPainter.paint(g, cache, metrics, row, selection, selectionStyle, palette, bidi)
+                    selectionPainter.paint(g, cache, metrics, row, selection, selectionStyle, palette, bidi, selectionBackground)
                     textPainter.paintRow(
                         g = g,
                         cache = cache,
@@ -231,6 +237,7 @@ internal class GridPainter(
                         followedHyperlinkId = followedHyperlinkId,
                         selection = selection,
                         selectionStyle = selectionStyle,
+                        selectionBackground = selectionBackground,
                         searchHighlights = searchHighlights,
                     )
                 } finally {

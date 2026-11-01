@@ -722,6 +722,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getVisualBellDurationMillis ()I
 	public final fun getVisualBellEdgeThicknessPixels ()I
 	public final fun getVisualBellEnabled ()Z
+	public final fun resetSelectionStyle ()V
 	public final fun setAcceptSelectedSuggestionWithEnter (Z)V
 	public final fun setAlternateScreenPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
 	public final fun setAlternateScreenWheelToArrowEnabled (Z)V

@@ -153,9 +153,10 @@ class SwingTerminalInteractionSettingsTest {
         ints = [
             KeyEvent.VK_SHIFT, KeyEvent.VK_CONTROL, KeyEvent.VK_ALT, KeyEvent.VK_META,
             KeyEvent.VK_WINDOWS, KeyEvent.VK_CAPS_LOCK, KeyEvent.VK_NUM_LOCK, KeyEvent.VK_SCROLL_LOCK,
+            KeyEvent.VK_PRINTSCREEN, KeyEvent.VK_PAUSE, KeyEvent.VK_CONTEXT_MENU,
         ],
     )
-    fun `modifier and lock keys preserve the scrollback position`(keyCode: Int) =
+    fun `non-editing keys preserve the scrollback position`(keyCode: Int) =
         fixture {
             scrollIntoHistory()
 

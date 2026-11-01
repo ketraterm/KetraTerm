@@ -158,6 +158,12 @@ public final class JavaConsumer {
             || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
             || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
             throw new AssertionError("Java color policies did not survive copying");
+        if (new SwingSettings().getMinimumContrastRatio() != 3.0)
+            throw new AssertionError("Java default contrast policy changed");
+        var paletteSelection = copiedSettings.copy(draft -> draft.resetSelectionStyle());
+        if (paletteSelection.equals(copiedSettings)
+            || !paletteSelection.equals(paletteSelection.copy(draft -> draft.resetSelectionStyle())))
+            throw new AssertionError("Java selection reset did not preserve the default policy");
         if (copiedSettings.getSearchMatchBackground() != copiedSettings.getSearchMatchStyle().getBackground()
             || copiedSettings.getSearchActiveMatchStyle().getForeground() != 0xFF161616
             || copiedSettings.getSearchActiveMatchStyle().getBorder() != 0xFFFFFFFF)

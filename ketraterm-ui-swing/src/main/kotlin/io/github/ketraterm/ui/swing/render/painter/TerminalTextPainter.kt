@@ -102,6 +102,7 @@ internal class TerminalTextPainter(
         followedHyperlinkId: Int = 0,
         selection: CellSelection? = null,
         selectionStyle: SwingSelectionStyle = checkNotNull(settings).selectionStyle,
+        selectionBackground: Int = selectionStyle.background,
         searchHighlights: TerminalSearchViewportHighlights? = null,
     ) {
         val bidi = cellGeometry.row(cache, row)
@@ -116,6 +117,7 @@ internal class TerminalTextPainter(
             selectionRange = selection?.packedColumnRange(row, cache, bidi) ?: CellSelection.NO_RANGE,
             selectionBidi = if (selection?.isBlock == true) bidi else null,
             selectionStyle = selectionStyle,
+            selectionBackground = selectionBackground,
             searchHighlights = searchHighlights,
             columns = cache.columns,
         )

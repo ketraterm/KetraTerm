@@ -102,6 +102,8 @@ fun main() =
             }
         check(interactionSettings == interactionSettings.copy {})
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
+        check(SwingSettings().minimumContrastRatio == 3.0)
+        check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)
         check(interactionSettings.searchMatchBackground == interactionSettings.searchMatchStyle.background)

@@ -16,8 +16,9 @@
 package io.github.ketraterm.ui.swing.settings
 
 /**
- * Immutable host selection presentation. Colors are packed ARGB values, with no sentinel colors
- * or automatic substitution. Permitted application selection overrides take precedence per role.
+ * Immutable explicit host selection presentation. Colors are packed ARGB values, with no sentinel
+ * colors or automatic substitution. An untouched [SwingSettings] uses a palette-aware default;
+ * assigning this style makes its background exact. Permitted application overrides take precedence per role.
  *
  * @property background fill blended over the existing cell background, including search/link fills.
  * Zero alpha leaves the underlying background visible.

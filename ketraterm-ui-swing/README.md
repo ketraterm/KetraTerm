@@ -47,7 +47,7 @@ fun createUnboundTerminalView(
             foreground = 0xFF161616.toInt(),
             border = 0xFFFFFFFF.toInt(),
         )
-        it.minimumContrastRatio = 4.5 // Optional readability policy; 1.0 preserves exact colors.
+        it.minimumContrastRatio = 4.5 // Default 3.0; set 1.0 to preserve exact text colors.
         it.faintOpacity = 0.5
         it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
         it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()

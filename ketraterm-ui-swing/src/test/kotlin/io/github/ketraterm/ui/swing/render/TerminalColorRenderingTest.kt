@@ -31,6 +31,7 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class TerminalColorRenderingTest {
@@ -193,6 +194,33 @@ class TerminalColorRenderingTest {
         assertEquals(TEST_GREEN, image.getRGB(0, 0))
         assertTrue(image.containsColor(TEST_WHITE))
         assertFalse(image.containsColor(TEST_RED))
+    }
+
+    @Test
+    fun `untouched selection stays visible on light and dark palettes while an explicit fill stays exact`() {
+        val light = basePalette.copy(defaultForeground = TEST_BLACK, defaultBackground = TEST_WHITE, selectionBackground = TEST_WHITE)
+        val dark = basePalette.copy(selectionBackground = TEST_BLACK)
+        for (palette in arrayOf(light, dark)) {
+            for (focused in booleanArrayOf(true, false)) {
+                val image = paint(textCells("A"), palette, selection = CellSelection(0, 0, 1, 0), focused = focused, selectionStyle = null)
+                assertNotEquals(palette.defaultBackground, image.getRGB(0, 0))
+                assertTrue(SwingColors.contrastRatio(image.getRGB(0, 0), palette.defaultBackground) >= 1.15)
+            }
+        }
+        val explicit = paint(textCells("A"), light, selection = CellSelection(0, 0, 1, 0), selectionStyle = SwingSelectionStyle())
+        assertEquals(TEST_WHITE, explicit.getRGB(0, 0), "The same ARGB value is exact when explicitly configured")
+    }
+
+    @Test
+    fun `ordinary text retains default contrast adjustment and can opt out`() {
+        val lowContrast = basePalette.copy(defaultForeground = 0xff222222.toInt())
+        val adjusted = paint(textCells("A"), lowContrast) { it.minimumContrastRatio = 3.0 }
+        val expected = SwingColors.ensureContrast(lowContrast.defaultForeground, lowContrast.defaultBackground, 3.0)
+        assertTrue(adjusted.containsColor(expected))
+        assertFalse(adjusted.containsColor(lowContrast.defaultForeground))
+
+        val exact = paint(textCells("A"), lowContrast) { it.minimumContrastRatio = 1.0 }
+        assertTrue(exact.containsColor(lowContrast.defaultForeground))
     }
 
     @Test
@@ -405,7 +433,7 @@ class TerminalColorRenderingTest {
         cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1),
         focused: Boolean = true,
         antialiased: Boolean = false,
-        selectionStyle: SwingSelectionStyle = SwingSelectionStyle(TEST_GREEN),
+        selectionStyle: SwingSelectionStyle? = SwingSelectionStyle(TEST_GREEN),
         inactiveStyle: SwingSelectionStyle? = null,
         searchHighlights: TerminalSearchViewportHighlights? = null,
         configure: (SwingSettings.Builder) -> Unit = {},
@@ -418,8 +446,9 @@ class TerminalColorRenderingTest {
         val settings =
             defaultTestSettings().copy { draft ->
                 draft.palette = palette
-                draft.selectionStyle = selectionStyle
+                if (selectionStyle != null) draft.selectionStyle = selectionStyle
                 draft.inactiveSelectionStyle = inactiveStyle
+                draft.minimumContrastRatio = 1.0
                 draft.shellIntegrationDecorationGutterWidth = 0
                 draft.textAntialiasing =
                     if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF

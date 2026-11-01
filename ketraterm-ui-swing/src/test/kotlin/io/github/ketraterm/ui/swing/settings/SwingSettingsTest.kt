@@ -119,7 +119,7 @@ class SwingSettingsTest {
 
     @Test
     fun `contrast and faintness validate finite bounds and freeze settings drafts`() {
-        assertEquals(1.0, SwingSettings().minimumContrastRatio)
+        assertEquals(3.0, SwingSettings().minimumContrastRatio)
         assertEquals(0.5, SwingSettings().faintOpacity)
         for (invalid in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0.999, 21.001)) {
             assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.minimumContrastRatio = invalid } }
@@ -162,6 +162,23 @@ class SwingSettingsTest {
         assertNotEquals(settings, changed)
         assertNull(changed.inactiveSelectionStyle)
         assertEquals(settings.selectionStyle, changed.selectionStyle)
+    }
+
+    @Test
+    fun `default selection policy survives copies and an exact matching fill can be reset`() {
+        val original = SwingSettings()
+        assertFalse(original.selectionStyleConfigured)
+        assertEquals(original, original.copy {})
+
+        val exact = original.copy { it.selectionBackground = 0x66FFFFFF }
+        assertTrue(exact.selectionStyleConfigured)
+        assertNotEquals(original, exact)
+        assertEquals(exact, exact.copy {})
+
+        val reset = exact.copy { it.resetSelectionStyle() }
+        assertEquals(original, reset)
+        assertFalse(reset.selectionStyleConfigured)
+        assertTrue(original.copy { it.selectionStyle = SwingSelectionStyle() }.selectionStyleConfigured)
     }
 
     @Test

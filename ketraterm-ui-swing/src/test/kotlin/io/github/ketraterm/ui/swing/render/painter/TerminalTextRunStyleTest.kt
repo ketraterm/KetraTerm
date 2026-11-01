@@ -35,7 +35,52 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
-    private val settings = SwingSettings()
+    private val settings = SwingSettings.create { it.minimumContrastRatio = 1.0 }
+
+    @Test
+    fun `default contrast adjusts resolved search and selection text while explicit opt out preserves it`() {
+        val cache = renderCache(TestRenderFrame.text("A"))
+        val color = 0xff222222.toInt()
+        val highlights =
+            TerminalSearchViewportHighlights().apply {
+                reset(1)
+                add(0, 0, 1, false)
+                finish()
+            }
+        val defaults =
+            SwingSettings.create {
+                it.searchMatchStyle = SwingSearchMatchStyle(TEST_BLACK, foreground = color)
+                it.selectionStyle = SwingSelectionStyle(TEST_BLACK, foreground = color)
+            }
+        val run = TerminalTextRunStyle()
+        for (selection in longArrayOf(CellSelection.NO_RANGE, CellSelection.packRange(0, 1))) {
+            run.configureRow(
+                true,
+                cache.hyperlinkIds,
+                null,
+                defaults,
+                selectionRange = selection,
+                searchHighlights = highlights,
+                columns = 1,
+            )
+            run.begin(cache, cache.palette, 0, 0)
+            assertTrue(SwingColors.contrastRatio(run.foreground, TEST_BLACK) >= 3.0)
+
+            run.configureRow(
+                true,
+                cache.hyperlinkIds,
+                null,
+                defaults.copy {
+                    it.minimumContrastRatio = 1.0
+                },
+                selectionRange = selection,
+                searchHighlights = highlights,
+                columns = 1,
+            )
+            run.begin(cache, cache.palette, 0, 0)
+            assertEquals(color, run.foreground)
+        }
+    }
 
     @Test
     fun `search text splits runs at match boundaries and active null preserves underlying text`() {

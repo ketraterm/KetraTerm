@@ -54,10 +54,10 @@ class SwingColorsTest {
     fun `faint intensity blends toward displayed background and can be disabled`() {
         val palette = TerminalColorPalette(defaultForeground = 0xff808080.toInt(), defaultBackground = 0xffffffff.toInt())
         val attr = TerminalRenderAttrs.pack(faint = true)
-        assertEquals(0xffffffff.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.0))
-        assertEquals(0xffbfbfbf.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.5))
-        assertEquals(0xff808080.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 1.0))
-        assertEquals(0xff404040.toInt(), SwingColors.foreground(palette, attr, background = 0xff000000.toInt()))
+        assertEquals(0xffffffff.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.0, minimumContrastRatio = 1.0))
+        assertEquals(0xffbfbfbf.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 0.5, minimumContrastRatio = 1.0))
+        assertEquals(0xff808080.toInt(), SwingColors.foreground(palette, attr, faintOpacity = 1.0, minimumContrastRatio = 1.0))
+        assertEquals(0xff404040.toInt(), SwingColors.foreground(palette, attr, background = 0xff000000.toInt(), minimumContrastRatio = 1.0))
     }
 
     @Test
@@ -86,7 +86,7 @@ class SwingColorsTest {
             )
         val attrs = TerminalRenderAttrs.pack(faint = true)
 
-        assertEquals(0xFF90A1B2.toInt(), SwingColors.foreground(palette, attrs))
+        assertEquals(0xFF90A1B2.toInt(), SwingColors.foreground(palette, attrs, minimumContrastRatio = 1.0))
     }
 
     @Test

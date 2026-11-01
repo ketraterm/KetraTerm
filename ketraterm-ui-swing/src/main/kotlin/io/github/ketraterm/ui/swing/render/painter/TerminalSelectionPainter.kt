@@ -42,6 +42,7 @@ internal class TerminalSelectionPainter(
         style: SwingSelectionStyle,
         palette: TerminalColorPalette,
         bidi: TerminalBidiLayout.Row? = null,
+        selectionBackground: Int = style.background,
     ) {
         if (selection == null) return
 
@@ -52,7 +53,7 @@ internal class TerminalSelectionPainter(
         val endColumn = CellSelection.rangeEnd(range)
 
         val dynamic = SelectionColors.dynamicBackground(palette, style)
-        val fixed = if (dynamic) 0 else SelectionColors.background(palette, style, 0L)
+        val fixed = if (dynamic) 0 else SelectionColors.background(palette, style, 0L, selectionBackground)
         val rowOffset = cache.rowOffset(row)
         // Block ranges are already visual; only linear selections need row reordering.
         forEachVisualCellSpan(if (selection.isBlock) null else bidi, startColumn, endColumn) { visualStart, visualEnd ->

@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1)
 @Fork(1)
 open class TerminalColorResolutionBenchmark {
-    @Param("1.0", "4.5")
+    @Param("1.0", "3.0", "4.5")
     @JvmField
     var ratio = 1.0
 
@@ -96,7 +96,7 @@ open class TerminalColorResolutionBenchmark {
         var checksum = 0
         for (column in 0 until 80) {
             style.begin(cache, cache.palette, 0, column)
-            checksum = checksum xor style.foreground
+            checksum = 31 * checksum + style.foreground
         }
         return checksum
     }
@@ -107,7 +107,7 @@ open class TerminalColorResolutionBenchmark {
         var checksum = 0
         repeat(80) {
             val color = 0xff000000.toInt() or (++sequence and 0xffffff)
-            checksum = checksum xor contrast.resolve(color, 0xff222222.toInt())
+            checksum = 31 * checksum + contrast.resolve(color, 0xff222222.toInt())
         }
         return checksum
     }

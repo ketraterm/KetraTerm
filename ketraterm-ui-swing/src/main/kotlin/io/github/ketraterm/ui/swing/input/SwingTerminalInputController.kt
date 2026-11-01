@@ -107,13 +107,17 @@ internal class SwingTerminalInputController(
 
     private fun submitKey(event: TerminalKeyEvent) {
         if (host.session?.submitInput(event) != TerminalInputAdmission.ACCEPTED) return
+        // Admission also accepts suppressed events; modifier and system keys do not request editing/navigation.
         val key = event.key
         if (key != null &&
             (
                 key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal ||
                     key == TerminalKey.CAPS_LOCK ||
                     key == TerminalKey.NUM_LOCK ||
-                    key == TerminalKey.SCROLL_LOCK
+                    key == TerminalKey.SCROLL_LOCK ||
+                    key == TerminalKey.PRINT_SCREEN ||
+                    key == TerminalKey.PAUSE ||
+                    key == TerminalKey.MENU
             )
         ) {
             return

@@ -7,9 +7,12 @@ explains session and host ownership.
 
 ## Selection
 
-`selectionStyle` configures focused selection. `inactiveSelectionStyle = null`
-inherits that complete style; supplying a style configures the unfocused view
-independently. Focus changes repaint the view without changing the selection.
+`selectionStyle` configures focused selection. Until a host assigns it, the
+selection fill follows the session palette and uses a visible light/dark fallback.
+Assigning a style makes its fill exact, even if it equals the default value.
+`inactiveSelectionStyle = null` inherits the focused policy; supplying a style
+configures the unfocused view independently. Focus changes repaint the view
+without changing the selection.
 
 ```kotlin
 val settings = SwingSettings.create {
@@ -24,7 +27,7 @@ val settings = SwingSettings.create {
 
 | Value | Meaning |
 | --- | --- |
-| `background` | Exact ARGB fill, blended over the existing cell/search/link background. Zero alpha leaves that background visible. Default: `0x66FFFFFF`. |
+| `background` | Explicit styles use an exact ARGB fill, blended over the existing cell/search/link background. Zero alpha leaves that background visible. `SwingSelectionStyle()` supplies `0x66FFFFFF` when explicitly assigned. Untouched settings use the palette-aware default. |
 | `foreground = null` | Preserve terminal/link/search text presentation. |
 | Opaque `foreground` | Replace selected text color. Transparent text overrides are rejected. |
 | `reverseVideo = true` | Swap each selected cell's original terminal foreground/background after inverse attributes. Configured foreground/background are unused in this mode. Images are not inverted. |
@@ -35,8 +38,10 @@ view's normal selection geometry. Concealed and blink-hidden text stays hidden.
 
 `selectionBackground` remains a convenience getter/setter for
 `selectionStyle.background`; there is one stored style. Setting this convenience
-property preserves the style's foreground and reverse-video choice. For example,
-changing a reversed selection's fill requires first disabling `reverseVideo`.
+property makes the fill exact and preserves the style's foreground and
+reverse-video choice. For example, changing a reversed selection's fill requires
+first disabling `reverseVideo`. Call `resetSelectionStyle()` on a settings draft
+to restore the palette-aware focused default; it leaves the inactive style alone.
 
 ## Search matches
 
@@ -158,9 +163,9 @@ authoritative.
 ## Contrast and faint text
 
 `minimumContrastRatio` accepts finite values from `1.0` through `21.0`.
-The default `1.0` disables adjustment, preserving requested text colors. Set it
-to `4.5` for the WCAG normal-text contrast target, or `3.0` to request the earlier
-terminal target. This is a rendering aid, not a claim that an embedding application
+The default `3.0` preserves the prior minimum adjustment. Set it to `1.0` to
+disable adjustment and preserve requested text colors, or `4.5` for the WCAG
+normal-text contrast target. This is a rendering aid, not a claim that an embedding application
 meets every accessibility requirement.
 
 The renderer evaluates the displayed foreground against the cell background after
@@ -185,7 +190,7 @@ val exactColors = settings.copy { it.minimumContrastRatio = 1.0 }
 ```
 
 Configured selection/search colors and permitted terminal selection overrides are inputs
-to the same opt-in contrast policy. Disable contrast adjustment when their exact
+to the same contrast policy. Disable contrast adjustment when their exact
 foreground colors must be retained. Concealed/blink-hidden text remains hidden.
 Box drawing, block elements, geometric shading, and braille retain their color
 relationships; intrinsic color emoji and image pixels are not recolored. Cursor
@@ -200,14 +205,13 @@ glyph preparation, and native rendering have their own allocation behavior.
 
 ## Migration
 
-Selection backgrounds are now exact: `0x66FFFFFF` no longer requests a palette
-fallback, and low-visibility fills are never silently substituted. Hosts that
-previously relied on automatic palette-derived selection must explicitly choose
-their theme's selection background and desired alpha. Existing `selectionBackground`
-source and binary entry points remain available.
+Untouched selection settings retain the palette-derived fill and visibility
+fallback. Assigning `selectionStyle` or `selectionBackground` opts into an exact
+ARGB fill, including `0x66FFFFFF`; `resetSelectionStyle()` restores the default.
+Existing `selectionBackground` source and binary entry points remain available.
 
-Ordinary text is no longer silently adjusted to 3:1. Set `minimumContrastRatio = 3.0`
-to retain that target, or choose `4.5` for stronger readability. Faint text now blends
+Ordinary text retains the default 3:1 adjustment. Set `minimumContrastRatio = 1.0`
+for exact colors, or choose `4.5` for stronger readability. Faint text now blends
 toward its displayed background rather than always darkening RGB toward black.
 This intentionally improves faint text on light themes. Selection and color-policy
 changes are local UI settings; reloading them alone preserves application palette
