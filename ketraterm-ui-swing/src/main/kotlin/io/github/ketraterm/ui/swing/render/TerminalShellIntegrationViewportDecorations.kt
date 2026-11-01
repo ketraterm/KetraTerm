@@ -85,6 +85,17 @@ internal class TerminalShellIntegrationViewportDecorations {
      */
     fun hasPromptStartAt(row: Int): Boolean = row in 0 until rowCount && promptStarts[row]
 
+    /** Returns whether the prompt has a finished command block available for selection. */
+    fun isPromptMarkerInteractiveAt(row: Int): Boolean =
+        hasPromptStartAt(row) &&
+            when (commandLifecycleAt(row)) {
+                TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN,
+                -> true
+                else -> false
+            }
+
     /**
      * Returns whether visible [row] belongs to failed-command output.
      */

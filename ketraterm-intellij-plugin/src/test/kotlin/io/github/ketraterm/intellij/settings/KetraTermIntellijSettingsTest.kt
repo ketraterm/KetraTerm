@@ -25,8 +25,8 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
-import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import org.jdom.Element
 import org.junit.Assert.*
@@ -344,15 +344,16 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
-    fun `default terminal grid keeps top edge open with horizontal gutter and bottom spacer`() {
+    fun `default terminal grid inherits shared padding and decoration gutter`() {
+        val defaults = SwingSettings()
         val settings =
             KetraTermIntellijSettingsMapper.toSwingSettings(
                 KetraTermIntellijSettings.State(themeId = "nord"),
             )
 
-        assertEquals(SwingPadding(0, 4, 4, 6), settings.padding)
-        assertEquals(SwingPadding(0, 13, 4, 13), settings.alternateScreenPadding)
-        assertEquals(16, settings.shellIntegrationDecorationGutterWidth)
+        assertEquals(defaults.padding, settings.padding)
+        assertEquals(defaults.alternateScreenPadding, settings.alternateScreenPadding)
+        assertEquals(defaults.shellIntegrationDecorationGutterWidth, settings.shellIntegrationDecorationGutterWidth)
     }
 
     @Test

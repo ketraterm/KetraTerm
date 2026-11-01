@@ -507,7 +507,7 @@ public class TerminalShellIntegrationState(
             val start = commandStartLineIds[index]
             val end = commandEndLineIds[index]
             if (start == NO_LINE_ID || end == NO_LINE_ID || start > end) return false
-            val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
+            val lastOutputLine = lastCommandLineBeforeNextPromptLocked(index, start, end)
             if (lastOutputLine < start) return false
             if (!isCommandStartInclusive(index) && lastOutputLine == start) return false
 
@@ -541,7 +541,7 @@ public class TerminalShellIntegrationState(
             val blockStart = promptStartLineIds[index].takeIf { it != NO_LINE_ID } ?: commandStart
             val blockEnd =
                 if (commandStart <= commandEnd) {
-                    lastCommandBlockLineBeforeNextPromptLocked(index, commandStart, commandEnd)
+                    lastCommandLineBeforeNextPromptLocked(index, commandStart, commandEnd)
                 } else {
                     commandEnd
                 }
@@ -1111,36 +1111,12 @@ public class TerminalShellIntegrationState(
         end: Long,
     ): Boolean {
         if (start > end) return false
-        val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
+        val lastOutputLine = lastCommandLineBeforeNextPromptLocked(index, start, end)
         return lineId in start..lastOutputLine && (isCommandStartInclusive(index) || lineId != start)
     }
 
-    /**
-     * Returns the last line that can belong to output for a completed command.
-     *
-     * The next prompt is an authoritative output boundary. In particular, a
-     * shell can finish on the same physical line that it will immediately use
-     * for the next prompt. That line must never be treated as prior-command
-     * output by either decorations or copy/selection operations.
-     */
-    private fun lastCommandOutputLineBeforePromptLocked(
-        start: Long,
-        end: Long,
-    ): Long {
-        var lastOutputLine = end
-        var i = 0
-        while (i < count) {
-            val promptStart = promptStartLineIds[i]
-            if (promptStart in start..lastOutputLine) {
-                lastOutputLine = promptStart - 1L
-            }
-            i++
-        }
-        return lastOutputLine
-    }
-
-    /** Returns the final command-block line before a newer prompt begins. */
-    private fun lastCommandBlockLineBeforeNextPromptLocked(
+    /** A subsequent prompt bounds both output and block selection; the command's own prompt does not. */
+    private fun lastCommandLineBeforeNextPromptLocked(
         commandIndex: Int,
         start: Long,
         end: Long,

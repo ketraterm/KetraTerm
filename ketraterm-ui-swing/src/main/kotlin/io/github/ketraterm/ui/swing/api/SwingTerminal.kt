@@ -692,13 +692,17 @@ public class SwingTerminal
         }
 
         private fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean {
-            if (!SwingUtilities.isLeftMouseButton(event)) return false
             if (renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) return false
             val row = promptMarkerRowAt(event.x, event.y)
             if (row == NO_PROMPT_MARKER_ROW) return false
+            if (!shellIntegrationDecorations.isPromptMarkerInteractiveAt(row)) {
+                event.consume()
+                return true
+            }
+            if (!SwingUtilities.isLeftMouseButton(event)) return false
             val recordId = shellIntegrationDecorations.commandRecordIdAt(row)
             if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
-            commandInteractionController.selectCommandBlock(recordId)
+            if (!commandInteractionController.selectCommandBlock(recordId)) return false
             event.consume()
             return true
         }
@@ -721,7 +725,7 @@ public class SwingTerminal
             val paddingLeft = chrome.left(settings, renderCache.activeBuffer)
             if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) {
                 val right = width - chrome.right(settings, renderCache.activeBuffer)
-                if (x !in paddingLeft until right) return NO_PROMPT_MARKER_ROW
+                if (x !in 0 until right) return NO_PROMPT_MARKER_ROW
                 return visualGeometry.dividerRowAtComponentY(y, chrome.top(settings, renderCache.activeBuffer))
             }
             val gutterWidth = chrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
@@ -738,8 +742,9 @@ public class SwingTerminal
         ): Boolean = settings.promptDecoration == SwingPromptDecoration.DIVIDER && promptMarkerRowAt(x, y) != NO_PROMPT_MARKER_ROW
 
         private fun updateHoveredPromptMarker(row: Int) {
-            if (hoveredPromptMarkerRow != row) {
-                hoveredPromptMarkerRow = row
+            val hoveredRow = if (shellIntegrationDecorations.isPromptMarkerInteractiveAt(row)) row else NO_PROMPT_MARKER_ROW
+            if (hoveredPromptMarkerRow != hoveredRow) {
+                hoveredPromptMarkerRow = hoveredRow
                 repaint()
             }
             updatePointerCursor()
@@ -1402,7 +1407,7 @@ public class SwingTerminal
                             if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
                             if (refreshShellIntegrationDecorations(session)) {
                                 if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
-                                    !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
+                                    !shellIntegrationDecorations.isPromptMarkerInteractiveAt(hoveredPromptMarkerRow)
                                 ) {
                                     updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                                 }
@@ -3397,7 +3402,7 @@ public class SwingTerminal
                 if (gutterActivated) {
                     viewportController.finishScroll()
                     chrome.promptDecorationsAvailable = true
-                    if (settings.promptDecoration == SwingPromptDecoration.GUTTER) {
+                    if (settings.promptDecoration != SwingPromptDecoration.NONE) {
                         resizeSessionToVisibleGridOnEdt()
                         preferredSize = preferredGridSize(settings.columns, settings.rows)
                         revalidate()
@@ -3411,7 +3416,7 @@ public class SwingTerminal
         }
 
         private fun canActivatePromptGutter(): Boolean {
-            if (settings.promptDecoration != SwingPromptDecoration.GUTTER ||
+            if (settings.promptDecoration == SwingPromptDecoration.NONE ||
                 renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE
             ) {
                 return true

@@ -16,20 +16,24 @@
 package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.BasicStroke
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import kotlin.test.assertEquals
+import kotlin.math.roundToInt
+import kotlin.test.*
 
 class TerminalShellIntegrationDecorationPainterTest {
     private val metrics = SwingMetrics(8, 20, 14, 16, 8, 0, 1)
@@ -41,6 +45,244 @@ class TerminalShellIntegrationDecorationPainterTest {
             it.shellIntegrationFailedPromptDotColor = TEST_RED
             it.shellIntegrationFailedCommandRailColor = TEST_BLUE
         }
+
+    @ParameterizedTest
+    @CsvSource("1.0,0.0", "1.25,0.0", "1.25,0.3", "1.5,0.5", "1.75,0.75", "2.0,0.25", "2.5,0.4")
+    fun `failure rails keep uniform device thickness and alpha across row joins`(
+        scale: Double,
+        origin: Double,
+    ) {
+        val rowMetrics = metrics.copy(cellHeight = 21)
+        val cache = renderCache(TestRenderFrame(Array(6) { arrayOf(TestCell()) }))
+        val state =
+            TerminalShellIntegrationState().apply {
+                recordPromptStart(1)
+                recordCommandStart(2, includeLine = true)
+                recordCommandFinished(6, exitCode = 1)
+            }
+        val decorations = TerminalShellIntegrationViewportDecorations().apply { updateFrom(state, cache) }
+        val color = 0x80ff0000.toInt()
+        for (mode in listOf(SwingPromptDecoration.GUTTER, SwingPromptDecoration.DIVIDER)) {
+            val configured =
+                settings.copy {
+                    it.promptDecoration = mode
+                    it.shellIntegrationPromptDotsVisible = false
+                    it.shellIntegrationFailedCommandRailColor = color
+                }
+            val image = BufferedImage(120, 400, BufferedImage.TYPE_INT_ARGB)
+            val g = image.createGraphics()
+            try {
+                g.scale(scale, scale)
+                g.translate(20 + origin, origin)
+                g.clip = Rectangle(-20, 0, 40, 126)
+                val transform = g.transform
+                val clip = g.clip
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_DEFAULT)
+                for (row in 0 until 6) painter.paint(g, configured, rowMetrics, decorations, 20, row, false, palette)
+                assertEquals(transform, g.transform)
+                assertEquals(clip.bounds, g.clip.bounds)
+                assertEquals(RenderingHints.VALUE_ANTIALIAS_DEFAULT, g.getRenderingHint(RenderingHints.KEY_ANTIALIASING))
+            } finally {
+                g.dispose()
+            }
+            val left = ((6.5 + origin) * scale).roundToInt()
+            val width = (3 * scale).roundToInt()
+            val firstRow = if (mode == SwingPromptDecoration.GUTTER) 1 else 0
+            val top = ((firstRow * 21 + origin) * scale).roundToInt() + width
+            val bottom = ((126 + origin) * scale).roundToInt() - width
+            for (y in top until bottom) {
+                assertEquals(0, image.getRGB(left - 1, y), "Left edge remains crisp at row $y in $mode")
+                for (x in left until left + width) {
+                    assertEquals(
+                        color,
+                        image.getRGB(x, y),
+                        "No rail seam or alpha buildup at ($x,$y) in $mode",
+                    )
+                }
+                assertEquals(0, image.getRGB(left + width, y), "Right edge remains crisp at row $y in $mode")
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("1.0,0.0", "1.25,0.3", "1.5,0.5", "1.75,0.75", "2.0,0.25", "2.5,0.4")
+    fun `divider thickness stays fixed across fractional row positions`(
+        scale: Double,
+        origin: Double,
+    ) {
+        val rowMetrics = metrics.copy(cellHeight = 21)
+        val configured = settings.copy { it.shellIntegrationPromptDividerColor = TEST_WHITE }
+        val image = BufferedImage(120, 400, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.scale(scale, scale)
+            g.translate(4.25, origin)
+            for (row in 1..5) painter.paintDivider(g, configured, rowMetrics, row, 20, false, palette, interactive = false)
+        } finally {
+            g.dispose()
+        }
+        val x = (10 * scale).roundToInt()
+        val thickness = (2 * scale).roundToInt()
+        for (row in 1..5) {
+            val top = ((row * 21 - 12 + origin) * scale).roundToInt()
+            assertEquals(0, image.getRGB(x, top - 1))
+            for (y in top until top + thickness) assertEquals(TEST_WHITE, image.getRGB(x, y))
+            assertEquals(0, image.getRGB(x, top + thickness))
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("1.0,6", "1.0,8", "1.25,8", "1.5,8", "2.0,8", "1.25,9", "1.5,9", "2.0,1", "2.0,2")
+    fun `hollow markers preserve filled marker bounds and graphics state across display scales`(
+        scale: Double,
+        diameter: Int,
+    ) {
+        val cache = renderCache(TestRenderFrame(arrayOf(arrayOf(TestCell()))))
+        val state = TerminalShellIntegrationState().apply { recordPromptStart(1) }
+        val decorations = TerminalShellIntegrationViewportDecorations().apply { updateFrom(state, cache) }
+        val configured =
+            settings.copy {
+                it.shellIntegrationPromptDotDiameter = diameter
+                it.shellIntegrationPromptDotColor = TEST_WHITE
+            }
+        val inheritedStroke = BasicStroke(4f)
+
+        fun paint(): BufferedImage =
+            image { g ->
+                g.scale(scale, scale)
+                g.translate(20, 0)
+                g.stroke = inheritedStroke
+                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE)
+                painter.paint(g, configured, metrics, decorations, 20, 0, false, palette)
+                assertEquals(inheritedStroke, g.stroke)
+                assertEquals(RenderingHints.VALUE_STROKE_NORMALIZE, g.getRenderingHint(RenderingHints.KEY_STROKE_CONTROL))
+            }
+
+        fun bounds(image: BufferedImage): Rectangle {
+            val bounds = Rectangle()
+            var empty = true
+            for (y in 0 until image.height) {
+                for (x in 0 until image.width) {
+                    if (image.getRGB(x, y) ushr 24 == 0) continue
+                    if (empty) {
+                        bounds.setBounds(x, y, 1, 1)
+                        empty = false
+                    } else {
+                        bounds.add(Rectangle(x, y, 1, 1))
+                    }
+                }
+            }
+            assertFalse(empty)
+            return bounds
+        }
+
+        val hollow = paint()
+        state.recordCommandStart(1, includeLine = true)
+        state.recordCommandFinished(1, exitCode = 0)
+        decorations.updateFrom(state, cache)
+        val filled = paint()
+        assertEquals(bounds(filled), bounds(hollow), "Completion preserves the marker's outer bounds")
+        val centerX = ((8 - diameter / 2 + diameter / 2.0) * scale).toInt()
+        val centerY = (((metrics.cellHeight - diameter) / 2 + diameter / 2.0) * scale).toInt()
+        val filledCenter = filled.getRGB(centerX, centerY)
+        assertTrue(filledCenter ushr 24 > 0)
+        assertEquals(if (diameter > 2) 0 else filledCenter, hollow.getRGB(centerX, centerY))
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        ints = [
+            TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+            TerminalShellIntegrationCommandLifecycle.RUNNING,
+            TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+            TerminalShellIntegrationCommandLifecycle.FAILED,
+            TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN,
+            TerminalShellIntegrationCommandLifecycle.ABANDONED,
+        ],
+    )
+    fun `only completed prompt records expose interactive markers`(lifecycle: Int) {
+        val cache = renderCache(TestRenderFrame(Array(3) { arrayOf(TestCell()) }))
+        val state =
+            TerminalShellIntegrationState().apply {
+                recordPromptStart(1)
+                if (lifecycle != TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY) recordCommandStart(2, includeLine = true)
+                when (lifecycle) {
+                    TerminalShellIntegrationCommandLifecycle.SUCCEEDED -> recordCommandFinished(2, exitCode = 0)
+                    TerminalShellIntegrationCommandLifecycle.FAILED -> recordCommandFinished(2, exitCode = 1)
+                    TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN -> recordCommandFinished(2, exitCode = null)
+                    TerminalShellIntegrationCommandLifecycle.ABANDONED -> recordPromptStart(3)
+                }
+            }
+        val decorations = TerminalShellIntegrationViewportDecorations().apply { updateFrom(state, cache) }
+        val completed =
+            lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED ||
+                lifecycle == TerminalShellIntegrationCommandLifecycle.FAILED ||
+                lifecycle == TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN
+        assertEquals(lifecycle, decorations.commandLifecycleAt(0))
+        assertEquals(completed, decorations.isPromptMarkerInteractiveAt(0))
+        assertFalse(decorations.isPromptMarkerInteractiveAt(-1))
+        assertFalse(decorations.isPromptMarkerInteractiveAt(1), "Command output is not a prompt marker")
+        assertFalse(decorations.isPromptMarkerInteractiveAt(3))
+
+        val configured =
+            settings.copy {
+                it.shellIntegrationPromptDotColor = TEST_WHITE
+                it.shellIntegrationPromptDotHoverColor = TEST_GREEN
+                it.shellIntegrationPromptDotHoverHaloColor = TEST_RED
+            }
+
+        fun paint(hovered: Boolean) =
+            image { g ->
+                g.translate(20, 0)
+                painter.paint(g, configured, metrics, decorations, 20, 0, hovered, palette)
+            }
+        val resting = paint(false)
+        val completedColor = if (lifecycle == TerminalShellIntegrationCommandLifecycle.FAILED) TEST_RED else TEST_WHITE
+        assertEquals(if (completed) completedColor else 0, resting.getRGB(8, 10))
+        assertNotEquals(0, resting.getRGB(8, 7), "Every prompt keeps a visible outline or fill")
+        if (!completed) {
+            val hovered = paint(true)
+            assertContentEquals(
+                resting.getRGB(0, 0, 40, 40, null, 0, 40),
+                hovered.getRGB(0, 0, 40, 40, null, 0, 40),
+            )
+        }
+        val dividerRail =
+            image { g ->
+                g.translate(20, 0)
+                val configuredDivider =
+                    settings.copy {
+                        it.promptDecoration =
+                            SwingPromptDecoration.DIVIDER
+                    }
+                for (row in 0..1) painter.paint(g, configuredDivider, metrics, decorations, 20, row, false, palette)
+            }
+        val railColor = if (lifecycle == TerminalShellIntegrationCommandLifecycle.FAILED) TEST_BLUE else 0
+        assertEquals(railColor, dividerRail.getRGB(8, 10), "Divider rail includes a failed prompt")
+        assertEquals(railColor, dividerRail.getRGB(8, 30), "Divider rail includes failed output")
+        assertEquals(0, dividerRail.getRGB(0, 10))
+        assertEquals(0, dividerRail.getRGB(6, 10))
+        assertTrue(decorations.updateFrom(state.apply { clear() }, cache))
+        assertFalse(decorations.isPromptMarkerInteractiveAt(0))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `inactive divider remains a solid line and ignores hover colors`(hovered: Boolean) {
+        val configured =
+            settings.copy {
+                it.shellIntegrationPromptDividerColor = TEST_WHITE
+                it.shellIntegrationPromptDividerHoverColor = TEST_RED
+            }
+        val image = divider(configured, palette, hovered, interactive = false)
+        assertEquals(0, image.getRGB(8, 8))
+        assertEquals(TEST_WHITE, image.getRGB(8, 9))
+        assertEquals(TEST_WHITE, image.getRGB(8, 10))
+        assertEquals(TEST_WHITE, image.getRGB(0, 9))
+        assertEquals(TEST_WHITE, image.getRGB(19, 9))
+        assertEquals(0, image.getRGB(8, 7))
+        assertEquals(0, image.getRGB(8, 11))
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -99,9 +341,9 @@ class TerminalShellIntegrationDecorationPainterTest {
                 failed -> TEST_WHITE
                 else -> TEST_RED
             }
-        assertEquals(dot, image.getRGB(10, 10))
-        assertEquals(halo, image.getRGB(10, 3))
-        assertEquals(if (failed) TEST_BLUE else 0, image.getRGB(10, 25), "Hover must not recolor the failure rail")
+        assertEquals(dot, image.getRGB(8, 10))
+        assertEquals(halo, image.getRGB(8, 3))
+        assertEquals(if (failed) TEST_BLUE else 0, image.getRGB(8, 25), "Hover must not recolor the failure rail")
     }
 
     @ParameterizedTest
@@ -109,9 +351,9 @@ class TerminalShellIntegrationDecorationPainterTest {
     fun `null hover overrides retain marker and palette derived halo defaults`(failed: Boolean) {
         val image = marker(settings, failed, true)
         val rgb = if (failed) TEST_RED else TEST_GREEN
-        assertEquals((rgb and 0xffffff) or 0x52000000, image.getRGB(10, 3))
+        assertEquals((rgb and 0xffffff) or 0x52000000, image.getRGB(8, 3))
         // The normal marker uses foreground RGB with its established 0x8c alpha over the halo.
-        assertEquals(if (failed) TEST_RED else 0xb100ff00.toInt(), image.getRGB(10, 10))
+        assertEquals(if (failed) TEST_RED else 0xb100ff00.toInt(), image.getRGB(8, 10))
     }
 
     @ParameterizedTest
@@ -125,10 +367,10 @@ class TerminalShellIntegrationDecorationPainterTest {
                 it.shellIntegrationFailedPromptDotHoverHaloColor = 0
             }
         val hovered = marker(configured, failed, true)
-        assertEquals(0, hovered.getRGB(10, 10))
-        assertEquals(0, hovered.getRGB(10, 3))
+        assertEquals(0, hovered.getRGB(8, 10))
+        assertEquals(0, hovered.getRGB(8, 3))
         val normal = marker(configured, failed, false)
-        assertEquals(if (failed) TEST_RED else (TEST_GREEN and 0xffffff) or 0x8c000000.toInt(), normal.getRGB(10, 10))
+        assertEquals(if (failed) TEST_RED else (TEST_GREEN and 0xffffff) or 0x8c000000.toInt(), normal.getRGB(8, 10))
     }
 
     @Test
@@ -149,8 +391,8 @@ class TerminalShellIntegrationDecorationPainterTest {
                     it.shellIntegrationFailedPromptDotHoverHaloColor = color
                 }
             for (failed in booleanArrayOf(false, true)) {
-                assertEquals(color, marker(dotOnly, failed, true).getRGB(10, 10), "Dot failed=$failed color=$color")
-                assertEquals(color, marker(haloOnly, failed, true).getRGB(10, 3), "Halo failed=$failed color=$color")
+                assertEquals(color, marker(dotOnly, failed, true).getRGB(8, 10), "Dot failed=$failed color=$color")
+                assertEquals(color, marker(haloOnly, failed, true).getRGB(8, 3), "Halo failed=$failed color=$color")
             }
         }
     }
@@ -163,8 +405,8 @@ class TerminalShellIntegrationDecorationPainterTest {
                 it.shellIntegrationPromptDotHoverHaloColor = TEST_WHITE
             }
         val hidden = marker(configured, false, true)
-        assertEquals(0, hidden.getRGB(10, 10))
-        assertEquals(0, hidden.getRGB(10, 3))
+        assertEquals(0, hidden.getRGB(8, 10))
+        assertEquals(0, hidden.getRGB(8, 3))
         val noGutter = marker(settings, true, true, gutterWidth = 0)
         for (y in 0 until noGutter.height) for (x in 0 until noGutter.width) assertEquals(0, noGutter.getRGB(x, y))
     }
@@ -177,7 +419,18 @@ class TerminalShellIntegrationDecorationPainterTest {
             g.scale(1.5, 1.5)
             g.clip = Rectangle(4, 8, 3, 4)
             val clip = g.clip
-            painter.paintDivider(g, settings.copy { it.shellIntegrationPromptDividerColor = TEST_RED }, metrics, 1, 20, false, palette)
+            painter.paintDivider(
+                g,
+                settings.copy {
+                    it.shellIntegrationPromptDividerColor = TEST_RED
+                },
+                metrics,
+                1,
+                20,
+                false,
+                palette,
+                interactive = true,
+            )
             assertEquals(clip, g.clip)
             assertEquals(TEST_RED, image.getRGB(6, 14))
             assertEquals(0, image.getRGB(5, 14))
@@ -192,7 +445,8 @@ class TerminalShellIntegrationDecorationPainterTest {
         settings: SwingSettings,
         palette: TerminalColorPalette,
         hovered: Boolean,
-    ): BufferedImage = image { g -> painter.paintDivider(g, settings, metrics, 1, 20, hovered, palette) }
+        interactive: Boolean = true,
+    ): BufferedImage = image { g -> painter.paintDivider(g, settings, metrics, 1, 20, hovered, palette, interactive) }
 
     private fun marker(
         settings: SwingSettings,
@@ -204,10 +458,8 @@ class TerminalShellIntegrationDecorationPainterTest {
         val state =
             TerminalShellIntegrationState().apply {
                 recordPromptStart(1)
-                if (failed) {
-                    recordCommandStart(2, includeLine = true)
-                    recordCommandFinished(2, exitCode = 1)
-                }
+                recordCommandStart(2, includeLine = true)
+                recordCommandFinished(2, exitCode = if (failed) 1 else 0)
             }
         val decorations = TerminalShellIntegrationViewportDecorations().apply { updateFrom(state, cache) }
         return image { g ->

@@ -60,7 +60,7 @@ reports. PowerShell directory reports cover filesystem locations only.
 
 | Feature | Description |
 | --- | --- |
-| Prompt decorations | Gutter dots, divider bands, or no decoration. |
+| Prompt decorations | Gutter dots, divider bands, or no decoration; failed-command rails in gutter and divider modes. |
 | Command navigation | Move between retained commands and select a command block. |
 | Command results | Exit status, timestamps, and failed-output indicators. |
 | Output extraction | Copy or export retained command output with soft wraps reconstructed. |

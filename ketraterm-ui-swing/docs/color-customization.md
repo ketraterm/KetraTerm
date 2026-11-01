@@ -89,8 +89,28 @@ results without changing the query, active match, or session palette.
 
 Choose `promptDecoration = SwingPromptDecoration.GUTTER`, `DIVIDER`, or `NONE`.
 Decorations require shell metadata and appear only on the primary screen.
+Prompts without a completed command block use a hollow gutter circle. Dividers
+always remain solid lines. Both styles ignore hover and clicks while a command
+is pending, running, or abandoned. Completed commands use filled gutter circles
+and enable hover styling and click-to-select command blocks for both styles.
 Color overrides belong to `SwingSettings`; reload a new snapshot on the EDT to
 repaint existing decorations without changing shell records or grid dimensions.
+
+Gutter and divider modes share the same left padding and
+`shellIntegrationDecorationGutterWidth`. Switching between these styles preserves
+the text's horizontal position. Defaults reserve 10 logical pixels for the gutter
+plus 2 pixels of left padding, for a compact 12-pixel total inset in both idle and
+failed-command views. Explicit widths and padding remain authoritative.
+Dots and rails share an axis slightly left of
+the gutter's center, leaving more space before text. Failed-command rails appear
+in both modes; in divider mode they span the failed prompt and output between
+divider bands. Rails and divider rules align their thickness to device pixels
+at fractional display scales, and adjacent rail segments join without seams.
+Configure the same
+`shellIntegrationFailedCommandRailColor`, `shellIntegrationFailedCommandRailWidth`,
+and `shellIntegrationFailedCommandRailsVisible` settings for either style.
+Disabling rails preserves the shared gutter; alternate screens and
+`promptDecoration = NONE` do not paint rails. `NONE` also removes the gutter.
 
 ```kotlin
 val settings = SwingSettings.create {
@@ -132,8 +152,8 @@ permitted terminal palette changes. Explicit overrides stay fixed. Transparent
 colors retain the decoration's hit target and space: a hidden divider rule still
 reserves its band. Use `promptDecoration = NONE` to remove decoration space, or
 `shellIntegrationPromptDotsVisible = false` to suppress dots and their halos while
-retaining any configured failure rails. Hover follows the full existing gutter
-or divider hit target, not just the painted dot or rule.
+retaining any configured failure rails. For completed commands, hover follows
+the full existing gutter or divider hit target, not just the painted dot or rule.
 
 ## Search controls
 

@@ -134,7 +134,7 @@ internal class GridPainter(
         val promptGutterWidth = chrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
         val geometry = visualGeometry?.takeIf { it.rowCount == cache.rows }
         val shellDecorations =
-            if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE || promptGutterWidth <= 0) {
+            if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
                 null
             } else {
                 shellIntegrationDecorations
@@ -182,9 +182,11 @@ internal class GridPainter(
                             settings,
                             metrics,
                             row,
-                            contentWidth,
+                            contentWidth + paddingLeft,
                             row == hoveredPromptMarkerRow,
                             palette,
+                            interactive = shellDecorations?.isPromptMarkerInteractiveAt(row) == true,
+                            left = -paddingLeft,
                         )
                     }
                     val bidi = cellGeometry.row(cache, row)

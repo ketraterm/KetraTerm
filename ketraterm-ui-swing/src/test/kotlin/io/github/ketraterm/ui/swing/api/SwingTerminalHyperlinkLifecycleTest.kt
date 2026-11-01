@@ -219,7 +219,7 @@ class SwingTerminalHyperlinkLifecycleTest {
         val gutter = 16
         SwingTerminalHyperlinkLifecycleFixture(gutterWidth = gutter).use { fixture ->
             fixture.awaitHyperlink()
-            fixture.markFirstRowAsPrompt()
+            fixture.markFirstRowAsCompletedCommand()
             fixture.movePointer(gutter + 1)
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
             fixture.movePointer(gutter + 2)

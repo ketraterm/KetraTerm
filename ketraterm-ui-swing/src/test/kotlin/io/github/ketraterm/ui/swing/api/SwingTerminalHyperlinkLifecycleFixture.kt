@@ -251,9 +251,13 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
         settle()
     }
 
-    fun markFirstRowAsPrompt() {
+    fun markFirstRowAsCompletedCommand() {
         onEdt {
-            session.readRenderFrame { frame -> shellState.recordPromptStart(frame.lineId(0)) }
+            session.readRenderFrame { frame ->
+                shellState.recordPromptStart(frame.lineId(0))
+                shellState.recordCommandStart(frame.lineId(0), includeLine = true)
+                shellState.recordCommandFinished(frame.lineId(0), exitCode = 0)
+            }
         }
         settle()
     }

@@ -29,7 +29,7 @@ occurs at build, and failed updates leave the original snapshot unchanged.
 Collection values are detached; supplied services keep their own lifetimes.
 Nullable services can be cleared explicitly.
 
-Default alternate-screen padding derives from primary padding and the gutter.
+Default alternate-screen padding derives from primary padding and reserved decoration space.
 A copied builder retains resolved padding; assigning null requests recalculation.
 
 Use the current examples in the [Swing README](../../ketraterm-ui-swing/README.md)

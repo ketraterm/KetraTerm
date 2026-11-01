@@ -21,7 +21,8 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
  * EDT-owned chrome geometry shared by sizing, painting and interaction.
  *
  * Primary screen chrome composes host/user margin plus terminal-owned gutters:
- * `left margin | prompt gutter | grid | scrollbar gutter`. Alternate screen
+ * `left margin | decoration gutter | grid | scrollbar gutter`. Gutter and divider
+ * modes share the same horizontal geometry. Alternate screen
  * sizing uses configured insets; default presentation centers the actual grid,
  * including spare pixels after cell rounding. Presentation offsets never feed
  * back into grid capacity. Explicit alternate padding remains authoritative.
@@ -150,7 +151,7 @@ internal class SwingTerminalChrome {
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE ||
-            settings.promptDecoration != SwingPromptDecoration.GUTTER ||
+            settings.promptDecoration == SwingPromptDecoration.NONE ||
             !promptDecorationsAvailable
         ) {
             0
