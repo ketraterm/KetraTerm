@@ -79,7 +79,7 @@ All keys below belong to `[behavior]`. Boolean values are `true` or `false`.
 | `shell_suggestions_enabled` | `true` | Automatic suggestions when the master switch is enabled. Explicit requests need only the master switch. |
 | `accept_selected_suggestion_with_enter` | `true` | Enter accepts an already selected suggestion; otherwise it reaches the shell. |
 | `suggestion_learning_persistence_enabled` | `false` | Persist compact completion-learning metadata when completion is enabled. |
-| `scroll_on_output` | `true` | Follow new process output. |
+| `scroll_on_output` | `false` | Return to live output when new rows enter history. Typing and accepted paste always reveal live input. |
 | `show_foreground_process_name` | `true` | Use a detected process name when it does not supply a title; custom names retain priority. |
 
 Command-finished alerts use monotonic time between shell markers and recheck the

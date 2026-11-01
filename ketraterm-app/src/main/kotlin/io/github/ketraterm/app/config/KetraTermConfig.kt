@@ -201,7 +201,7 @@ internal data class KetraTermConfig(
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
-        const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
+        const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = false
 
         val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
 

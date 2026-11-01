@@ -35,6 +35,14 @@ class SwingSettingsTest {
     private val chrome = SwingTerminalChrome()
 
     @Test
+    fun `output following is opt in and survives settings copies`() {
+        assertFalse(SwingSettings().scrollOnOutput)
+        val enabled = SwingSettings.create { it.scrollOnOutput = true }
+        assertTrue(enabled.scrollOnOutput)
+        assertTrue(enabled.copy {}.scrollOnOutput)
+    }
+
+    @Test
     fun `prompt modes copy independently and remove reserved gutter space`() {
         val initial = SwingSettings()
         assertEquals(SwingPromptDecoration.GUTTER, initial.promptDecoration)

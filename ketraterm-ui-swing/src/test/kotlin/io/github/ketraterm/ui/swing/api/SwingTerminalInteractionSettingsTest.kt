@@ -34,10 +34,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Point
 import java.awt.Rectangle
-import java.awt.event.ComponentEvent
-import java.awt.event.InputEvent
-import java.awt.event.MouseEvent
-import java.awt.event.MouseWheelEvent
+import java.awt.event.*
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -45,6 +42,206 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
+    @ParameterizedTest
+    @ValueSource(
+        ints = [
+            KeyEvent.VK_BACK_SPACE, KeyEvent.VK_DELETE, KeyEvent.VK_ENTER, KeyEvent.VK_TAB,
+            KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN,
+            KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_ESCAPE,
+        ],
+    )
+    fun `admitted editing keys immediately reveal live input without waiting for echo`(keyCode: Int) =
+        fixture {
+            scrollIntoHistory()
+
+            key(KeyEvent.KEY_PRESSED, keyCode)
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, view.viewportState().renderOffset)
+            dispatcher.scheduler.runCurrent()
+            assertTrue(output.size() > 0, "The editing key must still reach the application")
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["x", "\u4e2d", "\uD83D\uDE00"])
+    fun `committed text reveals live input and preserves Unicode encoding`(text: String) =
+        fixture {
+            scrollIntoHistory()
+
+            for (character in text) key(KeyEvent.KEY_TYPED, character = character)
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(text, output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(
+        ints = [
+            KeyEvent.VK_SHIFT, KeyEvent.VK_CONTROL, KeyEvent.VK_ALT, KeyEvent.VK_META,
+            KeyEvent.VK_WINDOWS, KeyEvent.VK_CAPS_LOCK, KeyEvent.VK_NUM_LOCK, KeyEvent.VK_SCROLL_LOCK,
+        ],
+    )
+    fun `modifier and lock keys preserve the scrollback position`(keyCode: Int) =
+        fixture {
+            scrollIntoHistory()
+
+            key(KeyEvent.KEY_PRESSED, keyCode)
+            key(KeyEvent.KEY_RELEASED, keyCode)
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
+    fun `local shortcuts retain scrollback through repeat typed and release events`() =
+        fixture {
+            scrollIntoHistory()
+            hostKeyHandled = true
+
+            repeat(2) {
+                key(KeyEvent.KEY_PRESSED, KeyEvent.VK_F, modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+                key(KeyEvent.KEY_TYPED, character = 'F')
+            }
+            key(KeyEvent.KEY_RELEASED, KeyEvent.VK_F)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `focus changes and key releases preserve scrollback`() =
+        fixture {
+            key(KeyEvent.KEY_PRESSED, KeyEvent.VK_LEFT)
+            dispatcher.scheduler.runCurrent()
+            scrollIntoHistory()
+
+            key(KeyEvent.KEY_RELEASED, KeyEvent.VK_LEFT)
+            view.focusListeners.forEach { it.focusGained(FocusEvent(view, FocusEvent.FOCUS_GAINED)) }
+            view.focusListeners.forEach { it.focusLost(FocusEvent(view, FocusEvent.FOCUS_LOST)) }
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unavailable session input leaves the history readable`(closed: Boolean) =
+        fixture(startSession = closed) {
+            scrollIntoHistory()
+            if (closed) session.close()
+
+            key(KeyEvent.KEY_TYPED, character = 'x')
+            key(KeyEvent.KEY_PRESSED, KeyEvent.VK_ENTER)
+            assertFalse(view.pasteText("paste"))
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, output.size())
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `accepted clipboard and supplied paste immediately reveal live input`(suppliedText: Boolean) =
+        fixture {
+            scrollIntoHistory()
+
+            assertTrue(paste(suppliedText))
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("clipboard", output.toString(Charsets.UTF_8))
+        }
+
+    @Test
+    fun `accepted middle button paste immediately reveals live input`() =
+        fixture {
+            scrollIntoHistory()
+
+            view.dispatchEvent(event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON2))
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("clipboard", output.toString(Charsets.UTF_8))
+        }
+
+    @Test
+    fun `empty and capacity rejected paste preserve scrollback`() =
+        fixture {
+            scrollIntoHistory()
+            assertFalse(view.pasteText(""))
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+            repeat(16) { assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("queued"))) }
+
+            assertFalse(view.pasteText("rejected"))
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
+    fun `capacity rejected keyboard input preserves scrollback`() =
+        fixture {
+            scrollIntoHistory()
+            assertEquals(TerminalInputAdmission.ACCEPTED, session.submitBytes(ByteArray(8 * 1024 * 1024)))
+
+            key(KeyEvent.KEY_TYPED, character = 'x')
+            key(KeyEvent.KEY_PRESSED, KeyEvent.VK_ENTER)
+
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, output.size(), "Admission does not drain the controlled writer")
+        }
+
+    @Test
+    fun `accepted clear screen action reveals the live viewport before application redraw`() =
+        fixture {
+            scrollIntoHistory()
+
+            assertTrue(view.clearScreen())
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u000c", output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `typing and paste override a pending smooth scroll immediately`(paste: Boolean) =
+        fixture {
+            scrollIntoHistory()
+            view.scrollViewportBy(2.0)
+
+            if (paste) assertTrue(view.pasteText("text")) else key(KeyEvent.KEY_TYPED, character = 'x')
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, view.viewportState().renderOffset)
+        }
+
+    @Test
+    fun `output preserves the reader position by default and resumes following after typing`() =
+        fixture {
+            assertFalse(settings.scrollOnOutput)
+            scrollIntoHistory()
+
+            feed("\r\nnew")
+
+            assertEquals(3.0, view.viewportState().scrollbackOffset)
+            key(KeyEvent.KEY_TYPED, character = 'x')
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            feed("\r\nnext")
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
+    fun `explicit scroll on output still returns to live output`() =
+        fixture {
+            settings = settings.copy { it.scrollOnOutput = true }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            scrollIntoHistory()
+
+            feed("\r\nnew")
+
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+        }
+
     @Test
     fun `reverting rejected settings restores the immediately applied paste policy`() =
         fixture {
@@ -1612,6 +1809,7 @@ class SwingTerminalInteractionSettingsTest {
         var copies = 0
         var onRead: () -> Unit = {}
         var onCopy: () -> Unit = {}
+        var hostKeyHandled = false
         val view =
             SwingTerminal(
                 { settings },
@@ -1621,6 +1819,7 @@ class SwingTerminalInteractionSettingsTest {
                             if (SwingUtilities.isEventDispatchThread()) task.run() else SwingUtilities.invokeLater(task)
                         }
                     it.scrollbarOverlayEnabled = true
+                    it.hostKeyHandler = SwingTerminalHostKeyHandler { hostKeyHandled }
                     it.middleClickPasteHandler = middleClickPasteHandler
                     it.clipboardHandler =
                         object : TerminalClipboardHandler {
@@ -1670,6 +1869,29 @@ class SwingTerminalInteractionSettingsTest {
         }
 
         fun paste(suppliedText: Boolean): Boolean = if (suppliedText) view.pasteText(clipboardText) else view.pasteClipboardText()
+
+        fun scrollIntoHistory() {
+            feed("\r\none\r\ntwo\r\nthree\r\nfour")
+            view.scrollToScrollbackOffset(2)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+        }
+
+        fun key(
+            id: Int,
+            keyCode: Int = KeyEvent.VK_UNDEFINED,
+            character: Char = KeyEvent.CHAR_UNDEFINED,
+            modifiers: Int = 0,
+        ) {
+            val event = KeyEvent(view, id, 0L, modifiers, keyCode, character)
+            for (listener in view.keyListeners) {
+                when (id) {
+                    KeyEvent.KEY_PRESSED -> listener.keyPressed(event)
+                    KeyEvent.KEY_TYPED -> listener.keyTyped(event)
+                    KeyEvent.KEY_RELEASED -> listener.keyReleased(event)
+                }
+            }
+        }
 
         fun event(
             id: Int,

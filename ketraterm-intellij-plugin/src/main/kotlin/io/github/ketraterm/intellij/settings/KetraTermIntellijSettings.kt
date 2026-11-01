@@ -279,7 +279,7 @@ class KetraTermIntellijSettings :
         @OptionTag
         @JvmField val titlePermission: String = DEFAULT_TITLE_PERMISSION.name.lowercase(Locale.ROOT),
         @OptionTag
-        @JvmField val scrollOnOutput: Boolean = true,
+        @JvmField val scrollOnOutput: Boolean = false,
         @OptionTag
         @JvmField val showForegroundProcessName: Boolean = DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
         @OptionTag

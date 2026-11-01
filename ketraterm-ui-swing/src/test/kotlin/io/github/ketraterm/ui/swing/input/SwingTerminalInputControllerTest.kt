@@ -287,6 +287,10 @@ class SwingTerminalInputControllerTest {
             cursorBlinkResetCount++
         }
 
+        override fun scrollToLiveViewport() {
+            fail<Unit>("Input without a running session must not scroll")
+        }
+
         override fun setTerminalFocused(focused: Boolean) {
             this.focused = focused
         }

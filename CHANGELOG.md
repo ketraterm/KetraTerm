@@ -2,6 +2,10 @@
 
 Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](ketraterm-intellij-plugin/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
+## Unreleased
+
+- Typing, editing keys, and accepted paste now immediately reveal the live viewport and cancel pending scroll animation. Local shortcuts, modifiers, focus changes, and key releases preserve scrollback. `SwingSettings.scrollOnOutput` now defaults to `false`, keeping scrolled content anchored while output continues; explicitly enabled output following is preserved.
+
 ## [0.4.0] - 2026-10-31
 
 ### Improvements and fixes

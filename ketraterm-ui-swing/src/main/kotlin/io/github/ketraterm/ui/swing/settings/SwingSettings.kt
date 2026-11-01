@@ -232,6 +232,11 @@ public class SwingSettings private constructor(
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
+
+    /**
+     * Returns to live output when new rows enter history. Disabled by default so reading
+     * scrollback keeps its content anchored; admitted typing and paste still reveal live input.
+     */
     public val scrollOnOutput: Boolean = builder.scrollOnOutput
     public val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = builder.osc8HyperlinkPresentation
     public val osc8HyperlinkActivation: SwingHyperlinkActivation = builder.osc8HyperlinkActivation
@@ -388,7 +393,7 @@ public class SwingSettings private constructor(
         public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
 
         /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */
-        public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: true
+        public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: false
 
         /** Draft value for [SwingSettings.osc8HyperlinkPresentation]; validated when [build] is called. */
         public var osc8HyperlinkPresentation: SwingHyperlinkPresentation? = source?.osc8HyperlinkPresentation
