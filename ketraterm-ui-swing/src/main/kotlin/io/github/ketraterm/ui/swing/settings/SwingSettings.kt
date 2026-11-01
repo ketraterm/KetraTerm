@@ -92,8 +92,8 @@ import java.util.*
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
  * @property padding primary-screen visual inset around the terminal grid in
  * pixels. Prompt-decoration and scrollbar gutters are component chrome layered
- * outside this margin. The default keeps top padding at zero so smooth
- * scrolling can enter through the top edge, leaves a small left margin before
+ * outside this margin. The default reserves four pixels above the grid and
+ * sticky command header, leaves a small left margin before
  * the prompt gutter, reserves a stable right gutter for the overlay scrollbar,
  * and keeps a small bottom visual spacer.
  * @property alternateScreenPadding configured alternate-screen inset in pixels.
@@ -486,7 +486,7 @@ public class SwingSettings private constructor(
         public var shellIntegrationFailedCommandRailWidth: Int = source?.shellIntegrationFailedCommandRailWidth ?: 3
 
         /** Draft value for [SwingSettings.padding]; validated when [build] is called. */
-        public var padding: SwingPadding = source?.padding ?: SwingPadding(0, 2, 4, 6)
+        public var padding: SwingPadding = source?.padding ?: SwingPadding(4, 2, 4, 6)
 
         /**
          * Explicit alternate padding, or null to balance the final [padding] and gutter at build time.

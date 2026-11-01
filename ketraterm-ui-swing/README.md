@@ -114,6 +114,10 @@ selection. Width changes clip rather than reflow it; height changes expose a
 bottom-anchored window over retained rows. Presentation changes do not restart
 the session.
 
+The default grid padding reserves four pixels at the top and bottom. The first row
+and sticky command header share the same top inset, including while scrolling.
+Configure `SwingSettings.padding` to customize these margins.
+
 ### Sticky command headers
 
 `stickyCommandHeadersEnabled` defaults to `true`, independently of `promptDecoration`.
@@ -126,7 +130,7 @@ clip to the available width; they are never shortened, scaled, or given a separa
 This applies to live running commands, scrollback, and retained closed-session output.
 Alternate-screen content, prompts still visible at the top, untouched trailing rows,
 and commands without a captured prompt have no overlay. The overlay reserves no grid
-space and does not resize the terminal. A subtle four-pixel shadow fades below the
+space and does not resize the terminal. A soft ten-pixel shadow fades below the
 header; only its opaque row intercepts pointer actions. Primary click reveals the original command;
 if its grid anchor has been evicted, the retained header remains and the click does
 nothing. Wheel gestures over the overlay scroll local history. Covered cells receive

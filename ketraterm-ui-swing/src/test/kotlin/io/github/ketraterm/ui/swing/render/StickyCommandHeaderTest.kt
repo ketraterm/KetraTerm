@@ -64,6 +64,34 @@ class StickyCommandHeaderTest {
         }
 
     @Test
+    fun `header painting and hit testing preserve top padding throughout fractional scrolling`() =
+        onEdt {
+            val fixture = Fixture()
+            fixture.settings = fixture.settings.copy { it.padding = it.padding.copy(top = 4) }
+            for (origin in doubleArrayOf(0.0, -0.5, -1.0)) {
+                fixture.geometry.updateContentOrigin(origin)
+                fixture.update()
+                val image = BufferedImage(360, 60, BufferedImage.TYPE_INT_RGB)
+                image.createGraphics().let { g ->
+                    try {
+                        g.color = Color.MAGENTA
+                        g.fillRect(0, 0, image.width, image.height)
+                        fixture.header.paint(g)
+                    } finally {
+                        g.dispose()
+                    }
+                }
+                for (y in 0 until 4) {
+                    assertEquals(Color.MAGENTA.rgb, image.getRGB(200, y))
+                    assertFalse(fixture.header.contains(200, y))
+                }
+                assertNotEquals(Color.MAGENTA.rgb, image.getRGB(200, 4))
+                assertTrue(fixture.header.contains(200, 4))
+                assertEquals(24, fixture.header.bottom)
+            }
+        }
+
+    @Test
     fun `fractional scrolling waits until input leaves and never covers a divider band`() =
         onEdt {
             val fixture = Fixture()
@@ -96,7 +124,7 @@ class StickyCommandHeaderTest {
                     g.dispose()
                 }
                 assertNotEquals(Color.MAGENTA.rgb, image.getRGB(200, 2))
-                assertEquals(Color.MAGENTA.rgb, image.getRGB(200, 24))
+                assertEquals(Color.MAGENTA.rgb, image.getRGB(200, 30))
                 assertTrue(fixture.header.contains(200, 1))
                 assertFalse(fixture.header.contains(200, 20))
             }
@@ -227,7 +255,7 @@ class StickyCommandHeaderTest {
             val configuration = ScaledConfiguration(scale)
             val pixelWidth = (360 * scale).toInt()
             val pixelHeight = (60 * scale).toInt()
-            val comparedHeight = (19 * scale).toInt()
+            val comparedHeight = (20 * scale).toInt()
             val text = "PS C:\\Users\\gagik> cat".padEnd(40)
             val attrs =
                 LongArray(40) { index ->
@@ -351,7 +379,7 @@ class StickyCommandHeaderTest {
                     g.color = Color.WHITE
                     g.fillRect(0, 0, image.width, image.height)
                     g.scale(scale, scale)
-                    g.clipRect(0, 20, 360, 4)
+                    g.clipRect(0, 20, 360, 10)
                     fixture.header.paint(g)
                 } finally {
                     g.dispose()
@@ -359,7 +387,7 @@ class StickyCommandHeaderTest {
             }
             val x = (200 * scale).toInt()
             val start = (20 * scale).toInt()
-            val end = (24 * scale).toInt()
+            val end = (30 * scale).toInt()
             assertEquals(Color.WHITE.rgb, image.getRGB(x, start - 1))
             assertNotEquals(Color.WHITE.rgb, image.getRGB(x, start))
             var previous = 0
@@ -368,28 +396,45 @@ class StickyCommandHeaderTest {
                 assertTrue(intensity >= previous, "shadow must fade at scale=$scale y=$y")
                 previous = intensity
             }
-            assertEquals(Color.WHITE.rgb, image.getRGB(x, end - 1))
+            assertTrue((image.getRGB(x, end - 1) and 0xff) >= 253, "blur must end with a nearly transparent tail")
             assertEquals(Color.WHITE.rgb, image.getRGB(x, end))
+            assertNotEquals(Color.WHITE.rgb, image.getRGB(x, (24 * scale).toInt()), "blur must extend beyond a thin rule")
+            val middle = image.getRGB(x, (25 * scale).toInt()) and 0xff
+            val contact = image.getRGB(x, start) and 0xff
+            assertTrue(middle > (contact + 255) / 2, "shadow must have a soft nonlinear falloff")
             assertFalse(fixture.header.contains(200, 21), "shadow must not intercept output interaction")
         }
 
-    @Test
-    fun `shadow stops at the content bottom padding`() =
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 2.0])
+    fun `shadow stops at the content bottom padding without compressing its blur`(scale: Double) =
         onEdt {
             val fixture = Fixture()
-            fixture.header.update(fixture.view, fixture.cache, fixture.geometry, fixture.settings, METRICS, 360, 22, null)
-            val image = BufferedImage(360, 60, BufferedImage.TYPE_INT_RGB)
-            image.createGraphics().let { g ->
-                try {
-                    g.color = Color.WHITE
-                    g.fillRect(0, 0, 360, 60)
-                    fixture.header.paint(g)
-                } finally {
-                    g.dispose()
+            val configuration = ScaledConfiguration(scale)
+
+            fun paint(): BufferedImage =
+                BufferedImage((360 * scale).toInt(), (60 * scale).toInt(), BufferedImage.TYPE_INT_RGB).also { image ->
+                    image.createGraphics().let { g ->
+                        try {
+                            g.color = Color.WHITE
+                            g.fillRect(0, 0, image.width, image.height)
+                            g.scale(scale, scale)
+                            fixture.header.paint(g)
+                        } finally {
+                            g.dispose()
+                        }
+                    }
                 }
+            fixture.update(configuration = configuration)
+            val full = paint()
+            fixture.header.update(fixture.view, fixture.cache, fixture.geometry, fixture.settings, METRICS, 360, 22, configuration)
+            val clipped = paint()
+            val x = (200 * scale).toInt()
+            for (y in (20 * scale).toInt() until (22 * scale).toInt()) {
+                assertEquals(full.getRGB(x, y), clipped.getRGB(x, y), "clipping must preserve shadow opacity")
             }
-            assertNotEquals(Color.WHITE.rgb, image.getRGB(200, 20))
-            assertEquals(Color.WHITE.rgb, image.getRGB(200, 22))
+            assertNotEquals(Color.WHITE.rgb, clipped.getRGB(x, (20 * scale).toInt()))
+            assertEquals(Color.WHITE.rgb, clipped.getRGB(x, ceil(22 * scale).toInt()))
         }
 
     private class Fixture {

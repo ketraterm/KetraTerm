@@ -27,9 +27,9 @@ import java.awt.Color
 import java.awt.Graphics2D
 import java.awt.GraphicsConfiguration
 import java.awt.Rectangle
-import java.awt.geom.AffineTransform
 import java.awt.image.BufferedImage
 import kotlin.math.ceil
+import kotlin.math.exp
 import kotlin.math.floor
 
 /** EDT-owned command context overlay. Metadata lookup and prompt raster preparation never run during painting. */
@@ -310,10 +310,6 @@ internal class StickyCommandHeader(
                 cursorBlinkVisible = false,
                 textBlinkVisible = true,
             )
-            val separator = settings.shellIntegrationPromptDividerColor ?: ((palette.defaultForeground and 0x00ffffff) or 0x30000000)
-            g.color = Color(separator, true)
-            g.transform = AffineTransform()
-            g.fillRect(0, headerPixelHeight - 1, pixelWidth, 1)
         } finally {
             g.dispose()
         }
@@ -323,7 +319,9 @@ internal class StickyCommandHeader(
             composite.drawImage(opaqueHeader, 0, 0, null)
             val shadowPixels = pixelHeight - headerPixelHeight
             for (row in 0 until shadowPixels) {
-                val alpha = if (shadowPixels == 1) SHADOW_ALPHA else SHADOW_ALPHA * (shadowPixels - row - 1) / (shadowPixels - 1)
+                // Sample a Gaussian in logical pixels; clipping must not squeeze the blur into the remaining space.
+                val distance = row / scaleY
+                val alpha = (SHADOW_ALPHA * exp(-0.5 * distance * distance / (SHADOW_SIGMA * SHADOW_SIGMA))).toInt()
                 composite.color = Color(0, 0, 0, alpha)
                 composite.fillRect(0, headerPixelHeight + row, pixelWidth, 1)
             }
@@ -345,7 +343,8 @@ internal class StickyCommandHeader(
     private companion object {
         fun buttonMask(button: Int): Int = if (button in 1 until Int.SIZE_BITS) 1 shl button else 0
 
-        const val SHADOW_HEIGHT = 4
-        const val SHADOW_ALPHA = 48
+        const val SHADOW_HEIGHT = 10
+        const val SHADOW_SIGMA = 3.0
+        const val SHADOW_ALPHA = 112
     }
 }
