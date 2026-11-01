@@ -27,7 +27,9 @@ import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.font.TerminalTextRunBuffer
 import io.github.ketraterm.ui.swing.render.primitives.TerminalCellPrimitivePainter
 import io.github.ketraterm.ui.swing.render.primitives.TerminalPlatformEmojiPainter
+import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import java.awt.Font
 import java.awt.Graphics2D
@@ -81,6 +83,8 @@ internal class TerminalTextPainter(
      */
     fun font(style: Int): Font = fontCache.font(style)
 
+    fun prepareColumns(columns: Int) = runStyle.prepareColumns(columns)
+
     /**
      * Paints all drawable text runs in [row].
      */
@@ -97,6 +101,9 @@ internal class TerminalTextPainter(
         hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
         followedHyperlinkId: Int = 0,
         selection: CellSelection? = null,
+        selectionStyle: SwingSelectionStyle = checkNotNull(settings).selectionStyle,
+        selectionBackground: Int = selectionStyle.background,
+        searchHighlights: TerminalSearchViewportHighlights? = null,
     ) {
         val bidi = cellGeometry.row(cache, row)
         runStyle.configureRow(
@@ -109,6 +116,10 @@ internal class TerminalTextPainter(
             followedHyperlinkId = followedHyperlinkId,
             selectionRange = selection?.packedColumnRange(row, cache, bidi) ?: CellSelection.NO_RANGE,
             selectionBidi = if (selection?.isBlock == true) bidi else null,
+            selectionStyle = selectionStyle,
+            selectionBackground = selectionBackground,
+            searchHighlights = searchHighlights,
+            columns = cache.columns,
         )
         val flagsPlane = cache.flags
         val codeWords = cache.codeWords

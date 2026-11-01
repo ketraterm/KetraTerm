@@ -51,10 +51,33 @@ public final class JavaConsumer {
     }
 
     public static SwingTerminalSearchColors lightSearchColors() {
-        var original = SwingTerminalSearchColors.create(b -> b.setForeground(Color.BLACK));
+        var original = SwingTerminalSearchColors.create(b -> {
+            b.setForeground(Color.BLACK);
+            b.setCounterErrorForeground(Color.RED);
+            b.setCounterNoMatchForeground(Color.ORANGE);
+            b.setTextFieldErrorBorder(Color.RED);
+            b.setTextFieldNoMatchBorder(Color.ORANGE);
+            b.setTextFieldSelectionBackground(Color.BLUE);
+            b.setTextFieldSelectionForeground(Color.WHITE);
+        });
         var light = original.copy(b -> b.setPanelBackground(Color.WHITE));
         if (!light.getForeground().equals(Color.BLACK) || original.getPanelBackground().equals(Color.WHITE)) {
             throw new AssertionError("Immutable host colors");
+        }
+        if (!light.getCounterErrorForeground().equals(Color.RED)
+            || !light.getCounterNoMatchForeground().equals(Color.ORANGE)
+            || !light.getTextFieldErrorBorder().equals(Color.RED)
+            || !light.getTextFieldNoMatchBorder().equals(Color.ORANGE)
+            || !light.getTextFieldSelectionBackground().equals(Color.BLUE)
+            || !light.getTextFieldSelectionForeground().equals(Color.WHITE)) {
+            throw new AssertionError("Search-control colors did not survive copying");
+        }
+        var reset = light.copy(b -> {
+            b.setTextFieldSelectionBackground(null);
+            b.setCounterErrorForeground(null);
+        });
+        if (reset.getTextFieldSelectionBackground() != null || reset.getCounterErrorForeground() != null) {
+            throw new AssertionError("Search-control colors could not be reset");
         }
         return light;
     }

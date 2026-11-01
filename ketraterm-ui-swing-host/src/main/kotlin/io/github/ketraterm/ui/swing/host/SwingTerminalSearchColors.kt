@@ -47,6 +47,12 @@ public class SwingTerminalSearchColors private constructor(
     /** Match count and search status text. */
     public val counterForeground: Color = Color(builder.counterForeground.rgb, true)
 
+    /** Failure status text, including invalid regex. Null inherits [counterForeground]. */
+    public val counterErrorForeground: Color? = builder.counterErrorForeground?.let { Color(it.rgb, true) }
+
+    /** Completed nonempty queries with zero matches. Null inherits [counterForeground]; pending searches use the normal color. */
+    public val counterNoMatchForeground: Color? = builder.counterNoMatchForeground?.let { Color(it.rgb, true) }
+
     /** Query field fill. */
     public val textFieldBackground: Color = Color(builder.textFieldBackground.rgb, true)
 
@@ -55,6 +61,18 @@ public class SwingTerminalSearchColors private constructor(
 
     /** Focused query field outline. */
     public val textFieldFocusBorder: Color = Color(builder.textFieldFocusBorder.rgb, true)
+
+    /** Failure outline, including invalid regex, before focus styling. Null retains normal/focused outlines. */
+    public val textFieldErrorBorder: Color? = builder.textFieldErrorBorder?.let { Color(it.rgb, true) }
+
+    /** Completed nonempty zero-match query outline, before focus styling. Null retains normal/focused outlines. */
+    public val textFieldNoMatchBorder: Color? = builder.textFieldNoMatchBorder?.let { Color(it.rgb, true) }
+
+    /** Query-field text selection fill. Null uses the Swing look-and-feel default sampled when colors are refreshed on the EDT. */
+    public val textFieldSelectionBackground: Color? = builder.textFieldSelectionBackground?.let { Color(it.rgb, true) }
+
+    /** Query-field selected text. Null uses the Swing look-and-feel default sampled when colors are refreshed on the EDT. */
+    public val textFieldSelectionForeground: Color? = builder.textFieldSelectionForeground?.let { Color(it.rgb, true) }
 
     /** Empty query placeholder. */
     public val textFieldPlaceholder: Color = Color(builder.textFieldPlaceholder.rgb, true)
@@ -99,6 +117,12 @@ public class SwingTerminalSearchColors private constructor(
         /** Draft value for [SwingTerminalSearchColors.counterForeground]. */
         public var counterForeground: Color = source?.counterForeground ?: Color(0xFFA4ABB6.toInt(), true)
 
+        /** Draft value for [SwingTerminalSearchColors.counterErrorForeground]. */
+        public var counterErrorForeground: Color? = source?.counterErrorForeground
+
+        /** Draft value for [SwingTerminalSearchColors.counterNoMatchForeground]. */
+        public var counterNoMatchForeground: Color? = source?.counterNoMatchForeground
+
         /** Draft value for [SwingTerminalSearchColors.textFieldBackground]. */
         public var textFieldBackground: Color = source?.textFieldBackground ?: Color(0xFF25282E.toInt(), true)
 
@@ -107,6 +131,18 @@ public class SwingTerminalSearchColors private constructor(
 
         /** Draft value for [SwingTerminalSearchColors.textFieldFocusBorder]. */
         public var textFieldFocusBorder: Color = source?.textFieldFocusBorder ?: Color(0xFF3574F0.toInt(), true)
+
+        /** Draft value for [SwingTerminalSearchColors.textFieldErrorBorder]. */
+        public var textFieldErrorBorder: Color? = source?.textFieldErrorBorder
+
+        /** Draft value for [SwingTerminalSearchColors.textFieldNoMatchBorder]. */
+        public var textFieldNoMatchBorder: Color? = source?.textFieldNoMatchBorder
+
+        /** Draft value for [SwingTerminalSearchColors.textFieldSelectionBackground]. */
+        public var textFieldSelectionBackground: Color? = source?.textFieldSelectionBackground
+
+        /** Draft value for [SwingTerminalSearchColors.textFieldSelectionForeground]. */
+        public var textFieldSelectionForeground: Color? = source?.textFieldSelectionForeground
 
         /** Draft value for [SwingTerminalSearchColors.textFieldPlaceholder]. */
         public var textFieldPlaceholder: Color = source?.textFieldPlaceholder ?: Color(0xFF8B929D.toInt(), true)

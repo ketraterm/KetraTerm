@@ -60,7 +60,7 @@ internal class TerminalShellIntegrationDecorationPainter(
         val dotX = centerX - diameter / 2
         val dotY = y + (metrics.cellHeight - diameter) / 2
         val failed = decorations.commandLifecycleAt(row) == TerminalShellIntegrationCommandLifecycle.FAILED
-        val markerColor =
+        val normalMarkerColor =
             if (failed) {
                 settings.shellIntegrationFailedPromptDotColor
             } else {
@@ -70,27 +70,37 @@ internal class TerminalShellIntegrationDecorationPainter(
                     settings.shellIntegrationPromptDotColor
                 }
             }
-        if (hovered) {
-            val haloDiameter = minOf(gutterWidth, metrics.cellHeight)
-            val haloX = centerX - haloDiameter / 2
-            val haloY = y + (metrics.cellHeight - haloDiameter) / 2
-            g.color = colorCache.color(withAlpha(markerColor, HOVER_HALO_ALPHA))
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g.fillOval(haloX, haloY, haloDiameter, haloDiameter)
-        }
-        g.color =
-            colorCache.color(markerColor)
+        val hoverMarkerColor =
+            if (failed) settings.shellIntegrationFailedPromptDotHoverColor else settings.shellIntegrationPromptDotHoverColor
+        val markerColor = if (hovered) hoverMarkerColor ?: normalMarkerColor else normalMarkerColor
+        val previousAntialiasing = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         try {
-            g.fillOval(dotX, dotY, diameter, diameter)
+            if (hovered) {
+                val haloOverride =
+                    if (failed) settings.shellIntegrationFailedPromptDotHoverHaloColor else settings.shellIntegrationPromptDotHoverHaloColor
+                val haloColor = haloOverride ?: withAlpha(markerColor, HOVER_HALO_ALPHA)
+                if (haloColor ushr 24 != 0) {
+                    val haloDiameter = minOf(gutterWidth, metrics.cellHeight)
+                    val haloX = centerX - haloDiameter / 2
+                    val haloY = y + (metrics.cellHeight - haloDiameter) / 2
+                    g.color = colorCache.color(haloColor)
+                    g.fillOval(haloX, haloY, haloDiameter, haloDiameter)
+                }
+            }
+            if (markerColor ushr 24 != 0) {
+                g.color = colorCache.color(markerColor)
+                g.fillOval(dotX, dotY, diameter, diameter)
+            }
         } finally {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF)
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, previousAntialiasing ?: RenderingHints.VALUE_ANTIALIAS_DEFAULT)
         }
     }
 
     /** Paints a rule centered in the visual band preceding the translated text row. */
     fun paintDivider(
         g: Graphics2D,
+        settings: SwingSettings,
         metrics: SwingMetrics,
         row: Int,
         contentWidth: Int,
@@ -98,8 +108,10 @@ internal class TerminalShellIntegrationDecorationPainter(
         palette: TerminalColorPalette,
     ) {
         if (contentWidth <= 0) return
-        val alpha = if (hovered) 0x70 else 0x30
-        g.color = colorCache.color(withAlpha(palette.defaultForeground, alpha))
+        val override = if (hovered) settings.shellIntegrationPromptDividerHoverColor else settings.shellIntegrationPromptDividerColor
+        val color = override ?: withAlpha(palette.defaultForeground, if (hovered) 0x70 else 0x30)
+        if (color ushr 24 == 0) return
+        g.color = colorCache.color(color)
         val thickness = minOf(2, metrics.cellHeight)
         val y = row * metrics.cellHeight - (metrics.cellHeight + thickness + 1) / 2
         g.fillRect(0, y, contentWidth, thickness)

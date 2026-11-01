@@ -15,16 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
-import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.CellSelection
-import io.github.ketraterm.ui.swing.render.SwingColors
+import io.github.ketraterm.ui.swing.render.SelectionColors
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
 import io.github.ketraterm.ui.swing.render.visualCellRangeStart
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import java.awt.Graphics2D
 
 /**
@@ -39,9 +39,10 @@ internal class TerminalSelectionPainter(
         metrics: SwingMetrics,
         row: Int,
         selection: CellSelection?,
-        selectionBackground: Int,
+        style: SwingSelectionStyle,
         palette: TerminalColorPalette,
         bidi: TerminalBidiLayout.Row? = null,
+        selectionBackground: Int = style.background,
     ) {
         if (selection == null) return
 
@@ -51,84 +52,38 @@ internal class TerminalSelectionPainter(
         val startColumn = CellSelection.rangeStart(range)
         val endColumn = CellSelection.rangeEnd(range)
 
-        if (palette.colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND != 0) {
-            val dynamic = palette.colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND != 0
-            val rowOffset = cache.rowOffset(row)
-            forEachVisualCellSpan(if (selection.isBlock) null else bidi, startColumn, endColumn) { visualStart, visualEnd ->
-                var column = visualStart
-                while (column < visualEnd) {
-                    val color =
-                        if (dynamic) {
-                            cellForeground(palette, cache, rowOffset, bidi?.logicalColumn(column) ?: column)
-                        } else {
-                            palette.selectionBackground
-                        }
-                    val first = column++
-                    if (dynamic) {
-                        while (column < visualEnd &&
-                            cellForeground(palette, cache, rowOffset, bidi?.logicalColumn(column) ?: column) == color
-                        ) {
-                            column++
-                        }
-                    } else {
-                        column = visualEnd
-                    }
-                    g.color = colorCache.color(color)
-                    g.fillRect(
-                        first * metrics.cellWidth,
-                        row * metrics.cellHeight,
-                        (column - first) * metrics.cellWidth,
-                        metrics.cellHeight,
-                    )
-                }
-            }
-            return
-        }
-
-        val baseSelBg =
-            if (selectionBackground == 0x66FFFFFF) {
-                val raw = palette.selectionBackground
-                val alpha = (raw ushr 24) and 0xFF
-                if (alpha == 0xFF) {
-                    (raw and 0x00FFFFFF) or 0x66000000
-                } else {
-                    raw
-                }
-            } else {
-                selectionBackground
-            }
-
-        var selColor = baseSelBg
-        val bg = palette.defaultBackground
-        val blended = SwingColors.blendOver(selColor, bg)
-        if (SwingColors.contrastRatio(blended, bg) < 1.15) {
-            selColor =
-                if (SwingColors.relativeLuminance(bg) < 0.5) {
-                    0x66FFFFFF
-                } else {
-                    0x33000000
-                }
-        }
-
-        g.color = colorCache.color(selColor)
+        val dynamic = SelectionColors.dynamicBackground(palette, style)
+        val fixed = if (dynamic) 0 else SelectionColors.background(palette, style, 0L, selectionBackground)
+        val rowOffset = cache.rowOffset(row)
         // Block ranges are already visual; only linear selections need row reordering.
         forEachVisualCellSpan(if (selection.isBlock) null else bidi, startColumn, endColumn) { visualStart, visualEnd ->
-            g.fillRect(
-                visualStart * metrics.cellWidth,
-                row * metrics.cellHeight,
-                (visualEnd - visualStart) * metrics.cellWidth,
-                metrics.cellHeight,
-            )
+            var column = visualStart
+            while (column < visualEnd) {
+                val color = if (dynamic) cellBackground(palette, style, cache, rowOffset, bidi?.logicalColumn(column) ?: column) else fixed
+                val first = column++
+                if (dynamic) {
+                    while (column < visualEnd &&
+                        cellBackground(palette, style, cache, rowOffset, bidi?.logicalColumn(column) ?: column) == color
+                    ) {
+                        column++
+                    }
+                } else {
+                    column = visualEnd
+                }
+                g.color = colorCache.color(color)
+                g.fillRect(first * metrics.cellWidth, row * metrics.cellHeight, (column - first) * metrics.cellWidth, metrics.cellHeight)
+            }
         }
     }
 
-    private fun cellForeground(
+    private fun cellBackground(
         palette: TerminalColorPalette,
+        style: SwingSelectionStyle,
         cache: TerminalRenderCache,
         rowOffset: Int,
         column: Int,
     ): Int {
         val leadingColumn = visualCellRangeStart(cache.flags[rowOffset + column], column)
-        return palette.foreground(cache.attrWords[rowOffset + leadingColumn])
+        return SelectionColors.background(palette, style, cache.attrWords[rowOffset + leadingColumn])
     }
 }

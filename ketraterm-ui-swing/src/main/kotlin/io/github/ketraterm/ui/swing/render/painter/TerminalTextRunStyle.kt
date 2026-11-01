@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
-import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderUnderline
@@ -25,6 +24,9 @@ import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.*
+import io.github.ketraterm.ui.swing.render.cache.TextContrastCache
+import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 
 /**
@@ -72,6 +74,22 @@ internal class TerminalTextRunStyle {
     private var selectionStart = 0
     private var selectionEnd = 0
     private var selectionBidi: TerminalBidiLayout.Row? = null
+    private var selectionStyle = SwingSelectionStyle()
+    private var selectionBackground = selectionStyle.background
+    private val contrast = TextContrastCache()
+    private var faintOpacity = 0.5
+    private var searchBackgrounds = IntArray(0)
+    private var searchForegrounds = IntArray(0)
+    private var hasSearchBackgrounds = false
+    private var hasSearchForegrounds = false
+
+    /** Reserve row scratch when a frame is installed, before the component paints it. */
+    fun prepareColumns(columns: Int) {
+        if (searchBackgrounds.size < columns) {
+            searchBackgrounds = IntArray(columns)
+            searchForegrounds = IntArray(columns)
+        }
+    }
 
     fun configureRow(
         textBlinkVisible: Boolean,
@@ -83,6 +101,10 @@ internal class TerminalTextRunStyle {
         row: Int = 0,
         selectionRange: Long = CellSelection.NO_RANGE,
         selectionBidi: TerminalBidiLayout.Row? = null,
+        selectionStyle: SwingSelectionStyle = settings.selectionStyle,
+        selectionBackground: Int = selectionStyle.background,
+        searchHighlights: TerminalSearchViewportHighlights? = null,
+        columns: Int = 0,
     ) {
         this.textBlinkVisible = textBlinkVisible
         this.hyperlinkIds = hyperlinkIds
@@ -96,6 +118,32 @@ internal class TerminalTextRunStyle {
         selectionStart = if (selectionRange == CellSelection.NO_RANGE) 0 else CellSelection.rangeStart(selectionRange)
         selectionEnd = if (selectionRange == CellSelection.NO_RANGE) 0 else CellSelection.rangeEnd(selectionRange)
         this.selectionBidi = selectionBidi
+        this.selectionStyle = selectionStyle
+        this.selectionBackground = selectionBackground
+        faintOpacity = settings.faintOpacity
+        contrast.configure(settings.minimumContrastRatio)
+        val segmentCount = searchHighlights?.segmentCountForRow(row) ?: 0
+        hasSearchBackgrounds = segmentCount > 0 && columns > 0
+        hasSearchForegrounds = hasSearchBackgrounds &&
+            (settings.searchMatchStyle.foreground != null || settings.searchActiveMatchStyle.foreground != null)
+        if (hasSearchBackgrounds && searchHighlights != null) {
+            prepareColumns(columns)
+            searchBackgrounds.fill(0, 0, columns)
+            if (hasSearchForegrounds) searchForegrounds.fill(0, 0, columns)
+            val first = searchHighlights.firstSegmentForRow(row)
+            for (segment in first until first + segmentCount) {
+                val style = if (searchHighlights.isActive(segment)) settings.searchActiveMatchStyle else settings.searchMatchStyle
+                val color = style.background
+                val foreground = style.foreground ?: 0
+                var column = searchHighlights.startColumn(segment).coerceIn(0, columns)
+                val end = searchHighlights.endColumn(segment).coerceIn(0, columns)
+                while (column < end) {
+                    searchBackgrounds[column] = SwingColors.blendOver(color, searchBackgrounds[column])
+                    if (hasSearchForegrounds) searchForegrounds[column] = foreground
+                    column++
+                }
+            }
+        }
     }
 
     fun begin(
@@ -151,17 +199,37 @@ internal class TerminalTextRunStyle {
         codePoint: Int,
         column: Int,
     ): Int {
-        if (palette.colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND != 0) {
-            val selectionColumn = selectionBidi?.visualColumn(column) ?: column
-            if (selectionColumn in selectionStart..<selectionEnd) {
-                return if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND != 0) {
-                    palette.background(attr)
-                } else {
-                    palette.selectionForeground
-                }
-            }
+        val selectionColumn = selectionBidi?.visualColumn(column) ?: column
+        val selected = selectionColumn in selectionStart..<selectionEnd
+        var background = palette.background(attr)
+        val linkBackground = hyperlinkStyle?.backgroundArgb
+        if (linkBackground != null && !isTextHidden(attr, textBlinkVisible)) background = SwingColors.blendOver(linkBackground, background)
+        if (hasSearchBackgrounds) background = SwingColors.blendOver(searchBackgrounds[column], background)
+        if (selected) {
+            background =
+                SwingColors.blendOver(SelectionColors.background(palette, selectionStyle, attr, selectionBackground), background)
         }
-        return hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(palette, attr, codePoint)
+        if (TerminalRenderAttrs.isInvisible(attr)) return background
+        val searchForeground = if (hasSearchForegrounds) searchForegrounds[column] else 0
+        val inherited =
+            if (searchForeground != 0) {
+                searchForeground
+            } else {
+                hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(
+                    palette,
+                    attr,
+                    codePoint,
+                    faintOpacity = faintOpacity,
+                    background = background,
+                )
+            }
+        val foreground =
+            if (selected) {
+                SelectionColors.foreground(palette, selectionStyle, attr, inherited)
+            } else {
+                inherited
+            }
+        return if (SwingColors.isGraphicCodePoint(codePoint)) foreground else contrast.resolve(foreground, background)
     }
 
     private fun decorationKey(

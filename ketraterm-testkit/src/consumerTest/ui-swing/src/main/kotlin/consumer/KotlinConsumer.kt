@@ -38,6 +38,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingPasteSource
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
@@ -80,9 +82,46 @@ fun main() =
                 it.middleClickPaste = true
                 it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
                 it.columnSpacing = -1
+                it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
+                it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
+                it.searchMatchStyle = SwingSearchMatchStyle(background = 0x554B6EAF, border = 0xFF4B6EAF.toInt())
+                it.searchActiveMatchStyle =
+                    SwingSearchMatchStyle(
+                        background = 0xFFFFC857.toInt(),
+                        foreground = 0xFF161616.toInt(),
+                        border = 0xFFFFFFFF.toInt(),
+                    )
+                it.minimumContrastRatio = 4.5
+                it.faintOpacity = 0.75
+                it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+                it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+                it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+                it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+                it.shellIntegrationPromptDividerColor = 0x304B6EAF
+                it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
             }
         check(interactionSettings == interactionSettings.copy {})
+        check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
+        check(SwingSettings().minimumContrastRatio == 3.0)
+        check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
+        check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
+        check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)
+        check(interactionSettings.searchMatchBackground == interactionSettings.searchMatchStyle.background)
+        check(interactionSettings.searchActiveMatchStyle.foreground == 0xFF161616.toInt())
+        check(
+            interactionSettings.copy { it.searchMatchBackground = 0 }.searchMatchStyle ==
+                interactionSettings.searchMatchStyle.copy(background = 0),
+        )
         check(interactionSettings.hashCode() == interactionSettings.copy {}.hashCode())
+        val promptColors = interactionSettings.toBuilder().build()
+        check(promptColors.shellIntegrationPromptDotHoverColor == 0xFFFFFFFF.toInt())
+        check(promptColors.shellIntegrationFailedPromptDotHoverColor == 0xFFFF8A8A.toInt())
+        check(promptColors.shellIntegrationPromptDotHoverHaloColor == 0x404B6EAF)
+        check(promptColors.shellIntegrationFailedPromptDotHoverHaloColor == 0x40E74856)
+        check(promptColors.shellIntegrationPromptDividerColor == 0x304B6EAF)
+        check(promptColors.shellIntegrationPromptDividerHoverColor == 0xFF4B6EAF.toInt())
+        check(promptColors.copy { it.shellIntegrationPromptDividerColor = null }.shellIntegrationPromptDividerColor == null)
+        check(promptColors.copy { it.shellIntegrationPromptDotHoverHaloColor = 0 }.shellIntegrationPromptDotHoverHaloColor == 0)
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)
         val arrowSettings = interactionSettings.copy { it.alternateScreenWheelToArrowEnabled = true }

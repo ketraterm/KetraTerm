@@ -460,6 +460,7 @@ public class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (settings.inactiveSelectionStyle != null) repaint()
                         if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
                         if (focused) reconcileHyperlinksOnEdt() else clearPointerHover()
                     }
@@ -3333,7 +3334,7 @@ public class SwingTerminal
                         renderCache.updateFrom(published)
                     } ?: return
                 }
-                painter.prepareImages(renderCache)
+                painter.prepareFrame(renderCache)
                 selectionController.updateFrame(renderCache)
                 hyperlinkDiscoveryController.scheduleForFrame()
                 selectionController.publishChange()

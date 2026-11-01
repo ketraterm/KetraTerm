@@ -251,7 +251,9 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors {
 	public final fun getButtonPressedBackground ()Ljava/awt/Color;
 	public final fun getButtonSelectedBackground ()Ljava/awt/Color;
 	public final fun getButtonSelectedForeground ()Ljava/awt/Color;
+	public final fun getCounterErrorForeground ()Ljava/awt/Color;
 	public final fun getCounterForeground ()Ljava/awt/Color;
+	public final fun getCounterNoMatchForeground ()Ljava/awt/Color;
 	public final fun getForeground ()Ljava/awt/Color;
 	public final fun getPanelBackground ()Ljava/awt/Color;
 	public final fun getPanelBorder ()Ljava/awt/Color;
@@ -259,8 +261,12 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors {
 	public final fun getSearchIconForeground ()Ljava/awt/Color;
 	public final fun getTextFieldBackground ()Ljava/awt/Color;
 	public final fun getTextFieldBorder ()Ljava/awt/Color;
+	public final fun getTextFieldErrorBorder ()Ljava/awt/Color;
 	public final fun getTextFieldFocusBorder ()Ljava/awt/Color;
+	public final fun getTextFieldNoMatchBorder ()Ljava/awt/Color;
 	public final fun getTextFieldPlaceholder ()Ljava/awt/Color;
+	public final fun getTextFieldSelectionBackground ()Ljava/awt/Color;
+	public final fun getTextFieldSelectionForeground ()Ljava/awt/Color;
 	public final fun toBuilder ()Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Builder;
 }
 
@@ -270,7 +276,9 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$B
 	public final fun getButtonPressedBackground ()Ljava/awt/Color;
 	public final fun getButtonSelectedBackground ()Ljava/awt/Color;
 	public final fun getButtonSelectedForeground ()Ljava/awt/Color;
+	public final fun getCounterErrorForeground ()Ljava/awt/Color;
 	public final fun getCounterForeground ()Ljava/awt/Color;
+	public final fun getCounterNoMatchForeground ()Ljava/awt/Color;
 	public final fun getForeground ()Ljava/awt/Color;
 	public final fun getPanelBackground ()Ljava/awt/Color;
 	public final fun getPanelBorder ()Ljava/awt/Color;
@@ -278,13 +286,19 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$B
 	public final fun getSearchIconForeground ()Ljava/awt/Color;
 	public final fun getTextFieldBackground ()Ljava/awt/Color;
 	public final fun getTextFieldBorder ()Ljava/awt/Color;
+	public final fun getTextFieldErrorBorder ()Ljava/awt/Color;
 	public final fun getTextFieldFocusBorder ()Ljava/awt/Color;
+	public final fun getTextFieldNoMatchBorder ()Ljava/awt/Color;
 	public final fun getTextFieldPlaceholder ()Ljava/awt/Color;
+	public final fun getTextFieldSelectionBackground ()Ljava/awt/Color;
+	public final fun getTextFieldSelectionForeground ()Ljava/awt/Color;
 	public final fun setButtonHoverBackground (Ljava/awt/Color;)V
 	public final fun setButtonPressedBackground (Ljava/awt/Color;)V
 	public final fun setButtonSelectedBackground (Ljava/awt/Color;)V
 	public final fun setButtonSelectedForeground (Ljava/awt/Color;)V
+	public final fun setCounterErrorForeground (Ljava/awt/Color;)V
 	public final fun setCounterForeground (Ljava/awt/Color;)V
+	public final fun setCounterNoMatchForeground (Ljava/awt/Color;)V
 	public final fun setForeground (Ljava/awt/Color;)V
 	public final fun setPanelBackground (Ljava/awt/Color;)V
 	public final fun setPanelBorder (Ljava/awt/Color;)V
@@ -292,8 +306,12 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$B
 	public final fun setSearchIconForeground (Ljava/awt/Color;)V
 	public final fun setTextFieldBackground (Ljava/awt/Color;)V
 	public final fun setTextFieldBorder (Ljava/awt/Color;)V
+	public final fun setTextFieldErrorBorder (Ljava/awt/Color;)V
 	public final fun setTextFieldFocusBorder (Ljava/awt/Color;)V
+	public final fun setTextFieldNoMatchBorder (Ljava/awt/Color;)V
 	public final fun setTextFieldPlaceholder (Ljava/awt/Color;)V
+	public final fun setTextFieldSelectionBackground (Ljava/awt/Color;)V
+	public final fun setTextFieldSelectionForeground (Ljava/awt/Color;)V
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Companion {

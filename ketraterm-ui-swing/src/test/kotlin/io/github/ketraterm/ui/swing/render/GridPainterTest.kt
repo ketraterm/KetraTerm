@@ -474,7 +474,7 @@ class GridPainterTest {
     }
 
     @Test
-    fun `selection adjusts low contrast background to be visible`() {
+    fun `explicit selection background is never silently substituted`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
@@ -507,7 +507,7 @@ class GridPainterTest {
         g.dispose()
 
         val rgb = image.getRGB(1, 1)
-        assertNotEquals(WHITE, rgb)
+        assertEquals(WHITE, rgb, "Translucent white over white must remain white")
     }
 
     @Test

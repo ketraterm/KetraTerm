@@ -18,6 +18,8 @@ later.
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
+import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
@@ -37,6 +39,22 @@ fun createUnboundTerminalView(
         it.font = Font("Cascadia Mono", Font.PLAIN, 15)
         it.columns = 80
         it.rows = 24
+        it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
+        it.inactiveSelectionStyle = SwingSelectionStyle(background = 0x404B6EAF)
+        it.searchMatchStyle = SwingSearchMatchStyle(background = 0x554B6EAF, border = 0xFF4B6EAF.toInt())
+        it.searchActiveMatchStyle = SwingSearchMatchStyle(
+            background = 0xFFFFC857.toInt(),
+            foreground = 0xFF161616.toInt(),
+            border = 0xFFFFFFFF.toInt(),
+        )
+        it.minimumContrastRatio = 4.5 // Default 3.0; set 1.0 to preserve exact text colors.
+        it.faintOpacity = 0.5
+        it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+        it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+        it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+        it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+        it.shellIntegrationPromptDividerColor = 0x304B6EAF
+        it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
     }
 
     return SwingTerminal(settingsProvider = { settings }).apply {
@@ -46,6 +64,8 @@ fun createUnboundTerminalView(
 ```
 
 The font name is a host choice; use a font available in your environment.
+Selection, search and prompt decoration colors, terminal color precedence, and migration notes are explained in
+[Color customization](docs/color-customization.md).
 `columns` and `rows` set the preferred size. Once laid out, the visible cell
 dimensions determine the live session's grid and connector size. Settings and
 session geometry require at least two columns and one row. A narrower component

@@ -189,7 +189,9 @@ class TerminalBidiRenderingTest {
                 metrics,
                 row = 0,
                 selection,
-                selectionBackground = TEST_WHITE,
+                style =
+                    io.github.ketraterm.ui.swing.settings
+                        .SwingSelectionStyle(TEST_WHITE),
                 palette = settings.palette,
                 bidi = TerminalBidiLayout().row(cache, 0),
             )

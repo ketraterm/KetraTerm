@@ -59,7 +59,10 @@ internal class GridPainter(
     private val clipScratch = Rectangle()
     private val graphicsPainter = GraphicsPainter()
 
-    fun prepareImages(cache: TerminalRenderCache) = graphicsPainter.prepare(cache.images)
+    fun prepareFrame(cache: TerminalRenderCache) {
+        graphicsPainter.prepare(cache.images)
+        textPainter.prepareColumns(cache.columns)
+    }
 
     fun clearImages() = graphicsPainter.clear()
 
@@ -99,6 +102,13 @@ internal class GridPainter(
         followedHyperlinkId: Int = 0,
     ) {
         val palette = cache.palette
+        val selectionStyle = if (terminalFocused) settings.selectionStyle else settings.inactiveSelectionStyle ?: settings.selectionStyle
+        val selectionBackground =
+            if (selection != null && !settings.selectionStyleConfigured && (terminalFocused || settings.inactiveSelectionStyle == null)) {
+                SelectionColors.defaultBackground(palette)
+            } else {
+                selectionStyle.background
+            }
         chrome.updateLayout(settings, metrics, width, height, cache.columns, cache.rows)
         textPainter.updateSettings(settings)
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
@@ -169,6 +179,7 @@ internal class GridPainter(
                     if (geometry?.hasDividerBefore(row) == true) {
                         shellIntegrationDecorationPainter.paintDivider(
                             g,
+                            settings,
                             metrics,
                             row,
                             contentWidth,
@@ -207,11 +218,11 @@ internal class GridPainter(
                         metrics = metrics,
                         row = row,
                         highlights = searchHighlights,
-                        matchBackground = settings.searchMatchBackground,
-                        activeMatchBackground = settings.searchActiveMatchBackground,
+                        matchStyle = settings.searchMatchStyle,
+                        activeMatchStyle = settings.searchActiveMatchStyle,
                         bidi = bidi,
                     )
-                    selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground, palette, bidi)
+                    selectionPainter.paint(g, cache, metrics, row, selection, selectionStyle, palette, bidi, selectionBackground)
                     textPainter.paintRow(
                         g = g,
                         cache = cache,
@@ -225,6 +236,9 @@ internal class GridPainter(
                         hyperlinkPresentations = hyperlinkPresentations,
                         followedHyperlinkId = followedHyperlinkId,
                         selection = selection,
+                        selectionStyle = selectionStyle,
+                        selectionBackground = selectionBackground,
+                        searchHighlights = searchHighlights,
                     )
                 } finally {
                     if (rowOffset != 0) g.translate(0, -rowOffset)

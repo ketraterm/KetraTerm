@@ -130,9 +130,47 @@ public class SwingSettings private constructor(
     public val textAntialiasing: Any = builder.textAntialiasing
     public val fractionalMetrics: Any = builder.fractionalMetrics
     public val hyperlinkActivationForeground: Int = builder.hyperlinkActivationForeground
-    public val selectionBackground: Int = builder.selectionBackground
-    public val searchMatchBackground: Int = builder.searchMatchBackground
-    public val searchActiveMatchBackground: Int = builder.searchActiveMatchBackground
+
+    /** Focused selection colors. An untouched default uses the palette-aware selection fill. Permitted terminal overrides take precedence per role. */
+    public val selectionStyle: SwingSelectionStyle = builder.selectionStyle
+
+    internal val selectionStyleConfigured: Boolean = builder.selectionStyleConfigured
+
+    /** Unfocused selection colors; null inherits [selectionStyle], including text preservation. */
+    public val inactiveSelectionStyle: SwingSelectionStyle? = builder.inactiveSelectionStyle
+
+    /**
+     * Minimum text contrast against the composed cell background, finite and in 1..21.
+     * The default 3 preserves the prior adjustment. Set 1 to disable it. Higher values adjust text toward black/white,
+     * using the best achievable contrast when the requested ratio is impossible.
+     * Concealed text, graphical shading, images, and intrinsic emoji colors are preserved.
+     */
+    public val minimumContrastRatio: Double = builder.minimumContrastRatio
+
+    /**
+     * Faint text intensity, finite and in 0..1. Default 0.5 blends text halfway toward its
+     * displayed background; 1 disables faintness. Explicit link/search/selection text colors replace
+     * faint text. Enabled minimum contrast is applied afterwards and can increase visibility.
+     */
+    public val faintOpacity: Double = if (builder.faintOpacity == 0.0) 0.0 else builder.faintOpacity
+
+    /** Convenience access to [selectionStyle]'s background ARGB value; the untouched default is palette-aware when painted. */
+    public val selectionBackground: Int get() = selectionStyle.background
+
+    /** Normal search matches. By default only the existing translucent yellow fill is applied. */
+    public val searchMatchStyle: SwingSearchMatchStyle = builder.searchMatchStyle
+
+    /**
+     * Active search result, independent of [searchMatchStyle]. Null text/border colors inherit
+     * underlying text/omit the border; they do not inherit the normal match's overrides.
+     */
+    public val searchActiveMatchStyle: SwingSearchMatchStyle = builder.searchActiveMatchStyle
+
+    /** Convenience access to [searchMatchStyle]'s background ARGB value. */
+    public val searchMatchBackground: Int get() = searchMatchStyle.background
+
+    /** Convenience access to [searchActiveMatchStyle]'s background ARGB value. */
+    public val searchActiveMatchBackground: Int get() = searchActiveMatchStyle.background
     public val visualBellEnabled: Boolean = builder.visualBellEnabled
     public val visualBellColor: Int = builder.visualBellColor
     public val visualBellDurationMillis: Int = builder.visualBellDurationMillis
@@ -148,6 +186,37 @@ public class SwingSettings private constructor(
     public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
     public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
     public val shellIntegrationFailedPromptDotColor: Int = builder.shellIntegrationFailedPromptDotColor
+
+    /** Hovered normal prompt dot ARGB, or null to retain its normal color. Gutter mode only. */
+    public val shellIntegrationPromptDotHoverColor: Int? = builder.shellIntegrationPromptDotHoverColor
+
+    /** Hovered failed-command prompt dot ARGB, or null to retain its failed color. Gutter mode only. */
+    public val shellIntegrationFailedPromptDotHoverColor: Int? = builder.shellIntegrationFailedPromptDotHoverColor
+
+    /**
+     * Hover halo behind a normal prompt dot, as exact ARGB. Null uses the hovered dot's RGB
+     * with alpha 0x52. Zero alpha suppresses the halo. Gutter mode only.
+     */
+    public val shellIntegrationPromptDotHoverHaloColor: Int? = builder.shellIntegrationPromptDotHoverHaloColor
+
+    /**
+     * Hover halo behind a failed-command prompt dot, as exact ARGB. Null uses the hovered dot's
+     * RGB with alpha 0x52. Independent of the normal halo and failed-command rail. Gutter mode only.
+     */
+    public val shellIntegrationFailedPromptDotHoverHaloColor: Int? = builder.shellIntegrationFailedPromptDotHoverHaloColor
+
+    /**
+     * Prompt divider rule ARGB, or null to use the terminal default foreground RGB with alpha
+     * 0x30. Zero alpha hides the rule without removing its reserved band. Divider mode only.
+     */
+    public val shellIntegrationPromptDividerColor: Int? = builder.shellIntegrationPromptDividerColor
+
+    /**
+     * Hovered prompt divider rule ARGB. Null independently uses the terminal default foreground
+     * RGB with alpha 0x70; it does not inherit [shellIntegrationPromptDividerColor]. Divider mode only.
+     */
+    public val shellIntegrationPromptDividerHoverColor: Int? = builder.shellIntegrationPromptDividerHoverColor
+
     public val shellIntegrationPromptDotDiameter: Int = builder.shellIntegrationPromptDotDiameter
     public val shellIntegrationDecorationGutterWidth: Int = builder.shellIntegrationDecorationGutterWidth
     public val shellIntegrationFailedCommandRailsVisible: Boolean = builder.shellIntegrationFailedCommandRailsVisible
@@ -297,13 +366,58 @@ public class SwingSettings private constructor(
         public var hyperlinkActivationForeground: Int = source?.hyperlinkActivationForeground ?: DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND
 
         /** Draft value for [SwingSettings.selectionBackground]; validated when [build] is called. */
-        public var selectionBackground: Int = source?.selectionBackground ?: DEFAULT_SELECTION_BACKGROUND
+        public var selectionBackground: Int
+            get() = selectionStyle.background
+            set(value) {
+                selectionStyle = selectionStyle.copy(background = value)
+            }
+
+        internal var selectionStyleConfigured: Boolean = source?.selectionStyleConfigured ?: false
+            private set
+
+        /** Draft value for [SwingSettings.selectionStyle]. Assigning it makes its background exact. */
+        public var selectionStyle: SwingSelectionStyle = source?.selectionStyle ?: SwingSelectionStyle()
+            set(value) {
+                field = value
+                selectionStyleConfigured = true
+            }
+
+        /** Restores the palette-aware focused selection default; leaves [inactiveSelectionStyle] unchanged. */
+        public fun resetSelectionStyle() {
+            selectionStyle = SwingSelectionStyle()
+            selectionStyleConfigured = false
+        }
+
+        /** Draft value for [SwingSettings.inactiveSelectionStyle]. */
+        public var inactiveSelectionStyle: SwingSelectionStyle? = source?.inactiveSelectionStyle
+
+        /** Draft value for [SwingSettings.minimumContrastRatio]. */
+        public var minimumContrastRatio: Double = source?.minimumContrastRatio ?: 3.0
+
+        /** Draft value for [SwingSettings.faintOpacity]. */
+        public var faintOpacity: Double = source?.faintOpacity ?: 0.5
 
         /** Draft value for [SwingSettings.searchMatchBackground]; validated when [build] is called. */
-        public var searchMatchBackground: Int = source?.searchMatchBackground ?: DEFAULT_SEARCH_MATCH_BACKGROUND
+        public var searchMatchBackground: Int
+            get() = searchMatchStyle.background
+            set(value) {
+                searchMatchStyle = searchMatchStyle.copy(background = value)
+            }
 
         /** Draft value for [SwingSettings.searchActiveMatchBackground]; validated when [build] is called. */
-        public var searchActiveMatchBackground: Int = source?.searchActiveMatchBackground ?: DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND
+        public var searchActiveMatchBackground: Int
+            get() = searchActiveMatchStyle.background
+            set(value) {
+                searchActiveMatchStyle = searchActiveMatchStyle.copy(background = value)
+            }
+
+        /** Draft value for [SwingSettings.searchMatchStyle]. */
+        public var searchMatchStyle: SwingSearchMatchStyle =
+            source?.searchMatchStyle ?: SwingSearchMatchStyle(DEFAULT_SEARCH_MATCH_BACKGROUND)
+
+        /** Draft value for [SwingSettings.searchActiveMatchStyle]. */
+        public var searchActiveMatchStyle: SwingSearchMatchStyle =
+            source?.searchActiveMatchStyle ?: SwingSearchMatchStyle(DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND)
 
         /** Draft value for [SwingSettings.visualBellEnabled]; validated when [build] is called. */
         public var visualBellEnabled: Boolean = source?.visualBellEnabled ?: true
@@ -330,6 +444,24 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotColor]; validated when [build] is called. */
         public var shellIntegrationFailedPromptDotColor: Int =
             source?.shellIntegrationFailedPromptDotColor ?: DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotHoverColor]. */
+        public var shellIntegrationPromptDotHoverColor: Int? = source?.shellIntegrationPromptDotHoverColor
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotHoverColor]. */
+        public var shellIntegrationFailedPromptDotHoverColor: Int? = source?.shellIntegrationFailedPromptDotHoverColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotHoverHaloColor]. */
+        public var shellIntegrationPromptDotHoverHaloColor: Int? = source?.shellIntegrationPromptDotHoverHaloColor
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotHoverHaloColor]. */
+        public var shellIntegrationFailedPromptDotHoverHaloColor: Int? = source?.shellIntegrationFailedPromptDotHoverHaloColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDividerColor]. */
+        public var shellIntegrationPromptDividerColor: Int? = source?.shellIntegrationPromptDividerColor
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDividerHoverColor]. */
+        public var shellIntegrationPromptDividerHoverColor: Int? = source?.shellIntegrationPromptDividerHoverColor
 
         /** Draft value for [SwingSettings.shellIntegrationPromptDotDiameter]; validated when [build] is called. */
         public var shellIntegrationPromptDotDiameter: Int = source?.shellIntegrationPromptDotDiameter ?: 8
@@ -419,9 +551,13 @@ public class SwingSettings private constructor(
             textAntialiasing == other.textAntialiasing &&
             fractionalMetrics == other.fractionalMetrics &&
             hyperlinkActivationForeground == other.hyperlinkActivationForeground &&
-            selectionBackground == other.selectionBackground &&
-            searchMatchBackground == other.searchMatchBackground &&
-            searchActiveMatchBackground == other.searchActiveMatchBackground &&
+            selectionStyle == other.selectionStyle &&
+            selectionStyleConfigured == other.selectionStyleConfigured &&
+            inactiveSelectionStyle == other.inactiveSelectionStyle &&
+            minimumContrastRatio == other.minimumContrastRatio &&
+            faintOpacity == other.faintOpacity &&
+            searchMatchStyle == other.searchMatchStyle &&
+            searchActiveMatchStyle == other.searchActiveMatchStyle &&
             visualBellEnabled == other.visualBellEnabled &&
             visualBellColor == other.visualBellColor &&
             visualBellDurationMillis == other.visualBellDurationMillis &&
@@ -430,6 +566,12 @@ public class SwingSettings private constructor(
             shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
             shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
             shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
+            shellIntegrationPromptDotHoverColor == other.shellIntegrationPromptDotHoverColor &&
+            shellIntegrationFailedPromptDotHoverColor == other.shellIntegrationFailedPromptDotHoverColor &&
+            shellIntegrationPromptDotHoverHaloColor == other.shellIntegrationPromptDotHoverHaloColor &&
+            shellIntegrationFailedPromptDotHoverHaloColor == other.shellIntegrationFailedPromptDotHoverHaloColor &&
+            shellIntegrationPromptDividerColor == other.shellIntegrationPromptDividerColor &&
+            shellIntegrationPromptDividerHoverColor == other.shellIntegrationPromptDividerHoverColor &&
             shellIntegrationPromptDotDiameter == other.shellIntegrationPromptDotDiameter &&
             shellIntegrationDecorationGutterWidth == other.shellIntegrationDecorationGutterWidth &&
             shellIntegrationFailedCommandRailsVisible == other.shellIntegrationFailedCommandRailsVisible &&
@@ -467,9 +609,13 @@ public class SwingSettings private constructor(
         result = 31 * result + textAntialiasing.hashCode()
         result = 31 * result + fractionalMetrics.hashCode()
         result = 31 * result + hyperlinkActivationForeground.hashCode()
-        result = 31 * result + selectionBackground.hashCode()
-        result = 31 * result + searchMatchBackground.hashCode()
-        result = 31 * result + searchActiveMatchBackground.hashCode()
+        result = 31 * result + selectionStyle.hashCode()
+        result = 31 * result + selectionStyleConfigured.hashCode()
+        result = 31 * result + inactiveSelectionStyle.hashCode()
+        result = 31 * result + minimumContrastRatio.hashCode()
+        result = 31 * result + faintOpacity.hashCode()
+        result = 31 * result + searchMatchStyle.hashCode()
+        result = 31 * result + searchActiveMatchStyle.hashCode()
         result = 31 * result + visualBellEnabled.hashCode()
         result = 31 * result + visualBellColor.hashCode()
         result = 31 * result + visualBellDurationMillis.hashCode()
@@ -478,6 +624,12 @@ public class SwingSettings private constructor(
         result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
         result = 31 * result + shellIntegrationPromptDotColor.hashCode()
         result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDotHoverColor.hashCode()
+        result = 31 * result + shellIntegrationFailedPromptDotHoverColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDotHoverHaloColor.hashCode()
+        result = 31 * result + shellIntegrationFailedPromptDotHoverHaloColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDividerColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDividerHoverColor.hashCode()
         result = 31 * result + shellIntegrationPromptDotDiameter.hashCode()
         result = 31 * result + shellIntegrationDecorationGutterWidth.hashCode()
         result = 31 * result + shellIntegrationFailedCommandRailsVisible.hashCode()
@@ -525,6 +677,12 @@ public class SwingSettings private constructor(
         )
 
     init {
+        require(minimumContrastRatio.isFinite() && minimumContrastRatio in 1.0..21.0) {
+            "minimumContrastRatio must be finite and in 1..21, was $minimumContrastRatio"
+        }
+        require(faintOpacity.isFinite() && faintOpacity in 0.0..1.0) {
+            "faintOpacity must be finite and in 0..1, was $faintOpacity"
+        }
         require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be >= ${TerminalBuffers.MIN_WIDTH}, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(cursorBlinkMillis >= 0) {
@@ -577,7 +735,6 @@ public class SwingSettings private constructor(
 
         private const val DEFAULT_FONT_SIZE = 16
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
-        private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
         private const val DEFAULT_SEARCH_MATCH_BACKGROUND = 0x55FFD54F
         private const val DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND = 0xAAFF8C00.toInt()
         private const val DEFAULT_VISUAL_BELL_COLOR = 0x664DA3FF

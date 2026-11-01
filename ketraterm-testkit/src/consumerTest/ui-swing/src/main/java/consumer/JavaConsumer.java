@@ -126,8 +126,53 @@ public final class JavaConsumer {
             draft.setMiddleClickPaste(true);
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
             draft.setColumnSpacing(-1);
+            draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
+            draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
+            draft.setSearchMatchStyle(new io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle(0x554B6EAF));
+            draft.setSearchActiveMatchStyle(new io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle(0xFFFFC857, 0xFF161616, 0xFFFFFFFF));
+            draft.setMinimumContrastRatio(4.5);
+            draft.setFaintOpacity(0.75);
+            draft.setShellIntegrationPromptDotHoverColor(0xFFFFFFFF);
+            draft.setShellIntegrationFailedPromptDotHoverColor(0xFFFF8A8A);
+            draft.setShellIntegrationPromptDotHoverHaloColor(0x404B6EAF);
+            draft.setShellIntegrationFailedPromptDotHoverHaloColor(0x40E74856);
+            draft.setShellIntegrationPromptDividerColor(0x304B6EAF);
+            draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getShellIntegrationPromptDotHoverColor() != 0xFFFFFFFF
+            || copiedSettings.getShellIntegrationFailedPromptDotHoverColor() != 0xFFFF8A8A
+            || copiedSettings.getShellIntegrationPromptDotHoverHaloColor() != 0x404B6EAF
+            || copiedSettings.getShellIntegrationFailedPromptDotHoverHaloColor() != 0x40E74856
+            || copiedSettings.getShellIntegrationPromptDividerColor() != 0x304B6EAF
+            || copiedSettings.getShellIntegrationPromptDividerHoverColor() != 0xFF4B6EAF)
+            throw new AssertionError("Java prompt colors did not survive copying");
+        var automaticPromptColors = copiedSettings.copy(draft -> {
+            draft.setShellIntegrationPromptDividerColor(null);
+            draft.setShellIntegrationPromptDotHoverHaloColor(0);
+        });
+        if (automaticPromptColors.getShellIntegrationPromptDividerColor() != null
+            || automaticPromptColors.getShellIntegrationPromptDotHoverHaloColor() != 0)
+            throw new AssertionError("Java prompt colors lost null or transparent values");
+        if (copiedSettings.getMinimumContrastRatio() != 4.5 || copiedSettings.getFaintOpacity() != 0.75
+            || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
+            || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
+            throw new AssertionError("Java color policies did not survive copying");
+        if (new SwingSettings().getMinimumContrastRatio() != 3.0)
+            throw new AssertionError("Java default contrast policy changed");
+        var paletteSelection = copiedSettings.copy(draft -> draft.resetSelectionStyle());
+        if (paletteSelection.equals(copiedSettings)
+            || !paletteSelection.equals(paletteSelection.copy(draft -> draft.resetSelectionStyle())))
+            throw new AssertionError("Java selection reset did not preserve the default policy");
+        if (copiedSettings.getSearchMatchBackground() != copiedSettings.getSearchMatchStyle().getBackground()
+            || copiedSettings.getSearchActiveMatchStyle().getForeground() != 0xFF161616
+            || copiedSettings.getSearchActiveMatchStyle().getBorder() != 0xFFFFFFFF)
+            throw new AssertionError("Java search match colors did not survive copying");
+        var searchSettings = copiedSettings.copy(draft -> draft.setSearchActiveMatchBackground(0));
+        if (searchSettings.getSearchActiveMatchBackground() != 0
+            || !searchSettings.getSearchActiveMatchStyle().getForeground().equals(copiedSettings.getSearchActiveMatchStyle().getForeground())
+            || !searchSettings.getSearchActiveMatchStyle().getBorder().equals(copiedSettings.getSearchActiveMatchStyle().getBorder()))
+            throw new AssertionError("Java search background accessor discarded text or border colors");
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
             || copiedSettings.getAlternateScreenWheelToArrowEnabled()
             || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1

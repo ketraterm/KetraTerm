@@ -66,9 +66,58 @@ IntelliJ plugin registers IDE actions so keymap remapping and multi-stroke short
 remain platform responsibilities. Keep search bindings scoped to the bar so they
 do not intercept terminal or unrelated editor input.
 
+### Search colors
+
 Use `SwingTerminalSearchColors.create`, `copy`, or a builder to supply an immutable
 palette through `refreshColors(colors)`. Updating colors preserves the query and
-visibility. The palette is retained across close/open cycles.
+selection, caret position, visibility, and current search results. The palette is
+retained across close/open cycles; closing the bar still clears its search.
+
+```kotlin
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors
+import java.awt.Color
+
+val colors = SwingTerminalSearchColors.create {
+    it.counterErrorForeground = Color(0xFFEF5350.toInt(), true)
+    it.counterNoMatchForeground = Color(0xFFFFB74D.toInt(), true)
+    it.textFieldErrorBorder = Color(0xFFEF5350.toInt(), true)
+    it.textFieldNoMatchBorder = Color(0xFFFFB74D.toInt(), true)
+    it.textFieldSelectionBackground = Color(0xFF355FA8.toInt(), true)
+    it.textFieldSelectionForeground = Color.WHITE
+}
+// On the EDT, with an existing SwingTerminalSearchBar:
+searchBar.refreshColors(colors)
+```
+
+| Optional color | Null behavior |
+| --- | --- |
+| `counterErrorForeground` | Use `counterForeground` for any search failure, including invalid regex. |
+| `counterNoMatchForeground` | Use `counterForeground` for a completed, nonempty query with zero matches. |
+| `textFieldErrorBorder` | Retain `textFieldBorder` or `textFieldFocusBorder`, according to focus. |
+| `textFieldNoMatchBorder` | Retain the normal/focused border for a completed, nonempty zero-match query. |
+| `textFieldSelectionBackground` | Use Swing's current `TextField.selectionBackground` default. |
+| `textFieldSelectionForeground` | Use Swing's current `TextField.selectionForeground` default. |
+
+All six default to null, preserving the existing appearance. Failures take priority
+over no-match styling. Empty queries, pending searches (even with zero provisional
+matches), successful results, and capped results use the normal counter and border.
+An explicit status border takes priority over the focus border. Status colors do
+not change query text, caret, placeholder, or search-icon colors. Error messages,
+tooltips, and accessible descriptions continue to identify failures independently
+of color.
+
+Colors retain their supplied ARGB values, including zero alpha. Transparent status
+borders suppress the outline instead of falling back to the focus color. These
+controls use Swing colors and do not participate in terminal text contrast rules.
+Terminal-grid matches and selection have separate
+[view settings](../ketraterm-ui-swing/docs/color-customization.md).
+
+Dynamic host `Color` subclasses are sampled when the immutable snapshot is built.
+Null selection roles sample look-and-feel defaults on the EDT during
+`refreshColors`, with initial widget colors as fallback if those defaults are
+unavailable. Call `refreshColors()` after a look-and-feel change when using these
+defaults. Painting never resolves the host theme. Clearing either selection role
+to null restores its default independently; it does not retain a previous override.
 
 ## Host actions and context menus
 

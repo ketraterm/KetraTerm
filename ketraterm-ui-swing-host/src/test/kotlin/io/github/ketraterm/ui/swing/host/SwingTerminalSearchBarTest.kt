@@ -232,13 +232,25 @@ class SwingTerminalSearchBarTest {
         }
         try {
             bar.refreshColors(SwingTerminalSearchColors.create { it.foreground = Color.BLUE })
-            bar.refreshColors(SwingTerminalSearchColors.create { it.foreground = Color.RED })
+            bar.refreshColors(
+                SwingTerminalSearchColors.create {
+                    it.foreground = Color.RED
+                    it.textFieldSelectionBackground = Color.BLUE
+                    it.textFieldSelectionForeground = Color.YELLOW
+                },
+            )
             SwingUtilities.invokeAndWait {
                 assertEquals(Color.RED, bar.component.foreground)
                 bar.open()
                 bar.close()
                 bar.open()
                 assertEquals(Color.RED, bar.component.foreground)
+
+                fun descendants(component: Component): List<Component> =
+                    listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+                val field = descendants(bar.component).filterIsInstance<JTextField>().single()
+                assertEquals(Color.BLUE, field.selectionColor)
+                assertEquals(Color.YELLOW, field.selectedTextColor)
             }
         } finally {
             SwingUtilities.invokeAndWait {
@@ -574,6 +586,7 @@ class SwingTerminalSearchBarTest {
                     ).distinct()
                 for (lookAndFeel in lookAndFeels) {
                     UIManager.setLookAndFeel(lookAndFeel)
+                    val referenceField = JTextField()
                     val terminal = SwingTerminal()
                     val searchBar = SwingTerminalSearchBar(terminal)
                     try {
@@ -587,6 +600,15 @@ class SwingTerminalSearchBarTest {
                             container.doLayout()
                             for (child in container.components) {
                                 if (!child.isVisible) continue
+                                if (child is JTextField) {
+                                    // Nimbus colors compare derivation metadata; snapshots preserve the sampled ARGB.
+                                    assertEquals(referenceField.selectionColor.rgb, child.selectionColor.rgb, "$lookAndFeel selection fill")
+                                    assertEquals(
+                                        referenceField.selectedTextColor.rgb,
+                                        child.selectedTextColor.rgb,
+                                        "$lookAndFeel selected text",
+                                    )
+                                }
                                 assertTrue(
                                     child.x >= 0 && child.x + child.width <= container.width,
                                     "$lookAndFeel ${child.javaClass.simpleName} clips: ${child.bounds}",

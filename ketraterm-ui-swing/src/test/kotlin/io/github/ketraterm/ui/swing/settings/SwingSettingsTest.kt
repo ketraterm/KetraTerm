@@ -35,6 +35,162 @@ class SwingSettingsTest {
     private val chrome = SwingTerminalChrome()
 
     @Test
+    fun `prompt color overrides are nullable independent and frozen in settings snapshots`() {
+        val original = SwingSettings()
+        assertNull(original.shellIntegrationPromptDividerColor)
+        assertNull(original.shellIntegrationPromptDividerHoverColor)
+        assertNull(original.shellIntegrationPromptDotHoverColor)
+        assertNull(original.shellIntegrationFailedPromptDotHoverColor)
+        assertNull(original.shellIntegrationPromptDotHoverHaloColor)
+        assertNull(original.shellIntegrationFailedPromptDotHoverHaloColor)
+        val draft =
+            original.toBuilder().apply {
+                shellIntegrationPromptDividerColor = 0
+                shellIntegrationPromptDividerHoverColor = 0x80123456.toInt()
+                shellIntegrationPromptDotHoverColor = 0xff123456.toInt()
+                shellIntegrationFailedPromptDotHoverColor = 0xff654321.toInt()
+                shellIntegrationPromptDotHoverHaloColor = 0x40556677
+                shellIntegrationFailedPromptDotHoverHaloColor = 0
+            }
+        val configured = draft.build()
+        assertEquals(0, configured.shellIntegrationPromptDividerColor)
+        assertEquals(0x80123456.toInt(), configured.shellIntegrationPromptDividerHoverColor)
+        assertEquals(0xff123456.toInt(), configured.shellIntegrationPromptDotHoverColor)
+        assertEquals(0xff654321.toInt(), configured.shellIntegrationFailedPromptDotHoverColor)
+        assertEquals(0x40556677, configured.shellIntegrationPromptDotHoverHaloColor)
+        assertEquals(0, configured.shellIntegrationFailedPromptDotHoverHaloColor)
+        draft.shellIntegrationPromptDividerColor = null
+        assertNotEquals(draft.build(), configured)
+        assertEquals(0, configured.shellIntegrationPromptDividerColor)
+        assertEquals(configured, configured.copy {})
+        assertEquals(configured.hashCode(), configured.toBuilder().build().hashCode())
+        val reset =
+            configured.copy {
+                it.shellIntegrationPromptDividerColor = null
+                it.shellIntegrationPromptDividerHoverColor = null
+                it.shellIntegrationPromptDotHoverColor = null
+                it.shellIntegrationFailedPromptDotHoverColor = null
+                it.shellIntegrationPromptDotHoverHaloColor = null
+                it.shellIntegrationFailedPromptDotHoverHaloColor = null
+            }
+        assertEquals(original, reset)
+    }
+
+    @Test
+    fun `search styles retain defaults and background convenience setters preserve other roles`() {
+        val original = SwingSettings()
+        assertEquals(0x55FFD54F, original.searchMatchStyle.background)
+        assertEquals(0xAAFF8C00.toInt(), original.searchActiveMatchStyle.background)
+        assertNull(original.searchMatchStyle.foreground)
+        assertNull(original.searchMatchStyle.border)
+        assertNull(original.searchActiveMatchStyle.foreground)
+        assertNull(original.searchActiveMatchStyle.border)
+        val draft =
+            original.toBuilder().apply {
+                searchMatchStyle = SwingSearchMatchStyle(0, 0xff123456.toInt(), 0x80123456.toInt())
+                searchActiveMatchStyle = SwingSearchMatchStyle(0, 0xff654321.toInt(), 0x80654321.toInt())
+                searchMatchBackground = 0x55112233
+                searchActiveMatchBackground = 0x55445566
+            }
+        val configured = draft.build()
+        assertEquals(SwingSearchMatchStyle(0x55112233, 0xff123456.toInt(), 0x80123456.toInt()), configured.searchMatchStyle)
+        assertEquals(SwingSearchMatchStyle(0x55445566, 0xff654321.toInt(), 0x80654321.toInt()), configured.searchActiveMatchStyle)
+        assertEquals(configured.searchMatchStyle.background, configured.searchMatchBackground)
+        assertEquals(configured.searchActiveMatchStyle.background, configured.searchActiveMatchBackground)
+        draft.searchMatchStyle = SwingSearchMatchStyle(0)
+        assertNotEquals(draft.build(), configured)
+        assertEquals(configured, configured.copy {})
+        assertEquals(configured.hashCode(), configured.copy {}.hashCode())
+        assertNotEquals(configured, configured.copy { it.searchMatchStyle = it.searchMatchStyle.copy(foreground = null) })
+        assertNotEquals(configured, configured.copy { it.searchActiveMatchStyle = it.searchActiveMatchStyle.copy(border = null) })
+    }
+
+    @Test
+    fun `search styles accept every fill and border alpha but require opaque or inherited text`() {
+        for (alpha in 0..255) {
+            val argb = alpha shl 24 or 0x123456
+            val style = SwingSearchMatchStyle(background = argb, border = argb)
+            assertEquals(argb, style.background)
+            assertEquals(argb, style.border)
+            if (alpha != 255) assertFailsWith<IllegalArgumentException> { style.copy(foreground = argb) }
+        }
+        assertEquals(0xff000000.toInt(), SwingSearchMatchStyle(0, foreground = 0xff000000.toInt()).foreground)
+    }
+
+    @Test
+    fun `contrast and faintness validate finite bounds and freeze settings drafts`() {
+        assertEquals(3.0, SwingSettings().minimumContrastRatio)
+        assertEquals(0.5, SwingSettings().faintOpacity)
+        for (invalid in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0.999, 21.001)) {
+            assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.minimumContrastRatio = invalid } }
+        }
+        for (invalid in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -0.001, 1.001)) {
+            assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.faintOpacity = invalid } }
+        }
+        val draft =
+            SwingSettings.builder().apply {
+                minimumContrastRatio = 21.0
+                faintOpacity = 0.0
+            }
+        val snapshot = draft.build()
+        draft.minimumContrastRatio = 1.0
+        draft.faintOpacity = 1.0
+        assertEquals(21.0, snapshot.minimumContrastRatio)
+        assertEquals(0.0, snapshot.faintOpacity)
+        assertEquals(snapshot, snapshot.copy {})
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertNotEquals(snapshot, snapshot.copy { it.minimumContrastRatio = 1.0 })
+        val negativeZero = snapshot.copy { it.faintOpacity = -0.0 }
+        assertEquals(snapshot, negativeZero)
+        assertEquals(snapshot.hashCode(), negativeZero.hashCode())
+    }
+
+    @Test
+    fun `selection background convenience and style have one authoritative value`() {
+        val settings =
+            SwingSettings.create {
+                it.selectionStyle = SwingSelectionStyle(background = 0xff123456.toInt(), foreground = 0xffffffff.toInt())
+                it.selectionBackground = 0x66FFFFFF
+                it.inactiveSelectionStyle = SwingSelectionStyle(background = 0)
+            }
+        assertEquals(0x66FFFFFF, settings.selectionStyle.background)
+        assertEquals(settings.selectionStyle.background, settings.selectionBackground)
+        assertEquals(0xffffffff.toInt(), settings.selectionStyle.foreground)
+        assertEquals(settings, settings.copy {})
+        assertEquals(settings.hashCode(), settings.copy {}.hashCode())
+        val changed = settings.copy { it.inactiveSelectionStyle = null }
+        assertNotEquals(settings, changed)
+        assertNull(changed.inactiveSelectionStyle)
+        assertEquals(settings.selectionStyle, changed.selectionStyle)
+    }
+
+    @Test
+    fun `default selection policy survives copies and an exact matching fill can be reset`() {
+        val original = SwingSettings()
+        assertFalse(original.selectionStyleConfigured)
+        assertEquals(original, original.copy {})
+
+        val exact = original.copy { it.selectionBackground = 0x66FFFFFF }
+        assertTrue(exact.selectionStyleConfigured)
+        assertNotEquals(original, exact)
+        assertEquals(exact, exact.copy {})
+
+        val reset = exact.copy { it.resetSelectionStyle() }
+        assertEquals(original, reset)
+        assertFalse(reset.selectionStyleConfigured)
+        assertTrue(original.copy { it.selectionStyle = SwingSelectionStyle() }.selectionStyleConfigured)
+    }
+
+    @Test
+    fun `selection accepts every fill alpha but rejects translucent text`() {
+        for (alpha in 0..255) {
+            assertEquals(alpha shl 24, SwingSelectionStyle(background = alpha shl 24).background)
+            if (alpha != 255) assertFailsWith<IllegalArgumentException> { SwingSelectionStyle(foreground = alpha shl 24) }
+        }
+        assertNull(SwingSelectionStyle().foreground)
+    }
+
+    @Test
     fun `output following is opt in and survives settings copies`() {
         assertFalse(SwingSettings().scrollOnOutput)
         val enabled = SwingSettings.create { it.scrollOnOutput = true }
