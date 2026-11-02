@@ -30,6 +30,8 @@ internal data class IntellijGitCompletionSnapshot(
     val localBranches: List<TerminalCompletionDomainValue>,
     val remoteBranches: List<TerminalCompletionDomainValue>,
     val tags: List<TerminalCompletionDomainValue>,
+    val remotes: List<TerminalCompletionDomainValue> = emptyList(),
+    val currentBranchName: String? = null,
 ) {
     companion object {
         val EMPTY = IntellijGitCompletionSnapshot(emptyList(), emptyList(), emptyList())
@@ -42,6 +44,7 @@ internal data class GitReferenceReadModel(
     val localBranchNames: Iterable<String>,
     val remoteBranchNames: Iterable<String>,
     val tagNames: Iterable<String>,
+    val remoteNames: Iterable<String> = emptyList(),
 )
 
 /** Executes bounded Git-reference collection inside an implementation-owned read action. */
@@ -63,6 +66,11 @@ private class IntellijGitReferenceReadPort(
             collector(
                 GitReferenceReadModel(
                     currentBranchName = repository.currentBranch?.name,
+                    remoteNames =
+                        repository.remotes
+                            .asSequence()
+                            .map { it.name }
+                            .asIterable(),
                     localBranchNames =
                         repository.branches.localBranches
                             .asSequence()
@@ -95,19 +103,22 @@ internal class IntellijGitCompletionLoader(
         val localBranchDetail = KetraTermBundle.message("completion.detail.localBranch")
         val remoteBranchDetail = KetraTermBundle.message("completion.detail.remoteBranch")
         val tagDetail = KetraTermBundle.message("completion.detail.tag")
+        val remoteDetail = KetraTermBundle.message("completion.detail.remote")
         return readPort.read(workingDirectoryUri) { model ->
             IntellijGitCompletionSnapshot(
+                currentBranchName = model.currentBranchName,
+                remotes =
+                    collectValues(
+                        model.remoteNames,
+                        cancellationContext,
+                    ) { TerminalCompletionDomainValue(it, detail = remoteDetail) },
                 localBranches =
                     collectValues(model.localBranchNames, cancellationContext) { branchName ->
-                        if (branchName == model.currentBranchName) {
-                            null
-                        } else {
-                            TerminalCompletionDomainValue(
-                                value = branchName,
-                                detail = localBranchDetail,
-                                scoreAdjustment = LOCAL_SCORE_ADJUSTMENT,
-                            )
-                        }
+                        TerminalCompletionDomainValue(
+                            value = branchName,
+                            detail = localBranchDetail,
+                            scoreAdjustment = LOCAL_SCORE_ADJUSTMENT,
+                        )
                     },
                 remoteBranches =
                     collectValues(model.remoteBranchNames, cancellationContext) { branchName ->
@@ -158,15 +169,41 @@ internal class IntellijGitCompletionLoader(
 /** Creates one completion source backed by one composite Git-reference load per request. */
 internal fun intellijGitCompletionSource(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
-        if (context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH) {
+        if (context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH &&
+            context.expectedValueDomain != TerminalCompletionValueDomain.GIT_REMOTE
+        ) {
             return@TerminalCompletionSource emptyList()
         }
         val commandName = context.currentCommand?.name
         val snapshot = loader(request.workingDirectoryUri)
+        if (context.expectedValueDomain == TerminalCompletionValueDomain.GIT_REMOTE) {
+            return@TerminalCompletionSource projectValues(request, context, REMOTE_SOURCE_ID, snapshot.remotes, limit)
+        }
+        if (commandName == "fetch" || commandName == "pull") {
+            val prefix =
+                context.precedingPositionalArguments.firstOrNull()?.let { "$it/" }
+                    ?: return@TerminalCompletionSource emptyList()
+            val branches =
+                snapshot.remoteBranches.filter { it.value.startsWith(prefix) }.map {
+                    val name = it.value.removePrefix(prefix)
+                    it.copy(value = name, displayText = name)
+                }
+            return@TerminalCompletionSource projectValues(request, context, REMOTE_SOURCE_ID, branches, limit)
+        }
         val candidates = ArrayList<TerminalCompletionCandidate>(limit)
-        candidates += projectValues(request, context, LOCAL_SOURCE_ID, snapshot.localBranches, limit)
+        val localBranches =
+            if (commandName == "push") {
+                snapshot.localBranches
+            } else {
+                snapshot.localBranches.filter {
+                    it.value != snapshot.currentBranchName
+                }
+            }
+        candidates += projectValues(request, context, LOCAL_SOURCE_ID, localBranches, limit)
         if (commandName in REMOTE_REFERENCE_COMMANDS) {
             candidates += projectValues(request, context, REMOTE_SOURCE_ID, snapshot.remoteBranches, limit)
+        }
+        if (commandName in REMOTE_REFERENCE_COMMANDS || commandName == "push") {
             candidates += projectValues(request, context, TAG_SOURCE_ID, snapshot.tags, limit)
         }
         candidates
@@ -184,7 +221,7 @@ private fun projectValues(
     TerminalCompletionSources.valueDomainCandidates(
         request = request,
         context = context,
-        domain = TerminalCompletionValueDomain.GIT_BRANCH,
+        domain = context.expectedValueDomain,
         sourceId = sourceId,
         values = values,
         limit = limit,

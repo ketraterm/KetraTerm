@@ -256,6 +256,13 @@ values through `TerminalCompletionValueDomain`, and paths through
 including `NONE`; it does not fall back to positional metadata.
 `positionalArguments` takes precedence over scalar positional fields and can
 declare an optional argument or a variadic final argument.
+`positionalArgumentAfterDoubleDash` optionally supplies uniform argument metadata
+after a completed option terminator; it overrides ordinary positional metadata.
+It leaves the original positional history and edit offsets intact, and does not
+activate when `--` is consumed as an option value. Git checkout/reset use it for
+path-only arguments. Git push/pull/fetch use ordinary ordered arguments:
+`GIT_REMOTE` for the repository, then variadic `GIT_BRANCH` references. Hosts
+use `precedingPositionalArguments` to select the remote's locally known refs.
 `exclusiveGroupIds` suppresses conflicting completed options before the cursor.
 `repeatableSubcommands` models sibling task values such as `gradle clean build`.
 

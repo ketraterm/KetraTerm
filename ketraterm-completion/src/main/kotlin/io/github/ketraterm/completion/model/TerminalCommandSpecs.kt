@@ -100,6 +100,8 @@ public object TerminalCommandSpecs {
      * `spec.kubectl.get.argument.resource.name`. The argument's zero-based ordinal
      * replaces its name when that name is empty. Dots separate canonical command
      * and subcommand tokens; aliases and translated labels never become keys.
+     * Post-terminator metadata uses `spec.<canonical.path>.argumentAfterDoubleDash.name`
+     * and `.description`.
      */
     @JvmStatic
     public fun defaults(localize: (key: String, english: String) -> String): List<TerminalCommandSpec> =
@@ -128,6 +130,13 @@ public object TerminalCommandSpecs {
                         argument.copy(
                             name = localizeNonempty("$argumentKey.name", argument.name, localize),
                             description = localizeNonempty("$argumentKey.description", argument.description, localize),
+                        )
+                    },
+                positionalArgumentAfterDoubleDash =
+                    spec.positionalArgumentAfterDoubleDash?.let { argument ->
+                        argument.copy(
+                            name = localizeNonempty("$key.argumentAfterDoubleDash.name", argument.name, localize),
+                            description = localizeNonempty("$key.argumentAfterDoubleDash.description", argument.description, localize),
                         )
                     },
             )
@@ -274,6 +283,10 @@ public object TerminalCommandSpecs {
                                 argument.copy(valueCandidates = immutableList(argument.valueCandidates))
                             },
                         ),
+                    positionalArgumentAfterDoubleDash =
+                        spec.positionalArgumentAfterDoubleDash?.let {
+                            it.copy(valueCandidates = immutableList(it.valueCandidates))
+                        },
                 )
             },
         )

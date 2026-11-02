@@ -41,10 +41,49 @@ class StandaloneGitCompletionSourceTest {
     private val directory = Path.of("git-completion-fixture").toAbsolutePath()
 
     @Test
+    fun `remote arguments query configuration and reference arguments select the appropriate branch group`() =
+        runTest {
+            val source =
+                StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { builder ->
+                    val output =
+                        if (builder.command().last() == "remote") {
+                            assertEquals(listOf("git", "--no-optional-locks", "--no-pager", "remote"), builder.command())
+                            "origin\nupstream\nbad\tname\n"
+                        } else {
+                            "*\u0000refs/heads/main\u0000\n" +
+                                " \u0000refs/heads/local-only\u0000\n" +
+                                " \u0000refs/remotes/origin/feature/one\u0000\n" +
+                                " \u0000refs/remotes/upstream/other\u0000\n" +
+                                " \u0000refs/remotes/origin/HEAD\u0000refs/remotes/origin/main\n"
+                        }
+                    TestGitProcess(output.toByteArray())
+                }
+            for (command in listOf("push", "pull", "fetch")) {
+                assertEquals(setOf("origin", "upstream"), complete(source, "git $command ").map { it.replacementText }.toSet())
+            }
+            assertEquals(setOf("main", "local-only"), complete(source, "git push origin ").map { it.replacementText }.toSet())
+            for (command in listOf("fetch", "pull")) {
+                assertEquals(listOf("feature/one"), complete(source, "git $command origin fe").map { it.replacementText })
+                assertEquals(listOf("other"), complete(source, "git $command upstream ").map { it.replacementText })
+                assertTrue(complete(source, "git $command unknown ").isEmpty())
+            }
+        }
+
+    @Test
     fun `only local Git reference arguments start a process`() =
         runTest {
             val source = StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { error("Unexpected Git process") }
-            for (line in listOf("git s", "git switch -", "git switch -c new", "git add file", "cd ", "unknown ")) {
+            for (line in listOf(
+                "git s",
+                "git switch -",
+                "git switch -c new",
+                "git add file",
+                "cd ",
+                "unknown ",
+                "git checkout -- fe",
+                "git checkout main -- fe",
+                "git reset -- fe",
+            )) {
                 assertTrue(complete(source, line).isEmpty(), line)
             }
             for (uri in listOf(null, "", "ssh://server/repo", "file://remote.example/repo", "file://wsl.localhost/Ubuntu/repo")) {

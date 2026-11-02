@@ -51,6 +51,7 @@ This table describes the sources available when completion is enabled.
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
 | Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
+| Git remote names | Bounded `git remote` query of local configuration. | Configured remotes from the selected IDE repository. |
 | Recent Git commits | No dynamic source. | Up to 50 commits for supported commit arguments. |
 | Git changed paths | Ordinary path completion. | IDE change-list paths for supported Git commands. |
 | Gradle tasks | Built-in lifecycle tasks. | Also tasks from the imported Gradle model. |
@@ -64,10 +65,21 @@ input order for the available reference, commit, changed-path, and ordinary/proj
 relative values build on the preceding directory and empty values leave it unchanged.
 IntelliJ's captured project directory is a fallback only when shell directory metadata is absent.
 
-Standalone queries the host's `git for-each-ref` for local branches; `checkout`,
-`merge`, and `rebase` also receive remote branches and tags. The current branch
-and symbolic remote aliases are omitted. Each eligible request refreshes the data,
-with at most 8192 refs, 1 MiB of output, and a 1.5-second process deadline.
+After a completed `--`, Git `checkout` and `reset` suggest only paths, including
+`git checkout <ref> -- <path>`. Other commands retain their declared argument
+semantics after `--`. `push`, `pull`, and `fetch` first suggest configured remote
+names (or local repository directories), then reference arguments. Push offers
+local branches, including the current branch, and tags. Fetch/pull suggest locally
+known tracking branches of the selected remote without its prefix; for example,
+`git fetch origin fe` can insert `feature/x` from `origin/feature/x`. Configured
+remotes are available even before any refs have been fetched. These sources make
+no network requests and do not claim to enumerate the remote server's current refs.
+
+Standalone queries the host's `git for-each-ref` for references and `git remote`
+for remote names; `checkout`, `merge`, and `rebase` receive remote branches and tags.
+Outside push, the current local branch is omitted; symbolic remote aliases are
+also omitted. Each eligible request refreshes the data,
+with at most 8192 values, 1 MiB of output, and a 1.5-second process deadline.
 Cancellation terminates the query. Requests without a resolvable local directory
 do not launch Git. Queries use the selected directory rather than inherited
 repository-selection variables, and pass fixed arguments directly to Git without

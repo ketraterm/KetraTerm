@@ -35,24 +35,44 @@ internal class StandaloneGitCompletionSource(
         limit: Int,
     ): List<TerminalCompletionCandidate> {
         require(limit > 0)
-        if (context.command?.name != "git" || context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH) return emptyList()
+        val domain = context.expectedValueDomain
+        if (context.command?.name != "git" ||
+            (domain != TerminalCompletionValueDomain.GIT_BRANCH && domain != TerminalCompletionValueDomain.GIT_REMOTE)
+        ) {
+            return emptyList()
+        }
         val directory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return emptyList()
-        val output = readReferences(directory) ?: return emptyList()
+        val remotes = domain == TerminalCompletionValueDomain.GIT_REMOTE
+        val output = readGit(directory, if (remotes) listOf("remote") else REFERENCE_ARGUMENTS) ?: return emptyList()
         val includeRemote = context.currentCommand?.name in REMOTE_REFERENCE_COMMANDS
+        val incoming = context.currentCommand?.name in INCOMING_REFERENCE_COMMANDS
+        val remotePrefix = context.precedingPositionalArguments.firstOrNull()?.let { "$it/" }
         val values = ArrayList<TerminalCompletionDomainValue>()
         for (line in output.lineSequence().take(MAX_REFERENCES)) {
             currentCoroutineContext().ensureActive()
+            if (remotes) {
+                if (line.isNotEmpty() && line.length <= 4096 && line.none { it.isISOControl() || it.isWhitespace() }) {
+                    values += TerminalCompletionDomainValue(line, detail = "remote")
+                }
+                continue
+            }
             val fields = line.split('\u0000')
             if (fields.size != 3 || (fields[0] != " " && fields[0] != "*") || fields[2].isNotEmpty()) continue
             val ref = fields[1]
             if (ref.length > 4096 || ref.endsWith('/') || ref.any { it.isISOControl() || it.isWhitespace() }) continue
+            if (incoming) {
+                if (remotePrefix != null && ref.startsWith("refs/remotes/$remotePrefix")) {
+                    values += TerminalCompletionDomainValue(ref.removePrefix("refs/remotes/$remotePrefix"), detail = "remote branch")
+                }
+                continue
+            }
             val value =
                 when {
-                    ref.startsWith("refs/heads/") && fields[0] != "*" ->
+                    ref.startsWith("refs/heads/") && (fields[0] != "*" || context.currentCommand?.name == "push") ->
                         TerminalCompletionDomainValue(ref.removePrefix("refs/heads/"), detail = "local branch", scoreAdjustment = 2)
                     includeRemote && ref.startsWith("refs/remotes/") ->
                         TerminalCompletionDomainValue(ref.removePrefix("refs/remotes/"), detail = "remote branch", scoreAdjustment = 1)
-                    includeRemote && ref.startsWith("refs/tags/") ->
+                    (includeRemote || context.currentCommand?.name == "push") && ref.startsWith("refs/tags/") ->
                         TerminalCompletionDomainValue(ref.removePrefix("refs/tags/"), detail = "tag")
                     else -> null
                 }
@@ -61,29 +81,24 @@ internal class StandaloneGitCompletionSource(
         return TerminalCompletionSources.valueDomainCandidates(
             request,
             context,
-            TerminalCompletionValueDomain.GIT_BRANCH,
+            domain,
             SOURCE_ID,
             values,
             limit,
         )
     }
 
-    private suspend fun readReferences(directory: Path): String? =
+    private suspend fun readGit(
+        directory: Path,
+        arguments: List<String>,
+    ): String? =
         withTimeoutOrNull(QUERY_TIMEOUT_MILLIS.milliseconds) {
             withContext(ioDispatcher) {
                 coroutineScope {
                     val builder =
-                        ProcessBuilder(
-                            "git",
-                            "--no-optional-locks",
-                            "--no-pager",
-                            "for-each-ref",
-                            "--count=$MAX_REFERENCES",
-                            "--format=%(HEAD)%00%(refname)%00%(symref)",
-                            "refs/heads/",
-                            "refs/remotes/",
-                            "refs/tags/",
-                        ).directory(directory.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD)
+                        ProcessBuilder(listOf("git", "--no-optional-locks", "--no-pager") + arguments)
+                            .directory(directory.toFile())
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
                     // Repository selection comes from the request, not the app's launch repository.
                     builder.environment().keys.removeAll { it.uppercase() in REPOSITORY_ENVIRONMENT_VARIABLES }
                     builder.environment()["GIT_NO_LAZY_FETCH"] = "1"
@@ -121,6 +136,16 @@ internal class StandaloneGitCompletionSource(
         const val MAX_OUTPUT_BYTES = 1_048_576
         const val QUERY_TIMEOUT_MILLIS = 1500L
         private val REMOTE_REFERENCE_COMMANDS = setOf("checkout", "merge", "rebase")
+        private val INCOMING_REFERENCE_COMMANDS = setOf("fetch", "pull")
+        private val REFERENCE_ARGUMENTS =
+            listOf(
+                "for-each-ref",
+                "--count=$MAX_REFERENCES",
+                "--format=%(HEAD)%00%(refname)%00%(symref)",
+                "refs/heads/",
+                "refs/remotes/",
+                "refs/tags/",
+            )
         private val REPOSITORY_ENVIRONMENT_VARIABLES =
             setOf("GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_NAMESPACE", "GIT_PREFIX")
     }

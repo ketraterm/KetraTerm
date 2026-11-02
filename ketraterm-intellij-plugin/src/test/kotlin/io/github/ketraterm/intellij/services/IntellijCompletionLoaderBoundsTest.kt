@@ -31,6 +31,7 @@ class IntellijCompletionLoaderBoundsTest {
     fun `Git reference loader owns an input budget independent of popup results`() =
         runBlocking {
             val localBranches = CountingStringIterable(valueAt = { index -> "local-$index" })
+            val remotes = CountingStringIterable(valueAt = { index -> "remote-$index" })
             val loader =
                 IntellijGitCompletionLoader(
                     GitReferenceReadPort { _, collector ->
@@ -40,6 +41,7 @@ class IntellijCompletionLoaderBoundsTest {
                                 localBranchNames = localBranches,
                                 remoteBranchNames = emptyList(),
                                 tagNames = emptyList(),
+                                remoteNames = remotes,
                             ),
                         )
                     },
@@ -49,6 +51,8 @@ class IntellijCompletionLoaderBoundsTest {
 
             assertEquals(8_192, snapshot.localBranches.size)
             assertEquals(8_192, localBranches.nextCalls)
+            assertEquals(8_192, snapshot.remotes.size)
+            assertEquals(8_192, remotes.nextCalls)
         }
 
     @Test

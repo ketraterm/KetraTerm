@@ -24,6 +24,52 @@ import org.junit.Test
 
 class IntellijGitCompletionSourceTest {
     @Test
+    fun `remotes and references follow the active argument and selected remote`() =
+        runBlocking {
+            val source =
+                engine { _ ->
+                    snapshot().copy(
+                        localBranches = listOf(TerminalCompletionDomainValue("main"), TerminalCompletionDomainValue("local-only")),
+                        remoteBranches =
+                            listOf(
+                                TerminalCompletionDomainValue("origin/feature/one"),
+                                TerminalCompletionDomainValue("upstream/other"),
+                            ),
+                        remotes = listOf(TerminalCompletionDomainValue("origin"), TerminalCompletionDomainValue("upstream")),
+                        currentBranchName = "main",
+                    )
+                }
+            for (command in listOf("push", "pull", "fetch")) {
+                assertEquals(setOf("origin", "upstream"), source.complete(request("git $command ")).map { it.replacementText }.toSet())
+            }
+            assertEquals(
+                setOf("main", "local-only", "v1.0"),
+                source.complete(request("git push origin ")).map { it.replacementText }.toSet(),
+            )
+            assertEquals(listOf("local-only"), source.complete(request("git switch ")).map { it.replacementText })
+            for (command in listOf("fetch", "pull")) {
+                assertEquals(listOf("feature/one"), source.complete(request("git $command origin fe")).map { it.replacementText })
+                assertEquals(listOf("other"), source.complete(request("git $command upstream ")).map { it.replacementText })
+                assertTrue(source.complete(request("git $command unknown ")).isEmpty())
+            }
+        }
+
+    @Test
+    fun `path arguments after checkout and reset separators do not load references`() =
+        runBlocking {
+            var loads = 0
+            val source =
+                engine { _ ->
+                    loads++
+                    snapshot()
+                }
+            for (command in listOf("checkout", "checkout main", "reset", "reset HEAD")) {
+                assertTrue(source.complete(request("git $command -- feature/")).isEmpty())
+            }
+            assertEquals(0, loads)
+        }
+
+    @Test
     fun `checkout loads one composite snapshot and exposes all reference groups`() =
         runBlocking {
             var loads = 0

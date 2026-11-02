@@ -64,10 +64,15 @@ class StandaloneGitCompletionIntegrationTest {
             )
         }
         git(first, "branch", "feature-first")
+        git(first, "remote", "add", "origin", "https://example.invalid/origin.git")
+        git(first, "remote", "add", "upstream", "https://example.invalid/upstream.git")
         git(first, "tag", "release-first")
         git(first, "update-ref", "refs/remotes/origin/feature-first", "HEAD")
+        git(first, "update-ref", "refs/remotes/upstream/feature-other", "HEAD")
         git(second, "branch", "feature-second")
+        git(second, "remote", "add", "secondary", "https://example.invalid/second.git")
         Files.writeString(first.resolve("file-first.txt"), "fixture")
+        Files.writeString(first.resolve("feature-first.txt"), "fixture")
         Files.writeString(second.resolve("file-second.txt"), "fixture")
         var workingDirectory = directory.toUri().toString()
         val registry = StandaloneCompletionRegistry.create(directory.resolve("learning.json"), persistenceEnabled = false)
@@ -89,8 +94,21 @@ class StandaloneGitCompletionIntegrationTest {
             assertEquals(listOf("release-first"), suggestions("git -C 'first repo' checkout release-").map { it.replacementText })
             assertTrue(suggestions("git -C 'first repo' switch release-").isEmpty())
             assertEquals(listOf("origin/feature-first"), suggestions("git -C 'first repo' merge origin/").map { it.replacementText })
+            for (command in listOf("checkout", "checkout main", "reset", "reset HEAD")) {
+                val paths = suggestions("git -C 'first repo' $command -- feature-")
+                assertEquals(listOf("feature-first.txt"), paths.map { it.replacementText })
+                assertEquals("path", paths.single().source)
+            }
+            for (command in listOf("push", "fetch", "pull")) {
+                assertEquals(listOf("origin"), suggestions("git -C 'first repo' $command or").map { it.replacementText })
+            }
+            assertEquals(listOf("main"), suggestions("git -C 'first repo' push origin ma").map { it.replacementText })
+            assertEquals(listOf("release-first"), suggestions("git -C 'first repo' push origin release-").map { it.replacementText })
+            assertEquals(listOf("feature-first"), suggestions("git -C 'first repo' fetch origin fe").map { it.replacementText })
+            assertEquals(listOf("feature-other"), suggestions("git -C 'first repo' pull upstream fe").map { it.replacementText })
 
             workingDirectory = second.toUri().toString()
+            assertEquals(listOf("secondary"), suggestions("git fetch sec").map { it.replacementText })
             assertEquals(listOf("feature-second"), suggestions("git switch feature-").map { it.replacementText })
             git(second, "branch", "feature-new")
             assertEquals(setOf("feature-new", "feature-second"), suggestions("git switch feature-").map { it.replacementText }.toSet())

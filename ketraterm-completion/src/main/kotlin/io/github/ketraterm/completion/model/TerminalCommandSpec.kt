@@ -42,6 +42,9 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * appear as sibling positional command values. This models task-style CLIs such
  * as Gradle, where `gradle clean build` is a sequence of tasks rather than
  * `build` being nested below `clean`.
+ * @property positionalArgumentAfterDoubleDash metadata applied to every positional
+ * argument after a completed `--` option terminator. `null` retains normal
+ * positional declarations. This does not apply when `--` is an option value.
  * @throws IllegalArgumentException if [name] or any alias is blank.
  */
 @ExperimentalTerminalCompletionApi
@@ -58,6 +61,7 @@ public data class TerminalCommandSpec
         val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val positionalArgumentHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         val repeatableSubcommands: Boolean = false,
+        val positionalArgumentAfterDoubleDash: TerminalArgumentSpec? = null,
     ) {
         init {
             require(name.isNotBlank()) { "name must not be blank" }
@@ -208,6 +212,10 @@ public data class TerminalCompletionValueDomain(
         /** Git branch or ref name. */
         @JvmField
         public val GIT_BRANCH: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.branch")
+
+        /** Configured Git remote name, without contacting the remote. */
+        @JvmField
+        public val GIT_REMOTE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.remote")
 
         /** Git commit object identifier. */
         @JvmField

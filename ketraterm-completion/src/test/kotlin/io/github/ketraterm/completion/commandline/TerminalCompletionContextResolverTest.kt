@@ -17,11 +17,60 @@ package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TerminalCompletionContextResolverTest {
+    @Test
+    fun `Git path separators override references while other terminators retain positional domains`() {
+        for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+            for (line in listOf("git checkout -- src/", "git co main -- 'src/", "git reset -- src/", "git reset HEAD -- first src/")) {
+                val context = TerminalCompletionContext.resolve(TerminalCompletionRequest(line, line.length, shellCapabilities = shell))
+                assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition, line)
+                assertEquals(TerminalPathArgumentKind.FILE_OR_DIRECTORY, context.expectedPathKind, line)
+                assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain, line)
+            }
+        }
+        assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, resolve("git switch -- feature/").expectedValueDomain)
+        assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, resolve("git checkout -b -- fe").expectedValueDomain)
+        assertEquals(false, resolve("git checkout -b -- fe").optionsTerminated)
+        assertEquals(TerminalCompletionActivePosition.OPTION_NAME, resolve("git checkout --").activePosition)
+    }
+
+    @Test
+    fun `remote commands distinguish repository from repeated reference arguments`() {
+        for (command in listOf("push", "pull", "fetch")) {
+            for (prefix in listOf("git $command ", "git -C repo $command -- ")) {
+                assertEquals(TerminalCompletionValueDomain.GIT_REMOTE, resolve(prefix + "or").expectedValueDomain, prefix)
+                assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, resolve(prefix + "origin ma").expectedValueDomain, prefix)
+                val context = resolve(prefix + "origin main fe")
+                assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, context.expectedValueDomain, prefix)
+                assertEquals(listOf("origin", "main"), context.precedingPositionalArguments, prefix)
+            }
+        }
+        assertEquals(TerminalCompletionValueDomain.GIT_REMOTE, resolve("git push -u or").expectedValueDomain)
+        assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, resolve("git push origin -u ma").expectedValueDomain)
+    }
+
+    @Test
+    fun `post-terminator metadata is declarative and preserves mid-line edit boundaries`() {
+        val spec =
+            optionMetadataSpec.copy(
+                positionalArgumentAfterDoubleDash = TerminalArgumentSpec(pathKind = TerminalPathArgumentKind.FILE),
+            )
+        val line = "tool -- first 'src/fi' tail"
+        val context = TerminalCompletionContextResolver.resolve(line, line.indexOf("fi'") + 2, listOf(spec))
+        assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind)
+        assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain)
+        assertEquals("src/fi", context.activePrefix)
+        assertEquals(line.indexOf("'src"), context.replacementStartOffset)
+        assertEquals(line.indexOf(" tail"), context.replacementEndOffset)
+        assertEquals(listOf("first"), context.precedingPositionalArguments)
+    }
+
     @Test
     fun `git subcommand prefix resolves subcommand position`() {
         val context = resolve("git s")

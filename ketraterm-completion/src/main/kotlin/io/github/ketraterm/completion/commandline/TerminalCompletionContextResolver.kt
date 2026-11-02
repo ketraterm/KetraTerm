@@ -101,7 +101,9 @@ internal object TerminalCompletionContextResolver {
             attachedOptionValue?.option ?: if (optionsTerminated) null else analysis.pendingOptionValue
         val activePositionalArgument =
             if (activeOption == null) {
-                commandPath.last().positionalArgumentAt(analysis.positionalArguments.size)
+                val command = commandPath.last()
+                command.positionalArgumentAfterDoubleDash?.takeIf { optionsTerminated }
+                    ?: command.positionalArgumentAt(analysis.positionalArguments.size)
             } else {
                 null
             }
