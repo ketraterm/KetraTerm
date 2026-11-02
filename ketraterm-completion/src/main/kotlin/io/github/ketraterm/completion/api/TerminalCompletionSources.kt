@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.source.*
 
 /** Factories for dependency-free, host-composable completion sources. */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionSources {
     /**
      * Creates a path autocomplete source backed by a host-provided file system lister.

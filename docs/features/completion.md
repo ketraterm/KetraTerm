@@ -4,6 +4,23 @@ KetraTerm's optional completion engine combines command specifications, paths,
 host-provided sources, and bounded local learning. It can run independently of
 a terminal or use the Swing/IntelliJ suggestion UI.
 
+## Stability: experimental
+
+The entire completion and suggestion subsystem is **experimental**.
+This includes the engine, command catalog, source and shell integrations,
+ranking and learning, persistence, and suggestion UI extension points.
+Its APIs and behavior may change incompatibly before stabilization; consumers
+should expect to adapt integrations when upgrading. Experimental status applies even
+when suggestions are enabled by default.
+
+Kotlin consumers must explicitly opt in to `ExperimentalTerminalCompletionApi`
+for completion contracts and `ExperimentalShellSuggestionsApi` for Swing suggestion
+providers, views, and interactions. Both markers use `RequiresOptIn.Level.ERROR`.
+The Swing completion adapter uses both APIs. Opting in acknowledges possible
+incompatible changes; it does not enable suggestions or change runtime behavior.
+Java callers receive the documented stability contract but Kotlin's compiler
+opt-in checks do not apply to Java compilation.
+
 ## Availability
 
 Completion and automatic suggestions are **enabled by default in both products**.

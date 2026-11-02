@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
  * Shell-specific quoting policy for replacement text produced by completion
  * sources.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalShellQuotingPolicy {
     /**
      * Preserve only replacements that are safe without dialect-specific
@@ -44,6 +45,7 @@ public enum class TerminalShellQuotingPolicy {
  * operator semantics. Hosts should derive it from authoritative shell profile
  * metadata rather than terminal text or process output.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalShellSyntax {
     /**
      * Conservative whitespace-and-quote tokenization with no command operator
@@ -71,6 +73,7 @@ public enum class TerminalShellSyntax {
  * @property syntax lexical rules used to resolve the cursor's command segment.
  * @property quoting replacement escaping policy used by candidate sources.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalShellCapabilities
     @JvmOverloads
     constructor(
@@ -116,6 +119,7 @@ public data class TerminalShellCapabilities
  * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
  * or splits a UTF-16 surrogate pair.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionRequest
     @JvmOverloads
     constructor(

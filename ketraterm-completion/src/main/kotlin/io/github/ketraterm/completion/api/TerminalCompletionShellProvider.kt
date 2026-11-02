@@ -17,11 +17,15 @@ package io.github.ketraterm.completion.api
 
 /**
  * Live shell completion authority, separate from catalog and filesystem sources.
+ *
+ * **Experimental:** follows the stability contract of [TerminalCompletionEngine].
+ *
  * At command positions a non-null result defines the verified executable candidates;
  * specifications enrich those candidates instead of advertising unverified commands.
  * Modeled argument positions use catalog/host sources first and query the shell
  * only if they produce no candidates. Unmodeled arguments use the shell first.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionShellProvider {
     /**
      * Returns shell-owned, escaped edits for this exact request. Null permits

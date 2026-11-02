@@ -54,6 +54,7 @@ import java.util.regex.Pattern
  * replacement offsets are unordered, or [matchedRanges] do not address
  * [displayText].
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestion
     @JvmOverloads
     constructor(
@@ -93,6 +94,7 @@ public data class SwingShellSuggestion
  * Hosts should provide this from their semantic completion vocabulary rather
  * than making the popup infer visual meaning from source-label text.
  */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionAccentRole {
     /** Command or subcommand completion. */
     COMMAND,
@@ -148,6 +150,7 @@ public enum class SwingShellSuggestionAccentRole {
  * @property deleteAfterCursorCount number of Delete key events needed before
  * any Backspace key events.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionReplacement(
     val startOffset: Int,
     val endOffset: Int,
@@ -229,6 +232,7 @@ public fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellS
  * @property selectedSuggestion selected suggestion, or `null` when no
  * suggestion is selected.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionState(
     val visible: Boolean,
     val count: Int,
@@ -260,6 +264,7 @@ public data class SwingShellSuggestionState(
  * @property commandText visible command-line text known to the provider.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionRequest(
     val commandText: String,
     val cursorOffset: Int,
@@ -272,6 +277,7 @@ public data class SwingShellSuggestionRequest(
 }
 
 /** Determines whether a provider request follows automatic observation or an explicit user action. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionTrigger {
     /** Requires both smart suggestions and automatic popup to be enabled. */
     AUTOMATIC,
@@ -287,6 +293,7 @@ public enum class SwingShellSuggestionTrigger {
  * @property index global rank of [suggestion] in the current ranked snapshot.
  * @property request command-line context that produced the accepted suggestion.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionAcceptance(
     val suggestion: SwingShellSuggestion,
     val index: Int,
@@ -296,6 +303,7 @@ public data class SwingShellSuggestionAcceptance(
 /**
  * Feedback kind emitted by the reusable suggestion popup.
  */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionFeedbackKind {
     /**
      * The editing authority admitted or applied the selected suggestion.
@@ -320,6 +328,7 @@ public enum class SwingShellSuggestionFeedbackKind {
  * @property request command-line context that produced the suggestion.
  * @property acceptanceResult editing outcome for acceptance attempts, or null for dismissal.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionFeedback(
     val kind: SwingShellSuggestionFeedbackKind,
     val suggestion: SwingShellSuggestion,
@@ -330,7 +339,10 @@ public data class SwingShellSuggestionFeedback(
 
 /**
  * Host provider for progressive shell-suggestion snapshots.
+ *
+ * **Experimental:** follows the suggestion stability contract of [SwingShellSuggestionViewFactory].
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionProvider {
     /**
      * Returns a cold stream of suggestions for [request].
@@ -370,6 +382,7 @@ public fun interface SwingShellSuggestionProvider {
  * A callback failure, including cancellation, propagates to the invoking operation;
  * subsequent listeners and input submission are skipped.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionInvalidationListener {
     /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
     public fun onShellSuggestionsInvalidated()
@@ -386,6 +399,7 @@ public fun interface SwingShellSuggestionInvalidationListener {
  * and stops notification of subsequent listeners. The eligibility change remains applied.
  * Reentrant eligibility changes or disposal supersede the remaining older notifications.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionEligibilityListener {
     /**
      * Reports the latest automatic-suggestion eligibility.
@@ -399,6 +413,7 @@ public fun interface SwingShellSuggestionEligibilityListener {
 /**
  * Host callback invoked for suggestion acceptance and explicit dismissal.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionFeedbackHandler {
     /**
      * Handles one user feedback event.
@@ -421,6 +436,7 @@ public fun interface SwingShellSuggestionFeedbackHandler {
  * Implementations run on the EDT and return the editing authority's actual result.
  * The owning interaction derives feedback and closes the capability exactly once.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionHandler : AutoCloseable {
     /**
      * Attempts the complete edit against the originally captured context.

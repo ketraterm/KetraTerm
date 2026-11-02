@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":ketraterm-parser"))
     implementation(project(":ketraterm-transport-api"))
     testImplementation(kotlin("test"))
+    testImplementation(kotlin("compiler-embeddable"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
 }
 

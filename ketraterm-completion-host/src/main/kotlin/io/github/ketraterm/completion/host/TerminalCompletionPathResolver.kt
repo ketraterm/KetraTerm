@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import java.nio.file.FileSystems
 import java.nio.file.Path
@@ -25,6 +26,7 @@ import java.nio.file.Path
  * @param homeDirectory explicit local home used for tilde expansion.
  * @param windows whether Windows drive and UNC syntax is accepted.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionPathResolver
     @JvmOverloads
     constructor(

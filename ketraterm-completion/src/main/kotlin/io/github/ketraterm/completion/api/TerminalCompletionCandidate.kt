@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
  * Completion candidate category used by hosts for grouping, ranking display,
  * and source-specific styling.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalCompletionCandidateKind {
     /** Top-level executable or shell command candidate. */
     COMMAND,
@@ -66,6 +67,7 @@ public enum class TerminalCompletionCandidateKind {
  * offsets do not form a nonnegative ordered range, or [matchedRanges] do not
  * address [displayText].
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionCandidate
     @JvmOverloads
     constructor(

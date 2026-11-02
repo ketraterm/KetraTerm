@@ -29,6 +29,7 @@ package io.github.ketraterm.completion.api
  * @throws IllegalArgumentException if [path] is blank or separator-terminated,
  * or [detail] contains a line break.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalFuzzyPathEntry(
     val path: String,
     val isDirectory: Boolean,
@@ -57,6 +58,7 @@ public data class TerminalFuzzyPathEntry(
  * cooperate with cancellation. Blocking I/O must be moved to an appropriate
  * dispatcher by the host.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalFuzzyPathProvider {
     /**
      * Returns host-bounded path entries matching the context's active prefix in

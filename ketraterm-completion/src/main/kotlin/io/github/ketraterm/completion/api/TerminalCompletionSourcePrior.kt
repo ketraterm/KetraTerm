@@ -23,6 +23,7 @@ package io.github.ketraterm.completion.api
  * values when composing the corresponding built-in sources so standalone and
  * IDE integrations start from the same policy before learned evidence applies.
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionSourcePrior {
     /** Prior for candidates returned by the current interactive shell's native completer. */
     public const val NATIVE_SHELL: Int = 20

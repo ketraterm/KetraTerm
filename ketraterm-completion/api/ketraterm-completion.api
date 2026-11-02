@@ -1,3 +1,6 @@
+public abstract interface annotation class io/github/ketraterm/completion/api/ExperimentalTerminalCompletionApi : java/lang/annotation/Annotation {
+}
+
 public final class io/github/ketraterm/completion/api/TerminalCompletionActivePosition : java/lang/Enum {
 	public static final field COMMAND Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
 	public static final field OPERATOR Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;

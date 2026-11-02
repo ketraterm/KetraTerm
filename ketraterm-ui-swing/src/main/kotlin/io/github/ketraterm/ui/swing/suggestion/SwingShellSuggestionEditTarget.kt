@@ -20,6 +20,7 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 
 /** Captures an editing capability on the EDT before asynchronous suggestion work starts. */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionEditTarget {
     /** Returns a request-owned handler, or null when editing is currently unavailable. */
     public fun capture(request: SwingShellSuggestionRequest): SwingShellSuggestionHandler?

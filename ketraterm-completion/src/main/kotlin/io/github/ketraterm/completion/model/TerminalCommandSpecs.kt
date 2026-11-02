@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import java.util.*
 import java.util.List.copyOf
 
@@ -22,6 +23,7 @@ import java.util.List.copyOf
  * Curated static command specs useful as a bootstrap source before richer
  * imported corpora and host context providers are available.
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCommandSpecs {
     private val DEFAULT_CATALOG: List<TerminalCommandSpec> =
         freezeSpecs(

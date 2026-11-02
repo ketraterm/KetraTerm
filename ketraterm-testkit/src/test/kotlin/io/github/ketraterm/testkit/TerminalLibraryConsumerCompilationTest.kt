@@ -15,11 +15,15 @@
  */
 package io.github.ketraterm.testkit
 
+import org.jetbrains.kotlin.cli.common.ExitCode
+import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.PrintStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -36,6 +40,63 @@ import kotlin.test.assertTrue
 class TerminalLibraryConsumerCompilationTest {
     @TempDir
     lateinit var directory: Path
+
+    @ParameterizedTest
+    @CsvSource(
+        "completion, completion.api.ExperimentalTerminalCompletionApi, completion.api.TerminalCompletionEngine",
+        "completion, completion.api.ExperimentalTerminalCompletionApi, completion.model.TerminalCommandSpec",
+        "completion, completion.api.ExperimentalTerminalCompletionApi, completion.api.TerminalCompletionLearningStore",
+        "completion-host, completion.api.ExperimentalTerminalCompletionApi, completion.host.TerminalDirectoryScanner",
+        "ui-swing-host, completion.api.ExperimentalTerminalCompletionApi, ui.swing.host.SessionShellCompletionProvider",
+        "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionProvider",
+        "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionViewFactory",
+    )
+    fun `Kotlin experimental consumers must opt in explicitly`(
+        module: String,
+        marker: String,
+        type: String,
+    ) {
+        val source = "fun identity(value: io.github.ketraterm.$type) = value"
+        val (rejected, diagnostics) = compileKotlin(module, source)
+        assertEquals(ExitCode.COMPILATION_ERROR, rejected, diagnostics)
+        assertTrue(diagnostics.contains("experimental", ignoreCase = true), diagnostics)
+        val (accepted, acceptedDiagnostics) = compileKotlin(module, "@file:OptIn(io.github.ketraterm.$marker::class)\n$source")
+        assertEquals(ExitCode.OK, accepted, acceptedDiagnostics)
+    }
+
+    @Test
+    fun `ordinary Kotlin terminal consumers do not need suggestion opt in`() {
+        val (result, diagnostics) = compileKotlin("ui-swing", "fun terminal() = io.github.ketraterm.ui.swing.api.SwingTerminal()")
+        assertEquals(ExitCode.OK, result, diagnostics)
+    }
+
+    private fun compileKotlin(
+        module: String,
+        source: String,
+    ): Pair<ExitCode, String> {
+        val classpaths = Path.of(checkNotNull(System.getProperty("ketraterm.consumerClasspaths")))
+        val jars = classpaths.resolve(module).listDirectoryEntries().filter { it.extension == "jar" }
+        assertTrue(jars.isNotEmpty(), "No exported API artifacts were prepared for $module")
+        val fixture = Files.createTempDirectory(directory, "kotlin-consumer")
+        val sourceFile = fixture.resolve("Consumer.kt").apply { writeText(source) }
+        val diagnostics = ByteArrayOutputStream()
+        val result =
+            PrintStream(diagnostics).use { output ->
+                K2JVMCompiler().exec(
+                    output,
+                    "-no-stdlib",
+                    "-no-reflect",
+                    "-jvm-target",
+                    "25",
+                    "-classpath",
+                    jars.joinToString(File.pathSeparator),
+                    "-d",
+                    fixture.resolve("classes").toString(),
+                    sourceFile.toString(),
+                )
+            }
+        return result to diagnostics.toString(StandardCharsets.UTF_8)
+    }
 
     @Test
     fun `Java Swing hosts configure local input and defer source aware middle click paste`() {

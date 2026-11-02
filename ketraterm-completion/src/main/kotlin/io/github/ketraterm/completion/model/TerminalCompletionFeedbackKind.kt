@@ -15,7 +15,10 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /** User feedback category recorded against an exact command suggestion. */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalCompletionFeedbackKind {
     /** The user accepted a suggestion and asked the host to apply it. */
     ACCEPTED,

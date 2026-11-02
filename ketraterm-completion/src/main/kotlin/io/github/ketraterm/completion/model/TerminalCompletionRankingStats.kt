@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /**
  * Aggregated ranking evidence for one opaque exact-command identity.
  *
@@ -35,6 +37,7 @@ package io.github.ketraterm.completion.model
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
  * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionRankingStats
     @JvmOverloads
     constructor(

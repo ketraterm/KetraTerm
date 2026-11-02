@@ -1892,6 +1892,7 @@ public class SwingTerminal
          *
          * @throws IllegalStateException when called outside the EDT or after disposal.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionFailureHandler(handler: SwingShellSuggestionFailureHandler?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion diagnostics must be configured on the EDT" }
             check(!disposed) { "Swing terminal is disposed" }
@@ -2020,6 +2021,7 @@ public class SwingTerminal
         public val searchState: StateFlow<TerminalSearchState> get() = searchController.states
 
         /** Whether a configured suggestion provider is available. Read on the EDT. */
+        @ExperimentalShellSuggestionsApi
         public val hasShellSuggestionProvider: Boolean
             get() {
                 check(SwingUtilities.isEventDispatchThread()) { "suggestion configuration must be read on the EDT" }
@@ -2034,6 +2036,7 @@ public class SwingTerminal
          * Automatic observation runs only while a session, provider or custom target, and
          * the automatic-suggestion setting are available. Explicit custom interactions remain independent.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionProvider(provider: SwingShellSuggestionProvider?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion providers must be configured on the EDT" }
             if (disposed) return
@@ -2053,6 +2056,7 @@ public class SwingTerminal
          * Call on the EDT. Replacement cancels pending requests and hides the old surface.
          * The host owns target resources. Explicit interaction and presentation methods are unaffected.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionTarget(target: SwingShellSuggestionTarget?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion targets must be configured on the EDT" }
             if (disposed || shellSuggestionTarget === target) return
@@ -2072,6 +2076,7 @@ public class SwingTerminal
          * Invalidates automatic request deduplication after host ranking context changes.
          * Call on the EDT. The next eligible automatic request runs after the normal debounce interval.
          */
+        @ExperimentalShellSuggestionsApi
         public fun refreshShellSuggestions() {
             check(SwingUtilities.isEventDispatchThread()) { "suggestions must refresh on the EDT" }
             if (!disposed) suggestionScheduler?.refresh()
@@ -2137,6 +2142,7 @@ public class SwingTerminal
          * Supply [editTarget] for a host editor, or [SwingShellSuggestionEditTarget.NONE] for display-only results.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun beginShellSuggestionInteraction(
             request: SwingShellSuggestionRequest,
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
@@ -2238,6 +2244,7 @@ public class SwingTerminal
 
         /** Captures the bound session's authoritative command line on the EDT, without mounting a popup. */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun beginActiveShellSuggestionInteraction(
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
@@ -2268,6 +2275,7 @@ public class SwingTerminal
          * Placement belongs to this adapter and is independent of provider request data.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun presentShellSuggestions(
             interaction: SwingShellSuggestionInteraction,
             anchorColumn: Int = suggestionAnchorColumn,
@@ -2286,6 +2294,7 @@ public class SwingTerminal
          * Closing the interaction cancels collection; final visible results survive stream completion.
          * Each interaction accepts one provider collection. Combine independent sources in the provider.
          */
+        @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
             interaction: SwingShellSuggestionInteraction,
             provider: SwingShellSuggestionProvider,
@@ -2339,6 +2348,7 @@ public class SwingTerminal
          * Automatic requests respect the automatic-popup setting; explicit requests respect the master switch.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
             commandText: String,
             cursorOffset: Int,
@@ -2359,6 +2369,7 @@ public class SwingTerminal
 
         /** Queries and presents the bound session's active command line using the configured provider. */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun requestActiveShellSuggestions(
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             editTarget: SwingShellSuggestionEditTarget? = null,
@@ -2377,6 +2388,7 @@ public class SwingTerminal
          * This method may be called from any thread; component state is updated
          * asynchronously on the EDT.
          */
+        @ExperimentalShellSuggestionsApi
         public fun hideShellSuggestions() {
             runOnEdt {
                 cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
@@ -2384,21 +2396,25 @@ public class SwingTerminal
         }
 
         /** Registers an EDT callback for shell-bound input invalidation. */
+        @ExperimentalShellSuggestionsApi
         public fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionInvalidationListener]. */
+        @ExperimentalShellSuggestionsApi
         public fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners -= listener
         }
 
         /** Registers an EDT callback for automatic-suggestion eligibility changes. */
+        @ExperimentalShellSuggestionsApi
         public fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionEligibilityListener]. */
+        @ExperimentalShellSuggestionsApi
         public fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners -= listener
         }
@@ -2409,6 +2425,7 @@ public class SwingTerminal
          * This method is safe to call from any thread and returns the last state
          * published by the EDT without blocking it.
          */
+        @ExperimentalShellSuggestionsApi
         public fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
 
         /**
@@ -2419,6 +2436,7 @@ public class SwingTerminal
          *
          * @return immutable shell suggestion state snapshot.
          */
+        @ExperimentalShellSuggestionsApi
         public fun currentShellSuggestionState(): SwingShellSuggestionState {
             check(SwingUtilities.isEventDispatchThread()) { "shell suggestion state must be read on the EDT" }
             return shellSuggestionController?.state() ?: SwingShellSuggestionState.EMPTY

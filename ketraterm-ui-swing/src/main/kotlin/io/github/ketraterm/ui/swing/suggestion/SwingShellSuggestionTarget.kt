@@ -26,6 +26,7 @@ package io.github.ketraterm.ui.swing.suggestion
  * Target exceptions propagate to the calling operation or component observation scope.
  * Changing the target or disposing the view never disposes host-owned target resources.
  */
+@ExperimentalShellSuggestionsApi
 public interface SwingShellSuggestionTarget {
     /** Replaces automatic work for [interaction]; cancel and close any previous request first. */
     public fun requestSuggestions(interaction: SwingShellSuggestionInteraction)

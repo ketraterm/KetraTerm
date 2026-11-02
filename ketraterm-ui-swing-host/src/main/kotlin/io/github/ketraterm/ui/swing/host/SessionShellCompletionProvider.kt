@@ -25,6 +25,7 @@ import io.github.ketraterm.session.TerminalShellCompletionKind
  * The session owns request admission, correlation, cancellation, and stale-edit validation.
  * Native replacement text is already escaped and is preserved verbatim.
  */
+@ExperimentalTerminalCompletionApi
 public class SessionShellCompletionProvider(
     private val session: TerminalSession,
 ) : TerminalCompletionShellProvider {

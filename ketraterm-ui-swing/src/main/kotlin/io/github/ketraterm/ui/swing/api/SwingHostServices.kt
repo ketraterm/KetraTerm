@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher.Companion.SWING
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import java.awt.event.KeyEvent
@@ -127,7 +128,11 @@ public class SwingHostServices private constructor(
     public val hyperlinkDetector: SwingHyperlinkDetector = builder.hyperlinkDetector
     public val viewportListener: TerminalViewportListener = builder.viewportListener
     public val scrollbarOverlayEnabled: Boolean = builder.scrollbarOverlayEnabled
+
+    @ExperimentalShellSuggestionsApi
     public val shellSuggestionKeymap: SwingShellSuggestionKeymap = builder.shellSuggestionKeymap
+
+    @ExperimentalShellSuggestionsApi
     public val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = builder.shellSuggestionViewFactory
     public val hostKeyHandler: SwingTerminalHostKeyHandler = builder.hostKeyHandler
     public val contextMenuHandler: SwingTerminalContextMenuHandler = builder.contextMenuHandler
@@ -166,9 +171,11 @@ public class SwingHostServices private constructor(
         public var scrollbarOverlayEnabled: Boolean = source?.scrollbarOverlayEnabled ?: true
 
         /** Draft value for [SwingHostServices.shellSuggestionKeymap]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var shellSuggestionKeymap: SwingShellSuggestionKeymap = source?.shellSuggestionKeymap ?: SwingShellSuggestionKeymap.STANDARD
 
         /** Draft value for [SwingHostServices.shellSuggestionViewFactory]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var shellSuggestionViewFactory: SwingShellSuggestionViewFactory =
             source?.shellSuggestionViewFactory ?: SwingShellSuggestionViewFactory.DEFAULT
 

@@ -1,5 +1,8 @@
 # Completion learning persistence
 
+**Experimental.** This module is part of the
+[experimental completion subsystem](../docs/features/completion.md#stability-experimental).
+
 `ketraterm-completion-persistence` stores bounded completion-learning snapshots
 for the standalone application and IntelliJ plugin. It is a shared product
 implementation module, outside the supported Maven publication and public ABI

@@ -841,6 +841,9 @@ public final class io/github/ketraterm/ui/swing/settings/TerminalTheme$Companion
 	public final fun fromId (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/settings/TerminalTheme;
 }
 
+public abstract interface annotation class io/github/ketraterm/ui/swing/suggestion/ExperimentalShellSuggestionsApi : java/lang/annotation/Annotation {
+}
+
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion {
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V

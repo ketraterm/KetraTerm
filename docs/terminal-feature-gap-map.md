@@ -4,6 +4,10 @@ Open work and deliberate limitations. Implemented features belong in the
 [feature catalog](terminal-feature-map.md); completed fixes belong in Git history
 and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
+Implemented [completion and suggestion capabilities](features/completion.md#stability-experimental)
+remain experimental. Their presence in the feature catalog does not
+promise stable APIs or behavior.
+
 ## Product and release work
 
 | Owner | Remaining work |

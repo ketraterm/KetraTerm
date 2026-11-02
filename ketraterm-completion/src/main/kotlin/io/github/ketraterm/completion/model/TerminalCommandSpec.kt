@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /**
  * Declarative command specification consumed by the in-process completion
  * engine.
@@ -42,6 +44,7 @@ package io.github.ketraterm.completion.model
  * `build` being nested below `clean`.
  * @throws IllegalArgumentException if [name] or any alias is blank.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCommandSpec
     @JvmOverloads
     constructor(
@@ -77,6 +80,7 @@ public data class TerminalCommandSpec
  * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
  * @throws IllegalArgumentException if [valueCandidates] contains a blank value.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalArgumentSpec
     @JvmOverloads
     constructor(
@@ -120,6 +124,7 @@ public data class TerminalArgumentSpec
  * @throws IllegalArgumentException if names are empty, or names, values, or
  * exclusive-group identifiers contain blank entries.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalOptionSpec
     @JvmOverloads
     constructor(
@@ -144,6 +149,7 @@ public data class TerminalOptionSpec
  * File-system path category accepted by a command positional argument or option
  * value.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalPathArgumentKind {
     /** The argument has no known path semantics. */
     NONE,
@@ -161,6 +167,7 @@ public enum class TerminalPathArgumentKind {
 /**
  * Policy for hidden filesystem entries exposed by one path-taking argument.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalHiddenPathPolicy {
     /** Hide dot-prefixed entries for an empty prefix, but show them after `.` is typed. */
     DEFAULT,
@@ -184,6 +191,7 @@ public enum class TerminalHiddenPathPolicy {
  * @property id stable lowercase domain id.
  * @throws IllegalArgumentException if [id] is blank or contains uppercase characters.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionValueDomain(
     val id: String,
 ) {

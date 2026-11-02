@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /**
  * Immutable snapshot of split completion learning.
  *
@@ -24,6 +26,7 @@ package io.github.ketraterm.completion.model
  * @property rankingStats opaque exact-command evidence used by ranking.
  * @property replayCommands plaintext commands used by history and observed-token suggestions.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionLearningSnapshot
     @JvmOverloads
     constructor(

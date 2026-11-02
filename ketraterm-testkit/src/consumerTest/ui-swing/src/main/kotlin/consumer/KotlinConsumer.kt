@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:OptIn(io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class)
+
 package consumer
 
 import consumer.documentation.createTerminalView
@@ -210,7 +212,7 @@ fun main() =
                     documentedView.dispose()
                 }
                 val provider = SwingShellSuggestionProvider { flowOf(emptyList()) }
-                val componentFirst = createUnboundTerminalView(provider)
+                val componentFirst = createUnboundTerminalView().apply { setShellSuggestionProvider(provider) }
                 try {
                     check(componentFirst.hasShellSuggestionProvider)
                     componentFirst.bind(session)

@@ -25,6 +25,7 @@ import java.util.List.copyOf
 import java.util.Set.copyOf as copySetOf
 
 /** Semantic position of the active completion token. */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalCompletionActivePosition {
     /** Cursor is on a shell operator rather than a command token. */
     OPERATOR,
@@ -75,6 +76,7 @@ public enum class TerminalCompletionActivePosition {
  * @property replacementEndOffset exclusive UTF-16 replacement end offset in the original request command line.
  * @property currentCommand deepest matched command specification in [commandPath], or `null` when no command spec was matched.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionContext
     internal constructor(
         internal val commandLineContext: TerminalCommandLineContext,

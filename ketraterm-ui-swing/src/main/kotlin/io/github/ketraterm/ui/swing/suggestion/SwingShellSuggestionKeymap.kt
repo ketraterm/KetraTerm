@@ -26,6 +26,7 @@ private const val RELEVANT_MODIFIERS =
         InputEvent.ALT_GRAPH_DOWN_MASK
 
 /** Semantic action understood by the reusable shell-suggestion controller. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionAction {
     /** Selects the next visible suggestion. */
     SELECT_NEXT,
@@ -62,6 +63,7 @@ public enum class SwingShellSuggestionAction {
  * standalone application can use conventional Swing defaults while an IDE can
  * honor its active, user-configurable keymap.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionKeymap {
     /**
      * Resolves one key press while the suggestion popup is visible.

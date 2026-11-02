@@ -7,6 +7,9 @@ with the [README](../README.md) for construction and a runnable example.
 
 ## Public Surface
 
+The completion subsystem is **experimental**, including the public
+contracts below. See the [stability policy](../../docs/features/completion.md#stability-experimental).
+
 Consumers use `io.github.ketraterm.completion.api` and
 `io.github.ketraterm.completion.model`.
 

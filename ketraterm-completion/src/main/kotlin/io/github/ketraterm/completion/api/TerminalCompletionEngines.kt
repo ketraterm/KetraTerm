@@ -20,8 +20,11 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
 /**
- * Factories for production completion engines.
+ * Factories for built-in completion engines.
+ *
+ * **Experimental:** follows the stability contract of [TerminalCompletionEngine].
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionEngines {
     /**
      * Creates a deterministic merged engine from prioritized completion sources.

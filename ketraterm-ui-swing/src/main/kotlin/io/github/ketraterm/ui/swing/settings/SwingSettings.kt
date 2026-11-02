@@ -23,6 +23,7 @@ import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkActivation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import java.awt.Font
@@ -301,8 +302,14 @@ public class SwingSettings private constructor(
      * Keyboard, menu, and programmatic clipboard paste continue using the ordinary clipboard.
      */
     public val middleClickPasteSource: SwingPasteSource = builder.middleClickPasteSource
+
+    @ExperimentalShellSuggestionsApi
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
+
+    @ExperimentalShellSuggestionsApi
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
+
+    @ExperimentalShellSuggestionsApi
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
 
     /**
@@ -522,12 +529,15 @@ public class SwingSettings private constructor(
         public var columnSpacing: Int = source?.columnSpacing ?: 0
 
         /** Draft value for [SwingSettings.smartSuggestionsEnabled]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var smartSuggestionsEnabled: Boolean = source?.smartSuggestionsEnabled ?: false
 
         /** Draft value for [SwingSettings.shellSuggestionsEnabled]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var shellSuggestionsEnabled: Boolean = source?.shellSuggestionsEnabled ?: true
 
         /** Draft value for [SwingSettings.acceptSelectedSuggestionWithEnter]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
 
         /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */

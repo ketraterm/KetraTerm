@@ -21,6 +21,7 @@ import java.util.*
 import javax.swing.SwingUtilities
 
 /** Why an interaction ended. Only explicit dismissal represents negative user preference. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionCloseReason {
     /** The complete edit was admitted or applied. */
     ACCEPTED,
@@ -48,6 +49,7 @@ public enum class SwingShellSuggestionCloseReason {
 }
 
 /** Synchronous EDT observation of publication, selection, acceptance, and closure. */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionInteractionListener {
     /** Reads authoritative state from [interaction]; callbacks may reenter it. */
     public fun onInteractionChanged(interaction: SwingShellSuggestionInteraction)
@@ -69,6 +71,7 @@ public fun interface SwingShellSuggestionInteractionListener {
  * @param handler original editing capability; owned and closed by this interaction.
  * @param feedbackHandler original request observer. Passive closure produces no preference feedback.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionInteraction(
     public val request: SwingShellSuggestionRequest,
     private val handler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,

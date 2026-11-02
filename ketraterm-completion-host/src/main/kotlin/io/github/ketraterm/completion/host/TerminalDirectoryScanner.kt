@@ -15,10 +15,12 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import java.nio.file.Path
 
 /** Suspending bounded direct-directory scan contract used by completion providers. */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalDirectoryScanner {
     /**
      * Scans direct children beginning with [entryNamePrefix].

@@ -21,7 +21,6 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
 import javax.swing.SwingUtilities
 
@@ -29,9 +28,7 @@ fun createTerminalView(session: TerminalSession): SwingTerminal {
     return createUnboundTerminalView().apply { bind(session) }
 }
 
-fun createUnboundTerminalView(
-    provider: SwingShellSuggestionProvider? = null,
-): SwingTerminal {
+fun createUnboundTerminalView(): SwingTerminal {
     check(SwingUtilities.isEventDispatchThread()) { "Create terminal views on the EDT" }
 
     val settings = SwingSettings.create {
@@ -57,9 +54,7 @@ fun createUnboundTerminalView(
         it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
     }
 
-    return SwingTerminal(settingsProvider = { settings }).apply {
-        setShellSuggestionProvider(provider)
-    }
+    return SwingTerminal(settingsProvider = { settings })
 }
 ```
 
@@ -218,6 +213,14 @@ become steady outlines; bars and underlines remain steady. Application-hidden
 cursors stay hidden.
 
 ### Suggestion request ownership
+
+**Experimental.** Suggestion providers, editing targets, interactions,
+and custom views follow the [completion stability policy](../docs/features/completion.md#stability-experimental).
+
+Opt in to `ExperimentalShellSuggestionsApi` where you configure or use suggestions.
+Creating, configuring, and binding the terminal without suggestions needs no opt-in.
+See the [completion adapter example](../ketraterm-ui-swing-host/README.md#completion-bridge)
+for suggestion-specific setup.
 
 Call `setShellSuggestionProvider(provider)` on the EDT before or after binding.
 The provider survives rebinding; replacing it cancels current requests without

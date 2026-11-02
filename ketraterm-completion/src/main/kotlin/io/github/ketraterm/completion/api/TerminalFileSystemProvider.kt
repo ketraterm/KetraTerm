@@ -22,6 +22,7 @@ package io.github.ketraterm.completion.api
  * @property isDirectory `true` if the entry represents a directory.
  * @throws IllegalArgumentException if [name] is empty, `.` or `..`.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalFileEntry(
     val name: String,
     val isDirectory: Boolean,
@@ -48,6 +49,7 @@ public data class TerminalFileEntry(
  * @throws IllegalArgumentException if the URI is blank, the directory prefix is
  * not empty and separator-terminated, or the entry prefix contains a separator.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalDirectoryListingRequest(
     val workingDirectoryUri: String,
     val directoryPrefix: String,
@@ -71,6 +73,7 @@ public data class TerminalDirectoryListingRequest(
  * reject working-directory authorities it cannot prove are local rather than
  * silently converting remote OSC 7 locations into local paths.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalFileSystemProvider {
     /**
      * Returns matching children for [request].

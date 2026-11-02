@@ -18,7 +18,7 @@ for the supported compiler, runtime, and publication contracts.
 - Kitty keyboard encoding, bracketed paste, and pixel-coordinate mouse reporting
 - OSC 8 hyperlinks and asynchronous scrollback search
 - Shell integration with command navigation, exit status, and output extraction
-- Extensible command completion with contextual ranking and bounded learning
+- Experimental command completion with contextual ranking and bounded learning
 - Host-controlled permissions for clipboard access and terminal actions
 - Customizable Swing rendering, font fallback, themes, and key bindings
 - Headless sessions, custom transports, and optional local PTY hosting

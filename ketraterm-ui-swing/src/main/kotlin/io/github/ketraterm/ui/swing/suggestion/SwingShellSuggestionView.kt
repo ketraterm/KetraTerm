@@ -33,6 +33,7 @@ import javax.swing.JComponent
  * @property viewportStartIndex absolute rank of the first visible suggestion.
  * @property totalSuggestionCount total suggestions retained by the controller.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionViewSnapshot private constructor(
     visibleSuggestions: List<SwingShellSuggestion>,
     public val selectedIndex: Int,
@@ -158,12 +159,15 @@ public class SwingShellSuggestionViewSnapshot private constructor(
 /**
  * Host-pluggable visual surface for shell suggestions.
  *
+ * **Experimental:** follows the suggestion stability contract of [SwingShellSuggestionViewFactory].
+ *
  * The interaction owns selection, acceptance, dismissal and feedback; the
  * embedded controller owns navigation and popup placement. A view renders immutable items
  * and reports pointer interaction through the listener used to create it.
  * Implementations must update Swing component state only on the Event Dispatch
  * Thread and must not invoke completion providers or mutate command lines.
  */
+@ExperimentalShellSuggestionsApi
 public interface SwingShellSuggestionView {
     /** View-owned number of rows used for viewport and page navigation. Must be positive. */
     public val maximumVisibleSuggestions: Int get() = DEFAULT_MAX_VISIBLE_SUGGESTIONS
@@ -207,6 +211,7 @@ public interface SwingShellSuggestionView {
  * The view reports the displayed snapshot and local item index. The adapter rejects
  * obsolete gestures before invoking the interaction's guarded actions.
  */
+@ExperimentalShellSuggestionsApi
 public interface SwingShellSuggestionViewListener {
     /**
      * Reports that the pointer moved over an item.
@@ -243,9 +248,13 @@ public interface SwingShellSuggestionViewListener {
 /**
  * Creates one suggestion view for a reusable Swing terminal instance.
  *
+ * **Experimental:** suggestion UI contracts and behavior may change incompatibly before stabilization.
+ * This includes custom views, providers, editing targets, and interaction contracts.
+ *
  * Standalone hosts normally use [DEFAULT]. Platform hosts can supply a native
  * Swing implementation without replacing completion behavior.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionViewFactory {
     /**
      * Creates a view that reports pointer interaction to [listener].

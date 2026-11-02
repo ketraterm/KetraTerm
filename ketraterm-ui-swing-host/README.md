@@ -139,6 +139,9 @@ for callback configuration.
 
 ## Completion bridge
 
+**Experimental.** Completion adapters and suggestion extension points follow
+the [completion stability policy](../docs/features/completion.md#stability-experimental).
+
 To use the running PowerShell session as the command authority, set
 `shellProvider = SessionShellCompletionProvider(session)` in
 `TerminalCompletionEngines.fromSources` and supply
@@ -155,6 +158,8 @@ presentation fields, matched ranges, and opaque feedback tokens. The host select
 the engine and sources and supplies current profile, directory, and shell metadata.
 
 ```kotlin
+@file:OptIn(io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi::class, io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class)
+
 import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext

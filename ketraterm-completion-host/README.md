@@ -1,5 +1,8 @@
 # KetraTerm Completion Host Support (`:ketraterm-completion-host`)
 
+**Experimental.** This module is part of the
+[experimental completion subsystem](../docs/features/completion.md#stability-experimental).
+
 Local filesystem access for path completion. This module connects the
 [completion engine](../ketraterm-completion/README.md) to bounded, suspending
 directory scans without depending on a terminal session, UI, or product.

@@ -172,6 +172,8 @@ kotlin {
     jvmToolchain(pluginJavaVersion)
     compilerOptions {
         allWarningsAsErrors.set(true)
+        optIn.add("io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi")
+        optIn.add("io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi")
         // Avoid compatibility bridges for inherited IntelliJ Kotlin interface defaults.
         // The plugin has no public Kotlin interface ABI to preserve.
         jvmDefault.set(JvmDefaultMode.NO_COMPATIBILITY)

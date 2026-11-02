@@ -108,6 +108,29 @@ subprojects {
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+            // Repository implementations opt in locally; consumers must make their own choice.
+            if (project.name in
+                setOf(
+                    "ketraterm-completion",
+                    "ketraterm-completion-host",
+                    "ketraterm-completion-persistence",
+                    "ketraterm-ui-swing-host",
+                    "ketraterm-app",
+                    "ketraterm-benchmarks",
+                )
+            ) {
+                compilerOptions.optIn.add("io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi")
+            }
+            if (project.name in
+                setOf(
+                    "ketraterm-ui-swing",
+                    "ketraterm-ui-swing-host",
+                    "ketraterm-app",
+                    "ketraterm-benchmarks",
+                )
+            ) {
+                compilerOptions.optIn.add("io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi")
+            }
             jvmToolchain {
                 languageVersion.set(JavaLanguageVersion.of(25))
                 vendor.set(JvmVendorSpec.JETBRAINS)
