@@ -24,6 +24,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
+import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -133,6 +134,7 @@ internal class KetraTermCompletionService : Disposable {
         project: Project,
         tab: TerminalWorkspaceTab,
     ): SwingShellSuggestionProvider {
+        val gitLoader = IntellijGitCompletionLoader(project)
         val context =
             IntellijCompletionContext(
                 profileId = tab.profile.id,
@@ -142,9 +144,9 @@ internal class KetraTermCompletionService : Disposable {
                 additionalSources =
                     listOf(
                         TerminalCompletionSourceEntry(
-                            intellijGitCompletionSource(
-                                loader = IntellijGitCompletionLoader(project)::load,
-                            ),
+                            TerminalCompletionSources.git("intellij-git-reference") { request, _ ->
+                                gitLoader.load(request.workingDirectoryUri)
+                            },
                             TerminalCompletionSourcePrior.GIT_REFERENCE,
                         ),
                         TerminalCompletionSourceEntry(

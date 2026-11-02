@@ -24,7 +24,7 @@ explicit `shellProvider`; omitting it selects the original factory contract.
 | `TerminalCompletionEngine` | Cold `Flow` of best-first candidate snapshots. |
 | `TerminalCompletionSource` | One suspending provider evaluated against the shared semantic context. |
 | `TerminalCompletionShellProvider` | Optional live authority for command candidates and native argument edits. |
-| `TerminalCompletionEngines` / `TerminalCompletionSources` | Engine composition and adapters for paths, Gradle tasks, and dynamic values. |
+| `TerminalCompletionEngines` / `TerminalCompletionSources` | Engine composition and adapters for paths, Gradle tasks, Git snapshots, and dynamic values. |
 | `TerminalCommandSpec`, `TerminalOptionSpec`, `TerminalArgumentSpec` | Declarative command grammar and value metadata. |
 | `TerminalCompletionLearningStore` | Bounded learning, immutable snapshots, and host-recorded outcomes. |
 
@@ -94,8 +94,9 @@ bundled; an empty catalog provides lexical context without inferred command,
 option, or positional metadata.
 
 Resolution performs no host I/O, scheduling, ranking, or caching. Empty, unknown,
-and incomplete lines produce partial contexts. At an `OPERATOR` position,
-callers should skip source evaluation. Custom engines own candidate limits,
+and incomplete lines produce partial contexts. When `isCompletionAllowed` is false,
+callers should skip source evaluation. This covers operators, exhausted modeled
+argument modes, and unsupported refspec expressions. Custom engines own candidate limits,
 replacement validation, ranking, source concurrency, failure handling, and
 cancellation.
 
@@ -261,8 +262,10 @@ after a completed option terminator; it overrides ordinary positional metadata.
 It leaves the original positional history and edit offsets intact, and does not
 activate when `--` is consumed as an option value. Git checkout/reset use it for
 path-only arguments. Git push/pull/fetch use ordinary ordered arguments:
-`GIT_REMOTE` for the repository, then variadic `GIT_BRANCH` references. Hosts
-use `precedingPositionalArguments` to select the remote's locally known refs.
+`GIT_REMOTE` for the repository, then variadic `GIT_BRANCH` references. A Git-specific
+context interprets resolved option occurrences and refspec component boundaries
+once; option-looking values and words after `--` do not become mode flags.
+The engine skips sources, history, and native fallback for exhausted modes.
 `exclusiveGroupIds` suppresses conflicting completed options before the cursor.
 `repeatableSubcommands` models sibling task values such as `gradle clean build`.
 
@@ -292,6 +295,7 @@ compiled from replay and are not a separate persisted learning family.
 | `path` | Bounded matching directory children for a lexical request. | Path eligibility, quoting, replacement, and local ranking. |
 | `fuzzyPath` | Already-matched, relevance-ordered entries from a bounded query. | Terminal path rules and final output limit. |
 | `gradleTask` | Complete host-bounded task snapshot. | Gradle matching, project scoping, replacement, and limit. |
+| `git` | Host-bounded `TerminalGitCompletionSnapshot` of local/tracking branches, tags, remotes, and the current branch. | Mode-dependent reference selection, component matching, refspec edits, and limit. |
 | `valueDomain` | Complete host-bounded values for the declared domain. | Matching, quoting, replacement, and limit. |
 
 Fuzzy providers own fuzzy matching; Gradle and value-domain providers leave
@@ -299,6 +303,14 @@ matching to the shared source. These loaders receive the immutable request and
 resolved context, not the engine's output limit. They require an independent
 visit, input, result, or time budget. A Gradle loader reads its available model;
 completion must not start Gradle to discover tasks.
+
+The Git source shares the value-domain matcher and shell replacement encoder.
+Standalone and IntelliJ loaders supply repository data without duplicating command
+policy. A plain composite refspec replaces only the active component; quoted or
+escaped tokens are re-encoded as one token to preserve literal values. Composite
+refspec editing excludes whole-command history so accepting a suggestion cannot
+replace the untouched component with a remembered command. The supported forms
+and local-data limitations live in the [capability catalog](../../docs/features/completion.md#sources-by-host).
 
 `valueDomainCandidates` projects already-loaded groups for aggregate providers
 without constructing a nested adapter per request. Optional canonical command

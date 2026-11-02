@@ -221,7 +221,11 @@ internal object GitCommandSpecs {
                                     listOf("--force-with-lease"),
                                     commandSpecText("spec.git.push.option.--force-with-lease.description"),
                                 ),
-                                TerminalOptionSpec(listOf("--all"), commandSpecText("spec.git.push.option.--all.description")),
+                                TerminalOptionSpec(
+                                    listOf("--all", "--branches"),
+                                    commandSpecText("spec.git.push.option.--all.description"),
+                                ),
+                                TerminalOptionSpec(listOf("--mirror"), commandSpecText("spec.git.push.option.--mirror.description")),
                                 TerminalOptionSpec(listOf("--tags"), commandSpecText("spec.git.push.option.--tags.description")),
                                 TerminalOptionSpec(listOf("-d", "--delete"), commandSpecText("spec.git.push.option.-d.description")),
                             ),
@@ -233,6 +237,7 @@ internal object GitCommandSpecs {
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("--all"), commandSpecText("spec.git.fetch.option.--all.description")),
+                                TerminalOptionSpec(listOf("--multiple"), commandSpecText("spec.git.fetch.option.--multiple.description")),
                                 TerminalOptionSpec(
                                     listOf("-p", "--prune"),
                                     commandSpecText("spec.git.fetch.option.-p.description"),

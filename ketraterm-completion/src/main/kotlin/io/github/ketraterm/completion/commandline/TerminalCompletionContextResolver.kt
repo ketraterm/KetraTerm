@@ -133,6 +133,7 @@ internal object TerminalCompletionContextResolver {
                 determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
             }
         val expectedHiddenPathPolicy = determineExpectedHiddenPathPolicy(activeOption, activePositionalArgument, lastCommand)
+        val gitCompletion = resolveGitCompletion(analysis, activePosition, expectedValueDomain, lineContext)
 
         return TerminalCompletionContext(
             commandLineContext = lineContext,
@@ -144,15 +145,26 @@ internal object TerminalCompletionContextResolver {
             activePositionalArgument = activePositionalArgument,
             usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
             optionsTerminated = optionsTerminated,
-            expectedPathKind = expectedPathKind,
+            expectedPathKind =
+                when (gitCompletion?.target) {
+                    GitCompletionTarget.NONE -> TerminalPathArgumentKind.NONE
+                    GitCompletionTarget.REMOTES -> TerminalPathArgumentKind.DIRECTORY
+                    else -> expectedPathKind
+                },
             expectedHiddenPathPolicy = expectedHiddenPathPolicy,
-            expectedValueDomain = expectedValueDomain,
+            expectedValueDomain =
+                when (gitCompletion?.target) {
+                    GitCompletionTarget.NONE -> TerminalCompletionValueDomain.NONE
+                    GitCompletionTarget.REMOTES -> TerminalCompletionValueDomain.GIT_REMOTE
+                    else -> expectedValueDomain
+                },
             subcommandCandidateSource = subcommandCandidateSource,
             staticValueCandidates = activeOption?.valueCandidates ?: activePositionalArgument?.valueCandidates ?: emptyList(),
             activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
             attachedOptionValue = attachedOptionValue,
-            optionValuesBeforeCursor = analysis.optionValues,
+            optionsBeforeCursor = analysis.options,
             precedingPositionalArguments = analysis.positionalArguments,
+            gitCompletion = gitCompletion,
         )
     }
 

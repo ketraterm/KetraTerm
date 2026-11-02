@@ -26,14 +26,14 @@ internal class CommandLineSemanticState(
     val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val pendingOptionValue: TerminalOptionSpec?,
-    val optionValues: List<ResolvedOptionValue>,
+    val options: List<ResolvedOption>,
     val positionalArguments: List<String>,
 )
 
-/** One completed option value associated with the spec resolved at its occurrence. */
-internal class ResolvedOptionValue(
+/** One completed option occurrence; null distinguishes a flag from an empty value. */
+internal class ResolvedOption(
     val option: TerminalOptionSpec,
-    val value: String,
+    val value: String?,
 )
 
 /** Analyzes a known command path once, retaining the state needed by completion. */
@@ -48,7 +48,7 @@ internal fun analyzeCommandTokens(
     var pendingOptionValue: TerminalOptionSpec? = null
     var acceptingSubcommands = true
     var optionsTerminated = false
-    var optionValues: ArrayList<ResolvedOptionValue>? = null
+    var options: ArrayList<ResolvedOption>? = null
     var positionalArguments: ArrayList<String>? = null
     commandPath += rootSpec
 
@@ -60,8 +60,8 @@ internal fun analyzeCommandTokens(
         val isPositional =
             when {
                 pendingOptionValue != null -> {
-                    val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
-                    values += ResolvedOptionValue(pendingOptionValue, token)
+                    val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                    values += ResolvedOption(pendingOptionValue, token)
                     pendingOptionValue = null
                     false
                 }
@@ -83,11 +83,14 @@ internal fun analyzeCommandTokens(
                         }
                         if (option.requiresValue) {
                             if (token.hasAttachedOptionValue()) {
-                                val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
-                                values += ResolvedOptionValue(option, token.substringAfter(OPTION_VALUE_SEPARATOR))
+                                val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                                values += ResolvedOption(option, token.substringAfter(OPTION_VALUE_SEPARATOR))
                             } else {
                                 pendingOptionValue = option
                             }
+                        } else {
+                            val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                            values += ResolvedOption(option, null)
                         }
                     }
                     false
@@ -118,7 +121,7 @@ internal fun analyzeCommandTokens(
         usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
         optionsTerminated = optionsTerminated,
         pendingOptionValue = pendingOptionValue,
-        optionValues = optionValues ?: emptyList(),
+        options = options ?: emptyList(),
         positionalArguments = positionalArguments ?: emptyList(),
     )
 }

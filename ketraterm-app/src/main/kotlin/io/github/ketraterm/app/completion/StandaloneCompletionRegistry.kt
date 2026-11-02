@@ -70,7 +70,10 @@ internal class StandaloneCompletionRegistry private constructor(
                 TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
                 TerminalCompletionSourcePrior.DIRECTORY_PATH,
             ),
-            TerminalCompletionSourceEntry(StandaloneGitCompletionSource(ioDispatcher), TerminalCompletionSourcePrior.GIT_REFERENCE),
+            TerminalCompletionSourceEntry(
+                TerminalCompletionSources.git(StandaloneGitCompletionLoader.SOURCE_ID, StandaloneGitCompletionLoader(ioDispatcher)::load),
+                TerminalCompletionSourcePrior.GIT_REFERENCE,
+            ),
         ).map { entry ->
             entry.copy(
                 source =
@@ -149,7 +152,7 @@ internal class StandaloneCompletionRegistry private constructor(
                         engine
                     },
                 contextProvider = contextProvider,
-                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash", StandaloneGitCompletionSource.SOURCE_ID to "Git"),
+                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash", StandaloneGitCompletionLoader.SOURCE_ID to "Git"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

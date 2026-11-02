@@ -13,7 +13,7 @@ promise stable APIs or behavior.
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(host/profile)` | Expose completion learning-reset actions in both products, including confirmation and persistence reset. |
-| `TODO(completion)` | Extend Git completion beyond ordinary remote/ref arguments: composite refspec editing (`+src:dst`, deletion and wildcard mappings), custom fetch mappings, and mode-specific argument forms such as `fetch --multiple`, `fetch --all`, and `push --delete`. Current supported forms are documented in [completion sources](features/completion.md#sources-by-host). |
+| `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 | `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
 | `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
 | `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |

@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -89,9 +90,9 @@ class IntellijCompletionRegistryTest {
             val scannedDirectories = mutableListOf<Path>()
             val sources =
                 listOf(
-                    intellijGitCompletionSource { uri ->
-                        referenceDirectories += uri
-                        IntellijGitCompletionSnapshot(
+                    TerminalCompletionSources.git("intellij-git-reference") { request, _ ->
+                        referenceDirectories += request.workingDirectoryUri
+                        TerminalGitCompletionSnapshot(
                             listOf(TerminalCompletionDomainValue("feature/selected")),
                             emptyList(),
                             emptyList(),
@@ -240,7 +241,7 @@ class IntellijCompletionRegistryTest {
             var loads = 0
             val source =
                 TerminalCompletionSources.valueDomain(
-                    sourceId = "intellij-git-branch",
+                    sourceId = "intellij-git-reference",
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     valuesProvider = { _, _ ->
                         loads++
@@ -257,7 +258,7 @@ class IntellijCompletionRegistryTest {
                 registry.createProvider(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
             val suggestions = resources.suggestions(request("git switch m")).last()
-            assertEquals("Git", suggestions.first { it.source == "intellij-git-branch" }.sourceDisplayText)
+            assertEquals("Git", suggestions.first { it.source == "intellij-git-reference" }.sourceDisplayText)
 
             assertEquals(1, loads)
             registry.closeAndFlush()

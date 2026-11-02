@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import kotlinx.coroutines.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,7 +59,7 @@ class IntellijCompletionLoaderBoundsTest {
     @Test
     fun `Git reference loader stops discovery when its request is cancelled`() =
         runBlocking {
-            lateinit var loading: Deferred<IntellijGitCompletionSnapshot>
+            lateinit var loading: Deferred<TerminalGitCompletionSnapshot>
             val localBranches =
                 CountingStringIterable(
                     valueAt = { index -> "local-$index" },

@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -44,7 +41,7 @@ class StandaloneGitCompletionSourceTest {
     fun `remote arguments query configuration and reference arguments select the appropriate branch group`() =
         runTest {
             val source =
-                StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { builder ->
+                StandaloneGitCompletionLoader(StandardTestDispatcher(testScheduler)) { builder ->
                     val output =
                         if (builder.command().last() == "remote") {
                             assertEquals(listOf("git", "--no-optional-locks", "--no-pager", "remote"), builder.command())
@@ -72,7 +69,7 @@ class StandaloneGitCompletionSourceTest {
     @Test
     fun `only local Git reference arguments start a process`() =
         runTest {
-            val source = StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { error("Unexpected Git process") }
+            val source = StandaloneGitCompletionLoader(StandardTestDispatcher(testScheduler)) { error("Unexpected Git process") }
             for (line in listOf(
                 "git s",
                 "git switch -",
@@ -88,7 +85,14 @@ class StandaloneGitCompletionSourceTest {
             }
             for (uri in listOf(null, "", "ssh://server/repo", "file://remote.example/repo", "file://wsl.localhost/Ubuntu/repo")) {
                 val request = request("git switch fe").copy(workingDirectoryUri = uri)
-                assertTrue(source.complete(request, TerminalCompletionContext.resolve(request), 20).isEmpty())
+                assertTrue(
+                    TerminalCompletionSources
+                        .git(
+                            "git",
+                            source::load,
+                        ).complete(request, TerminalCompletionContext.resolve(request), 20)
+                        .isEmpty(),
+                )
             }
         }
 
@@ -103,7 +107,7 @@ class StandaloneGitCompletionSourceTest {
                     " \u0000refs/tags/release\u0000\n"
             val processes = ArrayList<TestGitProcess>()
             val source =
-                StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { builder ->
+                StandaloneGitCompletionLoader(StandardTestDispatcher(testScheduler)) { builder ->
                     assertEquals(directory.toFile(), builder.directory())
                     assertEquals("git", builder.command().first())
                     assertTrue("for-each-ref" in builder.command())
@@ -123,7 +127,7 @@ class StandaloneGitCompletionSourceTest {
     fun `values use shared matching limits and shell escaping`() =
         runTest {
             val source =
-                StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) {
+                StandaloneGitCompletionLoader(StandardTestDispatcher(testScheduler)) {
                     TestGitProcess(" \u0000refs/heads/feature/o'hare\u0000\n \u0000refs/heads/other\u0000\n".toByteArray())
                 }
             val line = "git switch feature/o"
@@ -133,7 +137,7 @@ class StandaloneGitCompletionSourceTest {
             assertEquals(line.length, candidate.replacementEndOffset)
             val edited = "git switch " + candidate.replacementText
             assertEquals("feature/o'hare", TerminalCompletionContext.resolve(request(edited)).activePrefix)
-            assertEquals(StandaloneGitCompletionSource.SOURCE_ID, candidate.source)
+            assertEquals(StandaloneGitCompletionLoader.SOURCE_ID, candidate.source)
         }
 
     @Test
@@ -141,10 +145,10 @@ class StandaloneGitCompletionSourceTest {
         runTest {
             for (process in listOf(
                 TestGitProcess(" \u0000refs/heads/feature\u0000\n".toByteArray(), exitCode = 128),
-                TestGitProcess(ByteArray(StandaloneGitCompletionSource.MAX_OUTPUT_BYTES + 1) { 'a'.code.toByte() }),
+                TestGitProcess(ByteArray(StandaloneGitCompletionLoader.MAX_OUTPUT_BYTES + 1) { 'a'.code.toByte() }),
                 TestGitProcess("bad record\n \u0000refs/heads/\u0000\n \u0000refs/heads/bad\tname\u0000\n".toByteArray()),
             )) {
-                val source = StandaloneGitCompletionSource(StandardTestDispatcher(testScheduler)) { process }
+                val source = StandaloneGitCompletionLoader(StandardTestDispatcher(testScheduler)) { process }
                 assertTrue(complete(source, "git switch ").isEmpty())
                 assertTrue(process.destroyed.get())
             }
@@ -155,7 +159,7 @@ class StandaloneGitCompletionSourceTest {
         runBlocking {
             withTimeout(5.seconds) {
                 val process = TestGitProcess(blockRead = true)
-                val source = StandaloneGitCompletionSource { process }
+                val source = StandaloneGitCompletionLoader { process }
                 val query = launch { complete(source, "git switch ") }
                 try {
                     process.readStarted.await()
@@ -174,11 +178,11 @@ class StandaloneGitCompletionSourceTest {
             withTimeout(5.seconds) {
                 val scheduler = TestCoroutineScheduler()
                 val process = TestGitProcess(blockRead = true)
-                val source = StandaloneGitCompletionSource { process }
+                val source = StandaloneGitCompletionLoader { process }
                 val query = async(UnconfinedTestDispatcher(scheduler)) { complete(source, "git switch ") }
                 try {
                     process.readStarted.await()
-                    scheduler.advanceTimeBy(StandaloneGitCompletionSource.QUERY_TIMEOUT_MILLIS)
+                    scheduler.advanceTimeBy(StandaloneGitCompletionLoader.QUERY_TIMEOUT_MILLIS)
                     scheduler.runCurrent()
                     assertTrue(query.await().isEmpty())
                     assertTrue(process.destroyed.get())
@@ -190,12 +194,14 @@ class StandaloneGitCompletionSourceTest {
         }
 
     private suspend fun complete(
-        source: StandaloneGitCompletionSource,
+        source: StandaloneGitCompletionLoader,
         line: String,
         limit: Int = 20,
     ): List<TerminalCompletionCandidate> {
         val request = request(line)
-        return source.complete(request, TerminalCompletionContext.resolve(request), limit)
+        return TerminalCompletionSources
+            .git(StandaloneGitCompletionLoader.SOURCE_ID, source::load)
+            .complete(request, TerminalCompletionContext.resolve(request), limit)
     }
 
     private fun request(line: String) =

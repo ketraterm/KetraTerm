@@ -88,7 +88,7 @@ class StandaloneGitCompletionIntegrationTest {
             val line = "git -C 'first repo' -C '' switch feature-"
             val branch = suggestions(line).single()
             assertEquals("feature-first", branch.replacementText)
-            assertEquals(StandaloneGitCompletionSource.SOURCE_ID, branch.source)
+            assertEquals(StandaloneGitCompletionLoader.SOURCE_ID, branch.source)
             assertEquals(line.indexOf("feature-"), branch.replacementStartOffset)
             assertEquals(listOf("file-first.txt"), suggestions("git -C 'first repo' add file-").map { it.replacementText })
             assertEquals(listOf("release-first"), suggestions("git -C 'first repo' checkout release-").map { it.replacementText })
@@ -106,6 +106,17 @@ class StandaloneGitCompletionIntegrationTest {
             assertEquals(listOf("release-first"), suggestions("git -C 'first repo' push origin release-").map { it.replacementText })
             assertEquals(listOf("feature-first"), suggestions("git -C 'first repo' fetch origin fe").map { it.replacementText })
             assertEquals(listOf("feature-other"), suggestions("git -C 'first repo' pull upstream fe").map { it.replacementText })
+            assertEquals(listOf("feature-first"), suggestions("git -C 'first repo' push --delete origin fe").map { it.replacementText })
+            assertEquals(listOf("upstream"), suggestions("git -C 'first repo' fetch --multiple origin up").map { it.replacementText })
+            assertTrue(suggestions("git -C 'first repo' fetch --all ").isEmpty())
+            assertTrue(suggestions("git -C 'first repo' push --all origin ").isEmpty())
+            assertEquals(listOf("main"), suggestions("git -C 'first repo' push --tags origin ma").map { it.replacementText })
+            val refspec = "git -C 'first repo' push origin +main:fe"
+            val refspecEdit = suggestions(refspec).single()
+            assertEquals(
+                "git -C 'first repo' push origin +main:feature-first",
+                refspec.replaceRange(refspecEdit.replacementStartOffset, refspecEdit.replacementEndOffset, refspecEdit.replacementText),
+            )
 
             workingDirectory = second.toUri().toString()
             assertEquals(listOf("secondary"), suggestions("git fetch sec").map { it.replacementText })

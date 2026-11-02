@@ -75,9 +75,25 @@ known tracking branches of the selected remote without its prefix; for example,
 remotes are available even before any refs have been fetched. These sources make
 no network requests and do not claim to enumerate the remote server's current refs.
 
+Git modes refine these arguments: `push --delete` offers the selected remote's
+locally known branches; `fetch --multiple` offers remaining configured remotes.
+`fetch --all` stops repository/ref suggestions, and `push --all` (or `--branches`)
+and `push --mirror` stop ref suggestions after the repository. Options remain
+available in these modes. `push --tags` still accepts explicit refspecs.
+
+For `push`, `fetch`, and `pull`, ordinary `[+]<source>:<destination>` refspecs
+complete the component at the cursor. Push reads the source locally and the
+destination from the selected remote's tracking branches; fetch/pull reverse
+those roles. Empty-source push deletion (`:branch`) is supported. Plain tokens
+receive a component-only edit, preserving the force marker and other component.
+Quoted or escaped tokens use shell encoding to preserve both components' literal
+values. Whole-command history is suppressed while editing a composite refspec.
+Wildcard, negative, and malformed multi-colon refspecs are left untouched.
+
 Standalone queries the host's `git for-each-ref` for references and `git remote`
 for remote names; `checkout`, `merge`, and `rebase` receive remote branches and tags.
-Outside push, the current local branch is omitted; symbolic remote aliases are
+The current local branch is included for push sources and local refspec destinations;
+otherwise it is omitted. Symbolic remote aliases are
 also omitted. Each eligible request refreshes the data,
 with at most 8192 values, 1 MiB of output, and a 1.5-second process deadline.
 Cancellation terminates the query. Requests without a resolvable local directory
@@ -175,7 +191,7 @@ active keymap. Shell-native Tab completion remains a separate facility.
 | --- | --- |
 | Catalog | Replace or extend command specifications and localize descriptions without changing command tokens. |
 | Sources | Register custom asynchronous sources with bounded priorities and a failure-reporting callback. |
-| Source adapters | Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, or dynamic argument values. |
+| Source adapters | Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, Git snapshots, or dynamic argument values. |
 | Learning | Supply a shared learning store and replay policy; enable ranking evidence independently of command replay. |
 | Presentation | Replace the provider, popup view, suggestion keymap, or entire presentation target; customize source labels. |
 | Editing and feedback | Supply request-scoped edit authority and observe acceptance/dismissal outcomes. |

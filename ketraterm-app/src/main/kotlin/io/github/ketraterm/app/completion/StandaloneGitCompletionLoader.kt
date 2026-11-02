@@ -15,44 +15,43 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import kotlinx.coroutines.*
 import java.nio.ByteBuffer
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Reads local Git references on demand; process lifetime belongs to the completion request. */
-internal class StandaloneGitCompletionSource(
+internal class StandaloneGitCompletionLoader(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val startProcess: (ProcessBuilder) -> Process = ProcessBuilder::start,
-) : TerminalCompletionSource {
-    override suspend fun complete(
+) {
+    suspend fun load(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
-        limit: Int,
-    ): List<TerminalCompletionCandidate> {
-        require(limit > 0)
-        val domain = context.expectedValueDomain
-        if (context.command?.name != "git" ||
-            (domain != TerminalCompletionValueDomain.GIT_BRANCH && domain != TerminalCompletionValueDomain.GIT_REMOTE)
-        ) {
-            return emptyList()
-        }
-        val directory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return emptyList()
-        val remotes = domain == TerminalCompletionValueDomain.GIT_REMOTE
-        val output = readGit(directory, if (remotes) listOf("remote") else REFERENCE_ARGUMENTS) ?: return emptyList()
-        val includeRemote = context.currentCommand?.name in REMOTE_REFERENCE_COMMANDS
-        val incoming = context.currentCommand?.name in INCOMING_REFERENCE_COMMANDS
-        val remotePrefix = context.precedingPositionalArguments.firstOrNull()?.let { "$it/" }
-        val values = ArrayList<TerminalCompletionDomainValue>()
+    ): TerminalGitCompletionSnapshot {
+        val directory =
+            TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri)
+                ?: return TerminalGitCompletionSnapshot()
+        val remotes = context.expectedValueDomain == TerminalCompletionValueDomain.GIT_REMOTE
+        val output =
+            readGit(directory, if (remotes) listOf("remote") else REFERENCE_ARGUMENTS)
+                ?: return TerminalGitCompletionSnapshot()
+        val localBranches = ArrayList<TerminalCompletionDomainValue>()
+        val remoteBranches = ArrayList<TerminalCompletionDomainValue>()
+        val tags = ArrayList<TerminalCompletionDomainValue>()
+        val remoteNames = ArrayList<TerminalCompletionDomainValue>()
+        var currentBranch: String? = null
         for (line in output.lineSequence().take(MAX_REFERENCES)) {
             currentCoroutineContext().ensureActive()
             if (remotes) {
                 if (line.isNotEmpty() && line.length <= 4096 && line.none { it.isISOControl() || it.isWhitespace() }) {
-                    values += TerminalCompletionDomainValue(line, detail = "remote")
+                    remoteNames += TerminalCompletionDomainValue(line, detail = "remote")
                 }
                 continue
             }
@@ -60,32 +59,20 @@ internal class StandaloneGitCompletionSource(
             if (fields.size != 3 || (fields[0] != " " && fields[0] != "*") || fields[2].isNotEmpty()) continue
             val ref = fields[1]
             if (ref.length > 4096 || ref.endsWith('/') || ref.any { it.isISOControl() || it.isWhitespace() }) continue
-            if (incoming) {
-                if (remotePrefix != null && ref.startsWith("refs/remotes/$remotePrefix")) {
-                    values += TerminalCompletionDomainValue(ref.removePrefix("refs/remotes/$remotePrefix"), detail = "remote branch")
+            when {
+                ref.startsWith("refs/heads/") -> {
+                    val name = ref.removePrefix("refs/heads/")
+                    if (fields[0] == "*") currentBranch = name
+                    localBranches += TerminalCompletionDomainValue(name, detail = "local branch", scoreAdjustment = 2)
                 }
-                continue
-            }
-            val value =
-                when {
-                    ref.startsWith("refs/heads/") && (fields[0] != "*" || context.currentCommand?.name == "push") ->
-                        TerminalCompletionDomainValue(ref.removePrefix("refs/heads/"), detail = "local branch", scoreAdjustment = 2)
-                    includeRemote && ref.startsWith("refs/remotes/") ->
+                ref.startsWith("refs/remotes/") ->
+                    remoteBranches +=
                         TerminalCompletionDomainValue(ref.removePrefix("refs/remotes/"), detail = "remote branch", scoreAdjustment = 1)
-                    (includeRemote || context.currentCommand?.name == "push") && ref.startsWith("refs/tags/") ->
-                        TerminalCompletionDomainValue(ref.removePrefix("refs/tags/"), detail = "tag")
-                    else -> null
-                }
-            if (value != null) values += value
+                ref.startsWith("refs/tags/") ->
+                    tags += TerminalCompletionDomainValue(ref.removePrefix("refs/tags/"), detail = "tag")
+            }
         }
-        return TerminalCompletionSources.valueDomainCandidates(
-            request,
-            context,
-            domain,
-            SOURCE_ID,
-            values,
-            limit,
-        )
+        return TerminalGitCompletionSnapshot(localBranches, remoteBranches, tags, remoteNames, currentBranch)
     }
 
     private suspend fun readGit(
@@ -135,8 +122,6 @@ internal class StandaloneGitCompletionSource(
         const val MAX_REFERENCES = 8192
         const val MAX_OUTPUT_BYTES = 1_048_576
         const val QUERY_TIMEOUT_MILLIS = 1500L
-        private val REMOTE_REFERENCE_COMMANDS = setOf("checkout", "merge", "rebase")
-        private val INCOMING_REFERENCE_COMMANDS = setOf("fetch", "pull")
         private val REFERENCE_ARGUMENTS =
             listOf(
                 "for-each-ref",

@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.AttachedOptionValue
-import io.github.ketraterm.completion.commandline.ResolvedOptionValue
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.model.*
 import java.util.Collections.unmodifiableList
 import java.util.List.copyOf
@@ -95,13 +92,18 @@ public class TerminalCompletionContext
         staticValueCandidates: List<String> = emptyList(),
         public val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
-        optionValuesBeforeCursor: List<ResolvedOptionValue> = emptyList(),
+        optionsBeforeCursor: List<ResolvedOption> = emptyList(),
         precedingPositionalArguments: List<String> = emptyList(),
+        internal val gitCompletion: GitCompletionContext? = null,
     ) {
         public val commandPath: List<TerminalCommandSpec> = copyOf(commandPath)
         public val usedOptionExclusiveGroupIds: Set<String> = copySetOf(usedOptionExclusiveGroupIds)
         public val staticValueCandidates: List<String> = copyOf(staticValueCandidates)
-        private val optionValuesBeforeCursor = copyOf(optionValuesBeforeCursor)
+        private val optionsBeforeCursor = copyOf(optionsBeforeCursor)
+
+        /** False on shell operators, exhausted modeled arguments, or unsupported refspec expressions. */
+        public val isCompletionAllowed: Boolean
+            get() = activePosition != TerminalCompletionActivePosition.OPERATOR && gitCompletion?.target != GitCompletionTarget.NONE
 
         /**
          * Decoded words after the executable and strictly before the active token,
@@ -146,8 +148,8 @@ public class TerminalCompletionContext
         public fun precedingOptionValues(optionName: String): List<String> {
             val name = optionName.trim()
             var result: ArrayList<String>? = null
-            for (entry in optionValuesBeforeCursor) {
-                if (name in entry.option.names) {
+            for (entry in optionsBeforeCursor) {
+                if (name in entry.option.names && entry.value != null) {
                     val values = result ?: ArrayList<String>().also { result = it }
                     values += entry.value
                 }

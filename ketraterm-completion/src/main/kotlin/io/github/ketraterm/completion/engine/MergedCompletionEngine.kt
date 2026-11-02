@@ -73,7 +73,7 @@ internal class MergedCompletionEngine(
             }
 
             val completionContext = TerminalCompletionContext.resolve(request, commandSpecs)
-            if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) {
+            if (!completionContext.isCompletionAllowed) {
                 send(emptyList())
                 return@channelFlow
             }
@@ -82,7 +82,10 @@ internal class MergedCompletionEngine(
             val shellCandidates = if (shellProvider != null && !structuredArguments) completeShell(request, completionContext) else null
             val nativeArguments = !commandPosition && shellCandidates != null
             val activeSources = if (nativeArguments) emptyList() else sources
-            val includeHistory = !nativeArguments && !completionContext.commandLineContext.precededByOperator
+            val includeHistory =
+                !nativeArguments &&
+                    !completionContext.commandLineContext.precededByOperator &&
+                    completionContext.gitCompletion?.refspecEnd == null
             val availableCommands =
                 if (commandPosition) {
                     shellCandidates?.mapNotNull { commandName(request, it) }?.toHashSet()

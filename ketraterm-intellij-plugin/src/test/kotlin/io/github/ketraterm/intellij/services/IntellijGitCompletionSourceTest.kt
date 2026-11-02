@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -86,8 +87,8 @@ class IntellijGitCompletionSourceTest {
             assertEquals(1, loads)
             assertEquals("file:///repo", requestedDirectory)
             assertEquals(
-                setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
-                candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
+                setOf("feature/local", "origin/feature", "v1.0"),
+                candidates.mapTo(HashSet(), TerminalCompletionCandidate::replacementText),
             )
         }
 
@@ -96,7 +97,7 @@ class IntellijGitCompletionSourceTest {
         runBlocking {
             val candidates = engine { _ -> snapshot() }.complete(request("git switch "))
 
-            assertEquals(listOf("intellij-git-branch"), candidates.map { it.source }.distinct())
+            assertEquals(listOf("intellij-git-reference"), candidates.map { it.source }.distinct())
             assertEquals(listOf("feature/local"), candidates.map { it.replacementText })
         }
 
@@ -107,8 +108,8 @@ class IntellijGitCompletionSourceTest {
                 val candidates = engine { _ -> snapshot() }.complete(request("git $subcommand "))
 
                 assertEquals(
-                    setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
-                    candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
+                    setOf("feature/local", "origin/feature", "v1.0"),
+                    candidates.mapTo(HashSet(), TerminalCompletionCandidate::replacementText),
                 )
             }
         }
@@ -139,19 +140,22 @@ class IntellijGitCompletionSourceTest {
             assertEquals(3, candidates.size)
         }
 
-    private fun engine(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionEngine =
+    private fun engine(loader: suspend (String?) -> TerminalGitCompletionSnapshot): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(
             sources =
                 listOf(
                     TerminalCompletionSourceEntry(
-                        source = intellijGitCompletionSource(loader),
+                        source =
+                            TerminalCompletionSources.git(
+                                "intellij-git-reference",
+                            ) { request, _ -> loader(request.workingDirectoryUri) },
                         priority = TerminalCompletionSourcePrior.GIT_REFERENCE,
                     ),
                 ),
         )
 
     private fun snapshot() =
-        IntellijGitCompletionSnapshot(
+        TerminalGitCompletionSnapshot(
             localBranches = listOf(TerminalCompletionDomainValue("feature/local", detail = "local branch")),
             remoteBranches = listOf(TerminalCompletionDomainValue("origin/feature", detail = "remote branch")),
             tags = listOf(TerminalCompletionDomainValue("v1.0", detail = "tag")),
