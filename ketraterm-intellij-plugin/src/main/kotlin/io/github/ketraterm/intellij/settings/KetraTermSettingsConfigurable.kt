@@ -113,14 +113,12 @@ class KetraTermSettingsConfigurable internal constructor(
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
 
-    // TODO(host/profile): SUGGESTION_SETTINGS: Uncomment all matching blocks here and in MyMessageBundle.properties
-    // together; see docs/terminal-feature-gap-map.md. Keep the master default off.
-    // private val smartSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
-    // private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
-    // private val acceptSelectedSuggestionWithEnterCheckBox =
-    //     JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
-    // private val completionLearningPersistenceCheckBox =
-    //     JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
+    private val smartSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
+    private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val acceptSelectedSuggestionWithEnterCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
+    private val completionLearningPersistenceCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
     private val showForegroundProcessNameCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.showForegroundProcessName"))
 
@@ -252,22 +250,21 @@ class KetraTermSettingsConfigurable internal constructor(
                     row {
                         cell(overrideIdeShortcutsCheckBox)
                     }
-                    // TODO(host/profile): SUGGESTION_SETTINGS: Restore rows with their fields and Apply/Reset bindings.
-                    // row {
-                    //     cell(smartSuggestionsCheckBox)
-                    // }
-                    // row {
-                    //     cell(shellSuggestionsCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
-                    // }
-                    // row {
-                    //     cell(acceptSelectedSuggestionWithEnterCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
-                    // }
-                    // row {
-                    //     cell(completionLearningPersistenceCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
-                    // }
+                    row {
+                        cell(smartSuggestionsCheckBox)
+                    }
+                    row {
+                        cell(shellSuggestionsCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
+                    }
+                    row {
+                        cell(acceptSelectedSuggestionWithEnterCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
+                    }
+                    row {
+                        cell(completionLearningPersistenceCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
+                    }
                     // TODO(host/profile): Reconnect the completion service's learning-reset action before restoring its button.
                     row {
                         cell(scrollOnOutputCheckBox)
@@ -342,11 +339,10 @@ class KetraTermSettingsConfigurable internal constructor(
         commandFinishedAlertThresholdSpinner.value = state.commandFinishedAlertThresholdSeconds
         pasteOnMiddleClickCheckBox.isSelected = state.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = state.overrideIdeShortcuts
-        // TODO(host/profile): SUGGESTION_SETTINGS: Restore state loading with the controls.
-        // smartSuggestionsCheckBox.isSelected = state.smartSuggestionsEnabled
-        // shellSuggestionsCheckBox.isSelected = state.shellSuggestionsEnabled
-        // acceptSelectedSuggestionWithEnterCheckBox.isSelected = state.acceptSelectedSuggestionWithEnter
-        // completionLearningPersistenceCheckBox.isSelected = state.completionLearningPersistenceEnabled
+        smartSuggestionsCheckBox.isSelected = state.smartSuggestionsEnabled
+        shellSuggestionsCheckBox.isSelected = state.shellSuggestionsEnabled
+        acceptSelectedSuggestionWithEnterCheckBox.isSelected = state.acceptSelectedSuggestionWithEnter
+        completionLearningPersistenceCheckBox.isSelected = state.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = state.scrollOnOutput
         showForegroundProcessNameCheckBox.isSelected = state.showForegroundProcessName
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == state.pasteSanitization }
@@ -377,11 +373,10 @@ class KetraTermSettingsConfigurable internal constructor(
             commandFinishedAlertThresholdSeconds = spinnerValue(commandFinishedAlertThresholdSpinner),
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
-            // TODO(host/profile): SUGGESTION_SETTINGS: Restore with the controls; omitted fields preserve hidden preferences.
-            // smartSuggestionsEnabled = smartSuggestionsCheckBox.isSelected,
-            // shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
-            // acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
-            // completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
+            smartSuggestionsEnabled = smartSuggestionsCheckBox.isSelected,
+            shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
+            completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
             shellPath = selectedShellPath(),

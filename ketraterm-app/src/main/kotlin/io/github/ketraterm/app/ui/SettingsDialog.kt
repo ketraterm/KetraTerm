@@ -239,16 +239,14 @@ internal class SettingsDialog(
     private val shellRequestWindowManipulationCheckbox =
         JCheckBox(appMessages.text("settings.allowWindowManipulation"), settings.config.shellRequestWindowManipulation)
 
-    // TODO(host/profile): SUGGESTION_SETTINGS: Uncomment all matching blocks in this file together
-    // when restoring the controls; see docs/terminal-feature-gap-map.md. Keep the master default off.
-    // private val smartSuggestionsCheckbox =
-    //     JCheckBox("Enable smart suggestions", settings.config.smartSuggestionsEnabled)
-    // private val shellSuggestionsCheckbox =
-    //     JCheckBox("Show shell suggestions automatically", settings.config.shellSuggestionsEnabled)
-    // private val acceptSelectedSuggestionWithEnterCheckbox =
-    //     JCheckBox("Accept selected suggestion with Enter", settings.config.acceptSelectedSuggestionWithEnter)
-    // private val persistentSuggestionLearningCheckbox =
-    //     JCheckBox("Persist suggestion learning", settings.config.persistentSuggestionLearningEnabled)
+    private val smartSuggestionsCheckbox =
+        JCheckBox(appMessages.text("settings.smartSuggestions"), settings.config.smartSuggestionsEnabled)
+    private val shellSuggestionsCheckbox =
+        JCheckBox(appMessages.text("settings.shellSuggestions"), settings.config.shellSuggestionsEnabled)
+    private val acceptSelectedSuggestionWithEnterCheckbox =
+        JCheckBox(appMessages.text("settings.acceptSuggestionWithEnter"), settings.config.acceptSelectedSuggestionWithEnter)
+    private val persistentSuggestionLearningCheckbox =
+        JCheckBox(appMessages.text("settings.persistSuggestionLearning"), settings.config.persistentSuggestionLearningEnabled)
     private val scrollOnOutputCheckbox = JCheckBox(appMessages.text("settings.scrollOnOutput"), settings.config.scrollOnOutput)
     private val showForegroundProcessNameCheckbox =
         JCheckBox(appMessages.text("settings.processTitle"), settings.config.showForegroundProcessName)
@@ -352,11 +350,10 @@ internal class SettingsDialog(
         registerChangeListener(pasteSanitizationCombo, updateApplyState)
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
-        // TODO(host/profile): SUGGESTION_SETTINGS: Restore Apply-button tracking with the controls.
-        // registerChangeListener(smartSuggestionsCheckbox, updateApplyState)
-        // registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
-        // registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
-        // registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
+        registerChangeListener(smartSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
+        registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
         registerChangeListener(showForegroundProcessNameCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
@@ -602,24 +599,28 @@ internal class SettingsDialog(
         )
         panel.add(keyboardSection)
 
-        // TODO(host/profile): SUGGESTION_SETTINGS: Restore the section with its fields and bindings.
-        // panel.add(SectionHeader("Shell Suggestions"))
-        // val suggestionsSection = createSectionPanel()
-        // addCheckboxRow(suggestionsSection, 0, smartSuggestionsCheckbox, "Enable suggestions and local learning.")
-        // addCheckboxRow(
-        //     suggestionsSection,
-        //     2,
-        //     shellSuggestionsCheckbox,
-        //     "Show suggestions while typing. Ctrl+Space requests them manually when smart suggestions are enabled.",
-        // )
-        // addCheckboxRow(
-        //     suggestionsSection,
-        //     4,
-        //     acceptSelectedSuggestionWithEnterCheckbox,
-        //     "Insert the highlighted suggestion with Enter. With no selection, Enter runs the command normally.",
-        // )
-        // addCheckboxRow(suggestionsSection, 6, persistentSuggestionLearningCheckbox, "Save learning across app restarts.")
-        // panel.add(suggestionsSection)
+        panel.add(SectionHeader(appMessages.text("settings.suggestions")))
+        val suggestionsSection = createSectionPanel()
+        addCheckboxRow(suggestionsSection, 0, smartSuggestionsCheckbox, appMessages.text("settings.smartSuggestions.description"))
+        addCheckboxRow(
+            suggestionsSection,
+            2,
+            shellSuggestionsCheckbox,
+            appMessages.text("settings.shellSuggestions.description"),
+        )
+        addCheckboxRow(
+            suggestionsSection,
+            4,
+            acceptSelectedSuggestionWithEnterCheckbox,
+            appMessages.text("settings.acceptSuggestionWithEnter.description"),
+        )
+        addCheckboxRow(
+            suggestionsSection,
+            6,
+            persistentSuggestionLearningCheckbox,
+            appMessages.text("settings.persistSuggestionLearning.description"),
+        )
+        panel.add(suggestionsSection)
         // TODO(host/profile): Reconnect the host learning-reset callback before restoring its confirmation button.
 
         panel.add(SectionHeader(appMessages.text("settings.mouse")))
@@ -862,11 +863,10 @@ internal class SettingsDialog(
             }
         shellRequestResizeWindowCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
-        // TODO(host/profile): SUGGESTION_SETTINGS: Restore defaults only when these preferences are visible.
-        // smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
-        // shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
-        // acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
-        // persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
+        smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
+        shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
+        acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
+        persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = KetraTermConfig.DEFAULT_SCROLL_ON_OUTPUT
         showForegroundProcessNameCheckbox.isSelected = KetraTermConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
         cursorBlinkSpinner.value = KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS
@@ -1001,11 +1001,10 @@ internal class SettingsDialog(
             lineHeight = (lineHeightSpinner.value as Number).toFloat(),
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
-            // TODO(host/profile): SUGGESTION_SETTINGS: Restore with the controls; omitted fields preserve hidden preferences.
-            // smartSuggestionsEnabled = smartSuggestionsCheckbox.isSelected,
-            // shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
-            // acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
-            // persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
+            smartSuggestionsEnabled = smartSuggestionsCheckbox.isSelected,
+            shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
+            persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
             clipboardWrite = clipboardWriteCombo.selectedItem as TerminalClipboardPermission,
             clipboardRead = clipboardReadCombo.selectedItem as TerminalClipboardPermission,
             clipboardMaxDecodedBytes =

@@ -19,8 +19,8 @@ separate user action.
 ## Completion learning
 
 Persistence is opt-in and requires completion to be enabled. Standalone uses
-`suggestion_learning_persistence_enabled` under `[behavior]`. Product settings
-controls are currently hidden; see [completion availability](../features/completion.md#availability).
+`suggestion_learning_persistence_enabled` under `[behavior]`. Both products expose
+the persistence preference in settings; see [completion availability](../features/completion.md#availability).
 
 A product starting with persistence disabled neither loads nor writes the
 learning file. Enabling hydrates the fixed file once. Disabling prevents new

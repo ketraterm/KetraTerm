@@ -314,7 +314,7 @@ class KetraTermIntellijSettings :
             }
         internal const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         internal const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
-        internal const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
+        internal const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = true
         internal val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
         internal const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
         internal const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true

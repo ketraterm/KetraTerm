@@ -36,7 +36,7 @@ and choose a minimum duration (10 seconds initially). Shell integration must rep
 command completion; alerts appear only while that terminal pane has no keyboard
 focus, and their text omits the command line.
 
-Completion is disabled by default and its settings controls are hidden; see
+Completion is enabled by default and configurable in KetraTerm settings; see
 [completion availability](../docs/features/completion.md#availability).
 
 The **Project** settings page accepts a single startup command. The command is

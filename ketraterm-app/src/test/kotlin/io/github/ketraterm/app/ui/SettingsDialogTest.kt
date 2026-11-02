@@ -242,7 +242,7 @@ class SettingsDialogTest {
     }
 
     @Test
-    fun `dialog preserves configured clipboard permissions and hidden preferences on unrelated save`() {
+    fun `dialog preserves configured clipboard permissions and suggestion preferences on unrelated save`() {
         withDialog { settings, dialog, closed ->
             onEdt {
                 val theme = components(dialog).filterIsInstance<JComboBox<*>>().first { it.selectedItem is TerminalTheme }
@@ -261,7 +261,7 @@ class SettingsDialogTest {
     }
 
     @Test
-    fun `reset selects the actual default theme and preserves hidden preferences`() {
+    fun `reset restores the actual default theme and suggestion preferences`() {
         withDialog { settings, dialog, closed ->
             onEdt {
                 button(dialog, "Reset to Defaults").doClick()
@@ -275,9 +275,35 @@ class SettingsDialogTest {
             assertEquals(TerminalClipboardPermission.PROMPT, settings.createHostPolicy().clipboardPolicy.readPermission)
             assertEquals(TerminalClipboardPermission.ALLOW, settings.config.clipboardWrite)
             assertTrue(settings.config.smartSuggestionsEnabled)
-            assertFalse(settings.config.shellSuggestionsEnabled)
-            assertFalse(settings.config.acceptSelectedSuggestionWithEnter)
-            assertTrue(settings.config.persistentSuggestionLearningEnabled)
+            assertTrue(settings.config.shellSuggestionsEnabled)
+            assertTrue(settings.config.acceptSelectedSuggestionWithEnter)
+            assertFalse(settings.config.persistentSuggestionLearningEnabled)
+        }
+    }
+
+    @Test
+    fun `suggestion controls track changes and persist independently`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val checkboxes = components(dialog).filterIsInstance<JCheckBox>().associateBy { it.text }
+                val smart = checkboxes.getValue("Enable smart suggestions")
+                val automatic = checkboxes.getValue("Show shell suggestions automatically")
+                val enter = checkboxes.getValue("Accept selected suggestion with Enter")
+                val persistence = checkboxes.getValue("Persist suggestion learning")
+                assertTrue(smart.isSelected)
+                assertFalse(automatic.isSelected)
+                assertFalse(enter.isSelected)
+                assertTrue(persistence.isSelected)
+                assertFalse(button(dialog, "Apply").isEnabled)
+                for (checkbox in listOf(smart, automatic, enter, persistence)) checkbox.doClick()
+                assertTrue(button(dialog, "Apply").isEnabled)
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertFalse(settings.config.smartSuggestionsEnabled)
+            assertTrue(settings.config.shellSuggestionsEnabled)
+            assertTrue(settings.config.acceptSelectedSuggestionWithEnter)
+            assertFalse(settings.config.persistentSuggestionLearningEnabled)
         }
     }
 

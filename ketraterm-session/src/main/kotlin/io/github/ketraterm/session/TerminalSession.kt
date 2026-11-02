@@ -705,7 +705,7 @@ public class TerminalSession private constructor(
         return try {
             withTimeoutOrNull(2_000.milliseconds) { query.deferred.await() }
         } finally {
-            query.deferred.cancel()
+            query.deferred.cancel(CancellationException("Shell completion request ended"))
         }
     }
 
@@ -1818,7 +1818,7 @@ public class TerminalSession private constructor(
                 runtime.shellCompletion
                     .close()
                     ?.deferred
-                    ?.cancel()
+                    ?.cancel(CancellationException("Terminal session closed"))
             }
             cleanup { outboundWriter.close() }
             cleanup {

@@ -199,7 +199,7 @@ internal data class KetraTermConfig(
         const val DEFAULT_COMMAND_FINISHED_ALERT_THRESHOLD_SECONDS: Int = TerminalCommandFinishedAlerts.DEFAULT_MINIMUM_DURATION_SECONDS
         const val COMMAND_FINISHED_ALERT_THRESHOLD_MIN: Int = TerminalCommandFinishedAlerts.MINIMUM_DURATION_SECONDS
         const val COMMAND_FINISHED_ALERT_THRESHOLD_MAX: Int = TerminalCommandFinishedAlerts.MAXIMUM_DURATION_SECONDS
-        const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
+        const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false

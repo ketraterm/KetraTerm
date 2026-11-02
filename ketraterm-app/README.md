@@ -51,8 +51,9 @@ for file locations, recognized keys, defaults, and recovery behavior. Restart th
 application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
-Completion controls are currently hidden; see [completion availability](../docs/features/completion.md)
-for enabling suggestions through the configuration file.
+Suggestions are enabled by default. Use the Shell Suggestions section in settings
+to control completion, automatic popups, Enter acceptance, and learning persistence;
+see [completion availability](../docs/features/completion.md).
 
 Native local profiles receive a small `ketra` companion command:
 

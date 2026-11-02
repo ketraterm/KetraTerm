@@ -322,17 +322,17 @@ class KetraTermConfigTest {
     }
 
     @Test
-    fun `missing master flag stays off even when legacy preferences are on`() {
+    fun `missing master flag enables suggestions and explicit disable survives persistence`() {
         val directory = Files.createTempDirectory("ketraterm-suggestions-default")
         val path = directory.resolve("config.toml")
         try {
             Files.writeString(path, "[behavior]\nshell_suggestions_enabled = true\npersistent_suggestion_learning_enabled = true\n")
             val manager = KetraTermConfigManager(path)
             val config = manager.load()
-            assertFalse(config.smartSuggestionsEnabled)
-            manager.save(config.copy(smartSuggestionsEnabled = true))
-            assertTrue(manager.load().smartSuggestionsEnabled)
-            assertTrue(Files.readString(path).contains("smart_suggestions_enabled = true"))
+            assertTrue(config.smartSuggestionsEnabled)
+            manager.save(config.copy(smartSuggestionsEnabled = false))
+            assertFalse(manager.load().smartSuggestionsEnabled)
+            assertTrue(Files.readString(path).contains("smart_suggestions_enabled = false"))
         } finally {
             Files.deleteIfExists(path)
             Files.deleteIfExists(directory)
@@ -451,7 +451,7 @@ class KetraTermConfigTest {
         assertEquals(PasteControlPolicy.PRESERVE, config.pasteControlPolicy)
         assertFalse(config.shellRequestResizeWindow)
         assertFalse(config.shellRequestWindowManipulation)
-        assertFalse(config.smartSuggestionsEnabled)
+        assertTrue(config.smartSuggestionsEnabled)
         assertTrue(config.shellSuggestionsEnabled)
         assertTrue(config.acceptSelectedSuggestionWithEnter)
         assertFalse(config.persistentSuggestionLearningEnabled)

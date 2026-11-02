@@ -6,10 +6,11 @@ a terminal or use the Swing/IntelliJ suggestion UI.
 
 ## Availability
 
-Completion is **disabled by default in both products**. Its settings controls
-are currently hidden. Standalone users can enable `smart_suggestions_enabled`
-in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md);
-the IntelliJ plugin retains persisted preferences but exposes no settings toggle.
+Completion and automatic suggestions are **enabled by default in both products**.
+Settings expose the master switch, automatic popups, Enter acceptance, and optional
+learning persistence. Standalone users can also set `smart_suggestions_enabled`
+in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
+Explicit saved preferences remain effective.
 Library hosts enable and configure their own provider and presentation.
 
 Terminal suggestions require an editable command context, normally supplied by

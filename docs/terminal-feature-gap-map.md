@@ -8,7 +8,7 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(host/profile)` | Restore completion settings controls and learning-reset actions in both products, with defaults, persistence, and tests updated together. The master switch remains off by default. |
+| `TODO(host/profile)` | Expose completion learning-reset actions in both products, including confirmation and persistence reset. |
 | `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
 | `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
 | `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |

@@ -272,7 +272,7 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
         }
     }
 
-    fun testHiddenSuggestionPreferencesSurviveApply() {
+    fun testSuggestionControlsApplyIndependentlyAndResetUnsavedChanges() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state
         val configurable = KetraTermSettingsConfigurable()
@@ -287,20 +287,36 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
             )
             val component = configurable.createComponent()
             configurable.reset()
-            val texts =
-                descendants(component).mapNotNull {
-                    when (it) {
-                        is AbstractButton -> it.text
-                        is JLabel -> it.text
-                        else -> null
-                    }
-                }
-            assertFalse(texts.any { it.contains("suggest", ignoreCase = true) || it.contains("learning", ignoreCase = true) })
+            val buttons = descendants(component).filterIsInstance<AbstractButton>().associateBy { it.text }
+            val smart = buttons.getValue(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
+            val automatic = buttons.getValue(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+            val enter = buttons.getValue(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
+            val persistence = buttons.getValue(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
+            assertTrue(smart.isSelected)
+            assertFalse(automatic.isSelected)
+            assertFalse(enter.isSelected)
+            assertTrue(persistence.isSelected)
+            assertFalse(configurable.isModified())
             configurable.apply()
             assertTrue(settings.state.smartSuggestionsEnabled)
             assertFalse(settings.state.shellSuggestionsEnabled)
             assertFalse(settings.state.acceptSelectedSuggestionWithEnter)
             assertTrue(settings.state.completionLearningPersistenceEnabled)
+            for (button in listOf(smart, automatic, enter, persistence)) button.isSelected = !button.isSelected
+            assertTrue(configurable.isModified())
+            configurable.reset()
+            assertFalse(configurable.isModified())
+            assertTrue(smart.isSelected)
+            assertFalse(automatic.isSelected)
+            assertFalse(enter.isSelected)
+            assertTrue(persistence.isSelected)
+            for (button in listOf(smart, automatic, enter, persistence)) button.isSelected = !button.isSelected
+            configurable.apply()
+            assertFalse(configurable.isModified())
+            assertFalse(settings.state.smartSuggestionsEnabled)
+            assertTrue(settings.state.shellSuggestionsEnabled)
+            assertTrue(settings.state.acceptSelectedSuggestionWithEnter)
+            assertFalse(settings.state.completionLearningPersistenceEnabled)
         } finally {
             configurable.disposeUIResources()
             settings.replaceState(original)

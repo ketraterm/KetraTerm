@@ -256,6 +256,7 @@ class KetraTermIntellijSettingsTest {
     @Test
     fun `listener failure does not prevent later consumers from observing committed state`() {
         val service = KetraTermIntellijSettings()
+        service.loadState(service.state.copy(smartSuggestionsEnabled = false))
         val firstFailure = IllegalStateException("pane refresh failed")
         val secondFailure = IllegalArgumentException("policy refresh failed")
         var observed = false
@@ -293,6 +294,7 @@ class KetraTermIntellijSettingsTest {
     fun `listener cancellation remains visible after other consumers are notified`() {
         for (cancellation in listOf(CancellationException("settings caller cancelled"), ProcessCanceledException())) {
             val service = KetraTermIntellijSettings()
+            service.replaceState(service.state.copy(smartSuggestionsEnabled = false))
             val failure = IllegalStateException("pane refresh failed")
             var observed = false
             val attempted = mutableListOf<Int>()
@@ -326,9 +328,10 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
-    fun `smart suggestions default off and map independently from automatic popup`() {
+    fun `smart suggestions default on and map independently from automatic popup`() {
         val defaults = KetraTermIntellijSettings.State(themeId = "nord")
-        assertFalse(defaults.smartSuggestionsEnabled)
+        assertTrue(defaults.smartSuggestionsEnabled)
+        assertTrue(Element("State").deserialize(KetraTermIntellijSettings.State::class.java).smartSuggestionsEnabled)
         assertTrue(defaults.shellSuggestionsEnabled)
         val mapped =
             KetraTermIntellijSettingsMapper.toSwingSettings(
@@ -336,7 +339,14 @@ class KetraTermIntellijSettingsTest {
             )
         assertTrue(mapped.smartSuggestionsEnabled)
         assertFalse(mapped.shellSuggestionsEnabled)
-        assertFalse(KetraTermIntellijSettingsMapper.toSwingSettings(defaults).smartSuggestionsEnabled)
+        assertTrue(KetraTermIntellijSettingsMapper.toSwingSettings(defaults).smartSuggestionsEnabled)
+        val disabled = KetraTermIntellijSettingsMapper.toSwingSettings(defaults.copy(smartSuggestionsEnabled = false))
+        assertFalse(disabled.smartSuggestionsEnabled)
+        assertTrue(disabled.shellSuggestionsEnabled)
+        val restored =
+            requireNotNull(serialize(defaults.copy(smartSuggestionsEnabled = false)))
+                .deserialize(KetraTermIntellijSettings.State::class.java)
+        assertFalse(restored.smartSuggestionsEnabled)
     }
 
     @Test
