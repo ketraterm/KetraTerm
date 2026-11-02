@@ -48,7 +48,7 @@ internal class FuzzyPathCompletionSource(
             return emptyList()
         }
         val prefix = context.activePrefix
-        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix) ||
+        if (!allowsPathCompletion(context) ||
             (requiresNonEmptyPrefix && prefix.isEmpty())
         ) {
             return emptyList()

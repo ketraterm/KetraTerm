@@ -87,6 +87,13 @@ produce no candidates. Learned history does not suppress that fallback; its
 publication waits until a pending native query finishes. Unknown functions/arguments use native completers before
 generic file guesses. Directory arguments reject native files, and equivalent
 PowerShell path spellings merge into one result.
+Typed non-path arguments, such as Git branch names, exclude generic filesystem
+suggestions even when the prefix contains `/`. Specs that accept both paths and
+references, including `git checkout` and `git reset`, retain both sources.
+For non-path value domains, equally relevant live results precede history-only
+suggestions. Favorite paths and command sequences retain learning-based ordering.
+Learning still helps order live candidates; duplicate outcomes keep
+the live provider's edit, presentation, and feedback together.
 Escaped replacement text and ranges remain shell-owned. Requests are serialized and
 expire after two seconds; cancellation cannot interrupt a completer already running
 inside PowerShell. Native results remain subject to bounded protocol validation

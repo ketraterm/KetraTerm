@@ -27,7 +27,8 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
  * directory. Known path-taking commands may request file, directory, or
  * directory-only completion from an empty argument prefix; otherwise callers
  * must type an explicitly path-like prefix such as `./`, `/`, `~`, or a token
- * containing a path separator.
+ * containing a path separator. Explicit non-path value domains take
+ * precedence over this lexical fallback.
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
@@ -44,7 +45,7 @@ internal class PathCompletionSource(
         require(limit > 0) { "limit must be > 0, was $limit" }
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val prefix = context.activePrefix
-        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix)) {
+        if (!allowsPathCompletion(context)) {
             return emptyList()
         }
 

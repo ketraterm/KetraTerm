@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.source.hasNonPathValueDomain
 
 /** One source's bounded candidate surplus plus stable composition metadata. */
 internal data class CompletionSourceCandidates(
@@ -34,7 +35,7 @@ internal data class CompletionSourceCandidates(
  * Deterministic global evidence-fusion ranker for one merged completion engine.
  *
  * Groups projected outcomes, retains one complete representative per outcome,
- * and orders results using semantic fit, match quality, and bounded evidence.
+ * and orders results using semantic fit, match quality, live availability, and bounded evidence.
  */
 internal class GlobalCompletionRanker {
     private val outcomeResolver = TerminalCompletionOutcomeKeyResolver()
@@ -101,7 +102,11 @@ internal class GlobalCompletionRanker {
             }
             for ((key, contribution) in bestByOutcome) {
                 val outcome = outcomes[key]
-                if (outcome == null) outcomes[key] = RankedOutcome(contribution) else outcome.add(contribution)
+                if (outcome == null) {
+                    outcomes[key] = RankedOutcome(contribution, preferLiveResults = context.hasNonPathValueDomain())
+                } else {
+                    outcome.add(contribution)
+                }
                 publicationDirty = true
             }
         }
@@ -125,6 +130,7 @@ internal class GlobalCompletionRanker {
     /** Sufficient statistics for one outcome; provider count never adds ranking weight. */
     private class RankedOutcome(
         first: RankedContribution,
+        private val preferLiveResults: Boolean,
     ) {
         var representative = first
             private set
@@ -150,6 +156,7 @@ internal class GlobalCompletionRanker {
             get() {
                 val evidence = reciprocalRank(bestLocalRank) + sourcePrior + strongestContext + representative.exactLearningAdjustment
                 return semanticRelevance * SEMANTIC_RELEVANCE_SCALE + matchRelevance * MATCH_RELEVANCE_SCALE +
+                    (if (preferLiveResults && !representative.isFallback) LIVE_RESULT_SCALE else 0L) +
                     evidence.coerceIn(-EVIDENCE_SCORE_BOUND, EVIDENCE_SCORE_BOUND)
             }
 
@@ -293,8 +300,8 @@ internal class GlobalCompletionRanker {
             }
 
         private val EDIT_REPRESENTATIVE_ORDER =
-            compareByDescending<RankedContribution> { it.contextAdjustment }
-                .thenBy { it.isFallback }
+            compareBy<RankedContribution> { it.isFallback }
+                .thenByDescending { it.contextAdjustment }
                 .thenBy { it.replacementLength }
                 .thenByDescending { it.sourcePrior }
                 .thenBy { it.localRank }
@@ -327,9 +334,10 @@ internal class GlobalCompletionRanker {
         private const val RECIPROCAL_RANK_SCALE = 10_000L
         private const val RECIPROCAL_RANK_OFFSET = 60L
 
-        // Encode semantic fit, then match class, then bounded evidence without overlapping score bands.
+        // Encode semantic fit, match class, live availability, then evidence without overlapping score bands.
         private const val EVIDENCE_SCORE_BOUND = 1_023L
-        private const val MATCH_RELEVANCE_SCALE = 2 * EVIDENCE_SCORE_BOUND + 1
+        private const val LIVE_RESULT_SCALE = 2 * EVIDENCE_SCORE_BOUND + 1
+        private const val MATCH_RELEVANCE_SCALE = 2 * LIVE_RESULT_SCALE
         private const val SEMANTIC_RELEVANCE_SCALE = 4 * MATCH_RELEVANCE_SCALE
         private const val DOMAIN_CONTEXT_BOOST = 320
         private const val STRONG_CONTEXT_BOOST = 160

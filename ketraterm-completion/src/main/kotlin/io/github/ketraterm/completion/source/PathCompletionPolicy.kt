@@ -16,6 +16,8 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
@@ -29,19 +31,22 @@ internal fun isPathLike(prefix: String): Boolean =
         prefix.indexOf('\\') >= 0 ||
         (prefix.length >= 2 && prefix[1] == ':')
 
-internal fun allowsPathCompletion(
-    activePosition: TerminalCompletionActivePosition,
-    expectedPathKind: TerminalPathArgumentKind,
-    prefix: String,
-): Boolean {
+internal fun allowsPathCompletion(context: TerminalCompletionContext): Boolean {
+    val activePosition = context.activePosition
     if (activePosition == TerminalCompletionActivePosition.OPERATOR ||
         activePosition == TerminalCompletionActivePosition.OPTION_NAME
     ) {
         return false
     }
-    if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(prefix)
-    return expectedPathKind != TerminalPathArgumentKind.NONE || isPathLike(prefix)
+    if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(context.activePrefix)
+    if (context.expectedPathKind != TerminalPathArgumentKind.NONE) return true
+    // A slash in a branch name does not turn that value into a filesystem path.
+    if (context.hasNonPathValueDomain()) return false
+    return isPathLike(context.activePrefix)
 }
+
+internal fun TerminalCompletionContext.hasNonPathValueDomain(): Boolean =
+    expectedValueDomain != TerminalCompletionValueDomain.NONE && expectedPathKind == TerminalPathArgumentKind.NONE
 
 internal fun TerminalPathArgumentKind.acceptsPathEntry(isDirectory: Boolean): Boolean =
     when (this) {

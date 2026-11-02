@@ -124,6 +124,7 @@ internal object GitCommandSpecs {
                         name = "checkout",
                         description = commandSpecText("spec.git.checkout.description"),
                         aliases = listOf("co"),
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
@@ -285,6 +286,7 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "reset",
                         description = commandSpecText("spec.git.reset.description"),
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(

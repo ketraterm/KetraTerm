@@ -260,7 +260,13 @@ declare an optional argument or a variadic final argument.
 `repeatableSubcommands` models sibling task values such as `gradle clean build`.
 
 Path sources activate for explicit path-like command prefixes or declared path
-arguments. The expected path kind filters entries; `TerminalHiddenPathPolicy`
+arguments. A path-like argument prefix also enables lexical fallback when no
+dynamic domain is declared. Explicit non-path domains suppress
+both direct and indexed filesystem queries, even when their prefix contains a
+slash. Specs declaring both paths and a value domain permit both sources.
+The engine also rejects incompatible path candidates from native and custom
+sources before deciding whether structured results satisfy the request.
+The expected path kind filters entries; `TerminalHiddenPathPolicy`
 controls dot-prefixed entries. Its default hides them for an empty prefix and
 reveals them after a leading dot. Shell quoting preserves an existing quote
 style when safe and uses the request's replacement policy otherwise.
@@ -309,7 +315,11 @@ uses the projected, decoded active word rather than the provider's display label
 or an entire history edit. Path matching compares entry names, respecting
 PowerShell separators.
 
-Within those classes, ranking uses the strongest reciprocal local rank and the
+Within those classes, non-path value domains prefer live results over history-only
+outcomes. Better text matches still take precedence, and learning can reorder live
+candidates. Paths and command sequences retain their learning-based ordering:
+directory listings and specs do not enumerate every useful nested path or sequence.
+Ranking then uses the strongest reciprocal local rank and the
 strongest bounded source prior, plus context and exact learning evidence. Reporting
 the same outcome through additional providers does not accumulate votes or
 increase its score merely because more sources exist. Published scores encode
@@ -331,7 +341,7 @@ providers to supply presentation while matching learned evidence strengthens
 the same outcome.
 
 One representative supplies both the edit and its complete presentation metadata,
-including `feedbackToken`. Selection favors semantic fit, primary providers,
+including `feedbackToken`. Selection favors primary providers, semantic fit,
 shorter replacement text, source prior, local rank, and stable tie-breakers.
 Each outcome retains that representative and aggregate relevance values; it does
 not retain the contributing candidate list. The engine replaces only the chosen

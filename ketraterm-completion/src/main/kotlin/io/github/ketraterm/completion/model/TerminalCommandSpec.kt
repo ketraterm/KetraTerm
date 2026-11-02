@@ -183,7 +183,7 @@ public enum class TerminalHiddenPathPolicy {
  * Stable identifier for a dynamic value domain supplied by host-owned
  * completion providers.
  *
- * The shared completion engine uses this value only for context-aware ranking.
+ * The shared completion engine uses this value for source eligibility and context-aware ranking.
  * It does not fetch domain values itself. Standalone and plugin integrations may
  * provide candidates with matching domains using local process caches, IDE
  * services, project indexes, or other host-owned data sources.

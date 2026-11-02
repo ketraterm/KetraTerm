@@ -26,6 +26,65 @@ import kotlin.test.assertTrue
 
 class CompletionMergeRankingTest {
     @Test
+    fun `equally matching live domain values precede history even at the end of a source batch`() {
+        val request = TerminalCompletionRequest("git switch ma", 13)
+        val state = GlobalCompletionRanker().createRequestState(request, TerminalCompletionContext.resolve(request), 256, 0)
+        val branch =
+            TerminalCompletionCandidate(
+                "main-history",
+                11,
+                13,
+                "learned",
+                TerminalCompletionCandidateKind.ARGUMENT,
+                valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+            )
+        val live =
+            (0 until 100).map {
+                branch.copy(
+                    replacementText = "main-$it",
+                    displayText = "main-$it",
+                    source = "live",
+                    score = 100 - it,
+                )
+            }
+        state.ingest(CompletionSourceCandidates(0, -20, candidates = live))
+        state.ingest(CompletionSourceCandidates(1, 20, isFallback = true, candidates = listOf(branch)))
+        assertEquals(live.map { it.replacementText } + "main-history", state.rankedCandidates().map { it.replacementText })
+    }
+
+    @Test
+    fun `better matching history remains ahead of a weaker live match`() {
+        val state = state("git switch ma")
+        val branch =
+            TerminalCompletionCandidate(
+                "main",
+                11,
+                13,
+                "learned",
+                TerminalCompletionCandidateKind.ARGUMENT,
+                valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+            )
+        state.ingest(source(0, branch.copy(replacementText = "feature-main", displayText = "feature-main", source = "live")))
+        state.ingest(CompletionSourceCandidates(1, 8, isFallback = true, candidates = listOf(branch)))
+        assertEquals(listOf("main", "feature-main"), state.rankedCandidates().map { it.replacementText })
+    }
+
+    @Test
+    fun `live edit and feedback represent a duplicate even when history has more semantic metadata`() {
+        val feedback = Any()
+        val live = TerminalCompletionCandidate("main", 11, 13, "native", TerminalCompletionCandidateKind.ARGUMENT, feedbackToken = feedback)
+        val learned = live.copy(source = "learned", valueDomain = TerminalCompletionValueDomain.GIT_BRANCH, feedbackToken = null)
+        val sources = listOf(source(0, live), CompletionSourceCandidates(1, 8, isFallback = true, candidates = listOf(learned)))
+        for (order in listOf(sources, sources.reversed())) {
+            val state = state("git switch ma")
+            order.forEach(state::ingest)
+            val result = state.rankedCandidates().single()
+            assertEquals("native", result.source)
+            assertSame(feedback, result.feedbackToken)
+        }
+    }
+
+    @Test
     fun `quoted attached option values rank consistently for token and value edits`() {
         val line = "tool --branch='ma"
         val request = TerminalCompletionRequest(line, line.length, shellCapabilities = TerminalShellCapabilities.POWERSHELL)

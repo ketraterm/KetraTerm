@@ -16,12 +16,63 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import kotlin.test.*
 
 class PathCompletionSourceTest {
+    @Test
+    fun `explicit non-path domains exclude direct and indexed files before host queries`() =
+        runBlocking {
+            val direct = TerminalCompletionSources.path { error("Unexpected directory query") }
+            val indexed = TerminalCompletionSources.fuzzyPath("project", { _, _ -> error("Unexpected index query") })
+            val specs =
+                TerminalCommandSpecs.defaults() +
+                    TerminalCommandSpec(
+                        "tool",
+                        options =
+                            listOf(
+                                TerminalOptionSpec(
+                                    listOf("--branch"),
+                                    requiresValue = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
+                    )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val lines = listOf("git switch feature/", "git branch -d feature/", "git switch -- feature/", "tool --branch=feature/")
+                for (line in lines) {
+                    val request = request(line, "file:///project").copy(shellCapabilities = shell)
+                    val context = TerminalCompletionContext.resolve(request, specs)
+                    assertTrue(direct.complete(request, context, 20).isEmpty(), line)
+                    assertTrue(indexed.complete(request, context, 20).isEmpty(), line)
+                }
+            }
+        }
+
+    @Test
+    fun `explicit paths still participate alongside domains and unknown path-like arguments`() =
+        runBlocking {
+            val direct = TerminalCompletionSources.path { listOf(TerminalFileEntry("main", false)) }
+            val indexed = TerminalCompletionSources.fuzzyPath("project", { _, _ -> listOf(TerminalFuzzyPathEntry("src/main", false)) })
+            val specs =
+                TerminalCommandSpecs.defaults() +
+                    TerminalCommandSpec(
+                        "tool",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    )
+            for (line in listOf("tool src/", "unknown src/", "./src/", "git checkout src/", "git reset -- src/")) {
+                val request = request(line, "file:///project")
+                val context = TerminalCompletionContext.resolve(request, specs)
+                val expectedPath = if (line.startsWith("./")) "./src/main" else "src/main"
+                assertEquals(listOf(expectedPath), direct.complete(request, context, 20).map { it.replacementText }, line)
+                assertEquals(listOf("src/main"), indexed.complete(request, context, 20).map { it.replacementText }, line)
+            }
+        }
+
     private val mockProvider = FakeFileSystemProvider()
     private val source = PathCompletionSource(mockProvider)
 

@@ -17,6 +17,8 @@ package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.last
@@ -29,6 +31,96 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
+    @Test
+    fun `branch prefixes use runtime or native results without filesystem noise after shortening and quoting`() =
+        runTest {
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for (runtimeAvailable in listOf(true, false)) {
+                    var fileQueries = 0
+                    var nativeQueries = 0
+                    val branch = TerminalCompletionDomainValue("feature/local")
+                    val learning =
+                        TerminalCompletionLearningStore().apply {
+                            repeat(20) { recordCommandResult("git switch feature/old", true, null, null, 10) }
+                            recordCommandResult("git switch feature/local", true, null, null, 10)
+                        }
+                    val engine =
+                        MergedCompletionEngine(
+                            sources =
+                                listOf(
+                                    TerminalCompletionSourceEntry({ _, context, _ ->
+                                        listOf(
+                                            TerminalCompletionCandidate(
+                                                "feature/local.txt",
+                                                context.replacementStartOffset,
+                                                context.replacementEndOffset,
+                                                "custom-files",
+                                                TerminalCompletionCandidateKind.PATH,
+                                            ),
+                                        )
+                                    }),
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSources.path {
+                                            fileQueries++
+                                            listOf(TerminalFileEntry("local.txt", false))
+                                        },
+                                    ),
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                                            fileQueries++
+                                            listOf(TerminalFuzzyPathEntry("feature/local.txt", false))
+                                        }),
+                                    ),
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSources.valueDomain(
+                                            TerminalCompletionValueDomain.GIT_BRANCH,
+                                            "git",
+                                            { _, _ -> if (runtimeAvailable) listOf(branch) else emptyList() },
+                                        ),
+                                    ),
+                                ),
+                            learningStore = learning,
+                            clockEpochMillis = { 20 },
+                            shellProvider =
+                                TerminalCompletionShellProvider { request, context, limit ->
+                                    nativeQueries++
+                                    TerminalCompletionSources.valueDomainCandidates(
+                                        request,
+                                        context,
+                                        TerminalCompletionValueDomain.GIT_BRANCH,
+                                        "native",
+                                        listOf(branch),
+                                        limit,
+                                    ) +
+                                        TerminalCompletionCandidate(
+                                            "feature/local.txt",
+                                            context.replacementStartOffset,
+                                            context.replacementEndOffset,
+                                            "native",
+                                            TerminalCompletionCandidateKind.PATH,
+                                        )
+                                },
+                        )
+                    for (line in listOf("git switch feature/lo", "git switch feature/", "git switch 'feature/")) {
+                        val request = request(line).copy(shellCapabilities = shell, workingDirectoryUri = "file:///project")
+                        val results = engine.complete(request)
+                        val first = results.first()
+                        assertEquals(if (runtimeAvailable) "git" else "native", first.source, line)
+                        val edited = line.replaceRange(first.replacementStartOffset, first.replacementEndOffset, first.replacementText)
+                        val editedContext =
+                            TerminalCompletionContext.resolve(
+                                request.copy(commandLine = edited, cursorOffset = edited.length),
+                            )
+                        assertEquals("feature/local", editedContext.activePrefix, line)
+                        assertEquals(1, results.count { it.displayText == "feature/local" }, line)
+                        assertTrue(results.none { it.kind == TerminalCompletionCandidateKind.PATH }, line)
+                    }
+                    assertEquals(0, fileQueries)
+                    assertEquals(if (runtimeAvailable) 0 else 3, nativeQueries)
+                }
+            }
+        }
+
     @Test
     fun `PowerShell command authority preserves differently cased history`() =
         runTest {
@@ -104,14 +196,16 @@ class ShellAwareCompletionEngineTest {
                         ),
                     shellProvider = TerminalCompletionShellProvider { _, _, _ -> listOf(native) },
                 )
-            val publications = engine.completions(request).toList()
-            assertEquals(1, publications.size)
-            val result = publications.single().single()
-            assertEquals("docker", result.replacementText)
-            assertEquals("docker", result.displayText)
-            assertTrue(result.detail.startsWith("Container platform"))
-            assertTrue(result.detail.contains("C:\\tools\\docker.exe"))
-            assertEquals(1, result.matchedRanges.rangeCount)
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val publications = engine.completions(request.copy(shellCapabilities = shell)).toList()
+                assertEquals(1, publications.size)
+                val result = publications.single().single()
+                assertEquals("docker", result.replacementText)
+                assertEquals("docker", result.displayText)
+                assertTrue(result.detail.startsWith("Container platform"))
+                assertTrue(result.detail.contains("C:\\tools\\docker.exe"))
+                assertEquals(1, result.matchedRanges.rangeCount)
+            }
         }
 
     @Test

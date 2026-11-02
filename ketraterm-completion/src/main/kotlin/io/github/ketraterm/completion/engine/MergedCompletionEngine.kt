@@ -27,6 +27,7 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
 import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
 import io.github.ketraterm.completion.source.appendLearnedHistoryCandidates
+import io.github.ketraterm.completion.source.hasNonPathValueDomain
 import io.github.ketraterm.completion.spec.PathCommandSpecCandidateProjector
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 import kotlinx.coroutines.*
@@ -262,7 +263,10 @@ internal class MergedCompletionEngine(
         try {
             val result = shellProvider?.complete(request, context, SOURCE_CANDIDATE_LIMIT)
             currentCoroutineContext().ensureActive()
-            result?.filter { it.hasValidReplacementRangeFor(request) }?.boundedTo(SOURCE_CANDIDATE_LIMIT)
+            result
+                ?.filter { it.hasValidReplacementRangeFor(request) }
+                ?.filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
+                ?.boundedTo(SOURCE_CANDIDATE_LIMIT)
         } catch (_: CancellationException) {
             currentCoroutineContext().ensureActive()
             null
@@ -281,6 +285,7 @@ internal class MergedCompletionEngine(
         return pathCommandSpecCandidateProjector
             .project(request, context, candidates)
             .filter { it.hasValidReplacementRangeFor(request) }
+            .filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
             .boundedTo(SOURCE_CANDIDATE_LIMIT)
     }
 
