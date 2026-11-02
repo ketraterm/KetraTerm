@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
@@ -82,10 +79,15 @@ internal class TerminalCompletionOutcomeKeyResolver {
                 tokens = tokens,
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
+                shellSyntax = request.shellCapabilities.syntax,
             ) ?: return null
         return ResolvedCompletionOutcome(
             groupKey = outcomeKey,
             exactCommandLine = commandLine,
+            activeValue =
+                outcomeKey.getOrNull(lineContext.activeTokenIndex)?.let { value ->
+                    if (context.attachedOptionValue == null) value else value.substringAfter('=')
+                },
         )
     }
 
@@ -93,6 +95,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         tokens: List<TerminalCommandLineToken>,
         pathTokenIndex: Int,
         pathAware: Boolean,
+        shellSyntax: TerminalShellSyntax,
     ): List<String>? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
@@ -100,7 +103,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         var index = 0
         while (index < tokens.size) {
             val tokenText = tokens[index].text
-            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText) else tokenText
+            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText, shellSyntax) else tokenText
             index++
         }
         return resultTokens
@@ -116,12 +119,23 @@ internal class TerminalCompletionOutcomeKeyResolver {
         return false
     }
 
-    private fun normalizePathToken(token: String): String {
+    private fun normalizePathToken(
+        token: String,
+        shellSyntax: TerminalShellSyntax,
+    ): String {
         val separatorIndex = token.indexOf('=')
+
+        fun path(value: String): String {
+            var normalized = if (shellSyntax == TerminalShellSyntax.POWERSHELL) value.replace('\\', '/') else value
+            if (shellSyntax == TerminalShellSyntax.POWERSHELL) {
+                while (normalized.length > 2 && normalized.startsWith("./")) normalized = normalized.substring(2)
+            }
+            return stripRedundantTrailingSeparators(normalized)
+        }
         return if (separatorIndex > 0) {
-            token.substring(0, separatorIndex + 1) + stripRedundantTrailingSeparators(token.substring(separatorIndex + 1))
+            token.substring(0, separatorIndex + 1) + path(token.substring(separatorIndex + 1))
         } else {
-            stripRedundantTrailingSeparators(token)
+            path(token)
         }
     }
 
@@ -151,4 +165,5 @@ internal class TerminalCompletionOutcomeKeyResolver {
 internal data class ResolvedCompletionOutcome(
     val groupKey: List<String>,
     val exactCommandLine: String,
+    val activeValue: String?,
 )

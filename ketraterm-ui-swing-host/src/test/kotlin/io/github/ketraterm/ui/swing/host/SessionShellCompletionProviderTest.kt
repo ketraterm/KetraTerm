@@ -29,12 +29,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class SessionShellCompletionSourceTest {
+class SessionShellCompletionProviderTest {
     @Test
     fun `native ranges escaping order and metadata survive adaptation with a candidate limit`() =
         runTest {
@@ -68,7 +66,7 @@ class SessionShellCompletionSourceTest {
                     ),
                 )
                 runCurrent()
-                val candidates = query.await()
+                val candidates = assertNotNull(query.await())
                 assertEquals(listOf("'native value'", "'native path'"), candidates.map { it.replacementText })
                 assertEquals(
                     listOf(TerminalCompletionCandidateKind.ARGUMENT, TerminalCompletionCandidateKind.PATH),
@@ -91,9 +89,49 @@ class SessionShellCompletionSourceTest {
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
                 val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POSIX)
-                assertTrue(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10).isEmpty())
+                assertNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
                 runCurrent()
                 assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
+    @Test
+    fun `directory arguments reject native files before applying the candidate limit`() =
+        runTest {
+            val line = "cd x"
+            Fixture(StandardTestDispatcher(testScheduler), line).use { fixture ->
+                val request = TerminalCompletionRequest(line, line.length, shellCapabilities = TerminalShellCapabilities.POWERSHELL)
+                val query = async { fixture.source.complete(request, TerminalCompletionContext.resolve(request), 1) }
+                runCurrent()
+                fixture.respond(
+                    TerminalShellCompletionResult(
+                        line,
+                        line.length,
+                        3,
+                        4,
+                        listOf(
+                            TerminalShellCompletionCandidate("x.txt", "x.txt", "file", TerminalShellCompletionKind.FILE),
+                            TerminalShellCompletionCandidate("xdir/", "xdir", "directory", TerminalShellCompletionKind.DIRECTORY),
+                        ),
+                    ),
+                )
+                runCurrent()
+                assertEquals(listOf("xdir/"), assertNotNull(query.await()).map { it.replacementText })
+            }
+        }
+
+    @Test
+    fun `busy installed hook returns no unverified command candidates`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
+                val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POWERSHELL)
+                val context = TerminalCompletionContext.resolve(request)
+                val first = async { fixture.source.complete(request, context, 10) }
+                runCurrent()
+                assertEquals(emptyList(), fixture.source.complete(request, context, 10))
+                fixture.respond(TerminalShellCompletionResult("tool", 4, 0, 4, emptyList()))
+                runCurrent()
+                assertEquals(emptyList(), first.await())
             }
         }
 
@@ -118,7 +156,7 @@ class SessionShellCompletionSourceTest {
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
             )
-        val source = SessionShellCompletionSource(session)
+        val source = SessionShellCompletionProvider(session)
 
         init {
             session.start()

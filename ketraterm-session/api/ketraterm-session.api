@@ -129,6 +129,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun getProgress ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getPromptMarkersExpected ()Z
 	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getShellCompletionAvailable ()Z
 	public final fun getShellIntegrationState ()Lio/github/ketraterm/session/TerminalShellIntegrationView;
 	public final fun getStartupCommandStatus ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;

@@ -34,6 +34,8 @@ public class TerminalShellCompletionChannel internal constructor(
         private set
     private var receipt: Receipt? = null
 
+    internal val isReady: Boolean get() = epoch != null
+
     /** Installs a prompt-scoped epoch and its non-executing completion key chord. */
     public fun ready(
         epoch: String,

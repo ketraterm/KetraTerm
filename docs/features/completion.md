@@ -42,9 +42,17 @@ input order for references, commits, changed paths, and ordinary/project paths;
 relative values build on the preceding directory and empty values leave it unchanged.
 The captured project directory is a fallback only when shell directory metadata is absent.
 
-PowerShell's native source calls `TabExpansion2` inside the running shell, preserving
-its replacement text, quoting, and ranges. It requires the installed prompt hooks
-and PSReadLine, and supplements the other sources. Requests are serialized and
+PowerShell's live provider calls `TabExpansion2` inside the running shell. It requires
+the installed prompt hooks and PSReadLine. At command positions, the shell supplies
+the available commands; catalog descriptions enrich verified matches rather than
+advertising uninstalled tools. Empty prompts use bounded `Get-Command` discovery.
+Executable extensions merge with bare invocations only when PowerShell resolves
+both to the same file; aliases or functions that shadow the bare name stay distinct.
+Modeled arguments prefer specs and host sources, with native fallback when they
+produce no candidates. Unknown functions/arguments use native completers before
+generic file guesses. Directory arguments reject native files, and equivalent
+PowerShell path spellings merge into one result.
+Escaped replacement text and ranges remain shell-owned. Requests are serialized and
 expire after two seconds; cancellation cannot interrupt a completer already running
 inside PowerShell. Native results remain subject to bounded protocol validation
 and stale-edit checks. The OSC producer still requires an unambiguous visible
@@ -75,7 +83,7 @@ not an exhaustive schema for every version of these tools.
 | Paths | Directory traversal, shell-aware escaping, and hidden entries when explicitly requested. |
 | Ranking | Merged sources, deterministic ordering, contextual priority, and bounded learning boosts. |
 | Progressive results | Sources can update results asynchronously; obsolete requests are cancelled. |
-| Presentation | Matched-text highlighting, descriptions, source labels, keyboard/pointer navigation, and custom UI support. |
+| Presentation | Compact matched-text rows, keyboard/pointer navigation, descriptions and source metadata in tooltips/accessibility, and custom UI support. |
 | Acceptance | A stale editing context is rejected before replacement is admitted. |
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses

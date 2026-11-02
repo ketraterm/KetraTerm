@@ -57,7 +57,8 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 }
                 val emptyContext = assertNotNull(session.captureCommandEdit())
                 val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
-                assertTrue(emptyResult.candidates.isEmpty())
+                assertTrue(emptyResult.candidates.isNotEmpty())
+                assertTrue(emptyResult.candidates.size <= 128)
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
                 withTimeout(15.seconds) {
                     session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-Chi" }
@@ -97,7 +98,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 .lineSequence()
                 .filter { it.contains("KetraTermCompletion;1;Result;") }
                 .toList()
-        assertEquals(5, messages.size, visibleEscapes(result.stdout))
+        val application =
+            result.stdout
+                .lineSequence()
+                .firstOrNull { it.startsWith("APPLICATION=") }
+                ?.substringAfter('=')
+                ?.split(';')
+        assertEquals(if (application == null) 5 else 7, messages.size, visibleEscapes(result.stdout))
 
         fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
         assertTrue(messages[0].contains(encoded("Get-KetraNativeWidget")), visibleEscapes(messages[0]))
@@ -105,7 +112,14 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertTrue(messages[2].contains(encoded("beta")), visibleEscapes(messages[2]))
         assertTrue(messages[3].contains(encoded("'native value'")), visibleEscapes(messages[3]))
         assertTrue(messages[3].contains(encoded("native detail")), visibleEscapes(messages[3]))
-        assertTrue(messages[4].contains(";5;Ok;0;0;0;;0"), visibleEscapes(messages[4]))
+        assertTrue(messages[4].contains(";5;Ok;0;0;0;;"), visibleEscapes(messages[4]))
+        assertTrue(messages[4].contains(";Command;"), visibleEscapes(messages[4]))
+        assertTrue(messages[4].contains(encoded("& '0000'")), visibleEscapes(messages[4]))
+        assertTrue(messages[4].contains(encoded("& '00 space'")), visibleEscapes(messages[4]))
+        if (application != null) {
+            assertTrue(messages[5].contains(";Command;${encoded(application[1])};${encoded(application[0])};"), visibleEscapes(messages[5]))
+            assertTrue(messages[6].contains(";Command;${encoded(application[0])};${encoded(application[0])};"), visibleEscapes(messages[6]))
+        }
         assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
     }
 

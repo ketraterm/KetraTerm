@@ -39,6 +39,7 @@ public object TerminalCompletionEngines {
      * @param learningStore optional shared in-memory learning store. The engine
      * reads its immutable published snapshot and performs no host I/O.
      * @param sourceFailureHandler diagnostic sink for non-cancellation source failures.
+     * @param shellProvider optional live authority for available commands and native argument completion.
      * @return merged completion engine.
      */
     @JvmStatic
@@ -48,8 +49,9 @@ public object TerminalCompletionEngines {
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,
         sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+        shellProvider: TerminalCompletionShellProvider? = null,
     ): TerminalCompletionEngine =
-        fromSources(TerminalCompletionMessages.forLocale(), sources, commandSpecs, learningStore, sourceFailureHandler)
+        fromSources(TerminalCompletionMessages.forLocale(), sources, commandSpecs, learningStore, sourceFailureHandler, shellProvider)
 
     /**
      * Creates a merged engine with localized learned and observed descriptions.
@@ -66,6 +68,7 @@ public object TerminalCompletionEngines {
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,
         sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+        shellProvider: TerminalCompletionShellProvider? = null,
     ): TerminalCompletionEngine =
         MergedCompletionEngine(
             sources = sources,
@@ -73,5 +76,6 @@ public object TerminalCompletionEngines {
             learningStore = learningStore,
             sourceFailureHandler = sourceFailureHandler,
             messages = messages,
+            shellProvider = shellProvider,
         )
 }

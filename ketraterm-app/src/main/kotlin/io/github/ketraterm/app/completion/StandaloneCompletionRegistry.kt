@@ -21,7 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.ui.swing.host.SessionShellCompletionSource
+import io.github.ketraterm.ui.swing.host.SessionShellCompletionProvider
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
@@ -127,14 +127,8 @@ internal class StandaloneCompletionRegistry private constructor(
                 engine =
                     if (session != null && shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL) {
                         TerminalCompletionEngines.fromSources(
-                            sources =
-                                sources +
-                                    listOf(
-                                        TerminalCompletionSourceEntry(
-                                            SessionShellCompletionSource(session),
-                                            TerminalCompletionSourcePrior.NATIVE_SHELL,
-                                        ),
-                                    ),
+                            sources = sources,
+                            shellProvider = SessionShellCompletionProvider(session),
                             commandSpecs = specs,
                             learningStore = learningStore,
                             messages = completionMessages,

@@ -16,6 +16,7 @@ Consumers use `io.github.ketraterm.completion.api` and
 | `TerminalCompletionContext.resolve` | Public request resolution for custom engines and direct source evaluation. |
 | `TerminalCompletionEngine` | Cold `Flow` of best-first candidate snapshots. |
 | `TerminalCompletionSource` | One suspending provider evaluated against the shared semantic context. |
+| `TerminalCompletionShellProvider` | Optional live authority for command candidates and native argument edits. |
 | `TerminalCompletionEngines` / `TerminalCompletionSources` | Engine composition and adapters for paths, Gradle tasks, and dynamic values. |
 | `TerminalCommandSpec`, `TerminalOptionSpec`, `TerminalArgumentSpec` | Declarative command grammar and value metadata. |
 | `TerminalCompletionLearningStore` | Bounded learning, immutable snapshots, and host-recorded outcomes. |
@@ -51,10 +52,26 @@ uses the engine's command catalog to classify the cursor. The engine shares the
 result with static and host sources and the global ranker. The same catalog
 supplies the static source automatically.
 
-Each request captures one compiled learning-index set before source evaluation.
+An optional `shellProvider` answers command positions before initial publication.
+Its returned candidates define the verified command names; an empty list offers none.
+The engine enriches verified commands from its catalog and filters
+other command sources against those identities, so speculative catalog entries
+cannot flash before shell discovery finishes. Null means the shell is unsupported
+or unavailable and permits ordinary catalog fallback. Providers own this distinction;
+the session adapter returns empty for busy/stale requests once a native hook is installed.
+Modeled argument positions use progressive catalog and host sources first, with
+native fallback only when they produce no candidates. Unmodeled arguments query
+the shell before publishing and use its successful answer instead of generic file
+or replay guesses. No candidates are published while a native query could
+invalidate their captured editing context.
+PowerShell path outcomes normalize slash direction, leading `./`, quoting, and
+trailing directory separators; insertion keeps the chosen source's original edit.
+
+After any initial shell query, each request captures one compiled learning-index
+set before ordinary source evaluation.
 The set contains opaque ranking lookup, eligible replay history, and derived
 observed tokens. A snapshot-identity and shell-syntax cache reuses compiled
-indexes across requests. Learning mutations during evaluation affect the next
+indexes across requests. Learning mutations after this capture affect the next
 request, keeping one request internally consistent.
 
 ### Custom engines and direct source evaluation
@@ -274,11 +291,24 @@ probe filesystems or turn remote authorities into local paths.
 
 Sources rank locally before global fusion. Source-local numeric scores are not
 compared across providers. The global ranker projects candidates onto the command
-they produce, groups equivalent outcomes, and combines each distinct source's
-best local rank using reciprocal-rank fusion. Duplicate rows from one source do
-not multiply support. `TerminalCompletionSourceEntry.priority` contributes a
-small prior clamped to `[-20, 20]`; named `TerminalCompletionSourcePrior` values
-provide the shared baseline for built-in source families.
+they produce and groups equivalent outcomes. Semantic fit takes precedence over
+match quality: expected domain values and modeled arguments stay above unrelated
+filesystem candidates. Within the same semantic class, exact matches precede
+prefix matches, then word-boundary matches and other provider results. Matching
+uses the projected, decoded active word rather than the provider's display label
+or an entire history edit. Path matching compares entry names, respecting
+PowerShell separators.
+
+Within those classes, ranking uses the strongest reciprocal local rank and the
+strongest bounded source prior, plus context and exact learning evidence. Reporting
+the same outcome through additional providers does not accumulate votes or
+increase its score merely because more sources exist. Published scores encode
+the same ordering as the result list. `TerminalCompletionSourceEntry.priority`
+contributes a small prior clamped to `[-20, 20]`; named
+`TerminalCompletionSourcePrior` values provide the shared baseline for built-in
+source families. Native command candidates use the shared lexical matcher before
+local ranking, so shell enumeration order cannot bury a short command beneath
+longer helper names.
 
 Outcome comparison accounts for shell quoting. Declared path values also ignore
 a redundant trailing separator; it does not resolve `..`, symlinks, URI

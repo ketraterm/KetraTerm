@@ -1,4 +1,4 @@
-public final class io/github/ketraterm/ui/swing/host/SessionShellCompletionSource : io/github/ketraterm/completion/api/TerminalCompletionSource {
+public final class io/github/ketraterm/ui/swing/host/SessionShellCompletionProvider : io/github/ketraterm/completion/api/TerminalCompletionShellProvider {
 	public fun <init> (Lio/github/ketraterm/session/TerminalSession;)V
 	public fun complete (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }

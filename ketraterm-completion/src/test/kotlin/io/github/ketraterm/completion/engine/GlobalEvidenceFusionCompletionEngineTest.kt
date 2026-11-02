@@ -201,7 +201,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `Gradle task supported by history and statistics outranks an unused sibling`() =
+    fun `accepted Gradle task outranks an unused sibling without multiplying history providers`() =
         runBlocking {
             val commandLine = "./gradlew :app:"
             val task =
@@ -229,6 +229,18 @@ class GlobalEvidenceFusionCompletionEngineTest {
                         entry(source(remembered), 8),
                         entry(source(statistical), 6),
                     ),
+                    snapshot =
+                        learningSnapshot(
+                            rows =
+                                listOf(
+                                    commandLearning(
+                                        commandLine = "./gradlew :app:test",
+                                        profileId = "profile",
+                                        acceptedCount = 8,
+                                        lastUsedEpochMillis = NOW,
+                                    ),
+                                ),
+                        ),
                 ).complete(request(commandLine))
 
             assertEquals("./gradlew :app:test", candidates.first().let { commandLineAfter(it, commandLine) })

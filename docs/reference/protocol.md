@@ -441,6 +441,13 @@ tooltip per candidate. Ranges must contain the cursor and stay within the buffer
 on scalar boundaries. Command and replacement controls are rejected. The hook
 bounds its serialized body below the collection limit and preserves `LASTEXITCODE`.
 
+Empty command buffers use bounded `Get-Command` discovery. The hook uses PowerShell's
+parser to quote command names that require explicit invocation. For simple executable
+names it removes an extension only after resolving the long and short invocation
+to the same application/script path and type. Shadowing functions and aliases do
+not authorize that normalization. The command authority and catalog enrichment
+policy belongs to the [completion engine](../../ketraterm-completion/docs/completion-architecture.md#internal-implementation).
+
 Waiting expires after two seconds. Cancelled/timed-out requests retain the wire
 slot until their reply or a new prompt, so a late result cannot satisfy a newer
 request. Native completers run in the shell and may continue after host cancellation.

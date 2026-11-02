@@ -34,7 +34,7 @@ class LearnedCompletionEvidenceIndexTest {
         assertEquals(
             0,
             index.adjustment(
-                ResolvedCompletionOutcome(groupKey = listOf("git", "status"), exactCommandLine = "git status"),
+                ResolvedCompletionOutcome(groupKey = listOf("git", "status"), exactCommandLine = "git status", activeValue = "status"),
                 CompletionLearningContextKey.of(null, null),
                 NOW,
             ),

@@ -19,27 +19,72 @@ function global:__KetraTermComplete {
         $line = ''
         $cursor = 0
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-        if ($line.Length -eq 0) {
-            # TabExpansion2 rejects empty input on Windows PowerShell; preserve other sources.
-            $body = $prefix + 'Ok;0;0;0;;0'
-        } elseif ($line.Length -le 4096) {
+        if ($line.Length -le 4096) {
             # Even a failing completer can acknowledge an unchanged, validated buffer.
             $body = $prefix + 'Ok;' + $cursor + ';' + $cursor + ';' + $cursor + ';' + (global:__KetraTermCompletionEncode $line) + ';0'
-            $result = TabExpansion2 -inputScript $line -cursorColumn $cursor
-            $header = $prefix + 'Ok;' + $cursor + ';' + $result.ReplacementIndex + ';' +
-                ($result.ReplacementIndex + $result.ReplacementLength) + ';' + (global:__KetraTermCompletionEncode $line) + ';'
+            if ($line.Length -eq 0) {
+                # TabExpansion2 rejects empty input. Discover a bounded set of actual commands.
+                $discovered = Microsoft.PowerShell.Core\Get-Command -Name '*' -TotalCount 256 -ErrorAction SilentlyContinue |
+                    Microsoft.PowerShell.Utility\Sort-Object -Property Name
+                $matches = @(foreach ($command in $discovered) {
+                    if ($command.Name.StartsWith('__KetraTerm', [StringComparison]::OrdinalIgnoreCase)) { continue }
+                    $name = $command.Name
+                    $value = $name
+                    $parseTokens = $null
+                    $parseErrors = $null
+                    $ast = [Management.Automation.Language.Parser]::ParseInput($name, [ref]$parseTokens, [ref]$parseErrors)
+                    $statement = $null
+                    if ($ast.EndBlock -and $ast.EndBlock.Statements.Count -gt 0) { $statement = $ast.EndBlock.Statements[0] }
+                    if ($parseErrors.Count -gt 0 -or
+                        $statement -isnot [Management.Automation.Language.PipelineAst] -or
+                        $statement.PipelineElements.Count -ne 1 -or
+                        $statement.PipelineElements[0] -isnot [Management.Automation.Language.CommandAst] -or
+                        $statement.PipelineElements[0].GetCommandName() -cne $name) {
+                        $value = '& ''' + [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($name) + ''''
+                    }
+                    $description = [string]$command.Definition
+                    if ([string]::IsNullOrEmpty($description)) { $description = $name }
+                    [Management.Automation.CompletionResult]::new($value, $name,
+                        [Management.Automation.CompletionResultType]::Command, $description)
+                })
+                $start = 0
+                $end = 0
+            } else {
+                $result = TabExpansion2 -inputScript $line -cursorColumn $cursor
+                $matches = $result.CompletionMatches
+                $start = $result.ReplacementIndex
+                $end = $start + $result.ReplacementLength
+            }
+            $header = $prefix + 'Ok;' + $cursor + ';' + $start + ';' +
+                $end + ';' + (global:__KetraTermCompletionEncode $line) + ';'
             $items = [Collections.Generic.List[string]]::new()
             $size = $header.Length + 3
-            foreach ($match in $result.CompletionMatches) {
+            foreach ($match in $matches) {
                 if ($items.Count -ge 128) { break }
                 $value = [string]$match.CompletionText
                 $label = [string]$match.ListItemText
                 $detail = [string]$match.ToolTip
+                if ($match.ResultType -eq 'Command' -and $value -ceq $label) {
+                    $shortName = [IO.Path]::GetFileNameWithoutExtension($label).ToLowerInvariant()
+                    $prefixMatches = $start -ge 0 -and $cursor -ge $start -and
+                        $shortName.StartsWith($line.Substring($start, $cursor - $start), [StringComparison]::OrdinalIgnoreCase)
+                    if ($shortName -ne $label -and $prefixMatches) {
+                        $longCommand = $ExecutionContext.InvokeCommand.GetCommand($label, [Management.Automation.CommandTypes]::All)
+                        if ($longCommand -is [Management.Automation.ApplicationInfo] -or
+                            $longCommand -is [Management.Automation.ExternalScriptInfo]) {
+                            $shortCommand = $ExecutionContext.InvokeCommand.GetCommand($shortName, [Management.Automation.CommandTypes]::All)
+                            if ($null -ne $shortCommand -and $shortCommand.CommandType -eq $longCommand.CommandType -and
+                                $shortCommand.Path -ceq $longCommand.Path) {
+                                $value = $shortName
+                            }
+                        }
+                    }
+                }
                 if ($value.Length -gt 4096 -or $label.Length -gt 512) { continue }
                 if ($detail.Length -gt 1024) {
-                    $end = 1024
-                    if ([char]::IsHighSurrogate($detail[$end - 1])) { $end-- }
-                    $detail = $detail.Substring(0, $end)
+                    $detailEnd = 1024
+                    if ([char]::IsHighSurrogate($detail[$detailEnd - 1])) { $detailEnd-- }
+                    $detail = $detail.Substring(0, $detailEnd)
                 }
                 $item = [string]$match.ResultType + ';' + (global:__KetraTermCompletionEncode $value) + ';' +
                     (global:__KetraTermCompletionEncode $label) + ';' + (global:__KetraTermCompletionEncode $detail)

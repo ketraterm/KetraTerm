@@ -32,6 +32,26 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @Test
+    fun `compact rows show command text and retain details in tooltip and accessibility`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidate = suggestion("btop.exe", detail = "C:\\tools\\btop.exe", sourceDisplayText = "PowerShell")
+                view.update(snapshot(listOf(candidate), 0, 1, 0))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, true, false) as javax.swing.JLabel
+                assertTrue(row.text.contains("btop.exe"))
+                assertFalse(row.text.contains("C:"))
+                assertFalse(row.text.contains("PowerShell"))
+                assertTrue(row.toolTipText.contains("PowerShell"))
+                assertTrue(row.toolTipText.contains("C:\\tools\\btop.exe"))
+                assertTrue(row.accessibleContext.accessibleDescription.contains("PowerShell"))
+                assertTrue(view.preferredSize.width < 320)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
     fun `static bundle text preserves braces and apostrophes verbatim`() {
         val messages =
             SwingTerminalMessages.forLocale(
@@ -329,7 +349,7 @@ class SwingCompletionPopupViewTest {
             val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
             assertTrue(renderer.text.contains("<b>git</b>&nbsp;<b>st</b>atus"))
             view.update(snapshot(listOf(suggestion("x".repeat(10000))), 0, 1, 0))
-            assertTrue(view.preferredSize.width in 320..640)
+            assertTrue(view.preferredSize.width in 220..480)
             view.update(SwingShellSuggestionViewSnapshot.EMPTY)
             assertEquals(java.awt.Dimension(0, 0), view.preferredSize)
             view.close()

@@ -114,6 +114,7 @@ internal class IntellijCompletionRegistry(
                         },
                     commandSpecs = commandSpecs,
                     learningStore = learningStore,
+                    shellProvider = context.shellProvider,
                 )
             return SwingCompletionSuggestionProvider(
                 engine,

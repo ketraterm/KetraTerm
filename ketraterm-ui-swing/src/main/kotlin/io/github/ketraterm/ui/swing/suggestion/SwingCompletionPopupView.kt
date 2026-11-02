@@ -19,6 +19,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.Font
 import java.awt.event.*
 import java.util.regex.Pattern
 import javax.swing.*
@@ -65,7 +66,17 @@ internal class SwingCompletionPopupView(
 
     init {
         isFocusable = false
+        border =
+            BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") ?: foreground.darker(), 1, true),
+                BorderFactory.createEmptyBorder(4, 4, 4, 4),
+            )
+        background = UIManager.getColor("PopupMenu.background") ?: background
         list.isFocusable = false
+        list.font = list.font.deriveFont(Font.PLAIN)
+        list.background = background
+        scrollPane.border = BorderFactory.createEmptyBorder()
+        scrollPane.viewport.background = background
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.cellRenderer = renderer
         list.visibleRowCount = maximumVisibleSuggestions
@@ -123,7 +134,7 @@ internal class SwingCompletionPopupView(
         if (snapshot.visibleSuggestions.isEmpty()) {
             Dimension(0, 0)
         } else {
-            super.getPreferredSize().apply { width = width.coerceIn(320, 640) }
+            super.getPreferredSize().apply { width = width.coerceIn(220, 480) }
         }
 
     override fun doLayout() {
@@ -225,8 +236,7 @@ private class CompletionRenderer(
                     offset = end
                 }
                 append(escapeHtml(primary.substring(offset)))
-                if (detail.isNotEmpty()) append(" &nbsp; ").append(escapeHtml(detail))
-                append(" &nbsp; <small>").append(escapeHtml(source)).append("</small></html>")
+                append("</html>")
             }
         val tooltip =
             if (detail.isEmpty()) {

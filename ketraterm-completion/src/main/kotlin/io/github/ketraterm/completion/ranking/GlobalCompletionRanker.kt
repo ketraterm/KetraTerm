@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
@@ -79,6 +80,7 @@ internal class GlobalCompletionRanker {
                 val candidate = locallyRanked[candidateIndex]
                 val resolved = outcomeResolver.resolve(request, candidate, context)
                 val key: Any = resolved?.groupKey ?: FallbackOutcomeKey(candidate)
+                val semanticRelevance = semanticAdjustment(context, candidate)
                 val contribution =
                     RankedContribution(
                         candidate = candidate,
@@ -87,8 +89,10 @@ internal class GlobalCompletionRanker {
                         localRank = candidateIndex + 1,
                         sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
                         isFallback = sourceResult.isFallback,
+                        semanticRelevance = semanticRelevance,
+                        matchRelevance = matchRelevance(request, context, candidate, resolved),
                         contextAdjustment =
-                            semanticAdjustment(context, candidate) +
+                            semanticRelevance +
                                 if (sourceResult.isFallback) fallbackContextAdjustment(candidate) else 0,
                         exactLearningAdjustment = learnedIndex?.adjustment(resolved, learningContext, now) ?: 0,
                     )
@@ -142,11 +146,11 @@ internal class GlobalCompletionRanker {
             val editRepresentative = contributions.minWith(EDIT_REPRESENTATIVE_ORDER)
             var presentationRepresentative = editRepresentative
             var reciprocalRankScore = 0L
-            var sourcePriorScore = 0L
+            var sourcePriorScore = Long.MIN_VALUE
             var strongestContext = Int.MIN_VALUE
             for (contribution in contributions) {
-                reciprocalRankScore += reciprocalRank(contribution.localRank)
-                sourcePriorScore += contribution.sourcePrior
+                reciprocalRankScore = maxOf(reciprocalRankScore, reciprocalRank(contribution.localRank))
+                sourcePriorScore = maxOf(sourcePriorScore, contribution.sourcePrior.toLong())
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
                 if (contribution.hasSameEditAs(editRepresentative) &&
                     PRESENTATION_REPRESENTATIVE_ORDER.compare(contribution, presentationRepresentative) < 0
@@ -160,6 +164,8 @@ internal class GlobalCompletionRanker {
                     sourcePrior = sourcePriorScore,
                     semanticContext = strongestContext,
                     exactLearning = editRepresentative.exactLearningAdjustment,
+                    semanticRelevance = contributions.maxOf { it.semanticRelevance },
+                    matchRelevance = contributions.maxOf { it.matchRelevance },
                 )
             return FusedCandidate(
                 rankingCandidate = editRepresentative.candidate,
@@ -179,9 +185,13 @@ internal class GlobalCompletionRanker {
         val sourcePrior: Long,
         val semanticContext: Int,
         val exactLearning: Int,
+        val semanticRelevance: Int,
+        val matchRelevance: Int,
     ) {
         val total: Long
-            get() = reciprocalRank + sourcePrior + semanticContext + exactLearning
+            get() =
+                semanticRelevance * SEMANTIC_RELEVANCE_SCALE + matchRelevance * MATCH_RELEVANCE_SCALE +
+                    (reciprocalRank + sourcePrior + semanticContext + exactLearning).coerceIn(-EVIDENCE_SCORE_BOUND, EVIDENCE_SCORE_BOUND)
     }
 
     private data class RankedContribution(
@@ -191,6 +201,8 @@ internal class GlobalCompletionRanker {
         val localRank: Int,
         val sourcePrior: Int,
         val isFallback: Boolean,
+        val semanticRelevance: Int,
+        val matchRelevance: Int,
         val contextAdjustment: Int,
         val exactLearningAdjustment: Int,
     ) {
@@ -228,6 +240,47 @@ internal class GlobalCompletionRanker {
     }
 
     private companion object {
+        private fun matchRelevance(
+            request: TerminalCompletionRequest,
+            context: TerminalCompletionContext,
+            candidate: TerminalCompletionCandidate,
+            outcome: ResolvedCompletionOutcome?,
+        ): Int {
+            val prefix = context.activePrefix
+            if (prefix.isEmpty()) return 0
+            val value = outcome?.activeValue ?: candidate.displayText
+            val fullMatch = lexicalMatchRelevance(value, prefix)
+            if (candidate.kind != TerminalCompletionCandidateKind.PATH) return fullMatch
+            val windowsSeparators = request.shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL
+            val entryPrefix = pathLeaf(prefix, windowsSeparators, false)
+            if (entryPrefix.isEmpty()) return fullMatch
+            return maxOf(fullMatch, lexicalMatchRelevance(pathLeaf(value, windowsSeparators, true), entryPrefix))
+        }
+
+        private fun lexicalMatchRelevance(
+            target: String,
+            prefix: String,
+        ): Int =
+            when {
+                target.equals(prefix, ignoreCase = true) -> 3
+                target.startsWith(prefix, ignoreCase = true) -> 2
+                CompletionMatcher.match(target, prefix) != null -> 1
+                else -> 0
+            }
+
+        private fun pathLeaf(
+            text: String,
+            windowsSeparators: Boolean,
+            trimTrailing: Boolean,
+        ): String {
+            fun separator(character: Char): Boolean = character == '/' || (windowsSeparators && character == '\\')
+            var end = text.length
+            if (trimTrailing) while (end > 0 && separator(text[end - 1])) end--
+            var start = end
+            while (start > 0 && !separator(text[start - 1])) start--
+            return text.substring(start, end)
+        }
+
         private fun reciprocalRank(localRank: Int): Long = RECIPROCAL_RANK_SCALE / (RECIPROCAL_RANK_OFFSET + localRank)
 
         private fun semanticAdjustment(
@@ -336,6 +389,11 @@ internal class GlobalCompletionRanker {
         private const val MAX_SOURCE_PRIOR = 20
         private const val RECIPROCAL_RANK_SCALE = 10_000L
         private const val RECIPROCAL_RANK_OFFSET = 60L
+
+        // Encode semantic fit, then match class, then bounded evidence without overlapping score bands.
+        private const val EVIDENCE_SCORE_BOUND = 1_023L
+        private const val MATCH_RELEVANCE_SCALE = 2 * EVIDENCE_SCORE_BOUND + 1
+        private const val SEMANTIC_RELEVANCE_SCALE = 4 * MATCH_RELEVANCE_SCALE
         private const val DOMAIN_CONTEXT_BOOST = 320
         private const val STRONG_CONTEXT_BOOST = 160
         private const val MEDIUM_CONTEXT_BOOST = 80

@@ -80,7 +80,7 @@ the session's conditional-edit APIs when admitting asynchronous suggestions.
 With workspace PowerShell hooks and PSReadLine, this producer also decodes
 [native completion metadata](../docs/reference/protocol.md#private-powershell-completion-metadata).
 Call `session.requestShellCompletions(commandLine, cursorOffset)` from a caller-owned
-coroutine, or install `SessionShellCompletionSource` from `ketraterm-ui-swing-host`
+coroutine, or install `SessionShellCompletionProvider` from `ketraterm-ui-swing-host`
 in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
 return null; caller cancellation propagates. The native handler reads the current
 buffer and does not submit the command. Custom parser factories must explicitly

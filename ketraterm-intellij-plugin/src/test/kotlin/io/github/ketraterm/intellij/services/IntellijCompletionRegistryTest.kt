@@ -39,6 +39,44 @@ import javax.swing.SwingUtilities
 
 class IntellijCompletionRegistryTest {
     @Test
+    fun `live shell authority filters catalog commands through the IntelliJ provider`() =
+        runBlocking {
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val native =
+                    context().copy(
+                        shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                        shellProvider =
+                            TerminalCompletionShellProvider { request, _, _ ->
+                                if (request.commandLine == "dock") {
+                                    listOf(
+                                        TerminalCompletionCandidate(
+                                            "docker",
+                                            0,
+                                            4,
+                                            "powershell",
+                                            TerminalCompletionCandidateKind.COMMAND,
+                                        ),
+                                    )
+                                } else {
+                                    emptyList()
+                                }
+                            },
+                    )
+                val provider = registry.createProvider(native)
+                assertEquals(listOf("docker"), provider.suggestions(request("dock")).last().map { it.replacementText })
+                assertTrue(provider.suggestions(request("car")).last().isEmpty())
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
     fun `Git directory changes select the same environment for every host source`() =
         runBlocking {
             val originalDirectory = Path.of("completion-workspace").toAbsolutePath().normalize()
@@ -126,7 +164,7 @@ class IntellijCompletionRegistryTest {
                             additionalSources =
                                 listOf(
                                     TerminalCompletionSourceEntry(
-                                        TerminalCompletionSource { _, _, _ ->
+                                        { _, _, _ ->
                                             loads++
                                             emptyList()
                                         },

@@ -662,6 +662,13 @@ public class TerminalSession private constructor(
         }
 
     /**
+     * Whether the running session's producer has announced a native completion hook.
+     * Readiness does not reserve a query slot or guarantee that a later request can be admitted.
+     */
+    public val shellCompletionAvailable: Boolean
+        get() = synchronized(mutationLock) { isAcceptingInput() && runtime.shellCompletion.isReady }
+
+    /**
      * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
      * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
      * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.

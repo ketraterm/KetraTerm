@@ -73,6 +73,14 @@ bounded suspending host work; it must cooperate with cancellation and move
 blocking operations to an appropriate dispatcher. Reusable filesystem access
 lives in [completion-host](../ketraterm-completion-host/README.md).
 
+Pass a `TerminalCompletionShellProvider` as `shellProvider` when the running shell
+can discover executable commands. A successful shell answer supplies the command
+list, enriched with matching catalog descriptions and learning; unknown catalog
+commands are omitted. Modeled arguments prefer specialized sources with native
+fallback; unmodeled arguments use native completion before generic guesses.
+`SessionShellCompletionProvider` in `ketraterm-ui-swing-host` supplies this contract
+for installed PowerShell hooks. See the [shell authority contract](docs/completion-architecture.md#internal-implementation).
+
 Custom engines can resolve and share context with
 `TerminalCompletionContext.resolve(request, commandSpecs)`. See the
 [custom-engine contract](docs/completion-architecture.md#custom-engines-and-direct-source-evaluation).
