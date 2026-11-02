@@ -548,6 +548,75 @@ class SwingTerminalCompletionLifecycleTest {
             }
         }
 
+    @Test
+    fun `context refresh closes automatic suggestions immediately and requests again after debounce`() =
+        onEdtTest {
+            val session = SessionFixture(StandardTestDispatcher(testScheduler))
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(session.session)
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val old = target.interactions.single()
+
+                terminal.refreshShellSuggestions()
+
+                assertTrue(old.isClosed)
+                assertFalse(target.visible)
+                advanceTimeBy(74.milliseconds)
+                runCurrent()
+                assertEquals(1, target.interactions.size)
+                advanceTimeBy(1.milliseconds)
+                runCurrent()
+                assertEquals(2, target.interactions.size)
+                assertTrue(target.interactions.last().isActive)
+            } finally {
+                terminal.dispose()
+                session.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `context refresh preserves a replacement request opened by the hide callback`() =
+        onEdtTest {
+            val session = SessionFixture(StandardTestDispatcher(testScheduler))
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(session.session)
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val old = target.interactions.single()
+                target.onHide = {
+                    target.onHide = null
+                    startAutomatic(terminal, target)
+                }
+
+                terminal.refreshShellSuggestions()
+                advanceTimeBy(100.milliseconds)
+                runCurrent()
+
+                assertTrue(old.isClosed)
+                assertEquals(2, target.interactions.size)
+                assertTrue(target.interactions.last().isActive)
+                assertTrue(target.visible)
+            } finally {
+                terminal.dispose()
+                session.close()
+                runCurrent()
+            }
+        }
+
     private class SessionFixture(
         dispatcher: CoroutineDispatcher,
         legacySource: MutableStateFlow<TerminalShellCommandLineSnapshot?>? = null,

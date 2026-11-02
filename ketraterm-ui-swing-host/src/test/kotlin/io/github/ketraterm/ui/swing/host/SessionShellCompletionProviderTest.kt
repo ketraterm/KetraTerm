@@ -15,17 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -33,6 +32,51 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionShellCompletionProviderTest {
+    @Test
+    fun `native directory fallback merges equivalent history and paths before Swing adaptation`() =
+        runTest {
+            val line = "cd Do"
+            Fixture(StandardTestDispatcher(testScheduler), line).use { fixture ->
+                val learning =
+                    TerminalCompletionLearningStore().apply {
+                        recordCommandResult("cd Documents/", true, null, null, System.currentTimeMillis())
+                    }
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        emptyList(),
+                        learningStore = learning,
+                        shellProvider = fixture.source,
+                    )
+                val provider =
+                    SwingCompletionSuggestionProvider(engine, {
+                        SwingCompletionContext(shellCapabilities = TerminalShellCapabilities.POWERSHELL)
+                    })
+                val query = async { provider.suggestions(SwingShellSuggestionRequest(line, line.length)).last() }
+                runCurrent()
+                fixture.respond(
+                    TerminalShellCompletionResult(
+                        line,
+                        line.length,
+                        3,
+                        line.length,
+                        listOf(
+                            TerminalShellCompletionCandidate("Documents.txt", "Documents.txt", "", TerminalShellCompletionKind.FILE),
+                            TerminalShellCompletionCandidate("./Documents/", "Documents", "", TerminalShellCompletionKind.DIRECTORY),
+                            TerminalShellCompletionCandidate("Documents\\", "Documents", "", TerminalShellCompletionKind.DIRECTORY),
+                        ),
+                    ),
+                )
+                runCurrent()
+
+                val suggestion = query.await().single()
+                assertEquals("powershell", suggestion.source)
+                // Equivalent native edits retain the shorter spelling, not enumeration order.
+                assertEquals("Documents\\", suggestion.replacementText)
+                assertEquals(3, suggestion.replacementStartOffset)
+                assertEquals(line.length, suggestion.replacementEndOffset)
+            }
+        }
+
     @Test
     fun `native ranges escaping order and metadata survive adaptation with a candidate limit`() =
         runTest {

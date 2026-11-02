@@ -2073,13 +2073,17 @@ public class SwingTerminal
         }
 
         /**
-         * Invalidates automatic request deduplication after host ranking context changes.
-         * Call on the EDT. The next eligible automatic request runs after the normal debounce interval.
+         * Invalidates pending and displayed suggestions after host context changes, such as a new directory.
+         * Call on the EDT. The next eligible automatic request runs after the normal debounce interval;
+         * explicit suggestions must be requested again when automatic popups are disabled.
          */
         @ExperimentalShellSuggestionsApi
         public fun refreshShellSuggestions() {
             check(SwingUtilities.isEventDispatchThread()) { "suggestions must refresh on the EDT" }
-            if (!disposed) suggestionScheduler?.refresh()
+            if (disposed) return
+            val revision = suggestionRevision + 1
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestion context refreshed")
+            if (!disposed && suggestionRevision == revision) suggestionScheduler?.refresh()
         }
 
         private fun reconcileSuggestionSchedulerOnEdt() {

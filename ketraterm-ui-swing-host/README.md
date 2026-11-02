@@ -188,6 +188,9 @@ fun installCompletion(
 
 The terminal opens the provider on the EDT, capturing one immutable context and
 feedback handler before background collection. Keep `contextProvider` cheap.
+When that context changes, call `terminal.refreshShellSuggestions()` on the EDT
+to invalidate work and results captured for the previous context. Updating the
+context supplier alone does not invalidate an already opened request.
 Direct calls to `suggestions(request)` capture context in the caller's thread;
 the returned flow is cold and runs engine work only when collected. This adapter
 does not choose a dispatcher, launch jobs, or close the engine. Collection

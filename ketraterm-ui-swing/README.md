@@ -233,7 +233,10 @@ observation. `smartSuggestionsEnabled` gates all suggestions;
 `shellSuggestionsEnabled` gates automatic popups. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled. Use
-`refreshShellSuggestions()` to reconcile changes to external ranking context.
+`refreshShellSuggestions()` on the EDT when external context such as the working
+directory changes. It immediately cancels pending work and closes existing
+suggestions, including explicit requests. Automatic suggestions then refresh
+after the normal debounce; with automatic popups disabled, request them explicitly again.
 
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
