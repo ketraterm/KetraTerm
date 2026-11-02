@@ -15,6 +15,12 @@
  */
 package io.github.ketraterm.workspace
 
+import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.session.TerminalInputAdmission
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
@@ -28,9 +34,81 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
+    @Test
+    fun `PowerShell native completion round trips through real PSReadLine and PTY`(): Unit =
+        runBlocking {
+            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
+            val executable = installedExecutable("pwsh", "powershell.exe")
+            assumeTrue(executable != null, "PowerShell is not installed")
+            TerminalWorkspace().use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                        TerminalWorkspaceOpenOptions(),
+                    )
+                val session = tab.session
+                withTimeout(15.seconds) {
+                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "" }
+                }
+                val emptyContext = assertNotNull(session.captureCommandEdit())
+                val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
+                assertTrue(emptyResult.candidates.isEmpty())
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
+                withTimeout(15.seconds) {
+                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-Chi" }
+                }
+                val expected = assertNotNull(session.captureCommandEdit())
+                val result = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
+                assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
+                val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
+                withTimeout(15.seconds) {
+                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-ChildItem" }
+                }
+            }
+        }
+
+    @Test
+    fun `PowerShell native hook uses functions aliases and registered completers from its own session`() {
+        val executable = installedExecutable("pwsh", "powershell.exe")
+        assumeTrue(executable != null, "PowerShell is not installed")
+
+        fun resource(name: String) = checkNotNull(javaClass.getResourceAsStream(name)).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script = resource("powershell-completion-test.ps1").replace("__SCRIPT__", resource("powershell-completion.ps1"))
+        val result =
+            runProcess(
+                listOf(
+                    executable!!,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-EncodedCommand",
+                    Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE)),
+                ),
+                emptyMap(),
+            )
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val messages =
+            result.stdout
+                .lineSequence()
+                .filter { it.contains("KetraTermCompletion;1;Result;") }
+                .toList()
+        assertEquals(5, messages.size, visibleEscapes(result.stdout))
+
+        fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+        assertTrue(messages[0].contains(encoded("Get-KetraNativeWidget")), visibleEscapes(messages[0]))
+        assertTrue(messages[1].contains(encoded("alpha")), visibleEscapes(messages[1]))
+        assertTrue(messages[2].contains(encoded("beta")), visibleEscapes(messages[2]))
+        assertTrue(messages[3].contains(encoded("'native value'")), visibleEscapes(messages[3]))
+        assertTrue(messages[3].contains(encoded("native detail")), visibleEscapes(messages[3]))
+        assertTrue(messages[4].contains(";5;Ok;0;0;0;;0"), visibleEscapes(messages[4]))
+        assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
+    }
+
     @Test
     fun `Bash startup applies project toolchain after bashrc replaces environment and prompt hook`(
         @TempDir tempDir: Path,

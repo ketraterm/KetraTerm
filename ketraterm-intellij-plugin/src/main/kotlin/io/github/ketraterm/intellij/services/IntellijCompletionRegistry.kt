@@ -119,6 +119,7 @@ internal class IntellijCompletionRegistry(
                 engine,
                 context::swingContext,
                 mapOf(
+                    "powershell" to "PowerShell",
                     "spec" to KetraTermBundle.message("completion.source.builtin"),
                     "learned" to KetraTermBundle.message("completion.source.learned"),
                     "observed" to KetraTermBundle.message("completion.source.learned"),

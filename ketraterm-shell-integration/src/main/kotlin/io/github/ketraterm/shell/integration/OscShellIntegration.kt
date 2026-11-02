@@ -60,6 +60,16 @@ private class OscShellIntegrationSession(
     private val context: TerminalShellIntegrationContext,
     override val promptMarkersExpected: Boolean,
 ) : TerminalShellIntegration {
+    private val shellCompletion = PowerShellCompletionProtocol(context.shellCompletion)
+    override val customOscPayloadLimitBytes: Int get() = PowerShellCompletionProtocol.MAX_PAYLOAD_BYTES
+
+    override fun observeCustomOsc(
+        command: Int,
+        payload: ByteArray,
+        offset: Int,
+        length: Int,
+    ) = shellCompletion.observe(command, payload, offset, length)
+
     override val state = TerminalShellIntegrationState()
     private val mutablePromptReady = MutableStateFlow(false)
     override val promptReady: StateFlow<Boolean> = mutablePromptReady.asStateFlow()

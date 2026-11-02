@@ -662,6 +662,54 @@ public class TerminalSession private constructor(
         }
 
     /**
+     * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
+     * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
+     * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
+     * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
+     */
+    public suspend fun requestShellCompletions(
+        commandLine: String,
+        cursorOffset: Int,
+    ): TerminalShellCompletionResult? {
+        currentCoroutineContext().ensureActive()
+        val expected = captureCommandEdit() ?: return null
+        if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
+        val query =
+            try {
+                synchronized(mutationLock) {
+                    runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                        synchronized(outboundWriteLock) {
+                            if (
+                                !isAcceptingInput() ||
+                                inputRevision != expected.inputRevision ||
+                                outputRevision != expected.outputRevision ||
+                                revision != expected.shellRevision ||
+                                snapshot != expected.commandLine
+                            ) {
+                                return@synchronized null
+                            }
+                            var generation = 0L
+                            renderReader.readRenderFrame { generation = it.frameGeneration }
+                            val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
+                            outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
+                            inputRevision++
+                            pending
+                        }
+                    }
+                }
+            } catch (failure: OutboundCapacityException) {
+                failWrite(failure)
+                return null
+            } ?: return null
+        outboundWriter.signalPending()
+        return try {
+            withTimeoutOrNull(2_000.milliseconds) { query.deferred.await() }
+        } finally {
+            query.deferred.cancel()
+        }
+    }
+
+    /**
      * Atomically validates [expected] and admits the complete semantic [events].
      * Checks session identity, cancellation, producer revision/snapshot and all
      * intervening input/output/resize under mutation, producer and admission
@@ -685,8 +733,10 @@ public class TerminalSession private constructor(
                         inputRejection() ?: when {
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
                             expected.owner !== editContextOwner ||
-                                expected.inputRevision != inputRevision ||
-                                expected.outputRevision != outputRevision ||
+                                (
+                                    (expected.inputRevision != inputRevision || expected.outputRevision != outputRevision) &&
+                                        !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
+                                ) ||
                                 expected.shellRevision != revision ||
                                 expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
                             else -> {
@@ -883,6 +933,7 @@ public class TerminalSession private constructor(
                 if (isSessionClosed()) return null
                 drainResponses()
                 outputRevision++
+                runtime.shellCompletion.invalidateEdit()
                 var resizeCompleted = false
                 var coreResizeCompleted = false
                 try {
@@ -969,6 +1020,7 @@ public class TerminalSession private constructor(
             return mutate {
                 if (isSessionClosed() || resizePending || terminal.width != columns || terminal.height != rows) return false
                 outputRevision++
+                runtime.shellCompletion.invalidateEdit()
                 terminal.setWindowSizePixels(pixelWidth, pixelHeight)
                 drainResponses()
                 true
@@ -1364,6 +1416,7 @@ public class TerminalSession private constructor(
         bytes.checkBounds(offset, length)
         if (isSessionClosed()) return
 
+        var completedShellQuery: TerminalShellCompletionChannel.Pending? = null
         try {
             checkAdmissionReentry()
             synchronized(mutationAdmission) {
@@ -1408,13 +1461,26 @@ public class TerminalSession private constructor(
                         }
                     }
                 } finally {
-                    synchronized(mutationLock) { processingOutput = false }
+                    synchronized(mutationLock) {
+                        processingOutput = false
+                        if (runtime.shellCompletion.pending?.responded == true) {
+                            completedShellQuery =
+                                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                                    synchronized(outboundWriteLock) {
+                                        var generation = 0L
+                                        renderReader.readRenderFrame { generation = it.frameGeneration }
+                                        runtime.shellCompletion.finish(inputRevision, outputRevision, revision, snapshot, generation)
+                                    }
+                                }
+                        }
+                    }
                 }
                 submitStartupCommand()
             }
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
         }
+        completedShellQuery?.let { it.deferred.complete(it.response) }
         invalidateRender(immediate = false)
     }
 
@@ -1748,6 +1814,12 @@ public class TerminalSession private constructor(
                 synchronized(connectorResizeLock) { connector.close() }
             }
             cleanup { clipboardReads?.close() }
+            cleanup {
+                runtime.shellCompletion
+                    .close()
+                    ?.deferred
+                    ?.cancel()
+            }
             cleanup { outboundWriter.close() }
             cleanup {
                 synchronized(outboundWriteLock) {
@@ -2107,7 +2179,14 @@ public class TerminalSession private constructor(
                 )
             val parser =
                 parserFactory?.create(sink, sink::clipboardWriteLimitBytes)
-                    ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
+                    ?: runtime.shellIntegration?.let { integration ->
+                        TerminalParsers.create(
+                            sink,
+                            sink::clipboardWriteLimitBytes,
+                            integration.customOscPayloadLimitBytes,
+                            integration::observeCustomOsc,
+                        )
+                    } ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
             if (hostPolicy.terminalResponsePolicy == HostControlPolicy.DENY) terminal.clearResponseBytes()
 
             val session =
@@ -2161,9 +2240,10 @@ private class SessionRuntime(
 ) {
     val mutationLock = Any()
     val renderGeneration = MutableStateFlow(-1L)
+    val shellCompletion = TerminalShellCompletionChannel(mutationLock)
     val shellIntegration =
         factory?.create(
-            TerminalShellIntegrationContext(mutationLock, reader, publisher, renderGeneration.asStateFlow()),
+            TerminalShellIntegrationContext(mutationLock, reader, publisher, renderGeneration.asStateFlow(), shellCompletion),
         )
     val shellState = shellIntegration?.state ?: TerminalShellIntegrationState()
 }

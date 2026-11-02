@@ -21,8 +21,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Session-issued editing context captured with a selected producer's revision.
  * Retain it from suggestion request through final admission; never recapture it
  * merely to make an old edit pass. It is specific to its issuing session and
- * becomes stale after input, output, resize or a producer update. No writer or
- * frame lease is retained. Acceptance still does not confirm remote execution.
+ * becomes stale after input, output, resize or a producer update. A session-validated,
+ * non-editing native completion exchange can preserve the original context when
+ * the command, cursor, producer revision, and render generation remain unchanged.
+ * No writer or frame lease is retained. Acceptance still does not confirm remote execution.
  *
  * @property commandLine authoritative snapshot used to calculate editor actions.
  */

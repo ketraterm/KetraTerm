@@ -670,6 +670,7 @@ internal class TabManager(
             val registry = ensureCompletionRegistry()
             val completionProvider =
                 registry?.createProvider(
+                    session = workspaceTab.session,
                     profileId = workspaceTab.profile.id,
                     workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
@@ -1417,6 +1418,7 @@ internal class TabManager(
         panes.forEach { pane ->
             pane.setCompletionProvider(
                 registry.createProvider(
+                    session = pane.tab.session,
                     profileId = pane.tab.profile.id,
                     workingDirectoryUriProvider = { pane.tab.currentWorkingDirectoryUri },
                     shellCapabilities =

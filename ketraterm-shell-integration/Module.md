@@ -17,6 +17,11 @@ bounded command-text extraction, immutable styled prompt-row capture, and primit
 provides serialized frame access and owns shared observation, outbound writes,
 and startup submission. The producer owns no threads or coroutine scope.
 
+`PowerShellCompletionProtocol` validates the bounded private OSC 633 metadata
+and publishes prompt readiness/results through the session-owned completion
+channel. Session owns key-chord admission, request lifetime, and edit validation;
+workspace owns the installed PowerShell script. The producer performs no shell I/O.
+
 `ShellIntegrationCommandTextExtractor` is internal. It consumes primitive render
 data, preserves hard breaks and soft wraps, and fails closed when the required
 range or cluster data cannot be reconstructed. Marker callbacks capture command

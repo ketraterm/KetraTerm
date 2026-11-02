@@ -32,6 +32,8 @@ public class TerminalShellIntegrationContext internal constructor(
     private val publisher: TerminalRenderPublisher,
     /** Successfully published frame revisions; -1 before the first frame. */
     public val renderGeneration: StateFlow<Long>,
+    /** Session-owned native completion rendezvous; optional producers announce support explicitly. */
+    public val shellCompletion: TerminalShellCompletionChannel,
 ) : TerminalRenderFrameReader {
     /** Serializes a short compound context/frame read with parser and grid mutation. */
     public fun <T> withTerminalState(action: () -> T): T = synchronized(mutationLock, action)

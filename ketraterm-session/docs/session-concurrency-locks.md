@@ -100,6 +100,17 @@ same snapshot still invalidate it. Semantic input revisions conservatively
 advance even when modes suppress its bytes; empty input has the event-specific
 rules described by the API.
 
+`requestShellCompletions(commandLine, cursorOffset)` is the bounded exception for
+an installed native producer's non-editing request/reply exchange. Admission
+revalidates the exact captured buffer under the same producer guard and queues
+its key chord atomically. A correlated result preserves pre-query contexts only
+when the producer revision/snapshot and render frame generation stay unchanged,
+no other input was admitted, and no viewport mutation occurred. The session
+records the resulting input/output revisions; any later input/output invalidates
+that permission. Changed-away-and-back rendered text cannot renew an old context.
+Results complete outside session locks. Cancellation retains the pending wire
+slot until a reply/new prompt, and closure cancels the waiter.
+
 Rejection returns `STALE_CONTEXT`, `UNSUPPORTED_CONTEXT`, `CANCELLED`, or the
 usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
 use the ordinary bounded compound queue. Callers still own editor semantics:

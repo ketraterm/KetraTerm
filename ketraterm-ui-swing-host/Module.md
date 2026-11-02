@@ -15,6 +15,7 @@ Standalone and IntelliJ products configure these helpers independently.
 | Search chrome | `SwingTerminalSearchBar`, `SwingTerminalOverlayPane`, search palette | Search scanning and highlights remain in `SwingTerminal`. |
 | Host actions | Shortcut map and context-menu builder | Hosts install bindings and choose product actions. |
 | Completion | Suggestion provider and feedback recorder | Completion evaluates candidates; Swing coordinates request lifetime and editing admission. |
+| Native shell completion | `SessionShellCompletionSource` | Session owns correlation and lifetime; the shell supplies escaped replacements and ranges. Products choose whether to register the source. |
 | Clipboard consent | Pane prompt, window reader, dialog and message helpers | Session controls permission, deadlines, and terminal replies; hosts provide clipboard access and presentation. |
 
 ### Threading and lifetimes

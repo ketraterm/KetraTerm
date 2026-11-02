@@ -77,6 +77,15 @@ the session's conditional-edit APIs when admitting asynchronous suggestions.
 
 ## Readiness and trust
 
+With workspace PowerShell hooks and PSReadLine, this producer also decodes
+[native completion metadata](../docs/reference/protocol.md#private-powershell-completion-metadata).
+Call `session.requestShellCompletions(commandLine, cursorOffset)` from a caller-owned
+coroutine, or install `SessionShellCompletionSource` from `ketraterm-ui-swing-host`
+in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
+return null; caller cancellation propagates. The native handler reads the current
+buffer and does not submit the command. Custom parser factories must explicitly
+forward the selected producer's custom OSC callback and collection limit.
+
 A prompt becomes ready after an ordered `A`/`B` pair in the primary screen.
 Command markers, alternate-screen output, and a local primary-buffer clear
 invalidate that readiness. Session decides when to submit an explicitly configured

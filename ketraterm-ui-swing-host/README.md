@@ -139,6 +139,15 @@ for callback configuration.
 
 ## Completion bridge
 
+To include the running PowerShell session's native candidates, add
+`TerminalCompletionSourceEntry(SessionShellCompletionSource(session),
+TerminalCompletionSourcePrior.NATIVE_SHELL)` to the engine's sources and supply
+`TerminalShellCapabilities.POWERSHELL` in its requests. The adapter lives in
+`io.github.ketraterm.ui.swing.host`; the entry and prior live in
+`io.github.ketraterm.completion.api`. The source borrows its session and owns no jobs.
+It preserves shell quoting, replacement ranges, and presentation metadata, and
+participates in normal caller cancellation. See the [availability and bounds](../docs/features/completion.md#sources-by-host).
+
 `SwingCompletionSuggestionProvider` adapts a
 [`TerminalCompletionEngine`](../ketraterm-completion/README.md) to the terminal's
 suggestion contract. It preserves replacement ranges, source identity,

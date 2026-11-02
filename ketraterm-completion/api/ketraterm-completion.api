@@ -219,6 +219,7 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionSourcePr
 	public static final field GIT_STATUS_PATH I
 	public static final field GRADLE_TASK I
 	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionSourcePrior;
+	public static final field NATIVE_SHELL I
 	public static final field PROJECT_FUZZY_PATH I
 }
 

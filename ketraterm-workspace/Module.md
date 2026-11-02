@@ -21,6 +21,7 @@ All types are in `io.github.ketraterm.workspace`.
 | `TerminalProfile`, `TerminalProfileKind`, `TerminalProfileRegistry` | Launch vocabulary, presentation classification, and built-in profile discovery. |
 | `TerminalShellEnvironment` | Host-selected environment overrides and a PATH prefix. |
 | Internal shell bootstrappers | Prepare shell startup hooks and environment reapplication without interpreting terminal output. |
+| `powershell-completion.ps1` resource | Install the PSReadLine chord, read the live buffer, and serialize bounded native completion results. |
 
 ## Lifecycle and concurrency
 
@@ -64,3 +65,7 @@ suite. Tests cover profile discovery, tab selection, listener failures, cleanup,
 clipboard routing, and shell bootstrap behavior. Native shell integration and
 startup-command tests are environment-dependent; inspect their assumptions when
 validating changes to launch behavior.
+
+Use `./gradlew :ketraterm-workspace:test -Dterminal.pty.host=true` to include the
+real PSReadLine/PTY completion smoke test when PowerShell is installed. Quote
+`'-Dterminal.pty.host=true'` when invoking the Windows wrapper from PowerShell.

@@ -279,7 +279,9 @@ internal object TerminalShellIntegrationBootstrap {
 
     private fun encodedPowerShellScript(): String =
         Base64.getEncoder().encodeToString(
-            (TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT).toByteArray(Charsets.UTF_16LE),
+            (TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT + "\n" + powerShellCompletionScript).toByteArray(
+                Charsets.UTF_16LE,
+            ),
         )
 
     private fun hasExplicitPowerShellEntryPoint(command: List<String>): Boolean {
@@ -647,6 +649,7 @@ internal object TerminalShellIntegrationBootstrap {
                         ${'$'}global:LASTEXITCODE = ${'$'}nativeExitCode
                     }
                 }
+                global:__KetraTermCompletionReady
                 ${'$'}promptText + ([string][char]27) + ']133;B' + ([string][char]7)
             }
             ${'$'}command = Get-Command PSConsoleHostReadLine -CommandType Function -ErrorAction SilentlyContinue
@@ -664,6 +667,10 @@ internal object TerminalShellIntegrationBootstrap {
             }
         }
         """.trimIndent()
+
+    private val powerShellCompletionScript: String by lazy {
+        checkNotNull(javaClass.getResourceAsStream("powershell-completion.ps1")).use { it.readBytes().toString(Charsets.UTF_8) }
+    }
 
     private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
     private const val LOCAL_OSC7_AUTHORITY = "localhost"

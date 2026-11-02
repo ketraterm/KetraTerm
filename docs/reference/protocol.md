@@ -159,6 +159,10 @@ Permissions and decoded-size limits are checked again before execution.
 
 ## Query allowlists
 
+The optional PowerShell completion exchange below is host-initiated semantic
+input. Receiving its OSC metadata never sends a terminal reply, executes command
+text, or requests completion by itself; it adds no terminal-response allowlist entry.
+
 | Query | Reply scope |
 | --- | --- |
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
@@ -407,6 +411,41 @@ This advertises grapheme processing, not complete conformance to the original
 [Unicode Core draft](https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex):
 KetraTerm retains its documented [VS15/VS16 width policy](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy)
 and [streaming placement](#streaming-grapheme-placement).
+
+## Private PowerShell completion metadata
+
+The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;1;... BEL`
+(ST is also accepted) from the workspace's PSReadLine hook. All envelope fields
+are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+The session's default parser forwards unknown OSC bodies synchronously to the
+selected producer. Custom parser factories must forward `observeCustomOsc` and
+use `customOscPayloadLimitBytes` themselves.
+
+| Message body after `KetraTermCompletion;1;` | Meaning |
+| --- | --- |
+| `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
+| `Result;epoch;id;Failed` | Correlated failure. |
+| `Result;epoch;id;Ok;cursor;start;end;line;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line`. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
+
+The host admits at most one request per session, sending the semantic `F12,e`
+chord through ordinary ordered input. Host and hook increment their counters for
+each request. Replies must match the current prompt epoch and pending positive
+request ID. They must also match the captured command and cursor; wrong epochs
+or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
+metadata has no editing authority.
+
+Complete custom OSC collection is capped at 256 KiB with this producer installed;
+built-in command limits remain unchanged. Replies contain at most 128 candidates,
+a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
+tooltip per candidate. Ranges must contain the cursor and stay within the buffer
+on scalar boundaries. Command and replacement controls are rejected. The hook
+bounds its serialized body below the collection limit and preserves `LASTEXITCODE`.
+
+Waiting expires after two seconds. Cancelled/timed-out requests retain the wire
+slot until their reply or a new prompt, so a late result cannot satisfy a newer
+request. Native completers run in the shell and may continue after host cancellation.
+Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for the validation required before suggestion acceptance.
 
 ## Streaming grapheme placement
 

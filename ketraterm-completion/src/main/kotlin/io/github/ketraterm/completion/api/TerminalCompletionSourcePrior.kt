@@ -24,6 +24,9 @@ package io.github.ketraterm.completion.api
  * IDE integrations start from the same policy before learned evidence applies.
  */
 public object TerminalCompletionSourcePrior {
+    /** Prior for candidates returned by the current interactive shell's native completer. */
+    public const val NATIVE_SHELL: Int = 20
+
     /** Prior for imported Gradle task candidates. */
     public const val GRADLE_TASK: Int = 15
 

@@ -27,7 +27,9 @@ import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
+import io.github.ketraterm.ui.swing.host.SessionShellCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
 import java.nio.file.Path
@@ -138,38 +140,50 @@ internal class KetraTermCompletionService : Disposable {
                 workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
                 additionalSources =
-                    listOf(
-                        TerminalCompletionSourceEntry(
-                            intellijGitCompletionSource(
-                                loader = IntellijGitCompletionLoader(project)::load,
+                    buildList {
+                        if (tab.profile.kind == TerminalProfileKind.POWERSHELL) {
+                            add(
+                                TerminalCompletionSourceEntry(
+                                    SessionShellCompletionSource(tab.session),
+                                    TerminalCompletionSourcePrior.NATIVE_SHELL,
+                                ),
+                            )
+                        }
+                        addAll(
+                            listOf(
+                                TerminalCompletionSourceEntry(
+                                    intellijGitCompletionSource(
+                                        loader = IntellijGitCompletionLoader(project)::load,
+                                    ),
+                                    TerminalCompletionSourcePrior.GIT_REFERENCE,
+                                ),
+                                TerminalCompletionSourceEntry(
+                                    intellijGitCommitCompletionSource(
+                                        loader = IntellijGitCommitCompletionLoader(project)::load,
+                                    ),
+                                    TerminalCompletionSourcePrior.GIT_REFERENCE,
+                                ),
+                                TerminalCompletionSourceEntry(
+                                    intellijGitStatusPathCompletionSource(
+                                        loader = IntellijGitStatusPathLoader(project)::load,
+                                    ),
+                                    TerminalCompletionSourcePrior.GIT_STATUS_PATH,
+                                ),
+                                TerminalCompletionSourceEntry(
+                                    intellijGradleTaskCompletionSource(
+                                        loader = IntellijGradleTaskLoader(project)::load,
+                                    ),
+                                    TerminalCompletionSourcePrior.GRADLE_TASK,
+                                ),
+                                TerminalCompletionSourceEntry(
+                                    intellijProjectFileCompletionSource(
+                                        loader = IntellijProjectFileLoader(project)::load,
+                                    ),
+                                    TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
+                                ),
                             ),
-                            TerminalCompletionSourcePrior.GIT_REFERENCE,
-                        ),
-                        TerminalCompletionSourceEntry(
-                            intellijGitCommitCompletionSource(
-                                loader = IntellijGitCommitCompletionLoader(project)::load,
-                            ),
-                            TerminalCompletionSourcePrior.GIT_REFERENCE,
-                        ),
-                        TerminalCompletionSourceEntry(
-                            intellijGitStatusPathCompletionSource(
-                                loader = IntellijGitStatusPathLoader(project)::load,
-                            ),
-                            TerminalCompletionSourcePrior.GIT_STATUS_PATH,
-                        ),
-                        TerminalCompletionSourceEntry(
-                            intellijGradleTaskCompletionSource(
-                                loader = IntellijGradleTaskLoader(project)::load,
-                            ),
-                            TerminalCompletionSourcePrior.GRADLE_TASK,
-                        ),
-                        TerminalCompletionSourceEntry(
-                            intellijProjectFileCompletionSource(
-                                loader = IntellijProjectFileLoader(project)::load,
-                            ),
-                            TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
-                        ),
-                    ),
+                        )
+                    },
                 directoryScanner = IntellijProjectDirectoryScanner(project),
                 projectDirectory = project.guessProjectDir()?.toNioPath(),
             )

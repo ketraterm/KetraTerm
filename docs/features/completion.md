@@ -24,6 +24,7 @@ This table describes the sources available when completion is enabled.
 | Source | Standalone | IntelliJ plugin |
 | --- | --- | --- |
 | Built-in command specifications | Yes | Yes |
+| Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
 | Git branches and tags | No dynamic source. | Local/remote branches and tags from IDE repositories. |
@@ -39,6 +40,14 @@ metadata. For Git commands, completed `-C` values select the source directory in
 input order for references, commits, changed paths, and ordinary/project paths;
 relative values build on the preceding directory and empty values leave it unchanged.
 The captured project directory is a fallback only when shell directory metadata is absent.
+
+PowerShell's native source calls `TabExpansion2` inside the running shell, preserving
+its replacement text, quoting, and ranges. It requires the installed prompt hooks
+and PSReadLine, and supplements the other sources. Requests are serialized and
+expire after two seconds; cancellation cannot interrupt a completer already running
+inside PowerShell. Native results remain subject to bounded protocol validation
+and stale-edit checks. The OSC producer still requires an unambiguous visible
+command line with the cursor at its end. Bash and zsh have no native-completion bridge.
 
 ## Built-in command catalog
 

@@ -56,6 +56,11 @@ PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell directory reports cover filesystem locations only.
 
+When PSReadLine is loaded, the PowerShell bootstrap also installs the private
+`F12,e` chord for [native suggestions](completion.md#sources-by-host). The handler
+reads the live editing buffer and calls `TabExpansion2` without submitting or
+replacing the command. Each prompt announces a fresh completion epoch.
+
 ## Features supplied by shell metadata
 
 | Feature | Description |

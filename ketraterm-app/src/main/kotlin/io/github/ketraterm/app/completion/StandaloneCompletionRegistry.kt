@@ -20,6 +20,8 @@ import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.ui.swing.host.SessionShellCompletionSource
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
@@ -43,7 +45,7 @@ import java.util.*
 internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
-    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
+    private val specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
@@ -61,16 +63,17 @@ internal class StandaloneCompletionRegistry private constructor(
             ioDispatcher = ioDispatcher,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
+    private val sources =
+        listOf(
+            TerminalCompletionSourceEntry(
+                TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
+                TerminalCompletionSourcePrior.DIRECTORY_PATH,
+            ),
+        )
     private val engine =
         TerminalCompletionEngines.fromSources(
             messages = completionMessages,
-            sources =
-                listOf(
-                    TerminalCompletionSourceEntry(
-                        TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
-                        TerminalCompletionSourcePrior.DIRECTORY_PATH,
-                    ),
-                ),
+            sources = sources,
             commandSpecs = specs,
             learningStore = learningStore,
         )
@@ -100,6 +103,7 @@ internal class StandaloneCompletionRegistry private constructor(
      *
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
+     * @param session session supplying optional live PowerShell completions for this pane.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return provider with request-owned learning feedback for the pane.
      * @throws IllegalStateException if this registry is closed.
@@ -107,6 +111,7 @@ internal class StandaloneCompletionRegistry private constructor(
     fun createProvider(
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+        session: TerminalSession? = null,
         workingDirectoryUriProvider: () -> String? = { null },
     ): SwingShellSuggestionProvider =
         synchronized(lifecycleLock) {
@@ -119,8 +124,26 @@ internal class StandaloneCompletionRegistry private constructor(
                 )
             }
             SwingCompletionSuggestionProvider(
-                engine = engine,
+                engine =
+                    if (session != null && shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL) {
+                        TerminalCompletionEngines.fromSources(
+                            sources =
+                                sources +
+                                    listOf(
+                                        TerminalCompletionSourceEntry(
+                                            SessionShellCompletionSource(session),
+                                            TerminalCompletionSourcePrior.NATIVE_SHELL,
+                                        ),
+                                    ),
+                            commandSpecs = specs,
+                            learningStore = learningStore,
+                            messages = completionMessages,
+                        )
+                    } else {
+                        engine
+                    },
                 contextProvider = contextProvider,
+                sourceLabels = mapOf("powershell" to "PowerShell"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

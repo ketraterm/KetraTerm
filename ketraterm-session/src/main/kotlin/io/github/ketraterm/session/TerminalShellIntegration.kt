@@ -90,4 +90,15 @@ public interface TerminalShellIntegration {
 
     /** Optional synchronous finalization after a parser batch, before startup submission. */
     public fun outputProcessed(): Unit = Unit
+
+    /** Maximum complete custom OSC envelope collected for this producer. Ordinary built-in limits stay unchanged. */
+    public val customOscPayloadLimitBytes: Int get() = 4096
+
+    /** Borrows an unsupported OSC body synchronously under session serialization; never retain [payload]. */
+    public fun observeCustomOsc(
+        command: Int,
+        payload: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Unit = Unit
 }
