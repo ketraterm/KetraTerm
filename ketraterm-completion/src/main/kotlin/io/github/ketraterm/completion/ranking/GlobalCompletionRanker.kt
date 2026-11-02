@@ -33,10 +33,8 @@ internal data class CompletionSourceCandidates(
 /**
  * Deterministic global evidence-fusion ranker for one merged completion engine.
  *
- * This component groups projected outcomes, chooses edit and presentation
- * representatives, and orders the fused results. Outcome resolution, context
- * relevance, numeric policy, and learned evidence indexing are delegated to
- * their owning collaborators.
+ * Groups projected outcomes, retains one complete representative per outcome,
+ * and orders results using semantic fit, match quality, and bounded evidence.
  */
 internal class GlobalCompletionRanker {
     private val outcomeResolver = TerminalCompletionOutcomeKeyResolver()
@@ -102,25 +100,19 @@ internal class GlobalCompletionRanker {
                 }
             }
             for ((key, contribution) in bestByOutcome) {
-                val outcome = outcomes.getOrPut(key, ::RankedOutcome)
-                outcome.aggregate.add(contribution)
-                outcome.fused = outcome.aggregate.finish()
+                val outcome = outcomes[key]
+                if (outcome == null) outcomes[key] = RankedOutcome(contribution) else outcome.add(contribution)
                 publicationDirty = true
             }
         }
 
         fun rankedCandidates(): List<TerminalCompletionCandidate> {
             if (!publicationDirty) return publishedCandidates
-            val allFused = ArrayList<FusedCandidate>(outcomes.size)
-            for (outcome in outcomes.values) {
-                val fused = outcome.fused
-                if (fused != null) allFused += fused
-            }
-            allFused.sortWith(FUSED_ORDER)
-            val limit = minOf(resultLimit, allFused.size)
+            val rankedOutcomes = outcomes.values.sortedWith(OUTCOME_ORDER)
+            val limit = minOf(resultLimit, rankedOutcomes.size)
             val candidates = ArrayList<TerminalCompletionCandidate>(limit)
             for (i in 0 until limit) {
-                candidates += allFused[i].toPublicCandidate()
+                candidates += rankedOutcomes[i].toPublicCandidate()
             }
             if (candidates != publishedCandidates) {
                 publishedCandidates = candidates
@@ -130,68 +122,39 @@ internal class GlobalCompletionRanker {
         }
     }
 
-    private class RankedOutcome {
-        val aggregate = MutableOutcomeAggregate()
-        var fused: FusedCandidate? = null
-    }
-
-    private class MutableOutcomeAggregate {
-        private val contributions = ArrayList<RankedContribution>(2)
+    /** Sufficient statistics for one outcome; provider count never adds ranking weight. */
+    private class RankedOutcome(
+        first: RankedContribution,
+    ) {
+        var representative = first
+            private set
+        var bestLocalRank = first.localRank
+            private set
+        var strongestContext = first.contextAdjustment
+            private set
+        private var sourcePrior = first.sourcePrior
+        private var semanticRelevance = first.semanticRelevance
+        private var matchRelevance = first.matchRelevance
 
         fun add(contribution: RankedContribution) {
-            contributions += contribution
+            if (EDIT_REPRESENTATIVE_ORDER.compare(contribution, representative) < 0) representative = contribution
+            bestLocalRank = minOf(bestLocalRank, contribution.localRank)
+            sourcePrior = maxOf(sourcePrior, contribution.sourcePrior)
+            strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
+            semanticRelevance = maxOf(semanticRelevance, contribution.semanticRelevance)
+            matchRelevance = maxOf(matchRelevance, contribution.matchRelevance)
         }
 
-        fun finish(): FusedCandidate {
-            val editRepresentative = contributions.minWith(EDIT_REPRESENTATIVE_ORDER)
-            var presentationRepresentative = editRepresentative
-            var reciprocalRankScore = 0L
-            var sourcePriorScore = Long.MIN_VALUE
-            var strongestContext = Int.MIN_VALUE
-            for (contribution in contributions) {
-                reciprocalRankScore = maxOf(reciprocalRankScore, reciprocalRank(contribution.localRank))
-                sourcePriorScore = maxOf(sourcePriorScore, contribution.sourcePrior.toLong())
-                strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
-                if (contribution.hasSameEditAs(editRepresentative) &&
-                    PRESENTATION_REPRESENTATIVE_ORDER.compare(contribution, presentationRepresentative) < 0
-                ) {
-                    presentationRepresentative = contribution
-                }
+        // Keep the public numeric score consistent with the same lexicographic ranking policy.
+        val score: Long
+            get() {
+                val evidence = reciprocalRank(bestLocalRank) + sourcePrior + strongestContext + representative.exactLearningAdjustment
+                return semanticRelevance * SEMANTIC_RELEVANCE_SCALE + matchRelevance * MATCH_RELEVANCE_SCALE +
+                    evidence.coerceIn(-EVIDENCE_SCORE_BOUND, EVIDENCE_SCORE_BOUND)
             }
-            val score =
-                CompletionScoreComponents(
-                    reciprocalRank = reciprocalRankScore,
-                    sourcePrior = sourcePriorScore,
-                    semanticContext = strongestContext,
-                    exactLearning = editRepresentative.exactLearningAdjustment,
-                    semanticRelevance = contributions.maxOf { it.semanticRelevance },
-                    matchRelevance = contributions.maxOf { it.matchRelevance },
-                )
-            return FusedCandidate(
-                rankingCandidate = editRepresentative.candidate,
-                presentationCandidate = presentationRepresentative.candidate,
-                score = score.total,
-                strongestContext = strongestContext,
-                bestLocalRank = contributions.minOf { it.localRank },
-                sourceIndex = editRepresentative.sourceIndex,
-                candidateIndex = editRepresentative.candidateIndex,
-            )
-        }
-    }
 
-    /** Auditable score composition; each ranking policy contributes exactly once. */
-    private data class CompletionScoreComponents(
-        val reciprocalRank: Long,
-        val sourcePrior: Long,
-        val semanticContext: Int,
-        val exactLearning: Int,
-        val semanticRelevance: Int,
-        val matchRelevance: Int,
-    ) {
-        val total: Long
-            get() =
-                semanticRelevance * SEMANTIC_RELEVANCE_SCALE + matchRelevance * MATCH_RELEVANCE_SCALE +
-                    (reciprocalRank + sourcePrior + semanticContext + exactLearning).coerceIn(-EVIDENCE_SCORE_BOUND, EVIDENCE_SCORE_BOUND)
+        fun toPublicCandidate(): TerminalCompletionCandidate =
+            representative.candidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
     }
 
     private data class RankedContribution(
@@ -207,11 +170,6 @@ internal class GlobalCompletionRanker {
         val exactLearningAdjustment: Int,
     ) {
         val replacementLength: Int = candidate.replacementText.length
-
-        fun hasSameEditAs(other: RankedContribution): Boolean =
-            candidate.replacementText == other.candidate.replacementText &&
-                candidate.replacementStartOffset == other.candidate.replacementStartOffset &&
-                candidate.replacementEndOffset == other.candidate.replacementEndOffset
     }
 
     private data class FallbackOutcomeKey(
@@ -224,19 +182,6 @@ internal class GlobalCompletionRanker {
             candidate.replacementStartOffset,
             candidate.replacementEndOffset,
         )
-    }
-
-    private data class FusedCandidate(
-        val rankingCandidate: TerminalCompletionCandidate,
-        val presentationCandidate: TerminalCompletionCandidate,
-        val score: Long,
-        val strongestContext: Int,
-        val bestLocalRank: Int,
-        val sourceIndex: Int,
-        val candidateIndex: Int,
-    ) {
-        fun toPublicCandidate(): TerminalCompletionCandidate =
-            presentationCandidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
     }
 
     private companion object {
@@ -356,22 +301,14 @@ internal class GlobalCompletionRanker {
                 .thenBy { it.sourceIndex }
                 .thenBy { it.candidateIndex }
 
-        private val PRESENTATION_REPRESENTATIVE_ORDER =
-            compareByDescending<RankedContribution> { it.contextAdjustment }
-                .thenBy { it.isFallback }
-                .thenByDescending { it.sourcePrior }
-                .thenBy { it.localRank }
-                .thenBy { it.sourceIndex }
-                .thenBy { it.candidateIndex }
-
-        private val FUSED_ORDER =
-            compareByDescending<FusedCandidate> { it.score }
+        private val OUTCOME_ORDER =
+            compareByDescending<RankedOutcome> { it.score }
                 .thenByDescending { it.strongestContext }
                 .thenBy { it.bestLocalRank }
-                .thenBy { it.rankingCandidate.displayText }
-                .thenBy { it.rankingCandidate.replacementText }
-                .thenBy { it.sourceIndex }
-                .thenBy { it.candidateIndex }
+                .thenBy { it.representative.candidate.displayText }
+                .thenBy { it.representative.candidate.replacementText }
+                .thenBy { it.representative.sourceIndex }
+                .thenBy { it.representative.candidateIndex }
 
         private fun List<TerminalCompletionCandidate>.sortedLocally(): List<TerminalCompletionCandidate> {
             if (size <= 1) return this

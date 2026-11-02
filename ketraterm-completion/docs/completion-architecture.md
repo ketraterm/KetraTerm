@@ -320,13 +320,13 @@ extra provider vote. Learned candidates act as a fallback, allowing live semanti
 providers to supply presentation while matching learned evidence strengthens
 the same outcome.
 
-The edit representative favors semantic fit, narrower replacement ranges, the
-source prior, local rank, and stable tie-breakers. Presentation selection can
-choose only a contributor with the same edit. Its complete candidate metadata,
-including `feedbackToken`, is preserved together; the engine replaces only its
-score with the fused global score. Presentation selection does not change the
-admitted edit or final ordering. Ordering is deterministic for the same request,
-source results, learning snapshot, and evaluation time.
+One representative supplies both the edit and its complete presentation metadata,
+including `feedbackToken`. Selection favors semantic fit, primary providers,
+shorter replacement text, source prior, local rank, and stable tie-breakers.
+Each outcome retains that representative and aggregate relevance values; it does
+not retain the contributing candidate list. The engine replaces only the chosen
+candidate's score with the global score. Ordering is deterministic for the same
+request, source results, learning snapshot, and evaluation time.
 
 ## Ranking Calibration
 

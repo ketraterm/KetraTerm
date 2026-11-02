@@ -24,6 +24,42 @@ import kotlin.test.*
 
 class GlobalCompletionRankerIncrementalTest {
     @Test
+    fun `progressive merges preserve final ordering metadata and scores across all source arrival orders`() {
+        val token = Any()
+        val sources =
+            listOf(
+                CompletionSourceCandidates(0, 20, candidates = listOf(candidate("gradle", 100), candidate("'git'", 0))),
+                CompletionSourceCandidates(
+                    1,
+                    -20,
+                    candidates = listOf(candidate("git", 0, source = "commands", detail = "Git CLI", feedbackToken = token)),
+                ),
+                CompletionSourceCandidates(
+                    2,
+                    100,
+                    candidates = listOf(candidate("git", Int.MAX_VALUE).copy(kind = TerminalCompletionCandidateKind.PATH)),
+                ),
+            )
+        var expected: List<TerminalCompletionCandidate>? = null
+        for (first in sources.indices) {
+            for (second in sources.indices.filter { it != first }) {
+                val third = sources.indices.single { it != first && it != second }
+                val state = requestState()
+                for (index in listOf(first, second, third)) {
+                    state.ingest(sources[index])
+                    state.rankedCandidates()
+                }
+                val results = state.rankedCandidates()
+                assertEquals(listOf("git", "gradle"), results.map { it.replacementText })
+                assertEquals("commands", results.first().source)
+                assertEquals("Git CLI", results.first().detail)
+                assertSame(token, results.first().feedbackToken)
+                if (expected == null) expected = results else assertEquals(expected, results)
+            }
+        }
+    }
+
+    @Test
     fun `top K publication is reused until an updated outcome enters the retained set`() {
         val request = TerminalCompletionRequest("g", 1)
         val context =

@@ -18,10 +18,7 @@ package io.github.ketraterm.completion.engine
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.internal.boundedTo
-import io.github.ketraterm.completion.internal.commandLineAfterCandidate
-import io.github.ketraterm.completion.internal.hasValidReplacementRangeFor
+import io.github.ketraterm.completion.internal.*
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -53,7 +50,6 @@ internal class MergedCompletionEngine(
     private val learnedPathDetail = messages.message("completion.learnedPath")
     private val observedDetail = messages.message("completion.observedToken")
     private val specSource = commandSpecs.takeIf { it.isNotEmpty() }?.let(::SpecCompletionSource)
-    private val ordinarySourceCount = sources.size
     private val shellSource =
         shellProvider?.let { provider ->
             TerminalCompletionSourceEntry(
@@ -63,7 +59,8 @@ internal class MergedCompletionEngine(
         }
     private val sources = sources.toList()
     private val hostSourceIndexOffset = if (specSource == null) 0 else 1
-    private val learnedSourceIndex = hostSourceIndexOffset + sources.size + if (shellProvider == null) 0 else 1
+    private val shellSourceIndex = hostSourceIndexOffset + sources.size
+    private val learnedSourceIndex = shellSourceIndex + if (shellProvider == null) 0 else 1
     private val ranker = GlobalCompletionRanker()
     private val pathCommandSpecCandidateProjector = PathCommandSpecCandidateProjector(this.commandSpecs)
 
@@ -80,21 +77,11 @@ internal class MergedCompletionEngine(
                 return@channelFlow
             }
             val commandPosition = completionContext.activePosition == TerminalCompletionActivePosition.COMMAND
-            val structuredArguments =
-                !commandPosition &&
-                    (
-                        completionContext.subcommandCandidateSource != null ||
-                            completionContext.activeOption != null ||
-                            completionContext.activePositionalArgument != null ||
-                            completionContext.expectedPathKind != TerminalPathArgumentKind.NONE ||
-                            completionContext.expectedValueDomain != TerminalCompletionValueDomain.NONE ||
-                            (
-                                completionContext.activePosition == TerminalCompletionActivePosition.OPTION_NAME &&
-                                    completionContext.commandPath.any { it.options.isNotEmpty() }
-                            )
-                    )
-            val queryShellFirst = shellProvider != null && !structuredArguments
-            val shellCandidates = if (queryShellFirst) completeShell(request, completionContext) else null
+            val structuredArguments = completionContext.hasStructuredArguments()
+            val shellCandidates = if (shellProvider != null && !structuredArguments) completeShell(request, completionContext) else null
+            val nativeArguments = !commandPosition && shellCandidates != null
+            val activeSources = if (nativeArguments) emptyList() else sources
+            val includeHistory = !nativeArguments && !completionContext.commandLineContext.precededByOperator
             val availableCommands =
                 if (commandPosition) {
                     shellCandidates?.mapNotNull { commandName(request, it) }?.toHashSet()
@@ -116,51 +103,27 @@ internal class MergedCompletionEngine(
                 )
             var lastPublished: List<TerminalCompletionCandidate>? = null
 
-            learningIndexes
-                ?.takeUnless { completionContext.commandLineContext.precededByOperator || (!commandPosition && shellCandidates != null) }
-                ?.let { indexes ->
-                    val learnedCandidates =
-                        ArrayList<TerminalCompletionCandidate>()
-                            .apply {
-                                appendLearnedHistoryCandidates(
-                                    request = request,
-                                    lineContext = completionContext.commandLineContext,
-                                    completionContext = completionContext,
-                                    index = indexes.history,
-                                    nowEpochMillis = nowEpochMillis,
-                                    destination = this,
-                                    commandDetail = learnedCommandDetail,
-                                    directoryDetail = learnedDirectoryDetail,
-                                    pathDetail = learnedPathDetail,
-                                )
-                                indexes.observed.appendCandidates(
-                                    request = request,
-                                    context = completionContext,
-                                    destination = this,
-                                    detail = observedDetail,
-                                )
-                                sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-                            }.let { candidates ->
-                                pathCommandSpecCandidateProjector
-                                    .project(request, completionContext, candidates)
-                                    .filter { it.hasValidReplacementRangeFor(request) }
-                                    .filter(::available)
-                                    .boundedTo(SOURCE_CANDIDATE_LIMIT)
-                            }
-                    if (learnedCandidates.isNotEmpty()) {
-                        rankingState.ingest(
-                            CompletionSourceCandidates(
-                                sourceIndex = learnedSourceIndex,
-                                priority = LEARNED_PRIORITY,
-                                isFallback = true,
-                                candidates = learnedCandidates,
-                            ),
-                        )
-                    }
+            suspend fun publish() {
+                val ranked = rankingState.rankedCandidates()
+                if (ranked != lastPublished) {
+                    lastPublished = ranked
+                    send(ranked)
                 }
+            }
 
-            specSource?.takeUnless { shellCandidates != null }?.let { source ->
-                val candidates = completeSource(source, request, completionContext)
+            if (includeHistory && learningIndexes != null) {
+                rankingState.ingest(
+                    CompletionSourceCandidates(
+                        sourceIndex = learnedSourceIndex,
+                        priority = LEARNED_PRIORITY,
+                        isFallback = true,
+                        candidates = learnedCandidates(request, completionContext, learningIndexes, nowEpochMillis, ::available),
+                    ),
+                )
+            }
+
+            if (shellCandidates == null && specSource != null) {
+                val candidates = completeSource(specSource, request, completionContext)
                 if (candidates.isNotEmpty()) {
                     rankingState.ingest(
                         CompletionSourceCandidates(
@@ -175,7 +138,7 @@ internal class MergedCompletionEngine(
             if (shellCandidates != null && shellCandidates.isNotEmpty()) {
                 rankingState.ingest(
                     CompletionSourceCandidates(
-                        sourceIndex = ordinarySourceCount + hostSourceIndexOffset,
+                        sourceIndex = shellSourceIndex,
                         priority = TerminalCompletionSourcePrior.NATIVE_SHELL,
                         candidates =
                             shellCandidates.filter { changesText(request, it) }.map {
@@ -186,85 +149,103 @@ internal class MergedCompletionEngine(
             }
 
             // Command authority is resolved before the first publication; argument sources remain progressive.
-            val initialRanked = rankingState.rankedCandidates()
-            val asynchronousSourceCount = if (!commandPosition && shellCandidates != null) 0 else sources.size
-            if (initialRanked.isNotEmpty() || asynchronousSourceCount == 0) {
-                lastPublished = initialRanked
-                send(initialRanked)
-            }
-
-            if (asynchronousSourceCount > 0) {
-                val completions = Channel<SourceCompletion>(asynchronousSourceCount)
-                try {
-                    coroutineScope {
-                        for (localSourceIndex in 0 until asynchronousSourceCount) {
-                            val entry = sources[localSourceIndex]
-                            val sourceIndex = localSourceIndex + hostSourceIndexOffset
-                            launch {
-                                val candidates =
-                                    try {
-                                        completeSource(
-                                            source = entry.source,
-                                            request = request,
-                                            context = completionContext,
-                                        ).filter(::available).also { coroutineContext.ensureActive() }
-                                    } catch (_: CancellationException) {
-                                        this@coroutineScope.ensureActive()
-                                        emptyList()
-                                    } catch (failure: Throwable) {
-                                        reportSourceFailure(sourceIndex, entry, failure)
-                                        if (failure !is Exception) throw failure
-                                        emptyList()
-                                    }
-                                // One slot per source allows even a self-cancelled child to report without suspension.
-                                completions
-                                    .trySend(
-                                        SourceCompletion(
-                                            sourceIndex = sourceIndex,
-                                            priority = entry.priority,
-                                            candidates = candidates,
-                                        ),
-                                    ).getOrThrow()
-                            }
-                        }
-
-                        repeat(asynchronousSourceCount) {
-                            val completed = completions.receive()
-                            if (completed.candidates.isNotEmpty()) {
-                                rankingState.ingest(
-                                    CompletionSourceCandidates(
-                                        sourceIndex = completed.sourceIndex,
-                                        priority = completed.priority,
-                                        candidates = completed.candidates,
-                                    ),
-                                )
-                            }
-                            val ranked = rankingState.rankedCandidates()
-                            if (ranked != lastPublished) {
-                                lastPublished = ranked
-                                send(ranked)
-                            }
-                        }
-                    }
-                } finally {
-                    completions.cancel()
-                }
+            if (rankingState.rankedCandidates().isNotEmpty() || activeSources.isEmpty()) publish()
+            collectSources(activeSources, request, completionContext, ::available) { completed ->
+                rankingState.ingest(completed)
+                publish()
             }
             if (structuredArguments && shellProvider != null && rankingState.rankedCandidates().isEmpty()) {
                 val fallback = completeShell(request, completionContext).orEmpty().filter { changesText(request, it) }
                 if (fallback.isNotEmpty()) {
                     rankingState.ingest(
                         CompletionSourceCandidates(
-                            sourceIndex = ordinarySourceCount + hostSourceIndexOffset,
+                            sourceIndex = shellSourceIndex,
                             priority = TerminalCompletionSourcePrior.NATIVE_SHELL,
                             candidates = fallback,
                         ),
                     )
-                    val ranked = rankingState.rankedCandidates()
-                    if (ranked != lastPublished) send(ranked)
+                    publish()
                 }
             }
         }
+
+    private fun TerminalCompletionContext.hasStructuredArguments(): Boolean =
+        activePosition != TerminalCompletionActivePosition.COMMAND &&
+            (
+                subcommandCandidateSource != null ||
+                    activeOption != null ||
+                    activePositionalArgument != null ||
+                    expectedPathKind != TerminalPathArgumentKind.NONE ||
+                    expectedValueDomain != TerminalCompletionValueDomain.NONE ||
+                    (activePosition == TerminalCompletionActivePosition.OPTION_NAME && commandPath.any { it.options.isNotEmpty() })
+            )
+
+    private fun learnedCandidates(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        indexes: CompletionLearningIndexes,
+        nowEpochMillis: Long,
+        available: (TerminalCompletionCandidate) -> Boolean,
+    ): List<TerminalCompletionCandidate> {
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        appendLearnedHistoryCandidates(
+            request = request,
+            lineContext = context.commandLineContext,
+            completionContext = context,
+            index = indexes.history,
+            nowEpochMillis = nowEpochMillis,
+            destination = candidates,
+            commandDetail = learnedCommandDetail,
+            directoryDetail = learnedDirectoryDetail,
+            pathDetail = learnedPathDetail,
+        )
+        indexes.observed.appendCandidates(request = request, context = context, destination = candidates, detail = observedDetail)
+        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return pathCommandSpecCandidateProjector
+            .project(request, context, candidates)
+            .filter { it.hasValidReplacementRangeFor(request) }
+            .filter(available)
+            .boundedTo(SOURCE_CANDIDATE_LIMIT)
+    }
+
+    /** Owns provider children and delivers one result per source, including source-local cancellation. */
+    private suspend fun collectSources(
+        activeSources: List<TerminalCompletionSourceEntry>,
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        available: (TerminalCompletionCandidate) -> Boolean,
+        onCompleted: suspend (CompletionSourceCandidates) -> Unit,
+    ) {
+        if (activeSources.isEmpty()) return
+        val completions = Channel<CompletionSourceCandidates>(activeSources.size)
+        try {
+            coroutineScope {
+                for ((localIndex, entry) in activeSources.withIndex()) {
+                    val sourceIndex = localIndex + hostSourceIndexOffset
+                    launch {
+                        val candidates =
+                            try {
+                                completeSource(entry.source, request, context)
+                                    .filter(available)
+                                    .also { coroutineContext.ensureActive() }
+                            } catch (_: CancellationException) {
+                                this@coroutineScope.ensureActive()
+                                emptyList()
+                            } catch (failure: Throwable) {
+                                reportSourceFailure(sourceIndex, entry, failure)
+                                if (failure !is Exception) throw failure
+                                emptyList()
+                            }
+                        // One slot per child permits a cancelled source to report without suspending.
+                        completions.trySend(CompletionSourceCandidates(sourceIndex, entry.priority, candidates = candidates)).getOrThrow()
+                    }
+                }
+                repeat(activeSources.size) { onCompleted(completions.receive()) }
+            }
+        } finally {
+            completions.cancel()
+        }
+    }
 
     private suspend fun completeShell(
         request: TerminalCompletionRequest,
@@ -278,7 +259,7 @@ internal class MergedCompletionEngine(
             currentCoroutineContext().ensureActive()
             null
         } catch (failure: Throwable) {
-            reportSourceFailure(ordinarySourceCount + hostSourceIndexOffset, checkNotNull(shellSource), failure)
+            reportSourceFailure(shellSourceIndex, checkNotNull(shellSource), failure)
             if (failure !is Exception) throw failure
             null
         }
@@ -362,12 +343,6 @@ internal class MergedCompletionEngine(
             TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER.sourceFailed(sourceIndex, source, diagnosticFailure)
         }
     }
-
-    private data class SourceCompletion(
-        val sourceIndex: Int,
-        val priority: Int,
-        val candidates: List<TerminalCompletionCandidate>,
-    )
 
     private companion object {
         private const val STATIC_SPECIFICATION_PRIORITY = 0
