@@ -34,7 +34,8 @@ class TerminalCompletionPrecedingArgumentsTest {
 
         assertEquals(listOf("--context", "QA Region", "-c=Prod=blue", "--flag", "repo", "--namespace", "ns"), context.precedingArguments)
         assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues("--context"))
-        assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues(" -C "))
+        assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues(" -c "))
+        assertEquals(emptyList(), context.precedingOptionValues("-C"))
         assertEquals(listOf("ns"), context.precedingOptionValues("-n"))
         assertEquals(listOf("repo"), context.precedingPositionalArguments)
         assertEquals(emptyList(), context.precedingOptionValues("--flag"))

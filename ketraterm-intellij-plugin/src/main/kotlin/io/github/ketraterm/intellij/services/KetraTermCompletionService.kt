@@ -21,6 +21,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
@@ -170,6 +171,7 @@ internal class KetraTermCompletionService : Disposable {
                         ),
                     ),
                 directoryScanner = IntellijProjectDirectoryScanner(project),
+                projectDirectory = project.guessProjectDir()?.toNioPath(),
             )
         return runtime.registry.createProvider(context)
     }

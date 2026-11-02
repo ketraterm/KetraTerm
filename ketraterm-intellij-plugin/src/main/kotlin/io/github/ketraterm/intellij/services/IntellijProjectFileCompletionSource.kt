@@ -31,7 +31,6 @@ import com.intellij.util.indexing.FindSymbolParameters
 import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -71,9 +70,10 @@ internal class IntellijProjectFileLoader(
         val normalizedPrefix = prefix.replace('\\', '/')
         if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
         val workingDirectory =
-            TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
-                ?: project.guessProjectDir()?.toNioPath()
-                ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+            resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) {
+                project.guessProjectDir()?.toNioPath()
+                    ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+            }
                 ?: return emptyList()
         return readAction {
             ProgressManager.checkCanceled()

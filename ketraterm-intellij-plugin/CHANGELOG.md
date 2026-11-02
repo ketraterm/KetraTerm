@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Completion sources honor repeated Git `-C` directory changes and no longer substitute local project paths or repositories for explicitly unsupported shell working directories.
 - Added sticky command headers, enabled by default with an independent setting. The overlay repeats the full original prompt/input row with normal terminal typography, colors and cell spacing while its output is at the viewport top. Clicking reveals the command; scrolling, grid dimensions and PTY sizing remain unchanged.
 - Typing and accepted paste return to live input immediately. Scroll on output now defaults to off so incoming output preserves the reader's position; explicitly saved preferences remain effective.
 

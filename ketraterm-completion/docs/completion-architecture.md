@@ -94,7 +94,7 @@ empty strings, and no variable, glob, or command expansion occurs.
   inferred value ownership.
 - `precedingOptionValues(optionName)` returns all completed values for a known
   option, including repeats, inherited options, and empty values. Any declared
-  alias is accepted using trimmed, case-insensitive spec lookup. Separate and
+  alias is accepted using case-sensitive spec lookup with surrounding whitespace trimmed. Separate and
   `--name=value` forms share decoded value semantics. Unknown options, valueless
   flags, pending values, and the active word are excluded. The caller chooses
   first, last, or all values; no last-value-wins policy is imposed.
@@ -212,6 +212,10 @@ Trailing whitespace starts a new argument. Completing `cd` targets the command;
 completing `cd ` targets an empty argument. A learned `cd project/` is projected
 as `project/` in that argument context. History entries that cannot be projected
 safely are omitted.
+
+Option names retain case-sensitive identity, including short options such as
+Git's `-s` and `-S`. Candidate matching remains case-insensitive; completing one
+spelling can still suggest a distinct spelling that differs only in case.
 
 The exact `--` token ends option and subcommand resolution after the cursor has
 passed it. While the cursor remains attached to `--`, it is still an option

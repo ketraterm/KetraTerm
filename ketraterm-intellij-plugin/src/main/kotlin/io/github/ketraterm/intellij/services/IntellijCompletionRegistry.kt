@@ -100,7 +100,18 @@ internal class IntellijCompletionRegistry(
             val engine =
                 TerminalCompletionEngines.fromSources(
                     messages = completionMessages,
-                    sources = sources,
+                    sources =
+                        sources.map { entry ->
+                            entry.copy(
+                                source =
+                                    TerminalCompletionSource { request, completionContext, limit ->
+                                        val sourceRequest =
+                                            resolveIntellijCompletionRequest(request, completionContext, context.projectDirectory)
+                                                ?: return@TerminalCompletionSource emptyList()
+                                        entry.source.complete(sourceRequest, completionContext, limit)
+                                    },
+                            )
+                        },
                     commandSpecs = commandSpecs,
                     learningStore = learningStore,
                 )

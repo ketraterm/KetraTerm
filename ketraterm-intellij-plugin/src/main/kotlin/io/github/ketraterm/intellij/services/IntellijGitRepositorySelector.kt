@@ -22,7 +22,6 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFileManager
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
@@ -42,8 +41,7 @@ internal suspend fun <T> readIntellijGitRepository(
     cancellationContext.ensureActive()
     if (project.isDisposed) return null
     val workingDirectory =
-        TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
-            ?: project.guessProjectDir()?.toNioPath()
+        resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) { project.guessProjectDir()?.toNioPath() }
             ?: return null
     return readAction {
         cancellationContext.ensureActive()

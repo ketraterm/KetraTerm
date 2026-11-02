@@ -119,7 +119,7 @@ internal class SpecCompletionSource(
         for (option in options) {
             if (option.exclusiveGroupIds.any(context.usedOptionExclusiveGroupIds::contains)) continue
             for (name in option.names) {
-                if (prefix.isNotEmpty() && name.equals(prefix, ignoreCase = true)) continue
+                if (name == prefix) continue
                 val match = CompletionMatcher.match(name, prefix) ?: continue
                 candidates +=
                     candidate(

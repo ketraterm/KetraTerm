@@ -15,7 +15,10 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.commandline.AttachedOptionValue
+import io.github.ketraterm.completion.commandline.ResolvedOptionValue
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.model.*
 import java.util.Collections.unmodifiableList
 import java.util.List.copyOf
@@ -126,7 +129,7 @@ public class TerminalCompletionContext
         /**
          * Returns every completed value for a known option in input order, including
          * repeats and empty values. [optionName] may be any declared alias; matching
-         * follows command-spec lookup (trimmed and case-insensitive). Separate values
+         * follows case-sensitive command-spec lookup, with surrounding whitespace trimmed. Separate values
          * and `--name=value` use the same resolved option and decoded value semantics.
          *
          * Only occurrences resolved by the spec at their position are included,
@@ -139,10 +142,10 @@ public class TerminalCompletionContext
          * @return decoded values, or an empty list when no matching value precedes the cursor.
          */
         public fun precedingOptionValues(optionName: String): List<String> {
-            val normalizedName = normalizeTerminalCommandToken(optionName)
+            val name = optionName.trim()
             var result: ArrayList<String>? = null
             for (entry in optionValuesBeforeCursor) {
-                if (entry.option.names.any { normalizeTerminalCommandToken(it) == normalizedName }) {
+                if (name in entry.option.names) {
                     val values = result ?: ArrayList<String>().also { result = it }
                     values += entry.value
                 }

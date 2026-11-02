@@ -34,6 +34,11 @@ This table describes the sources available when completion is enabled.
 
 Local filesystem sources require locally resolvable paths. WSL or remote shell
 metadata does not provide a remote filesystem completion service.
+IntelliJ never substitutes its local project for explicitly unsupported directory
+metadata. For Git commands, completed `-C` values select the source directory in
+input order for references, commits, changed paths, and ordinary/project paths;
+relative values build on the preceding directory and empty values leave it unchanged.
+The captured project directory is a fallback only when shell directory metadata is absent.
 
 ## Built-in command catalog
 
@@ -54,7 +59,7 @@ not an exhaustive schema for every version of these tools.
 | Feature | Description |
 | --- | --- |
 | Matching | Exact, prefix, CamelHump, word-boundary/acronym, and substring matching. |
-| Context | Active command segment, preceding arguments, option values, and end-of-options handling. |
+| Context | Active command segment, preceding arguments, case-sensitive option identity, option values, and end-of-options handling. |
 | Command specifications | Aliases, nested/repeatable subcommands, ordered/variadic arguments, literal values, path kinds, and mutually exclusive option groups. |
 | Shell syntax | POSIX and PowerShell subsets, plus conservative plain parsing; see the [shell matrix](shells.md). |
 | Paths | Directory traversal, shell-aware escaping, and hidden entries when explicitly requested. |

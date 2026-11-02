@@ -39,10 +39,10 @@ internal fun findOptionSpec(
     commandPath: List<TerminalCommandSpec>,
     token: String,
 ): TerminalOptionSpec? {
-    val normalized = normalizeTerminalCommandToken(token.substringBefore(OPTION_VALUE_SEPARATOR))
+    val name = token.substringBefore(OPTION_VALUE_SEPARATOR)
     return commandPath.asReversed().firstNotNullOfOrNull { command ->
         command.options.firstOrNull { option ->
-            option.names.any { normalizeTerminalCommandToken(it) == normalized }
+            name in option.names
         }
     }
 }

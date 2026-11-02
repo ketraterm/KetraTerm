@@ -39,6 +39,116 @@ import javax.swing.SwingUtilities
 
 class IntellijCompletionRegistryTest {
     @Test
+    fun `Git directory changes select the same environment for every host source`() =
+        runBlocking {
+            val originalDirectory = Path.of("completion-workspace").toAbsolutePath().normalize()
+            val selectedDirectory = originalDirectory.resolve("other repo")
+            val selectedUri = selectedDirectory.toUri().toString()
+            val referenceDirectories = mutableListOf<String?>()
+            val commitDirectories = mutableListOf<String?>()
+            val statusDirectories = mutableListOf<String?>()
+            val projectDirectories = mutableListOf<String?>()
+            val scannedDirectories = mutableListOf<Path>()
+            val sources =
+                listOf(
+                    intellijGitCompletionSource { uri ->
+                        referenceDirectories += uri
+                        IntellijGitCompletionSnapshot(
+                            listOf(TerminalCompletionDomainValue("feature/selected")),
+                            emptyList(),
+                            emptyList(),
+                        )
+                    },
+                    intellijGitCommitCompletionSource { uri ->
+                        commitDirectories += uri
+                        listOf(TerminalCompletionDomainValue("abc123"))
+                    },
+                    intellijGitStatusPathCompletionSource { uri, _ ->
+                        statusDirectories += uri
+                        listOf(TerminalFuzzyPathEntry("Changed.kt", false))
+                    },
+                    intellijProjectFileCompletionSource { uri, _ ->
+                        projectDirectories += uri
+                        listOf(TerminalFuzzyPathEntry("Changed.kt", false))
+                    },
+                )
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val provider =
+                    registry.createProvider(
+                        context(
+                            additionalSources = sources.map { TerminalCompletionSourceEntry(it) },
+                            workingDirectoryUriProvider = { originalDirectory.toUri().toString() },
+                            scanner =
+                                TerminalDirectoryScanner { directory, _ ->
+                                    scannedDirectories.add(directory)
+                                    listOf(TerminalFileEntry("Changed.kt", false))
+                                },
+                        ),
+                    )
+                for ((line, expected) in listOf(
+                    "git -C 'other repo' switch fe" to "feature/selected",
+                    "git -C 'other repo' cherry-pick ab" to "abc123",
+                    "git -C 'other repo' add Cha" to "Changed.kt",
+                )) {
+                    assertTrue(provider.suggestions(request(line)).last().any { it.replacementText == expected })
+                }
+
+                assertEquals(listOf(selectedUri), referenceDirectories)
+                assertEquals(listOf(selectedUri), commitDirectories)
+                assertEquals(listOf(selectedUri), statusDirectories)
+                assertEquals(listOf(selectedUri), projectDirectories)
+                assertEquals(listOf(selectedDirectory), scannedDirectories)
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
+    fun `explicit remote environments never invoke local host sources`() =
+        runBlocking {
+            var loads = 0
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val provider =
+                    registry.createProvider(
+                        context(
+                            additionalSources =
+                                listOf(
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSource { _, _, _ ->
+                                            loads++
+                                            emptyList()
+                                        },
+                                    ),
+                                ),
+                            workingDirectoryUriProvider = { "file://remote.example/repo" },
+                            scanner =
+                                TerminalDirectoryScanner { _, _ ->
+                                    loads++
+                                    emptyList()
+                                },
+                        ),
+                    )
+
+                assertTrue(provider.suggestions(request("git add Cha")).last().isEmpty())
+                assertEquals(0, loads)
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
     fun `reset removes shared completion learning`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
