@@ -16,13 +16,15 @@
 package io.github.ketraterm.completion.api
 
 /**
- * Marks experimental completion APIs whose source, binary, and behavioral contracts may change.
+ * Marks experimental completion APIs. Suggestions may be incomplete, rank poorly,
+ * or behave unexpectedly in edge cases.
  *
- * Consumers must opt in explicitly or propagate this marker from their own experimental APIs.
+ * Consumers can acknowledge the warning with opt-in or propagate this marker from their own experimental APIs.
+ * Source and binary contracts may also change before stabilization.
  */
 @RequiresOptIn(
-    message = "KetraTerm completion APIs are experimental and may change incompatibly.",
-    level = RequiresOptIn.Level.ERROR,
+    message = "KetraTerm suggestions are experimental: they may be incomplete, rank poorly, or behave unexpectedly in edge cases.",
+    level = RequiresOptIn.Level.WARNING,
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(

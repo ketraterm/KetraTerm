@@ -17,13 +17,14 @@ package io.github.ketraterm.ui.swing.suggestion
 
 /**
  * Marks experimental suggestion providers, presentation, and interaction APIs.
+ * Suggestions may be incomplete, rank poorly, or behave unexpectedly in edge cases.
  *
- * Their source, binary, and behavioral contracts may change. Consumers must opt in explicitly
- * or propagate this marker from their own experimental APIs.
+ * Consumers can acknowledge the warning with opt-in or propagate this marker from their own experimental APIs.
+ * Source and binary contracts may also change before stabilization.
  */
 @RequiresOptIn(
-    message = "KetraTerm shell suggestion APIs are experimental and may change incompatibly.",
-    level = RequiresOptIn.Level.ERROR,
+    message = "KetraTerm suggestions are experimental: they may be incomplete, rank poorly, or behave unexpectedly in edge cases.",
+    level = RequiresOptIn.Level.WARNING,
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(

@@ -4,6 +4,10 @@ Command-line completion for Kotlin/JVM hosts. The engine combines command
 specifications, host-provided sources, and optional in-memory learning into
 progressive, ranked suggestions with explicit text replacement ranges.
 
+**Experimental.** Suggestions may be incomplete, rank poorly, or behave unexpectedly
+in edge cases. See the [experimental contract](../docs/features/completion.md#stability-experimental)
+for Kotlin opt-in and API stability details.
+
 The module has no terminal, UI, process, or filesystem dependency. Its coroutine
 API can serve a headless caller or a host-owned suggestion UI.
 

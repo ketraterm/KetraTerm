@@ -51,28 +51,36 @@ class TerminalLibraryConsumerCompilationTest {
         "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionProvider",
         "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionViewFactory",
     )
-    fun `Kotlin experimental consumers must opt in explicitly`(
+    fun `Kotlin experimental consumers receive warnings that opt in acknowledges`(
         module: String,
         marker: String,
         type: String,
     ) {
         val source = "fun identity(value: io.github.ketraterm.$type) = value"
-        val (rejected, diagnostics) = compileKotlin(module, source)
-        assertEquals(ExitCode.COMPILATION_ERROR, rejected, diagnostics)
+        val (result, diagnostics) = compileKotlin(module, source)
+        assertEquals(ExitCode.OK, result, diagnostics)
         assertTrue(diagnostics.contains("experimental", ignoreCase = true), diagnostics)
-        val (accepted, acceptedDiagnostics) = compileKotlin(module, "@file:OptIn(io.github.ketraterm.$marker::class)\n$source")
+        val (rejected, strictDiagnostics) = compileKotlin(module, source, "-Werror")
+        assertEquals(ExitCode.COMPILATION_ERROR, rejected, strictDiagnostics)
+        val (accepted, acceptedDiagnostics) = compileKotlin(module, "@file:OptIn(io.github.ketraterm.$marker::class)\n$source", "-Werror")
         assertEquals(ExitCode.OK, accepted, acceptedDiagnostics)
     }
 
     @Test
     fun `ordinary Kotlin terminal consumers do not need suggestion opt in`() {
-        val (result, diagnostics) = compileKotlin("ui-swing", "fun terminal() = io.github.ketraterm.ui.swing.api.SwingTerminal()")
+        val (result, diagnostics) =
+            compileKotlin(
+                "ui-swing",
+                "fun terminal() = io.github.ketraterm.ui.swing.api.SwingTerminal()",
+                "-Werror",
+            )
         assertEquals(ExitCode.OK, result, diagnostics)
     }
 
     private fun compileKotlin(
         module: String,
         source: String,
+        vararg compilerArguments: String,
     ): Pair<ExitCode, String> {
         val classpaths = Path.of(checkNotNull(System.getProperty("ketraterm.consumerClasspaths")))
         val jars = classpaths.resolve(module).listDirectoryEntries().filter { it.extension == "jar" }
@@ -92,6 +100,7 @@ class TerminalLibraryConsumerCompilationTest {
                     jars.joinToString(File.pathSeparator),
                     "-d",
                     fixture.resolve("classes").toString(),
+                    *compilerArguments,
                     sourceFile.toString(),
                 )
             }

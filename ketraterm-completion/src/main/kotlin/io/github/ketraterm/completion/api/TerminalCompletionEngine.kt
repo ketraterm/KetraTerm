@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Pure completion engine contract.
  *
- * **Experimental:** completion APIs and behavior may change incompatibly before stabilization.
+ * **Experimental:** suggestions may be incomplete, rank poorly, or behave unexpectedly in edge cases.
  * This status applies to the engine, source and model contracts, learning, and host integrations.
  *
  * Engines merge and rank one or more [TerminalCompletionSource] instances for a

@@ -9,15 +9,19 @@ a terminal or use the Swing/IntelliJ suggestion UI.
 The entire completion and suggestion subsystem is **experimental**.
 This includes the engine, command catalog, source and shell integrations,
 ranking and learning, persistence, and suggestion UI extension points.
-Its APIs and behavior may change incompatibly before stabilization; consumers
-should expect to adapt integrations when upgrading. Experimental status applies even
-when suggestions are enabled by default.
+Suggestions may be incomplete, rank poorly, or behave unexpectedly in edge cases.
+Experimental status applies even when suggestions are enabled by default.
+APIs may also change incompatibly before stabilization, requiring consumers to
+adapt integrations when upgrading.
 
-Kotlin consumers must explicitly opt in to `ExperimentalTerminalCompletionApi`
+Kotlin consumers receive warnings and can opt in to `ExperimentalTerminalCompletionApi`
 for completion contracts and `ExperimentalShellSuggestionsApi` for Swing suggestion
-providers, views, and interactions. Both markers use `RequiresOptIn.Level.ERROR`.
-The Swing completion adapter uses both APIs. Opting in acknowledges possible
-incompatible changes; it does not enable suggestions or change runtime behavior.
+providers, views, and interactions. Both markers use `RequiresOptIn.Level.WARNING`.
+Using these APIs without opt-in still compiles unless the consumer treats warnings
+as errors (for example, with `allWarningsAsErrors`).
+The Swing completion adapter uses both APIs. Opting in acknowledges these quality
+limitations and the experimental API contract; it does not enable suggestions or
+change runtime behavior.
 Java callers receive the documented stability contract but Kotlin's compiler
 opt-in checks do not apply to Java compilation.
 

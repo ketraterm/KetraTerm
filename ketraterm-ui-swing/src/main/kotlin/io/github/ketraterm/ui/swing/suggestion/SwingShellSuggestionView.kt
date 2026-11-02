@@ -248,7 +248,7 @@ public interface SwingShellSuggestionViewListener {
 /**
  * Creates one suggestion view for a reusable Swing terminal instance.
  *
- * **Experimental:** suggestion UI contracts and behavior may change incompatibly before stabilization.
+ * **Experimental:** suggestions may be incomplete, rank poorly, or behave unexpectedly in edge cases.
  * This includes custom views, providers, editing targets, and interaction contracts.
  *
  * Standalone hosts normally use [DEFAULT]. Platform hosts can supply a native

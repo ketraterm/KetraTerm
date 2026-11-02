@@ -214,7 +214,8 @@ cursors stay hidden.
 
 ### Suggestion request ownership
 
-**Experimental.** Suggestion providers, editing targets, interactions,
+**Experimental.** Suggestions may be incomplete, rank poorly, or behave unexpectedly
+in edge cases. Suggestion providers, editing targets, interactions,
 and custom views follow the [completion stability policy](../docs/features/completion.md#stability-experimental).
 
 Opt in to `ExperimentalShellSuggestionsApi` where you configure or use suggestions.
