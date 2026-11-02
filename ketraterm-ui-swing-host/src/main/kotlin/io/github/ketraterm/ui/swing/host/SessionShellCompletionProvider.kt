@@ -35,7 +35,26 @@ public class SessionShellCompletionProvider(
         limit: Int,
     ): List<TerminalCompletionCandidate>? {
         require(limit > 0)
-        if (request.shellCapabilities.syntax != TerminalShellSyntax.POWERSHELL) return null
+        val syntax = request.shellCapabilities.syntax
+        if (syntax == TerminalShellSyntax.POSIX) {
+            if (context.activePosition != TerminalCompletionActivePosition.COMMAND || '/' in context.activePrefix) return null
+            val commands = session.shellCompletionCommands.value ?: return null
+            return commands
+                .asSequence()
+                .filter { it.displayText.startsWith(context.activePrefix) }
+                .take(limit)
+                .map { item ->
+                    TerminalCompletionCandidate(
+                        replacementText = item.replacementText,
+                        replacementStartOffset = context.replacementStartOffset,
+                        replacementEndOffset = context.replacementEndOffset,
+                        displayText = item.displayText,
+                        source = "bash",
+                        kind = TerminalCompletionCandidateKind.COMMAND,
+                    )
+                }.toList()
+        }
+        if (syntax != TerminalShellSyntax.POWERSHELL) return null
         if (!session.shellCompletionAvailable) return null
         val result = session.requestShellCompletions(request.commandLine, request.cursorOffset) ?: return emptyList()
         return result.candidates

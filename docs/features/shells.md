@@ -61,6 +61,12 @@ When PSReadLine is loaded, the PowerShell bootstrap also installs the private
 reads the live editing buffer and calls `TabExpansion2` without submitting or
 replacing the command. Each prompt announces a fresh completion epoch.
 
+Bash 5.3+ with `base64` starts background command discovery at each terminal prompt for
+[command suggestions](completion.md#sources-by-host), including explicit Bash
+launches inside WSL. It installs no completion key binding and does not invoke
+programmable argument completers. Prompt-time discovery includes session aliases
+and functions as well as builtins and executable commands from the shell's `PATH`.
+
 ## Features supplied by shell metadata
 
 | Feature | Description |

@@ -60,8 +60,8 @@ private class OscShellIntegrationSession(
     private val context: TerminalShellIntegrationContext,
     override val promptMarkersExpected: Boolean,
 ) : TerminalShellIntegration {
-    private val shellCompletion = PowerShellCompletionProtocol(context.shellCompletion)
-    override val customOscPayloadLimitBytes: Int get() = PowerShellCompletionProtocol.MAX_PAYLOAD_BYTES
+    private val shellCompletion = NativeCompletionProtocol(context.shellCompletion)
+    override val customOscPayloadLimitBytes: Int get() = NativeCompletionProtocol.MAX_PAYLOAD_BYTES
 
     override fun observeCustomOsc(
         command: Int,

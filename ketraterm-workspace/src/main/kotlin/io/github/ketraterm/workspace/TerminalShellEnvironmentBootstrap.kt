@@ -17,6 +17,21 @@ package io.github.ketraterm.workspace
 
 /** The launch-only marker protocol shared by the supported shell startup hooks. */
 internal object TerminalShellEnvironmentBootstrap {
+    fun inheritEnvironment(
+        overrides: Map<String, String>,
+        inherited: Map<String, String>,
+        windows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
+    ): Map<String, String> =
+        if (windows) {
+            // Keep one spelling when layering profile values over PTY defaults.
+            sortedMapOf<String, String>(String.CASE_INSENSITIVE_ORDER).apply {
+                putAll(inherited)
+                putAll(overrides)
+            }
+        } else {
+            inherited + overrides
+        }
+
     fun applyInitial(
         profile: TerminalProfile,
         inherited: Map<String, String> = System.getenv(),

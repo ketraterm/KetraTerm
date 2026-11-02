@@ -449,12 +449,16 @@ internal object TerminalShellIntegrationBootstrap {
             "-f",
         )
 
+    private val bashCompletionScript =
+        checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+
     private val BASH_PROMPT_COMMAND =
         """
         if [[ -z ${'$'}{__KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             __KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED=1
             __ketraterm_command_started=0
             __ketraterm_in_prompt=0
+            $bashCompletionScript
             __ketraterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
             __ketraterm_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_hostname" ]] || __ketraterm_hostname=localhost
@@ -489,6 +493,7 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_install_prompt_end
                 __ketraterm_osc7
                 __ketraterm_osc133 A
+                __ketraterm_completion_ready
                 __ketraterm_in_prompt=0
                 return ${'$'}__ketraterm_status
             }

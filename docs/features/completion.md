@@ -47,6 +47,7 @@ This table describes the sources available when completion is enabled.
 | --- | --- | --- |
 | Built-in command specifications | Yes | Yes |
 | Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
+| Bash command inventory | Commands, aliases, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. | Same inventory and command authority. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
 | Git branches and tags | No dynamic source. | Local/remote branches and tags from IDE repositories. |
@@ -77,7 +78,31 @@ Escaped replacement text and ranges remain shell-owned. Requests are serialized 
 expire after two seconds; cancellation cannot interrupt a completer already running
 inside PowerShell. Native results remain subject to bounded protocol validation
 and stale-edit checks. The OSC producer still requires an unambiguous visible
-command line with the cursor at its end. Bash and zsh have no native-completion bridge.
+command line with the cursor at its end.
+
+Bash starts command discovery at each interactive terminal prompt, after user startup files
+and environment overrides have run. Discovery runs in a background shell snapshot
+so scanning a large `PATH` does not delay prompt editing. Bare command suggestions use its inventory
+as availability authority, while catalog descriptions and existing ranking enrich
+the matches. This also applies to explicitly configured Bash inside WSL: command
+discovery uses the guest's environment, never the Windows host's `PATH`.
+The inventory includes at most 8192 names within a 180 KB raw payload; names over
+512 UTF-8 bytes are omitted. Changes to functions, aliases, and `PATH` take effect
+after discovery for a subsequent prompt completes. A completed inventory remains
+usable while the same environment refreshes. Changes to `PATH`, the directory,
+or alias/function/builtin names invalidate it immediately. Only one scan may run
+at a time; results for superseded environments are discarded and a later prompt
+retries. Initial discovery and invalidated inventories supply no command candidates
+until a matching scan completes.
+Reading the inventory sends no input and causes no prompt redraw.
+On Git Bash/Cygwin, `.exe` commands use the bare insertion only when Bash resolves
+both spellings identically. Shadowing aliases and functions remain distinct;
+Unix executable suffixes remain literal.
+
+Bash argument and executable-path suggestions continue to use existing specs and
+host sources. Installed Bash argument completers, guest filesystem completion, and
+zsh native completion are not integrated. Older Bash and shells without an inventory
+retain their existing sources. Normal shell Tab completion remains available.
 
 ## Built-in command catalog
 

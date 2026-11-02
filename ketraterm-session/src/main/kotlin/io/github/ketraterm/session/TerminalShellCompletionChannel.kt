@@ -17,6 +17,8 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.input.event.TerminalInputEvent
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Session-owned rendezvous for an optional native shell-completion producer.
@@ -33,6 +35,21 @@ public class TerminalShellCompletionChannel internal constructor(
     internal var pending: Pending? = null
         private set
     private var receipt: Receipt? = null
+    private val mutableCommands = MutableStateFlow<List<TerminalShellCompletionCandidate>?>(null)
+    internal val commands = mutableCommands.asStateFlow()
+
+    /**
+     * Publishes a detached command inventory from the current shell environment.
+     * Null means unavailable; an empty list is authoritative. Producers refresh it
+     * at prompt boundaries. It does not grant editing authority or install a query hook.
+     */
+    public fun publishCommands(commands: List<TerminalShellCompletionCandidate>?) {
+        require(commands == null || commands.size <= 8192)
+        require(commands == null || commands.all { it.kind == TerminalShellCompletionKind.COMMAND })
+        synchronized(lock) {
+            mutableCommands.value = commands?.let { java.util.List.copyOf(it) }
+        }
+    }
 
     internal val isReady: Boolean get() = epoch != null
 
@@ -124,6 +141,7 @@ public class TerminalShellCompletionChannel internal constructor(
     internal fun close(): Pending? =
         synchronized(lock) {
             epoch = null
+            mutableCommands.value = null
             receipt = null
             pending.also { pending = null }
         }

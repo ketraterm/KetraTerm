@@ -626,7 +626,8 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
         return TerminalSessions.createLocalPty(
             PtyOptions.create { draft ->
                 draft.command = launchProfile.command
-                draft.environment = PtyOptions.defaultEnvironment() + launchProfile.environment
+                draft.environment =
+                    TerminalShellEnvironmentBootstrap.inheritEnvironment(launchProfile.environment, PtyOptions.defaultEnvironment())
                 draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
                 draft.columns = options.columns
                 draft.rows = options.rows

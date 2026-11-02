@@ -39,6 +39,110 @@ import kotlin.time.Duration.Companion.seconds
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
+    fun `Bash command inventory refreshes functions aliases and executable availability`(
+        @TempDir tempDir: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        assumeBashCommandInventory(bash!!)
+        val hook = checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            hook + "\n" +
+                """
+                shopt -s expand_aliases
+                ketra_native_function() { :; }
+                alias ketra_native_alias='printf alias'
+                printf '#!/bin/sh\n' > 'ketra native executable'
+                chmod +x 'ketra native executable'
+                export PATH="${'$'}PWD:/usr/bin:/bin"
+                cp "${'$'}(type -P true)" ketra_native_exe.exe
+                __ketraterm_publish_commands test
+                alias ketra_native_exe='printf shadowed'
+                unalias ketra_native_alias
+                unset -f ketra_native_function
+                rm 'ketra native executable'
+                __ketraterm_publish_commands test
+                unalias ketra_native_exe
+                rm ketra_native_exe.exe
+                __ketraterm_publish_commands test
+                """.trimIndent()
+        val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script, workingDirectory = tempDir)
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val inventories =
+            Regex("\u001b]633;KetraTermCommands;1;Result;test;([^\u0007]*)\u0007")
+                .findAll(result.stdout)
+                .map {
+                    Base64
+                        .getDecoder()
+                        .decode(
+                            it.groupValues[1],
+                        ).toString(Charsets.UTF_8)
+                        .removeSuffix("\u0000")
+                        .split('\u0000')
+                        .chunked(2)
+                }.toList()
+        assertEquals(3, inventories.size, visibleEscapes(result.stdout))
+        assertTrue(inventories[0].contains(listOf("ketra_native_function", "ketra_native_function")))
+        assertTrue(inventories[0].contains(listOf("ketra_native_alias", "ketra_native_alias")))
+        assertTrue(inventories[0].contains(listOf("ketra native executable", "'ketra native executable'")))
+        assertTrue(inventories[0].contains(listOf("printf", "printf")))
+        assertTrue(inventories.all { inventory -> inventory.none { it[0] == "!" || it[0] == "if" } })
+        val executableReplacement = if (isWindows()) "ketra_native_exe" else "ketra_native_exe.exe"
+        assertTrue(
+            inventories[0].contains(listOf("ketra_native_exe.exe", executableReplacement)),
+            inventories[0].filter { it[0].startsWith("ketra") }.toString(),
+        )
+        assertTrue(inventories[1].contains(listOf("ketra_native_exe.exe", "ketra_native_exe.exe")))
+        assertTrue(inventories[1].contains(listOf("ketra_native_exe", "ketra_native_exe")))
+        assertTrue(inventories[2].none { it[0].startsWith("ketra") })
+        assertTrue(inventories.all { it.size <= 8192 && it.map { entry -> entry[0] }.distinct().size == it.size })
+    }
+
+    @Test
+    fun `Bash inventory survives deletion and guarded acceptance through real Readline`(): Unit =
+        runBlocking {
+            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
+            val bash = installedExecutable("bash", "bash.exe")
+            assumeTrue(bash != null, "Bash is not installed")
+            assumeBashCommandInventory(bash!!)
+            TerminalWorkspace().use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile(
+                            "bash",
+                            "Bash",
+                            listOf(bash, "--noprofile", "--norc", "-i"),
+                            environment = mapOf("PS1" to "ketra> ", "PATH" to "/usr/bin:/bin"),
+                        ),
+                        TerminalWorkspaceOpenOptions(),
+                    )
+                val session = tab.session
+
+                suspend fun awaitLine(line: String) {
+                    withTimeout(15.seconds) {
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == line }
+                    }
+                }
+                awaitLine("")
+                withTimeout(15.seconds) {
+                    session.shellCompletionCommands.first { commands -> commands?.any { it.displayText == "printf" } == true }
+                }
+                session.submitInput(TerminalPasteEvent("prin"))
+                awaitLine("prin")
+                session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                awaitLine("pri")
+                val expected = assertNotNull(session.captureCommandEdit())
+                val candidate = assertNotNull(session.shellCompletionCommands.value).single { it.displayText == "printf" }
+                session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE))
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 3, candidate.replacementText))),
+                )
+                awaitLine("printf")
+            }
+        }
+
+    @Test
     fun `PowerShell native completion round trips through real PSReadLine and PTY`(): Unit =
         runBlocking {
             assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
@@ -654,6 +758,11 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
             outputTask.cancel(true)
             error("process output stream did not close: ${command.joinToString(" ")}")
         }
+
+    private fun assumeBashCommandInventory(bash: String) {
+        val probe = runProcess(listOf(bash, "--noprofile", "--norc", "-c", "compgen -V commands -A builtin"))
+        assumeTrue(probe.exitCode == 0, "Bash 5.3+ command inventory is not supported by this installed shell")
+    }
 
     private fun installedExecutable(vararg names: String): String? {
         val locator = if (isWindows()) listOf("where.exe") else listOf("sh", "-c")

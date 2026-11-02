@@ -36,6 +36,64 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
     @Test
+    fun `chunked Bash inventories replace atomically without installing a query hook`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
+                val body = "ztool\u0000ztool\u0000a tool\u0000'a tool'\u0000"
+                fixture.feed(inventoryBegin())
+                val message = inventory(body)
+                val bytes = message.toByteArray(Charsets.UTF_8)
+                for (byte in bytes.dropLast(1)) fixture.connector.feedFromHost(byteArrayOf(byte))
+                assertEquals(emptyList(), fixture.session.shellCompletionCommands.value)
+                fixture.connector.feedFromHost(byteArrayOf(bytes.last()))
+                runCurrent()
+                val commands = assertNotNull(fixture.session.shellCompletionCommands.value)
+                assertEquals(listOf("a tool", "ztool"), commands.map { it.displayText })
+                assertEquals(listOf("'a tool'", "ztool"), commands.map { it.replacementText })
+                assertFalse(fixture.session.shellCompletionAvailable)
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+                fixture.feed(inventoryBegin())
+                assertSame(commands, fixture.session.shellCompletionCommands.value)
+                fixture.feed(inventoryBegin("b".repeat(32)))
+                fixture.feed(inventory(body))
+                assertEquals(emptyList(), fixture.session.shellCompletionCommands.value)
+                fixture.feed(inventory("", "b".repeat(32)))
+                assertEquals(emptyList(), fixture.session.shellCompletionCommands.value)
+                assertEquals(2, commands.size) // Previously returned snapshots remain immutable and detached.
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "a tool"))),
+                )
+            }
+        }
+
+    @Test
+    fun `malformed inventories invalidate previous command authority`() =
+        runTest {
+            val invalidBodies =
+                listOf(
+                    "one\u0000",
+                    "one\u0000one",
+                    "\u0000one\u0000",
+                    "one\u0000\u0000",
+                    "one\u0000bad\ncommand\u0000",
+                    "${"x".repeat(513)}\u0000one\u0000",
+                    "one\u0000${"x".repeat(4097)}\u0000",
+                    "one\u0000one\u0000".repeat(8193),
+                )
+            for (body in invalidBodies) {
+                Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
+                    fixture.feed(inventoryBegin())
+                    fixture.feed(inventory("one\u0000one\u0000"))
+                    assertNotNull(fixture.session.shellCompletionCommands.value)
+                    fixture.feed(inventory(body))
+                    assertNull(fixture.session.shellCompletionCommands.value)
+                }
+            }
+        }
+
+    @Test
     fun `chunked native reply preserves escaped edits and pre-query acceptance`() =
         runTest {
             val fixture = Fixture(StandardTestDispatcher(testScheduler))
@@ -283,6 +341,13 @@ class PowerShellNativeCompletionTest {
     }
 
     companion object {
+        private fun inventoryBegin(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCommands;1;Begin;$epoch\u0007"
+
+        private fun inventory(
+            body: String,
+            epoch: String = "a".repeat(32),
+        ) = "\u001b]633;KetraTermCommands;1;Result;$epoch;${encoded(body)}\u0007"
+
         private fun encoded(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 
         private fun ready(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCompletion;1;Ready;$epoch\u0007"

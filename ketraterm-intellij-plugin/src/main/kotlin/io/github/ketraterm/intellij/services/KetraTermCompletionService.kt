@@ -29,7 +29,6 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SessionShellCompletionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
 import java.nio.file.Path
@@ -139,14 +138,7 @@ internal class KetraTermCompletionService : Disposable {
                 profileId = tab.profile.id,
                 workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
-                shellProvider =
-                    if (tab.profile.kind ==
-                        TerminalProfileKind.POWERSHELL
-                    ) {
-                        SessionShellCompletionProvider(tab.session)
-                    } else {
-                        null
-                    },
+                shellProvider = SessionShellCompletionProvider(tab.session),
                 additionalSources =
                     listOf(
                         TerminalCompletionSourceEntry(

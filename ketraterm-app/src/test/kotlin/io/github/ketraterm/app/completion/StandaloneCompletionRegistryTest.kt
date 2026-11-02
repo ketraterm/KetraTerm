@@ -20,6 +20,10 @@ import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.session.*
+import io.github.ketraterm.transport.TerminalConnector
+import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +38,60 @@ class StandaloneCompletionRegistryTest {
     private val registries = ArrayList<StandaloneCompletionRegistry>()
     private val persistenceDirectory = Files.createTempDirectory("ketraterm-registry-test")
     private var eventTime = 0L
+
+    @Test
+    fun `Bash session inventory prevents uninstalled catalog commands from appearing`() =
+        runBlocking {
+            val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), TerminalShellCommandLineState())
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(80, 4),
+                    object : TerminalConnector {
+                        override fun start(listener: TerminalConnectorListener) = Unit
+
+                        override fun write(
+                            bytes: ByteArray,
+                            offset: Int,
+                            length: Int,
+                        ) = error("Reading an inventory must not send input")
+
+                        override fun resize(
+                            columns: Int,
+                            rows: Int,
+                        ) = Unit
+
+                        override fun close() = Unit
+                    },
+                    shellIntegration =
+                        TerminalShellIntegrationFactory { context ->
+                            context.shellCompletion.publishCommands(
+                                listOf(
+                                    TerminalShellCompletionCandidate(
+                                        "cargo-session",
+                                        "cargo-session",
+                                        "",
+                                        TerminalShellCompletionKind.COMMAND,
+                                    ),
+                                    TerminalShellCompletionCandidate("git", "git.exe", "", TerminalShellCompletionKind.COMMAND),
+                                ),
+                            )
+                            host.create(context)
+                        },
+                ).use { session ->
+                    session.start()
+                    val provider =
+                        registry(specs = TerminalCommandSpecs.defaults()).createProvider(
+                            profileId = "bash",
+                            shellCapabilities = TerminalShellCapabilities.POSIX,
+                            session = session,
+                        )
+                    val suggestions = provider.suggestions(request("car")).last()
+                    assertEquals(listOf("cargo-session"), suggestions.map { it.replacementText })
+                    assertEquals("bash", suggestions.single().source)
+                    assertEquals(listOf("git"), provider.suggestions(request("gi")).last().map { it.replacementText })
+                    assertTrue(provider.suggestions(request("git s")).last().any { it.replacementText == "status" })
+                }
+        }
 
     @Test
     fun `reset removes shared completion learning`() =

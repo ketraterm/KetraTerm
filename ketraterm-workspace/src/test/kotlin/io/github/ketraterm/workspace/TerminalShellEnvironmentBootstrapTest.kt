@@ -30,6 +30,29 @@ class TerminalShellEnvironmentBootstrapTest {
     }
 
     @Test
+    fun `explicit Windows path replaces inherited path without a selected toolchain`() {
+        val inherited = mapOf("Path" to "system", "KEEP" to "inherited")
+        val overrides = linkedMapOf("path" to "first", "PATH" to "selected")
+
+        val environment = TerminalShellEnvironmentBootstrap.inheritEnvironment(overrides, inherited, windows = true)
+
+        assertEquals(mapOf("Path" to "selected", "KEEP" to "inherited"), environment)
+        assertEquals(linkedMapOf("path" to "first", "PATH" to "selected"), overrides)
+    }
+
+    @Test
+    fun `POSIX profile overrides preserve distinct environment names`() {
+        val environment =
+            TerminalShellEnvironmentBootstrap.inheritEnvironment(
+                mapOf("PATH" to "selected"),
+                mapOf("PATH" to "system", "Path" to "distinct"),
+                windows = false,
+            )
+
+        assertEquals(mapOf("PATH" to "selected", "Path" to "distinct"), environment)
+    }
+
+    @Test
     fun `selected environment overrides explicit values and prepends explicit path`() {
         val profile = profile(environment = mapOf("JAVA_HOME" to "/explicit/jdk", "PATH" to "/explicit/bin", "KEEP" to "value"))
         val launch =

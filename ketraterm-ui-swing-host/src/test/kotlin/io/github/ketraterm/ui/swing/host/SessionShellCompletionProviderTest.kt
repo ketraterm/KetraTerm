@@ -85,10 +85,37 @@ class SessionShellCompletionProviderTest {
         }
 
     @Test
-    fun `non PowerShell requests never invoke the installed session hook`() =
+    fun `unsupported dialects never invoke the installed session hook`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
+                val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.PLAIN)
+                assertNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
+                runCurrent()
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
+    @Test
+    fun `Bash command requests preserve native authority and source`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
                 val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POSIX)
+                fixture.publishCommands(
+                    listOf(TerminalShellCompletionCandidate("toolbox", "toolbox", "", TerminalShellCompletionKind.COMMAND)),
+                )
+                val candidates = assertNotNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
+                runCurrent()
+                assertEquals("bash", candidates.single().source)
+                assertEquals("toolbox", candidates.single().replacementText)
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
+    @Test
+    fun `Bash unmodeled arguments retain existing source fallback`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), "tool x").use { fixture ->
+                val request = TerminalCompletionRequest("tool x", 6, shellCapabilities = TerminalShellCapabilities.POSIX)
                 assertNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
                 runCurrent()
                 assertTrue(fixture.connector.writtenBytes.isEmpty())
@@ -166,6 +193,8 @@ class SessionShellCompletionProviderTest {
             channel.respond("test", 1, result)
             connector.feedFromHost(byteArrayOf())
         }
+
+        fun publishCommands(commands: List<TerminalShellCompletionCandidate>) = channel.publishCommands(commands)
 
         override fun close() = session.close()
     }

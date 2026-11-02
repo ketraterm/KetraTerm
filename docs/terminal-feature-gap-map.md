@@ -31,6 +31,7 @@ promise stable APIs or behavior.
 | `TODO(transport)` | Update the bundled Windows ConPTY backend to include Microsoft's graphics cursor synchronization fix. pty4j 0.14.0's bundled backend can leave PowerShell input above its visible prompt after Kitty graphics and resize. The [native reproduction and upstream fix](../ketraterm-pty/docs/pty4j-backend-limitations.md#windows-graphics-cursor-desynchronization) are recorded for the deferred upstream change; no backend update is shipped yet. |
 | `TODO(host/profile)` | Opt-in SSH shell helpers for terminal-environment forwarding and remote terminfo setup. These helpers are separate from a built-in SSH connector and must handle unavailable remote tools and rejected environment forwarding. |
 | `TODO(host/profile)` | WSL-aware directory, JDK, and startup-command mapping. Existing explicit-shell hooks do not provide guest filesystem completion or remote process metadata; see [shell support](features/shells.md). |
+| `TODO(host/profile)` | Integrate Bash programmable argument completers and zsh native completion without prompt redraws invalidating guarded edits. Bash currently publishes prompt-time command inventories only; see [completion sources](features/completion.md#sources-by-host). |
 | `TODO(host/profile)` | Dev Container launch contexts and container-aware host services; no built-in container-session integration exists. |
 
 ## Shell integration

@@ -103,7 +103,7 @@ internal class StandaloneCompletionRegistry private constructor(
      *
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
-     * @param session session supplying optional live PowerShell completions for this pane.
+     * @param session session supplying optional live shell completions for this pane.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return provider with request-owned learning feedback for the pane.
      * @throws IllegalStateException if this registry is closed.
@@ -125,7 +125,7 @@ internal class StandaloneCompletionRegistry private constructor(
             }
             SwingCompletionSuggestionProvider(
                 engine =
-                    if (session != null && shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL) {
+                    if (session != null && shellCapabilities.syntax != TerminalShellSyntax.PLAIN) {
                         TerminalCompletionEngines.fromSources(
                             sources = sources,
                             shellProvider = SessionShellCompletionProvider(session),
@@ -137,7 +137,7 @@ internal class StandaloneCompletionRegistry private constructor(
                         engine
                     },
                 contextProvider = contextProvider,
-                sourceLabels = mapOf("powershell" to "PowerShell"),
+                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

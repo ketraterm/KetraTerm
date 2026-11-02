@@ -669,6 +669,15 @@ public class TerminalSession private constructor(
         get() = synchronized(mutationLock) { isAcceptingInput() && runtime.shellCompletion.isReady }
 
     /**
+     * Immutable command inventories published by the shell; null means unavailable.
+     * An empty inventory may mean discovery is pending. Snapshots describe prompt-time
+     * availability, carry no edit authority, and do not imply interactive argument
+     * completion. Session closure publishes null. Reading/subscribing sends no input.
+     */
+    public val shellCompletionCommands: StateFlow<List<TerminalShellCompletionCandidate>?>
+        get() = runtime.shellCompletion.commands
+
+    /**
      * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
      * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
      * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
