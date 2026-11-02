@@ -17,6 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.session.TerminalInputAdmission.*
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +35,27 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCommandEditTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `key release invalidates a fresh edit only when sent to the shell`(reportReleases: Boolean) =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            session(connector, model).use { session ->
+                session.start(10, 3)
+                if (reportReleases) connector.feedFromHost("\u001b[=11u".toByteArray())
+                val expected = checkNotNull(session.captureCommandEdit())
+                val release = TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE)
+                assertEquals(ACCEPTED, session.submitInput(release))
+                runCurrent()
+                assertEquals(reportReleases, connector.writtenBytes.isNotEmpty())
+                assertEquals(
+                    if (reportReleases) STALE_CONTEXT else ACCEPTED,
+                    session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 1, "status"))),
+                )
+            }
+        }
+
     @Test
     fun `fresh context admits one compound edit and cannot admit another edit`() =
         runTest {
@@ -224,6 +246,7 @@ class TerminalCommandEditTest {
             TerminalBuffers.create(10, 3),
             connector,
             shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
+            kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,
             cleanupDispatcher = dispatcher,

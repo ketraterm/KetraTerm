@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.workspace
 
-import io.github.ketraterm.input.event.TerminalPasteEvent
-import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.session.TerminalInputAdmission
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -70,6 +69,37 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
                 withTimeout(15.seconds) {
                     session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-ChildItem" }
+                }
+                repeat(3) {
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            listOf(
+                                TerminalTextReplacementEvent(
+                                    0,
+                                    "Get-ChildItem".length - "Get-Chi".length,
+                                    "",
+                                ),
+                            ),
+                        ),
+                    )
+                    withTimeout(15.seconds) {
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-Chi" }
+                    }
+                    val afterDeletion = assertNotNull(session.captureCommandEdit())
+                    val refreshed = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
+                    assertTrue(refreshed.candidates.any { it.replacementText == "Get-ChildItem" })
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE)),
+                    )
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(afterDeletion, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
+                    )
+                    withTimeout(15.seconds) {
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-ChildItem" }
+                    }
                 }
             }
         }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import java.awt.event.FocusEvent
+import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -38,6 +39,34 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCompletionLifecycleTest {
+    @Test
+    fun `releasing backspace after refreshed suggestions still permits acceptance`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "git st")
+            val terminal = terminal(testScheduler)
+            try {
+                terminal.bind(fixture.session)
+                runCurrent()
+                val press = KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_BACK_SPACE, '\b')
+                terminal.keyListeners.forEach { it.keyPressed(press) }
+                runCurrent()
+                fixture.model.value = snapshot
+                runCurrent()
+                val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                interaction.publish(listOf(suggestion), selectedIndex = 0)
+                val release = KeyEvent(terminal, KeyEvent.KEY_RELEASED, 0L, 0, KeyEvent.VK_BACK_SPACE, '\b')
+                terminal.keyListeners.forEach { it.keyReleased(release) }
+                runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, interaction.tryAccept(interaction.snapshot, 0))
+                runCurrent()
+                assertEquals("\u007f".repeat(6) + "replacement", fixture.connector.output.toString(Charsets.UTF_8))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
     @Test
     fun `default command editing follows the bound session even when both commands are equal`() =
         onEdtTest {

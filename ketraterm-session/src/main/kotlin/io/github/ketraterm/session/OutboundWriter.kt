@@ -45,14 +45,15 @@ internal class OutboundWriter(
     private var pendingReply = false
     private var writing = false
 
-    /** Returns after copying a complete operation, never after waiting for transport I/O. */
+    /** Returns the number of admitted bytes, never waiting for transport I/O. */
     inline fun submit(
         signal: Boolean = true,
         crossinline block: () -> Unit,
-    ) {
+    ): Int {
+        var byteCount = 0
         val wake =
             synchronized(lock) {
-                if (closed) return
+                if (closed) return 0
                 val previousSize = size
                 try {
                     block()
@@ -61,10 +62,12 @@ internal class OutboundWriter(
                     size = previousSize
                     throw failure
                 }
-                producedBytes += size - previousSize
+                byteCount = size - previousSize
+                producedBytes += byteCount
                 previousSize == 0 && size != 0
             }
         if (wake && signal) ready.trySend(Unit)
+        return byteCount
     }
 
     /**

@@ -97,8 +97,11 @@ Final validation and queue reservation share mutation, producer, and outbound
 serialization. Intervening input, output, resize, or host-model assignment makes
 an older context stale. Equal assignments and changes away from and back to the
 same snapshot still invalidate it. Semantic input revisions conservatively
-advance even when modes suppress its bytes; empty input has the event-specific
-rules described by the API.
+advance even when modes suppress its bytes, except for a single key-release event
+that emits no bytes. Such a release cannot edit the shell buffer and must not
+invalidate suggestions captured after the preceding key press. Encoded releases
+still invalidate contexts. Empty input has the event-specific rules described by
+the API.
 
 `requestShellCompletions(commandLine, cursorOffset)` is the bounded exception for
 an installed native producer's non-editing request/reply exchange. Admission
