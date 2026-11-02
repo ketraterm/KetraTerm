@@ -19,6 +19,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import io.github.ketraterm.ui.swing.render.SwingColors
 import java.awt.*
 import java.awt.event.*
+import java.awt.geom.RoundRectangle2D
 import java.util.regex.Pattern
 import javax.swing.*
 
@@ -104,7 +105,9 @@ internal class SwingCompletionPopupView(
             canvas.color = background
             canvas.fillRoundRect(0, 0, width, height, 12, 12)
             canvas.color = UIManager.getColor("Component.borderColor") ?: list.foreground.darker()
-            canvas.drawRoundRect(0, 0, width - 1, height - 1, 12, 12)
+            // Keep the entire centered stroke inside the component, including at fractional display scales.
+            canvas.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+            canvas.draw(RoundRectangle2D.Float(0.5f, 0.5f, width - 1f, height - 1f, 12f, 12f))
         } finally {
             canvas.dispose()
         }

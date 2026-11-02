@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Color
 import java.awt.Font
 import java.awt.event.MouseEvent
@@ -34,6 +35,36 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 2.0])
+    fun `popup border is fully visible on every edge at fractional scales`(scale: Double) =
+        onEdt {
+            val previous = javax.swing.UIManager.get("Component.borderColor")
+            javax.swing.UIManager.put("Component.borderColor", Color.WHITE)
+            val view = createView(RecordingListener())
+            try {
+                view.background = Color.BLACK
+                view.update(snapshot(listOf(suggestion("cd")), 0, 1, 0))
+                view.setSize(160, 100)
+                view.doLayout()
+                val image = BufferedImage((view.width * scale).toInt(), (view.height * scale).toInt(), BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    graphics.scale(scale, scale)
+                    view.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertEquals(Color.WHITE.rgb, image.getRGB(0, image.height / 2), "Left edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width - 1, image.height / 2), "Right edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width / 2, 0), "Top edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width / 2, image.height - 1), "Bottom edge must not be clipped")
+            } finally {
+                view.close()
+                javax.swing.UIManager.put("Component.borderColor", previous)
+            }
+        }
+
     @ParameterizedTest
     @CsvSource("true, 1", "true, 2", "false, 1", "false, 2")
     fun `rounded popup retains theme colors and selection at display scales`(
