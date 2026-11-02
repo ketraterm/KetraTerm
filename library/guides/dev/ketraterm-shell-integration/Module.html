@@ -32,7 +32,7 @@ configuration factory. Session, PTY, and Swing do not depend on this module.</p>
 contracts. <code>ketraterm-protocol</code> is an implementation dependency.</p>
 <h2 id="components">Components</h2>
 <p>The producer owns prompt-marker interpretation, stable-line command anchors,
-bounded command-text extraction, and primitive command fingerprints. Session
+bounded command-text extraction, immutable styled prompt-row capture, and primitive command fingerprints. Session
 provides serialized frame access and owns shared observation, outbound writes,
 and startup submission. The producer owns no threads or coroutine scope.</p>
 <p><code>ShellIntegrationCommandTextExtractor</code> is internal. It consumes primitive render
@@ -48,7 +48,7 @@ submission.</p>
 for synchronization and model ownership. Capability scope remains in the
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/52498795c8cb6a8ddf938a9ea81db46971590ecf/ketraterm-shell-integration/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d16cbc8ec304dc7728816fb03a8a660c7b70e046/ketraterm-shell-integration/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

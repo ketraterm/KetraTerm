@@ -43,7 +43,9 @@ writer. Connector writes run outside mutation and admission monitors.</p>
 owns cache storage and reader leases; consumers access it through the session.
 One publication viewport is retained per session.</p>
 <p><code>TerminalShellIntegration</code> and its factory define the neutral producer boundary.
-<code>TerminalShellIntegrationState</code> stores bounded metadata;
+<code>TerminalShellIntegrationState</code> stores bounded metadata and immutable styled prompt
+rows, and exposes allocation-free output ownership separately from completed-command
+selection;
 <code>TerminalShellCommandLineState</code> serializes host editing revisions with conditional
 admission. Optional OSC interpretation and grid extraction belong to
 <code>ketraterm-shell-integration</code>, which this module does not depend on.</p>
@@ -74,7 +76,7 @@ guidance.</li>
 <p>Run <code>./gradlew :ketraterm-session:test</code> from the repository root. This includes
 <code>defaultDispatcherTest</code> in a separate JVM with one ordinary I/O worker, so cleanup
 independence is checked against actual defaults without changing other tests&#39; schedulers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/52498795c8cb6a8ddf938a9ea81db46971590ecf/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d16cbc8ec304dc7728816fb03a8a660c7b70e046/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
