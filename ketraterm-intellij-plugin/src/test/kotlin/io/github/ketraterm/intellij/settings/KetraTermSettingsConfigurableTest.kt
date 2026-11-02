@@ -34,6 +34,33 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testStickyCommandHeadersApplyAndReset() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.replaceState(original.copy(stickyCommandHeadersEnabled = true))
+            val component = configurable.createComponent()
+            val toggle =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.stickyCommandHeaders")
+                }
+            assertTrue(toggle.isSelected)
+            toggle.isSelected = false
+            assertTrue(configurable.isModified())
+            configurable.apply()
+            assertFalse(settings.state.stickyCommandHeadersEnabled)
+            assertFalse(settings.current().stickyCommandHeadersEnabled)
+            toggle.isSelected = true
+            configurable.reset()
+            assertFalse(toggle.isSelected)
+            assertFalse(configurable.isModified())
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testCommandFinishedAlertControlsApplyAndReset() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

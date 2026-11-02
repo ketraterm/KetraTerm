@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -106,6 +107,14 @@ public interface TerminalShellIntegrationView {
      * @return captured command text, or `null` when no safe text is retained.
      */
     public fun commandText(recordId: Int): String?
+
+    /**
+     * Returns a retained immutable prompt/input row captured before command output, or null.
+     * Captures preserve terminal cell attributes and clusters; fonts remain renderer-owned.
+     * Availability is independently bounded and does not imply that the original grid row remains.
+     * Custom views may omit this optional presentation capability.
+     */
+    public fun commandPrompt(recordId: Int): TerminalRenderRowSnapshot? = null
 
     /**
      * Returns the working-directory URI snapshotted when [recordId] began.
@@ -218,6 +227,20 @@ public interface TerminalShellIntegrationView {
      * @return owning command record id, or `0` when no command owns the line.
      */
     public fun commandRecordIdAtLine(lineId: Long): Int
+
+    /**
+     * Returns the command owning an observed primary-buffer output [lineId], or zero.
+     *
+     * Prompt/input lines and exclusive command-start lines are excluded. The active
+     * running command owns observed output after its start until completion or
+     * abandonment. Callers must exclude untouched frame rows: this metadata model
+     * does not observe grid writes. Completed ranges exclude subsequent prompts.
+     * This allocation-free query does not make unfinished output selectable.
+     *
+     * Custom views may leave this optional presentation capability unsupported;
+     * the default returns [TerminalShellIntegrationCommandRecord.NONE].
+     */
+    public fun commandOutputRecordIdAtLine(lineId: Long): Int = TerminalShellIntegrationCommandRecord.NONE
 
     /**
      * Returns the previous retained command record before [recordId].

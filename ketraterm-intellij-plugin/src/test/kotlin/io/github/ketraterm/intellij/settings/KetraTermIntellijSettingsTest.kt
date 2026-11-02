@@ -38,6 +38,19 @@ import java.util.concurrent.CancellationException
  */
 class KetraTermIntellijSettingsTest {
     @Test
+    fun `sticky headers default on for old XML and survive restart and Swing conversion`() {
+        val service = KetraTermIntellijSettings()
+        assertTrue(Element("State").deserialize(KetraTermIntellijSettings.State::class.java).stickyCommandHeadersEnabled)
+        service.replaceState(service.state.copy(themeId = "nord"))
+        assertTrue(service.current().stickyCommandHeadersEnabled)
+        service.replaceState(service.state.copy(stickyCommandHeadersEnabled = false))
+        val restored = KetraTermIntellijSettings()
+        restored.loadState(requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+        assertFalse(restored.state.stickyCommandHeadersEnabled)
+        assertFalse(restored.current().stickyCommandHeadersEnabled)
+    }
+
+    @Test
     fun `command alerts default off and preferences survive XML restart`() {
         val service = KetraTermIntellijSettings()
         val legacy = Element("State").deserialize(KetraTermIntellijSettings.State::class.java)

@@ -63,6 +63,7 @@ private fun defaultFontFamily(): String {
  * @property useSystemFallbackFonts whether Swing rendering may scan installed
  * system fonts after configured fallback fonts fail.
  * @property promptDecoration prompt presentation style on the primary screen.
+ * @property stickyCommandHeadersEnabled whether scrolled command output displays the original styled prompt/input row.
  * @property cursorShape default cursor shape id: `block`, `underline`, or `beam`.
  * @property shellPath command or executable path used when opening a local shell.
  * @property startDirectory initial working directory for newly opened shells.
@@ -103,6 +104,7 @@ internal data class KetraTermConfig(
     val useSystemFallbackFonts: Boolean = DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
     val cursorShape: String = DEFAULT_CURSOR_SHAPE,
     val promptDecoration: SwingPromptDecoration = DEFAULT_PROMPT_DECORATION,
+    val stickyCommandHeadersEnabled: Boolean = true,
     val shellPath: String = DEFAULT_SHELL_PATH,
     val startDirectory: String = DEFAULT_START_DIRECTORY,
     val audibleBell: Boolean = DEFAULT_AUDIBLE_BELL,

@@ -92,8 +92,8 @@ import java.util.*
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
  * @property padding primary-screen visual inset around the terminal grid in
  * pixels. Prompt-decoration and scrollbar gutters are component chrome layered
- * outside this margin. The default keeps top padding at zero so smooth
- * scrolling can enter through the top edge, leaves a small left margin before
+ * outside this margin. The default reserves four pixels above the grid and
+ * sticky command header, leaves a small left margin before
  * the prompt gutter, reserves a stable right gutter for the overlay scrollbar,
  * and keeps a small bottom visual spacer.
  * @property alternateScreenPadding configured alternate-screen inset in pixels.
@@ -182,6 +182,9 @@ public class SwingSettings private constructor(
      * The alternate screen never displays prompt decorations.
      */
     public val promptDecoration: SwingPromptDecoration = builder.promptDecoration
+
+    /** Repeats the original styled prompt/input row above output when that input has scrolled away. */
+    public val stickyCommandHeadersEnabled: Boolean = builder.stickyCommandHeadersEnabled
 
     public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
     public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
@@ -434,6 +437,9 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.promptDecoration]. */
         public var promptDecoration: SwingPromptDecoration = source?.promptDecoration ?: SwingPromptDecoration.GUTTER
 
+        /** Draft value for [SwingSettings.stickyCommandHeadersEnabled]. Defaults to true. */
+        public var stickyCommandHeadersEnabled: Boolean = source?.stickyCommandHeadersEnabled ?: true
+
         /** Draft value for [SwingSettings.shellIntegrationPromptDotsVisible]. */
         public var shellIntegrationPromptDotsVisible: Boolean = source?.shellIntegrationPromptDotsVisible ?: true
 
@@ -480,7 +486,7 @@ public class SwingSettings private constructor(
         public var shellIntegrationFailedCommandRailWidth: Int = source?.shellIntegrationFailedCommandRailWidth ?: 3
 
         /** Draft value for [SwingSettings.padding]; validated when [build] is called. */
-        public var padding: SwingPadding = source?.padding ?: SwingPadding(0, 2, 4, 6)
+        public var padding: SwingPadding = source?.padding ?: SwingPadding(4, 2, 4, 6)
 
         /**
          * Explicit alternate padding, or null to balance the final [padding] and gutter at build time.
@@ -563,6 +569,7 @@ public class SwingSettings private constructor(
             visualBellDurationMillis == other.visualBellDurationMillis &&
             visualBellEdgeThicknessPixels == other.visualBellEdgeThicknessPixels &&
             promptDecoration == other.promptDecoration &&
+            stickyCommandHeadersEnabled == other.stickyCommandHeadersEnabled &&
             shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
             shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
             shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
@@ -621,6 +628,7 @@ public class SwingSettings private constructor(
         result = 31 * result + visualBellDurationMillis.hashCode()
         result = 31 * result + visualBellEdgeThicknessPixels.hashCode()
         result = 31 * result + promptDecoration.hashCode()
+        result = 31 * result + stickyCommandHeadersEnabled.hashCode()
         result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
         result = 31 * result + shellIntegrationPromptDotColor.hashCode()
         result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()

@@ -395,6 +395,8 @@ public final class io/github/ketraterm/session/TerminalShellIntegrationState : i
 	public fun commandAnchorLineId (I)J
 	public fun commandDurationMillis (I)Ljava/lang/Long;
 	public fun commandMetadata (I)Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;
+	public fun commandOutputRecordIdAtLine (J)I
+	public fun commandPrompt (I)Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;
 	public fun commandRecordIdAtLine (J)I
 	public fun commandText (I)Ljava/lang/String;
 	public fun commandWorkingDirectoryUri (I)Ljava/lang/String;
@@ -413,6 +415,7 @@ public final class io/github/ketraterm/session/TerminalShellIntegrationState : i
 	public final fun reanchorActivePromptStart (J)V
 	public final fun recordCommandFinished (JLjava/lang/Integer;)V
 	public final fun recordCommandStart (JZLjava/lang/String;Ljava/lang/String;)V
+	public final fun recordCommandStart (JZLjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;)V
 	public static synthetic fun recordCommandStart$default (Lio/github/ketraterm/session/TerminalShellIntegrationState;JZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public fun recordCount ()I
 	public final fun recordCurrentWorkingDirectory (Ljava/lang/String;)V
@@ -426,6 +429,8 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 	public abstract fun commandAnchorLineId (I)J
 	public fun commandDurationMillis (I)Ljava/lang/Long;
 	public abstract fun commandMetadata (I)Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;
+	public fun commandOutputRecordIdAtLine (J)I
+	public fun commandPrompt (I)Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;
 	public abstract fun commandRecordIdAtLine (J)I
 	public abstract fun commandText (I)Ljava/lang/String;
 	public abstract fun commandWorkingDirectoryUri (I)Ljava/lang/String;
@@ -449,6 +454,8 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 
 public final class io/github/ketraterm/session/TerminalShellIntegrationView$DefaultImpls {
 	public static fun commandDurationMillis (Lio/github/ketraterm/session/TerminalShellIntegrationView;I)Ljava/lang/Long;
+	public static fun commandOutputRecordIdAtLine (Lio/github/ketraterm/session/TerminalShellIntegrationView;J)I
+	public static fun commandPrompt (Lio/github/ketraterm/session/TerminalShellIntegrationView;I)Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;
 	public static synthetic fun copyCommandBlockRange$default (Lio/github/ketraterm/session/TerminalShellIntegrationView;I[JIILjava/lang/Object;)Z
 	public static synthetic fun copyCommandOutputRange$default (Lio/github/ketraterm/session/TerminalShellIntegrationView;I[JIILjava/lang/Object;)Z
 	public static synthetic fun copyViewport$default (Lio/github/ketraterm/session/TerminalShellIntegrationView;[JI[Z[Z[Z[I[I[ZIILjava/lang/Object;)V

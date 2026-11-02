@@ -22,9 +22,11 @@ import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.api.TerminalRenderFrame
 import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import io.github.ketraterm.session.*
 import kotlinx.coroutines.flow.*
 
+private const val MAX_SHELL_INTEGRATION_PROMPT_COLUMNS = 4096
 private const val SHELL_COMMAND_LINE_CONTEXT_LONGS = 3
 private const val SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX = 0
 private const val SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX = 1
@@ -137,6 +139,7 @@ private class OscShellIntegrationSession(
         var previousLineId = NO_LINE_ID
         var cursorColumn = 0
         var commandText: String? = null
+        var commandPrompt: TerminalRenderRowSnapshot? = null
         var visiblePromptStartLineId = NO_LINE_ID
         var historySize = 0
         var liveRows = 0
@@ -153,6 +156,7 @@ private class OscShellIntegrationSession(
                 previousLineId = frame.lineId(cursor.row - 1)
             }
             if (event.marker == ShellIntegrationMarker.COMMAND_START) {
+                commandPrompt = captureCommandPrompt(frame, cursor.row)
                 commandText =
                     commandTextExtractor.extract(
                         frame = frame,
@@ -174,13 +178,14 @@ private class OscShellIntegrationSession(
             }
         }
 
-        if (event.marker == ShellIntegrationMarker.COMMAND_START && commandText == null && historySize > 0) {
+        if (event.marker == ShellIntegrationMarker.COMMAND_START && (commandText == null || commandPrompt == null) && historySize > 0) {
             val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
             context.readRenderFrame(
                 scrollbackOffset = historyRows,
                 viewportRows = liveRows + historyRows,
             ) { frame ->
                 val cursor = frame.cursor
+                if (commandPrompt == null) commandPrompt = captureCommandPrompt(frame, cursor.row)
                 commandText =
                     commandTextExtractor.extract(
                         frame = frame,
@@ -218,6 +223,7 @@ private class OscShellIntegrationSession(
                         includeLine = cursorColumn == 0,
                         commandText = commandText,
                         workingDirectoryUri = state.currentWorkingDirectoryUri(),
+                        prompt = commandPrompt,
                     )
                 }
                 promptStartedForCommandText = false
@@ -235,6 +241,22 @@ private class OscShellIntegrationSession(
             }
         }
         activeCommandLineContextRevision++
+    }
+
+    private fun captureCommandPrompt(
+        frame: TerminalRenderFrame,
+        cursorRow: Int,
+    ): TerminalRenderRowSnapshot? {
+        if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY ||
+            promptEndLineId == NO_LINE_ID ||
+            frame.columns > MAX_SHELL_INTEGRATION_PROMPT_COLUMNS
+        ) {
+            return null
+        }
+        for (row in 0..cursorRow.coerceAtMost(frame.rows - 1)) {
+            if (frame.lineId(row) == promptEndLineId) return TerminalRenderRowSnapshot.copyOf(frame, row)
+        }
+        return null
     }
 
     private fun copyActiveCommandLineContext(destination: LongArray): Long {

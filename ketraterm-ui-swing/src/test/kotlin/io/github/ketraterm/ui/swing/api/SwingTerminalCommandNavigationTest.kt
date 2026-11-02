@@ -17,13 +17,12 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalFocusEvent
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
+import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
@@ -42,8 +41,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import java.awt.Cursor
+import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.util.concurrent.LinkedBlockingQueue
 import javax.swing.JComponent
@@ -671,6 +672,92 @@ class SwingTerminalCommandNavigationTest {
         session.close()
     }
 
+    @Test
+    fun `sticky header reveals original command and settings disable its hit target without transport changes`() {
+        SwingUtilities.invokeAndWait {
+            HostModelFixture().use { fixture ->
+                fixture.shellState.recordPromptStart(lineIdForAbsoluteRow(1))
+                fixture.shellState.recordPromptEnd(lineIdForAbsoluteRow(1))
+                val frame = CommandFrame(5, 2, mapOf(1 to "PS > build"))
+                val prompt = TerminalRenderRowSnapshot.copyOf(frame, 0)
+                fixture.shellState.recordCommandStart(lineIdForAbsoluteRow(2), true, "build", null, prompt)
+                fixture.flush()
+                val resizes = fixture.resizeCount
+                val writes = fixture.writeCount
+
+                fun mouse(type: Int) = MouseEvent(fixture.component, type, 0, 0, 32, 10, 1, false, MouseEvent.BUTTON1)
+                fixture.component.dispatchEvent(mouse(MouseEvent.MOUSE_PRESSED))
+                fixture.component.dispatchEvent(mouse(MouseEvent.MOUSE_RELEASED))
+                fixture.flush()
+                assertEquals(5, fixture.component.viewportState().renderOffset)
+                assertEquals(resizes, fixture.resizeCount)
+                assertEquals(writes, fixture.writeCount)
+                fixture.component.scrollToLiveViewport()
+                fixture.flush()
+                fixture.stickyHeaders = false
+                fixture.component.reloadSettings()
+                fixture.flush()
+                fixture.component.dispatchEvent(mouse(MouseEvent.MOUSE_PRESSED))
+                fixture.component.dispatchEvent(mouse(MouseEvent.MOUSE_RELEASED))
+                fixture.flush()
+                assertEquals(0, fixture.component.viewportState().renderOffset)
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, false", "false, true", "true, false", "true, true")
+    fun `header and body buttons preserve tracked drag and release ownership`(
+        headerFirst: Boolean,
+        bodyReleasedFirst: Boolean,
+    ) {
+        SwingUtilities.invokeAndWait {
+            val reports = ArrayList<TerminalMouseEvent>()
+            HostModelFixture(reports).use { fixture ->
+                fixture.session.start(12, 2)
+                fixture.shellState.recordPromptStart(lineIdForAbsoluteRow(1))
+                fixture.shellState.recordPromptEnd(lineIdForAbsoluteRow(1))
+                val prompt = TerminalRenderRowSnapshot.copyOf(CommandFrame(5, 2, mapOf(1 to "PS > build")), 0)
+                fixture.shellState.recordCommandStart(lineIdForAbsoluteRow(2), true, "build", null, prompt)
+                fixture.flush()
+                val bodyY = fixture.component.height - 10
+
+                fun mouse(
+                    type: Int,
+                    button: Int,
+                    y: Int,
+                    modifiers: Int = 0,
+                ) {
+                    fixture.component.dispatchEvent(MouseEvent(fixture.component, type, 0, modifiers, 40, y, 1, false, button))
+                }
+                if (headerFirst) mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 10)
+                mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, bodyY)
+                if (!headerFirst) mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 10)
+                mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, bodyY, InputEvent.BUTTON1_DOWN_MASK or InputEvent.BUTTON3_DOWN_MASK)
+                if (bodyReleasedFirst) mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, 10)
+                // Header releases stay local even when the pointer has moved into output.
+                mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, bodyY)
+                if (!bodyReleasedFirst) mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, 10)
+                fixture.flush()
+                assertEquals(
+                    listOf(TerminalMouseEventType.PRESS, TerminalMouseEventType.MOTION, TerminalMouseEventType.RELEASE),
+                    reports.map { it.type },
+                )
+                assertEquals(TerminalMouseButton.LEFT, reports.first().button)
+                assertEquals(TerminalMouseButton.LEFT, reports.last().button)
+                assertEquals(reports[1].column, reports.last().column)
+                assertEquals(reports[1].row, reports.last().row)
+                assertEquals(0, fixture.component.viewportState().renderOffset)
+
+                // A fresh Shift gesture must select locally, proving the tracked gesture ended.
+                mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, bodyY, InputEvent.SHIFT_DOWN_MASK)
+                mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, bodyY, InputEvent.SHIFT_DOWN_MASK)
+                fixture.flush()
+                assertEquals(3, reports.size)
+            }
+        }
+    }
+
     private fun createComponent(
         settingsProvider: SwingSettingsProvider,
         hostServices: SwingHostServices = SwingHostServices(),
@@ -692,17 +779,26 @@ class SwingTerminalCommandNavigationTest {
         populate: Boolean = true,
         workerDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
         state: TerminalShellIntegrationState = TerminalShellIntegrationState(capacity = capacity),
+        connector: TerminalConnector = NoOpConnector,
+        trackedMouseEvents: MutableList<TerminalMouseEvent>? = null,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 2, maxHistory = HISTORY_SIZE)
+        if (trackedMouseEvents != null) terminal.setMouseTrackingMode(MouseTrackingMode.BUTTON_EVENT)
         val session =
             TerminalSession(
                 terminal = terminal,
                 renderPublisher = TerminalRenderPublisher(12, 2),
                 renderReader = renderReader,
                 responseReader = terminal,
-                connector = NoOpConnector,
+                connector = connector,
                 parser = NoOpParser,
-                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ ->
+                    object : TerminalInputEncoder by NoOpInputEncoder {
+                        override fun encodeMouse(event: TerminalMouseEvent) {
+                            trackedMouseEvents?.add(event)
+                        }
+                    }
+                },
                 shellIntegration =
                     TerminalShellIntegrationFactory.host(state),
                 workerDispatcher = workerDispatcher,
@@ -730,15 +826,45 @@ class SwingTerminalCommandNavigationTest {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private inner class HostModelFixture : AutoCloseable {
+    private inner class HostModelFixture(
+        trackedMouseEvents: MutableList<TerminalMouseEvent>? = null,
+    ) : AutoCloseable {
         private val worker = StandardTestDispatcher()
         private val dispatches = LinkedBlockingQueue<Runnable>()
         private val padding = SwingPadding(8, 12, 8, 8)
         private val previousRepaints = RepaintManager.currentManager(null)
         val repaints = RecordingRepaints(previousRepaints)
         var clipboard: String? = null
+        var stickyHeaders = true
+        var resizeCount = 0
+        var writeCount = 0
+        private val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun resize(
+                    columns: Int,
+                    rows: Int,
+                ) {
+                    resizeCount++
+                }
+
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    writeCount++
+                }
+            }
         val shellState = TerminalShellIntegrationState()
-        val session = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker, state = shellState)
+        val session =
+            commandSession(
+                CommandFrameReader(),
+                populate = false,
+                workerDispatcher = worker,
+                state = shellState,
+                connector = connector,
+                trackedMouseEvents = trackedMouseEvents,
+            )
         val replacementSession = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
         val component =
             SwingTerminal(
@@ -747,6 +873,7 @@ class SwingTerminalCommandNavigationTest {
                         draft.padding = padding
                         draft.cursorBlinkMillis = 0
                         draft.useSystemFallbackFonts = false
+                        draft.stickyCommandHeadersEnabled = stickyHeaders
                     }
                 },
                 hostServices =

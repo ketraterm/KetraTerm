@@ -72,6 +72,7 @@ internal class KetraTermSettings(
             draft.pasteControlPolicy = config.pasteControlPolicy
             draft.cursorShape = parseCursorShape(config.cursorShape)
             draft.promptDecoration = config.promptDecoration
+            draft.stickyCommandHeadersEnabled = config.stickyCommandHeadersEnabled
             draft.lineHeight = config.lineHeight
             draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled

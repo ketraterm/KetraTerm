@@ -36,6 +36,63 @@ import java.nio.charset.StandardCharsets
 @OptIn(ExperimentalCoroutinesApi::class)
 class OscShellIntegrationTest {
     @Test
+    fun `original full prompt row preserves styles after output evicts its grid anchor`() {
+        val connector = MockConnector()
+        val terminal = TerminalBuffers.create(width = 30, height = 2, maxHistory = 1)
+        TerminalSession
+            .create(
+                terminal,
+                connector,
+                shellIntegration = OscShellIntegration,
+                workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = UnconfinedTestDispatcher(),
+            ).use { session ->
+                session.start(30, 2)
+                connector.feedFromHost("\u001b]133;A\u0007PS C:\\work> \u001b]133;B\u0007\u001b[33mcat\u001b[0m".ascii())
+                val original = TerminalRenderCache(30, 2)
+                original.updateFrom(session)
+                connector.feedFromHost("\r\n\u001b]133;C\u0007one\r\ntwo\r\nthree\r\nfour".ascii())
+                val state = session.shellIntegrationState
+                val id = state.latestCommandRecordId()
+                val capture = requireNotNull(state.commandPrompt(id))
+                val retained = TerminalRenderCache(30, 1)
+                retained.accept(capture)
+                assertArrayEquals(original.codeWords.copyOf(30), retained.codeWords)
+                assertArrayEquals(original.attrWords.copyOf(30), retained.attrWords)
+                assertArrayEquals(original.flags.copyOf(30), retained.flags)
+                assertEquals("cat", state.commandText(id))
+                session.readRenderFrame { frame ->
+                    assertNotEquals(state.commandAnchorLineId(id), frame.lineId(0))
+                    assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(0)))
+                }
+            }
+    }
+
+    @Test
+    fun `output ownership follows chunked OSC command lifecycle without making running output selectable`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 5).use { session ->
+            for (byte in "\u001b]133;A\u0007$ \u001b]133;B\u0007build\r\n\u001b]133;C\u0007first\r\nsecond".ascii()) {
+                connector.feedFromHost(byteArrayOf(byte))
+            }
+            val state = session.shellIntegrationState
+            val id = state.latestCommandRecordId()
+            assertEquals("build", state.commandText(id))
+            session.readRenderFrame { frame ->
+                assertEquals(0, state.commandOutputRecordIdAtLine(frame.lineId(0)))
+                assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(1)))
+                assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(2)))
+            }
+            assertFalse(state.copyCommandOutputRange(id, LongArray(3)))
+            connector.feedFromHost("\r\n\u001b]133;D;0\u0007\u001b]133;A\u0007$ \u001b]133;B\u0007".ascii())
+            session.readRenderFrame { frame ->
+                assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(2)))
+                assertEquals(0, state.commandOutputRecordIdAtLine(frame.lineId(3)))
+            }
+        }
+    }
+
+    @Test
     fun `local clear discards OSC anchors and editing context then accepts a new prompt`() {
         val connector = MockConnector()
         createStartedSession(connector, columns = 30, rows = 4).use { session ->

@@ -59,6 +59,15 @@ preserved. Extraction is bounded to 256 rows and 4096 UTF-16 code units. Missing
 evicted, ambiguous, or oversized content produces unknown text (`null`). The
 current producer retains at most 4096 timeline records.
 
+At command start the producer also copies the first physical row containing the
+prompt-end marker, including input, colors, cell attributes and grapheme payloads.
+This immutable `TerminalRenderRowSnapshot` survives output overwrites and grid
+eviction. Captures are limited to 4096 columns. The neutral state independently
+bounds retained prompt planes to 8 MiB, retiring the oldest prompt copies first
+without removing their command metadata; a missing capture stays unavailable.
+The view chooses fonts and presentation, while the producer retains only terminal
+render data. Custom producers can pass the same snapshot to `recordCommandStart`.
+
 `session.activeShellCommandLine()` returns an immutable snapshot only when the
 prompt context is available and the cursor is at the visible command end. Use
 `session.activeShellCommandLineRevision` to observe edits; session shares one

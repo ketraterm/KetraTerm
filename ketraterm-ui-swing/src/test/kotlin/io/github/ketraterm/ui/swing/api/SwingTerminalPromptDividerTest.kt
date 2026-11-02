@@ -342,14 +342,18 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
-    @Test
-    fun `divider failure rails span prompt and output between bands at the far left`() =
+    @ParameterizedTest
+    @ValueSource(ints = [10, 14, 20])
+    fun `divider failure rails span prompt and output between bands at the far left`(fontSize: Int) =
         edt {
             Fixture(SwingPromptDecoration.DIVIDER, OscShellIntegration.configured(true)).use { f ->
                 val red = 0xffff0000.toInt()
                 val blue = 0xff0000ff.toInt()
                 f.settings =
                     f.settings.copy {
+                        it.font = it.font.deriveFont(fontSize.toFloat())
+                        // This test asserts uncomposited rail colors; the sticky overlay has its own pixel tests.
+                        it.stickyCommandHeadersEnabled = false
                         it.shellIntegrationFailedCommandRailColor = red
                         it.shellIntegrationPromptDividerColor = WHITE
                     }

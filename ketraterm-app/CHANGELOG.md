@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added sticky command headers, enabled by default with an independent setting. The overlay repeats the full original prompt/input row with normal terminal typography, colors and cell spacing while its output is at the viewport top. Clicking reveals the command; scrolling, grid dimensions and PTY sizing remain unchanged.
 - Typing and accepted paste return to live input immediately. Scroll on output now defaults to off so incoming output preserves the reader's position; saved preferences remain effective.
 
 ## [0.4.0] - 2026-10-31

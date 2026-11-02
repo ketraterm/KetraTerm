@@ -99,6 +99,7 @@ class KetraTermSettingsConfigurable internal constructor(
     private val defaultTabNameField = JBTextField()
     private val cursorShapeCombo = ComboBox(cursorShapeOptions())
     private val promptDecorationCombo = ComboBox(promptDecorationOptions())
+    private val stickyCommandHeadersCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.stickyCommandHeaders"))
     private val ambiguousWidthCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.ambiguousWidth"))
     private val systemFallbackFontsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.systemFallbackFonts"))
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
@@ -211,6 +212,11 @@ class KetraTermSettingsConfigurable internal constructor(
                     }
                     row(KetraTermBundle.message("settings.ketraterm.scrollback")) {
                         cell(scrollbackSpinner)
+                    }
+                    row {
+                        cell(
+                            stickyCommandHeadersCheckBox,
+                        ).comment(KetraTermBundle.message("settings.ketraterm.stickyCommandHeaders.comment"))
                     }
                     row(KetraTermBundle.message("settings.ketraterm.promptDecoration")) {
                         cell(promptDecorationCombo)
@@ -328,6 +334,7 @@ class KetraTermSettingsConfigurable internal constructor(
         defaultTabNameField.text = state.defaultTabName
         cursorShapeCombo.selectedItem = cursorShapeOptions().first { it.id == state.cursorShape }
         promptDecorationCombo.selectedItem = promptDecorationOptions().first { it.id == state.promptDecoration }
+        stickyCommandHeadersCheckBox.isSelected = state.stickyCommandHeadersEnabled
         ambiguousWidthCheckBox.isSelected = state.treatAmbiguousAsWide
         systemFallbackFontsCheckBox.isSelected = state.useSystemFallbackFonts
         visualBellCheckBox.isSelected = state.visualBell
@@ -365,6 +372,7 @@ class KetraTermSettingsConfigurable internal constructor(
                 (promptDecorationCombo.selectedItem as? PromptDecorationOption)?.id
                     ?: KetraTermIntellijSettings.DEFAULT_PROMPT_DECORATION,
             visualBell = visualBellCheckBox.isSelected,
+            stickyCommandHeadersEnabled = stickyCommandHeadersCheckBox.isSelected,
             commandFinishedAlertsEnabled = commandFinishedAlertsCheckBox.isSelected,
             commandFinishedAlertThresholdSeconds = spinnerValue(commandFinishedAlertThresholdSpinner),
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,

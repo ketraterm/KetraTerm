@@ -91,6 +91,37 @@ public final class io/github/ketraterm/render/cache/TerminalRenderRangeCopy {
 	public static synthetic fun read$default (Lio/github/ketraterm/render/cache/TerminalRenderRangeCopy;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Z
 }
 
+public final class io/github/ketraterm/render/cache/TerminalRenderRowSnapshot : io/github/ketraterm/render/api/TerminalRenderFrame {
+	public static final field Companion Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot$Companion;
+	public fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
+	public fun copyImages (Lio/github/ketraterm/render/api/TerminalRenderImageSink;)V
+	public fun copyLine (I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
+	public static final fun copyOf (Lio/github/ketraterm/render/api/TerminalRenderFrame;I)Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;
+	public fun copyTextLine (I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
+	public fun getActiveBuffer ()Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public fun getColumns ()I
+	public fun getContentGeneration ()J
+	public fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public fun getDiscardedCount ()J
+	public fun getFrameGeneration ()J
+	public fun getGraphicsGeneration ()J
+	public fun getHistoryContentGeneration ()J
+	public fun getHistorySize ()I
+	public fun getOutputEndAbsoluteRow ()J
+	public fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public fun getRows ()I
+	public fun getScrollbackOffset ()I
+	public final fun getStorageBytes ()J
+	public fun getStructureGeneration ()J
+	public fun lineGeneration (I)J
+	public fun lineId (I)J
+	public fun lineWrapped (I)Z
+}
+
+public final class io/github/ketraterm/render/cache/TerminalRenderRowSnapshot$Companion {
+	public final fun copyOf (Lio/github/ketraterm/render/api/TerminalRenderFrame;I)Lio/github/ketraterm/render/cache/TerminalRenderRowSnapshot;
+}
+
 public final class io/github/ketraterm/render/cache/TerminalTextRangeCopy {
 	public fun <init> ()V
 	public fun <init> (II)V

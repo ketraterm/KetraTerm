@@ -50,9 +50,12 @@ internal class TerminalCommandInteractionController(
                     shellState.nextCommandRecordIdAfterLine(anchorLineId)
                 }
             }
-        if (targetRecordId == TerminalShellIntegrationCommandRecord.NONE) return false
+        return targetRecordId != TerminalShellIntegrationCommandRecord.NONE && revealCommand(targetRecordId)
+    }
 
-        val targetLineId = shellState.commandAnchorLineId(targetRecordId)
+    fun revealCommand(recordId: Int): Boolean {
+        val boundSession = host.session ?: return false
+        val targetLineId = boundSession.shellIntegrationState.commandAnchorLineId(recordId)
         if (targetLineId == NO_LINE_ID) return false
 
         refreshCommandNavigationCache(boundSession)

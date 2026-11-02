@@ -117,3 +117,19 @@ should use the primitive cursor fields and packed cluster storage directly.
 - [Publication and cache concurrency](docs/triple-buffering-concurrency.md)
 - [Render contracts](../ketraterm-render-api/README.md)
 - [Session lifecycle and synchronized access](../ketraterm-session/README.md)
+
+
+## Immutable row copies
+
+`TerminalRenderRowSnapshot.copyOf(frame, row)` retains one physical row after the
+source frame callback returns. Its public frame contract exposes copied codepoints,
+cell attributes, clusters, stable identity and wrap provenance without mutable plane
+access, a cursor, images or terminal hyperlinks. It is safe to share as read-only
+metadata and can be consumed by `TerminalRenderCache.accept`. Capture allocates;
+subsequent primitive copies reuse the caller's destinations. `storageBytes` reports
+retained primitive-plane storage for owners that bound metadata retention.
+
+Every snapshot has its own generation namespace. Before passing a different snapshot
+to an existing cache, call `cache.reset()` followed by `cache.accept(snapshot)`.
+This also applies to repeated captures of the same source row: its stable line identity
+can remain unchanged while its text changes. Snapshot row access always uses index zero.

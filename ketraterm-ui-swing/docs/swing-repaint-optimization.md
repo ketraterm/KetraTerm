@@ -132,3 +132,32 @@ remain available to the host. Route/session changes and reloads of either
 wheel-routing setting clear partial alternate input. See the
 [middle-button paste contract](../README.md#middle-button-paste) for source-aware
 clipboard access and deferred host completion.
+
+
+## Sticky command headers
+
+The EDT-owned header resolves the top authored output row through shared viewport
+geometry. Ownership and immutable prompt capture are queried only when the top
+logical line, shell revision or binding changes. Raster preparation uses `GridPainter`
+with the captured primitive row and the current terminal settings, metrics and palette.
+The resulting single-row image is composited after grid content and before the
+scrollbar and visual bell. A ten-pixel shadow with Gaussian opacity falloff is composed into the cached
+image during preparation, keeping one image blit per paint. The prompt is first
+rendered on an opaque surface to preserve LCD text antialiasing, then copied into
+the final image with its transparent shadow. The full opaque device-pixel area is
+initialized before logical drawing, including fractional-scale rounding fringes.
+The header has no separator rule. The shadow clips to the content bottom without
+compressing its falloff and has no pointer hit area. Painting
+performs no shell queries or source reads.
+
+Fractional scrolling reuses the raster. A new prompt capture, width, font/metrics,
+palette, settings or display scale invalidates it. Hiding or replacing the overlay
+repaints its previous region through the existing frame/viewport repaint paths.
+Unbinding and disposal release captured prompt/raster references and reset the
+reusable primitive cache. The overlay
+has pointer precedence over covered cells; existing terminal gestures retain their
+release and selection-drag lifetime, with tracked releases using the last valid
+terminal coordinates. No terminal row geometry is changed.
+
+See the [sticky command header benchmarks](../../ketraterm-benchmarks/README.md#sticky-command-headers)
+for workload boundaries and commands to measure overlay updates and Java2D painting.

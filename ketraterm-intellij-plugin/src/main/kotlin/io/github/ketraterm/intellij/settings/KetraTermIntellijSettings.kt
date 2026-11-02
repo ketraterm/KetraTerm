@@ -193,6 +193,7 @@ class KetraTermIntellijSettings :
      * @property useSystemFallbackFonts whether renderer may scan installed fonts.
      * @property cursorShape default cursor shape id.
      * @property promptDecoration primary-screen prompt style id: gutter, divider, or none.
+     * @property stickyCommandHeadersEnabled whether the original styled prompt/input row stays above scrolled output.
      * @property visualBell whether BEL events show a visual terminal indicator.
      * @property pasteOnMiddleClick whether the middle click pastes clipboard text.
      * @property overrideIdeShortcuts whether focused terminal panes may claim
@@ -239,6 +240,8 @@ class KetraTermIntellijSettings :
         @JvmField val cursorShape: String = DEFAULT_CURSOR_SHAPE,
         @OptionTag
         @JvmField val promptDecoration: String = DEFAULT_PROMPT_DECORATION,
+        @OptionTag
+        @JvmField val stickyCommandHeadersEnabled: Boolean = true,
         @OptionTag
         @JvmField val visualBell: Boolean = DEFAULT_VISUAL_BELL,
         @OptionTag
@@ -519,6 +522,7 @@ internal object KetraTermIntellijSettingsMapper {
             draft.pasteControlPolicy = parsePasteSanitization(state.pasteSanitization)
             draft.cursorShape = parseCursorShape(state.cursorShape)
             draft.promptDecoration = SwingPromptDecoration.valueOf(state.promptDecoration.uppercase(Locale.ROOT))
+            draft.stickyCommandHeadersEnabled = state.stickyCommandHeadersEnabled
             draft.lineHeight = state.lineHeight
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled

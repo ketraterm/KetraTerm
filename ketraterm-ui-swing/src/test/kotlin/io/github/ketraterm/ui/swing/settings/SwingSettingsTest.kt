@@ -32,6 +32,17 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingSettingsTest {
+    @Test
+    fun `sticky headers are independent copied settings and participate in equality`() {
+        val defaults = SwingSettings.create { it.promptDecoration = SwingPromptDecoration.NONE }
+        assertTrue(defaults.stickyCommandHeadersEnabled)
+        val disabled = defaults.copy { it.stickyCommandHeadersEnabled = false }
+        assertFalse(disabled.stickyCommandHeadersEnabled)
+        assertNotEquals(defaults, disabled)
+        assertEquals(disabled, disabled.copy {})
+        assertEquals(disabled.hashCode(), disabled.copy {}.hashCode())
+    }
+
     private val chrome = SwingTerminalChrome()
 
     @Test
@@ -624,9 +635,9 @@ class SwingSettingsTest {
         assertFalse(cache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts))
         assertSame(missingGlyphFont, cache.fontForCodePoint(0x10FFFF, Font.PLAIN))
         assertEquals(18, chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(8, chrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(18, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(8, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }
 
     @Test
@@ -683,10 +694,10 @@ class SwingSettingsTest {
 
         assertEquals(listOf(originalFont), settings.fallbackFonts)
         assertEquals(listOf(replacementFont), copy.fallbackFonts)
-        assertEquals(SwingPadding(0, 2, 4, 6), settings.padding)
-        assertEquals(SwingPadding(0, 12, 4, 6), copy.padding)
-        assertEquals(SwingPadding(0, 9, 4, 9), settings.alternateScreenPadding)
-        assertEquals(SwingPadding(0, 9, 9, 9), copy.alternateScreenPadding)
+        assertEquals(SwingPadding(4, 2, 4, 6), settings.padding)
+        assertEquals(SwingPadding(4, 12, 4, 6), copy.padding)
+        assertEquals(SwingPadding(4, 9, 4, 9), settings.alternateScreenPadding)
+        assertEquals(SwingPadding(4, 9, 9, 9), copy.alternateScreenPadding)
         assertEquals(settings.font, copy.font)
         assertTrue(settings != copy)
     }
@@ -820,9 +831,9 @@ class SwingSettingsTest {
         assertEquals(true, settings.shellIntegrationFailedCommandRailsVisible)
         assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
         assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
-        assertEquals(SwingPadding(0, 2, 4, 6), settings.padding)
-        assertEquals(SwingPadding(0, 9, 4, 9), settings.alternateScreenPadding)
-        assertEquals(0, settings.padding.top)
+        assertEquals(SwingPadding(4, 2, 4, 6), settings.padding)
+        assertEquals(SwingPadding(4, 9, 4, 9), settings.alternateScreenPadding)
+        assertEquals(4, settings.padding.top)
         assertEquals(2, settings.padding.left)
         assertEquals(4, settings.padding.bottom)
     }
@@ -877,7 +888,9 @@ class SwingSettingsTest {
         assertEquals(9, chrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(18, chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(18, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(8, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, chrome.top(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(4, chrome.top(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(10, chrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(0, chrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(true, settings.shellSuggestionsEnabled)
