@@ -178,6 +178,17 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `option names do not inherit positional value providers`() {
+        for (commandLine in listOf("tool -", "tool --", "tool --lab")) {
+            val context = resolve(commandLine, listOf(optionMetadataSpec))
+
+            assertEquals(TerminalCompletionActivePosition.OPTION_NAME, context.activePosition, commandLine)
+            assertEquals(TerminalPathArgumentKind.NONE, context.expectedPathKind, commandLine)
+            assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain, commandLine)
+        }
+    }
+
+    @Test
     fun `active option NONE metadata overrides positional defaults`() {
         for (commandLine in listOf("tool --label ", "tool --label x", "tool --label=", "tool --label=x")) {
             val context = resolve(commandLine, listOf(optionMetadataSpec))

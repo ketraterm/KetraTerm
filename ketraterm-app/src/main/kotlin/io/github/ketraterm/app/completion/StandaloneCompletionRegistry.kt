@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalCompletionSourceEnvironment
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -69,7 +70,18 @@ internal class StandaloneCompletionRegistry private constructor(
                 TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
                 TerminalCompletionSourcePrior.DIRECTORY_PATH,
             ),
-        )
+            TerminalCompletionSourceEntry(StandaloneGitCompletionSource(ioDispatcher), TerminalCompletionSourcePrior.GIT_REFERENCE),
+        ).map { entry ->
+            entry.copy(
+                source =
+                    TerminalCompletionSource { request, context, limit ->
+                        val sourceRequest =
+                            TerminalCompletionSourceEnvironment.resolve(request, context)
+                                ?: return@TerminalCompletionSource emptyList()
+                        entry.source.complete(sourceRequest, context, limit)
+                    },
+            )
+        }
     private val engine =
         TerminalCompletionEngines.fromSources(
             messages = completionMessages,
@@ -137,7 +149,7 @@ internal class StandaloneCompletionRegistry private constructor(
                         engine
                     },
                 contextProvider = contextProvider,
-                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash"),
+                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash", StandaloneGitCompletionSource.SOURCE_ID to "Git"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

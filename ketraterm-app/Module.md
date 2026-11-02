@@ -25,6 +25,9 @@ a pane releases those UI resources; closing its workspace tab closes the session
 `KetraTermConfigManager` loads and replaces settings files.
 `KetraTermSettings` publishes saved immutable preferences to EDT consumers.
 `StandaloneCompletionRegistry` composes the completion modules for a window.
+Its local path and Git-reference sources use shared source-directory resolution.
+`StandaloneGitCompletionSource` owns bounded Git process queries and request-linked
+cancellation; command parsing, matching, quoting, and ranking remain in the engine.
 
 ## Configuration
 

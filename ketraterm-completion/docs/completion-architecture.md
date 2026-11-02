@@ -67,7 +67,10 @@ cannot flash before shell discovery finishes. Null means the shell is unsupporte
 or unavailable and permits ordinary catalog fallback. Providers own this distinction;
 the session adapter returns empty for busy/stale requests once a native hook is installed.
 Modeled argument positions use progressive catalog and host sources first, with
-native fallback only when they produce no candidates. Unmodeled arguments query
+native fallback only when they produce no candidates. Retained learning does not
+count as a structured-source answer: when it is the only available result, its
+publication waits for the native fallback to finish, then participates in ranking.
+Unmodeled arguments query
 the shell before publishing and use its successful answer instead of generic file
 or replay guesses. No candidates are published while a native query could
 invalidate their captured editing context.

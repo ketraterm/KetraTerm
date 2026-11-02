@@ -117,8 +117,19 @@ internal object TerminalCompletionContextResolver {
                 lastCommand = lastCommand,
                 subcommandCandidateSource = subcommandCandidateSource,
             )
-        val expectedPathKind = determineExpectedPathKind(activeOption, activePositionalArgument, lastCommand)
-        val expectedValueDomain = determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
+        val completingOptionName = activePosition == TerminalCompletionActivePosition.OPTION_NAME
+        val expectedPathKind =
+            if (completingOptionName) {
+                TerminalPathArgumentKind.NONE
+            } else {
+                determineExpectedPathKind(activeOption, activePositionalArgument, lastCommand)
+            }
+        val expectedValueDomain =
+            if (completingOptionName) {
+                TerminalCompletionValueDomain.NONE
+            } else {
+                determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
+            }
         val expectedHiddenPathPolicy = determineExpectedHiddenPathPolicy(activeOption, activePositionalArgument, lastCommand)
 
         return TerminalCompletionContext(

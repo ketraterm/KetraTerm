@@ -292,6 +292,58 @@ class ShellAwareCompletionEngineTest {
         }
 
     @Test
+    fun `learned arguments cannot suppress native fallback or publish before its edit completes`() =
+        runTest {
+            val learning = TerminalCompletionLearningStore()
+            learning.recordCommandResult("git switch feature-old", true, null, null, 10)
+            val native = CompletableDeferred<List<TerminalCompletionCandidate>>()
+            var queries = 0
+            val engine =
+                MergedCompletionEngine(
+                    sources = listOf(TerminalCompletionSourceEntry({ _, _, _ -> emptyList() })),
+                    learningStore = learning,
+                    clockEpochMillis = { 20 },
+                    shellProvider =
+                        TerminalCompletionShellProvider { _, _, _ ->
+                            queries++
+                            native.await()
+                        },
+                )
+            val results = ArrayList<List<TerminalCompletionCandidate>>()
+            val job = launch { engine.completions(request("git switch fe")).toList(results) }
+            runCurrent()
+            assertEquals(1, queries)
+            assertTrue(results.isEmpty())
+            native.complete(
+                listOf(TerminalCompletionCandidate("feature-current", 11, 13, "powershell", TerminalCompletionCandidateKind.ARGUMENT)),
+            )
+            job.join()
+            assertTrue(results.last().any { it.replacementText == "feature-current" })
+            assertTrue(results.last().any { it.replacementText == "feature-old" })
+        }
+
+    @Test
+    fun `learned arguments remain available when native fallback has no matches`() =
+        runTest {
+            val learning = TerminalCompletionLearningStore()
+            learning.recordCommandResult("git switch feature-old", true, null, null, 10)
+            var queries = 0
+            val engine =
+                MergedCompletionEngine(
+                    sources = emptyList(),
+                    learningStore = learning,
+                    clockEpochMillis = { 20 },
+                    shellProvider =
+                        TerminalCompletionShellProvider { _, _, _ ->
+                            queries++
+                            emptyList()
+                        },
+                )
+            assertTrue(engine.completions(request("git switch fe")).last().any { it.replacementText == "feature-old" })
+            assertEquals(1, queries)
+        }
+
+    @Test
     fun `unmodeled argument completers take precedence over generic filesystem candidates`() =
         runTest {
             var fileQueries = 0

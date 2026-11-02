@@ -9,7 +9,7 @@ implemented capabilities and their host-specific limits.
 | [Terminal emulation](features/terminal.md) | Screen operations, Unicode, colors, input protocols, host commands, and queries. |
 | [Shell support](features/shells.md) | Automatic discovery, prompt hooks, working directories, startup commands, and completion dialects. |
 | [Desktop and IDE](features/desktop.md) | Rendering, selection, search, links, tabs, settings, command-finished alerts, application progress rings, and product integration. |
-| [Completion — experimental](features/completion.md) | Availability, built-in commands, PowerShell completion, Bash command discovery, dynamic sources, matching, and learning. |
+| [Completion — experimental](features/completion.md) | Availability, built-in commands, PowerShell completion, Bash command discovery, local/IDE Git sources, matching, and learning. |
 | [Library embedding](features/embedding.md) | Headless sessions, custom transports, rendering, host services, and extension points. |
 
 Start with [library setup](../README.md#using-the-libraries), the

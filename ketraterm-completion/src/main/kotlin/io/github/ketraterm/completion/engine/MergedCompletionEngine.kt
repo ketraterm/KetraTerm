@@ -102,6 +102,7 @@ internal class MergedCompletionEngine(
                     nowEpochMillis = nowEpochMillis,
                 )
             var lastPublished: List<TerminalCompletionCandidate>? = null
+            var hasStructuredCandidates = false
 
             suspend fun publish() {
                 val ranked = rankingState.rankedCandidates()
@@ -125,6 +126,7 @@ internal class MergedCompletionEngine(
             if (shellCandidates == null && specSource != null) {
                 val candidates = completeSource(specSource, request, completionContext)
                 if (candidates.isNotEmpty()) {
+                    hasStructuredCandidates = true
                     rankingState.ingest(
                         CompletionSourceCandidates(
                             sourceIndex = 0,
@@ -149,12 +151,18 @@ internal class MergedCompletionEngine(
             }
 
             // Command authority is resolved before the first publication; argument sources remain progressive.
-            if (rankingState.rankedCandidates().isNotEmpty() || activeSources.isEmpty()) publish()
-            collectSources(activeSources, request, completionContext, ::available) { completed ->
-                rankingState.ingest(completed)
+            val canFallBackToShell = structuredArguments && shellProvider != null
+            if ((!canFallBackToShell || hasStructuredCandidates) &&
+                (rankingState.rankedCandidates().isNotEmpty() || activeSources.isEmpty())
+            ) {
                 publish()
             }
-            if (structuredArguments && shellProvider != null && rankingState.rankedCandidates().isEmpty()) {
+            collectSources(activeSources, request, completionContext, ::available) { completed ->
+                if (completed.candidates.isNotEmpty()) hasStructuredCandidates = true
+                rankingState.ingest(completed)
+                if (!canFallBackToShell || hasStructuredCandidates) publish()
+            }
+            if (canFallBackToShell && !hasStructuredCandidates) {
                 val fallback = completeShell(request, completionContext).orEmpty().filter { changesText(request, it) }
                 if (fallback.isNotEmpty()) {
                     rankingState.ingest(
@@ -164,8 +172,8 @@ internal class MergedCompletionEngine(
                             candidates = fallback,
                         ),
                     )
-                    publish()
                 }
+                publish()
             }
         }
 

@@ -50,7 +50,7 @@ This table describes the sources available when completion is enabled.
 | Bash command inventory | Commands, aliases, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. | Same inventory and command authority. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
-| Git branches and tags | No dynamic source. | Local/remote branches and tags from IDE repositories. |
+| Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
 | Recent Git commits | No dynamic source. | Up to 50 commits for supported commit arguments. |
 | Git changed paths | Ordinary path completion. | IDE change-list paths for supported Git commands. |
 | Gradle tasks | Built-in lifecycle tasks. | Also tasks from the imported Gradle model. |
@@ -58,11 +58,23 @@ This table describes the sources available when completion is enabled.
 
 Local filesystem sources require locally resolvable paths. WSL or remote shell
 metadata does not provide a remote filesystem completion service.
-IntelliJ never substitutes its local project for explicitly unsupported directory
-metadata. For Git commands, completed `-C` values select the source directory in
-input order for references, commits, changed paths, and ordinary/project paths;
+Neither product substitutes local data for explicitly unsupported directory
+metadata. For Git commands in both products, completed `-C` values select the source directory in
+input order for the available reference, commit, changed-path, and ordinary/project path sources;
 relative values build on the preceding directory and empty values leave it unchanged.
-The captured project directory is a fallback only when shell directory metadata is absent.
+IntelliJ's captured project directory is a fallback only when shell directory metadata is absent.
+
+Standalone queries the host's `git for-each-ref` for local branches; `checkout`,
+`merge`, and `rebase` also receive remote branches and tags. The current branch
+and symbolic remote aliases are omitted. Each eligible request refreshes the data,
+with at most 8192 refs, 1 MiB of output, and a 1.5-second process deadline.
+Cancellation terminates the query. Requests without a resolvable local directory
+do not launch Git. Queries use the selected directory rather than inherited
+repository-selection variables, and pass fixed arguments directly to Git without
+evaluating the user's command line. The executable and remaining environment come
+from the host process; shell-local toolchain changes are not mirrored by this source.
+Unavailable Git, non-repositories, and exceeded budgets leave the other completion
+sources available. IntelliJ continues to use its repository model.
 
 PowerShell's live provider calls `TabExpansion2` inside the running shell. It requires
 the installed prompt hooks and PSReadLine. At command positions, the shell supplies
@@ -71,7 +83,8 @@ advertising uninstalled tools. Empty prompts use bounded `Get-Command` discovery
 Executable extensions merge with bare invocations only when PowerShell resolves
 both to the same file; aliases or functions that shadow the bare name stay distinct.
 Modeled arguments prefer specs and host sources, with native fallback when they
-produce no candidates. Unknown functions/arguments use native completers before
+produce no candidates. Learned history does not suppress that fallback; its
+publication waits until a pending native query finishes. Unknown functions/arguments use native completers before
 generic file guesses. Directory arguments reject native files, and equivalent
 PowerShell path spellings merge into one result.
 Escaped replacement text and ranges remain shell-owned. Requests are serialized and

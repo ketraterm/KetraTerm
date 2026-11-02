@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalCompletionSourceEnvironment
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -106,7 +107,11 @@ internal class IntellijCompletionRegistry(
                                 source =
                                     TerminalCompletionSource { request, completionContext, limit ->
                                         val sourceRequest =
-                                            resolveIntellijCompletionRequest(request, completionContext, context.projectDirectory)
+                                            TerminalCompletionSourceEnvironment.resolve(
+                                                request,
+                                                completionContext,
+                                                context.projectDirectory,
+                                            )
                                                 ?: return@TerminalCompletionSource emptyList()
                                         entry.source.complete(sourceRequest, completionContext, limit)
                                     },
