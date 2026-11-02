@@ -30,6 +30,42 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
     @Test
+    fun `PowerShell command authority preserves differently cased history`() =
+        runTest {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, _, _ ->
+                                listOf(
+                                    candidate("GIT status", 2, "history", TerminalCompletionCandidateKind.COMMAND),
+                                    candidate("cargo build", 2, "history", TerminalCompletionCandidateKind.COMMAND),
+                                )
+                            }),
+                        ),
+                    shellProvider =
+                        TerminalCompletionShellProvider { _, _, _ ->
+                            listOf(candidate("git", 2, "powershell", TerminalCompletionCandidateKind.COMMAND))
+                        },
+                )
+            assertEquals(
+                setOf("git", "GIT status"),
+                engine
+                    .completions(request("gi"))
+                    .last()
+                    .map { it.replacementText }
+                    .toSet(),
+            )
+            assertEquals(
+                listOf("git"),
+                engine
+                    .completions(request("gi").copy(shellCapabilities = TerminalShellCapabilities.POSIX))
+                    .last()
+                    .map { it.replacementText },
+            )
+        }
+
+    @Test
     fun `command relevance overrides native enumeration order`() =
         runTest {
             val names = listOf("docker-credential-desktop.exe", "docker-compose", "docker", "docker-credential-wincred.exe")

@@ -13,6 +13,10 @@ contracts below. See the [stability policy](../../docs/features/completion.md#st
 Consumers use `io.github.ketraterm.completion.api` and
 `io.github.ketraterm.completion.model`.
 
+`TerminalCompletionEngines.fromSources` retains the original overloads and their
+Kotlin default-argument entry points. Native-completion overloads require an
+explicit `shellProvider`; omitting it selects the original factory contract.
+
 | Contract | Purpose |
 |----------|---------|
 | `TerminalCompletionRequest` | Captured command text, UTF-16 cursor, working-directory URI, profile, and shell capabilities. |

@@ -287,7 +287,12 @@ internal class MergedCompletionEngine(
                 candidate.replacementStartOffset + candidate.replacementText.length,
                 request.shellCapabilities.syntax,
             )
-        return parsed.tokens.getOrNull(parsed.tokens.firstCommandTokenIndex())?.text
+        val name = parsed.tokens.getOrNull(parsed.tokens.firstCommandTokenIndex())?.text ?: return null
+        return if (request.shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL && '/' !in name && '\\' !in name) {
+            name.lowercase()
+        } else {
+            name
+        }
     }
 
     private fun changesText(
