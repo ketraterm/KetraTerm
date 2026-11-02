@@ -39,7 +39,7 @@ class PowerShellNativeCompletionTest {
     fun `chunked Bash inventories replace atomically without installing a query hook`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
-                val body = "ztool\u0000ztool\u0000a tool\u0000'a tool'\u0000"
+                val body = "ztool\u0000ztool\u0000Command\u0000\u0000a tool\u0000'a tool'\u0000Alias\u0000git switch\u0000"
                 fixture.feed(inventoryBegin())
                 val message = inventory(body)
                 val bytes = message.toByteArray(Charsets.UTF_8)
@@ -50,6 +50,7 @@ class PowerShellNativeCompletionTest {
                 val commands = assertNotNull(fixture.session.shellCompletionCommands.value)
                 assertEquals(listOf("a tool", "ztool"), commands.map { it.displayText })
                 assertEquals(listOf("'a tool'", "ztool"), commands.map { it.replacementText })
+                assertEquals(listOf("git switch", null), commands.map { it.aliasExpansion })
                 assertFalse(fixture.session.shellCompletionAvailable)
                 assertTrue(fixture.connector.writtenBytes.isEmpty())
                 fixture.feed(inventoryBegin())
@@ -75,17 +76,20 @@ class PowerShellNativeCompletionTest {
                 listOf(
                     "one\u0000",
                     "one\u0000one",
-                    "\u0000one\u0000",
-                    "one\u0000\u0000",
-                    "one\u0000bad\ncommand\u0000",
-                    "${"x".repeat(513)}\u0000one\u0000",
-                    "one\u0000${"x".repeat(4097)}\u0000",
-                    "one\u0000one\u0000".repeat(8193),
+                    "\u0000one\u0000Command\u0000\u0000",
+                    "one\u0000\u0000Command\u0000\u0000",
+                    "one\u0000bad\ncommand\u0000Command\u0000\u0000",
+                    "${"x".repeat(513)}\u0000one\u0000Command\u0000\u0000",
+                    "one\u0000${"x".repeat(4097)}\u0000Command\u0000\u0000",
+                    "one\u0000one\u0000Command\u0000\u0000".repeat(8193),
+                    "one\u0000one\u0000Command\u0000git\u0000",
+                    "one\u0000one\u0000Unknown\u0000\u0000",
+                    "one\u0000one\u0000Alias\u0000${"x".repeat(4097)}\u0000",
                 )
             for (body in invalidBodies) {
                 Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
                     fixture.feed(inventoryBegin())
-                    fixture.feed(inventory("one\u0000one\u0000"))
+                    fixture.feed(inventory("one\u0000one\u0000Command\u0000\u0000"))
                     assertNotNull(fixture.session.shellCompletionCommands.value)
                     fixture.feed(inventory(body))
                     assertNull(fixture.session.shellCompletionCommands.value)
@@ -341,12 +345,12 @@ class PowerShellNativeCompletionTest {
     }
 
     companion object {
-        private fun inventoryBegin(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCommands;1;Begin;$epoch\u0007"
+        private fun inventoryBegin(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCommands;2;Begin;$epoch\u0007"
 
         private fun inventory(
             body: String,
             epoch: String = "a".repeat(32),
-        ) = "\u001b]633;KetraTermCommands;1;Result;$epoch;${encoded(body)}\u0007"
+        ) = "\u001b]633;KetraTermCommands;2;Result;$epoch;${encoded(body)}\u0007"
 
         private fun encoded(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 

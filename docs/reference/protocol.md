@@ -459,16 +459,20 @@ for the validation required before suggestion acceptance.
 
 ## Private Bash command inventory
 
-The optional OSC shell producer accepts `OSC 633;KetraTermCommands;1;Begin;epoch BEL`
-and `OSC 633;KetraTermCommands;1;Result;epoch;data BEL` (or ST). An epoch has 32
+The optional OSC shell producer accepts `OSC 633;KetraTermCommands;2;Begin;epoch BEL`
+and `OSC 633;KetraTermCommands;2;Result;epoch;data BEL` (or ST). An epoch has 32
 lowercase hexadecimal characters. A changed Begin epoch clears the old inventory;
 the same epoch retains it during refresh. Results for superseded epochs are ignored.
 Workspace epochs identify the shell environment used for command discovery.
-`data` is standard Base64 of UTF-8 NUL-terminated pairs of display name
-and shell-escaped insertion text. Empty data is an authoritative empty inventory.
+`data` is standard Base64 of UTF-8 NUL-terminated groups of four fields: display name,
+shell-escaped insertion text, kind (`Command` or `Alias`), and alias definition.
+Command definitions must be empty. Alias definitions are literal metadata, never
+executed; an empty definition also represents an alias exceeding the producer's
+4096-byte bound. Empty data is an authoritative empty inventory.
 The existing 256 KiB custom OSC limit applies; the decoded inventory permits at
-most 8192 pairs, 512 UTF-16 units per name and 4096 per insertion. Empty fields,
-controls, invalid UTF-8, and incomplete pairs are rejected. A malformed received
+most 8192 entries, 512 UTF-16 units per name and 4096 per insertion or definition.
+Empty names/insertions, controls in names/insertions, invalid UTF-8, unknown kinds,
+and incomplete groups are rejected. A malformed received
 inventory withdraws previous command authority; valid inventories replace it
 atomically and expose immutable, alphabetically ordered snapshots.
 
@@ -476,8 +480,9 @@ Workspace Bash hooks discover commands in a background snapshot at each terminal
 prompt, with at most one outstanding scan. This is one-way shell
 metadata, not a terminal query: it emits no host reply, installs no key binding,
 and grants no editing authority. Consumers retain ordinary conditional-edit checks.
-It supplies command availability only; it does not advertise native argument or
-remote filesystem completion. See [completion scope](../features/completion.md#sources-by-host).
+It supplies command availability and alias definitions for semantic argument analysis;
+it does not advertise native argument or remote filesystem completion.
+See [completion scope](../features/completion.md#sources-by-host).
 
 ## Streaming grapheme placement
 

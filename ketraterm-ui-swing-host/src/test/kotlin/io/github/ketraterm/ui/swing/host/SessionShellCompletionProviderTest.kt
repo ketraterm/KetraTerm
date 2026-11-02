@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.*
@@ -151,6 +153,50 @@ class SessionShellCompletionProviderTest {
                 runCurrent()
                 assertEquals("bash", candidates.single().source)
                 assertEquals("toolbox", candidates.single().replacementText)
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
+    @Test
+    fun `Bash alias definitions refresh shared argument semantics without rewriting accepted commands`() =
+        runTest {
+            val line = "gs fe"
+            Fixture(StandardTestDispatcher(testScheduler), line).use { fixture ->
+                val observedDirectories = mutableListOf<List<String>>()
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        listOf(
+                            TerminalCompletionSourceEntry(
+                                TerminalCompletionSources.git("git") { _, context ->
+                                    observedDirectories += context.precedingOptionValues("-C")
+                                    TerminalGitCompletionSnapshot(localBranches = listOf(TerminalCompletionDomainValue("feature/local")))
+                                },
+                            ),
+                        ),
+                        shellProvider = fixture.source,
+                    )
+                val request = TerminalCompletionRequest(line, line.length, shellCapabilities = TerminalShellCapabilities.POSIX)
+                for (directory in listOf("first repo", "second repo")) {
+                    fixture.publishCommands(
+                        listOf(
+                            TerminalShellCompletionCandidate(
+                                "gs",
+                                "gs",
+                                "",
+                                TerminalShellCompletionKind.COMMAND,
+                                "git -C '$directory' switch",
+                            ),
+                        ),
+                    )
+                    val candidate = engine.completions(request).last().single { it.source == "git" }
+                    assertEquals(listOf(directory), observedDirectories.last())
+                    assertEquals(
+                        "gs feature/local",
+                        line.replaceRange(candidate.replacementStartOffset, candidate.replacementEndOffset, candidate.replacementText),
+                    )
+                }
+                fixture.publishCommands(emptyList())
+                assertTrue(engine.completions(request).last().isEmpty())
                 assertTrue(fixture.connector.writtenBytes.isEmpty())
             }
         }

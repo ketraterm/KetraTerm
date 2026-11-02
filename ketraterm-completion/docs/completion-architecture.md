@@ -23,7 +23,7 @@ explicit `shellProvider`; omitting it selects the original factory contract.
 | `TerminalCompletionContext.resolve` | Public request resolution for custom engines and direct source evaluation. |
 | `TerminalCompletionEngine` | Cold `Flow` of best-first candidate snapshots. |
 | `TerminalCompletionSource` | One suspending provider evaluated against the shared semantic context. |
-| `TerminalCompletionShellProvider` | Optional live authority for command candidates and native argument edits. |
+| `TerminalCompletionShellProvider` | Optional live authority for command candidates, alias metadata, and native argument edits. |
 | `TerminalCompletionEngines` / `TerminalCompletionSources` | Engine composition and adapters for paths, Gradle tasks, Git snapshots, and dynamic values. |
 | `TerminalCommandSpec`, `TerminalOptionSpec`, `TerminalArgumentSpec` | Declarative command grammar and value metadata. |
 | `TerminalCompletionLearningStore` | Bounded learning, immutable snapshots, and host-recorded outcomes. |
@@ -58,6 +58,15 @@ One token pass selects the active command segment, and one context resolver
 uses the engine's command catalog to classify the cursor. The engine shares the
 result with static and host sources and the global ranker. The same catalog
 supplies the static source automatically.
+
+Before resolution, the engine captures `shellProvider.commandAliases()` once.
+Literal Bash aliases expand only the completed command prefix in the semantic
+token list, reusing the shared tokenizer and command analyzer. Fixed arguments
+therefore participate in option, subcommand, and repository resolution without
+another source or shell query. Editable tokens retain their original offsets;
+the request text is never rewritten. Custom engines may supply the same map to
+`TerminalCompletionContext.resolve`. Definitions are not evaluated; see the
+[supported subset and bounds](../../docs/features/completion.md#sources-by-host).
 
 An optional `shellProvider` answers command positions before initial publication.
 Its returned candidates define the verified command names; an empty list offers none.

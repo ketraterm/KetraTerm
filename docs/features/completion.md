@@ -47,7 +47,7 @@ This table describes the sources available when completion is enabled.
 | --- | --- | --- |
 | Built-in command specifications | Yes | Yes |
 | Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
-| Bash command inventory | Commands, aliases, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. | Same inventory and command authority. |
+| Bash command inventory | Commands, alias definitions, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
 | Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
@@ -138,7 +138,7 @@ The inventory includes at most 8192 names within a 180 KB raw payload; names ove
 512 UTF-8 bytes are omitted. Changes to functions, aliases, and `PATH` take effect
 after discovery for a subsequent prompt completes. A completed inventory remains
 usable while the same environment refreshes. Changes to `PATH`, the directory,
-or alias/function/builtin names invalidate it immediately. Only one scan may run
+or alias definitions/function/builtin names invalidate it immediately. Only one scan may run
 at a time; results for superseded environments are discarded and a later prompt
 retries. Initial discovery and invalidated inventories supply no command candidates
 until a matching scan completes.
@@ -146,6 +146,17 @@ Reading the inventory sends no input and causes no prompt redraw.
 On Git Bash/Cygwin, `.exe` commands use the bare insertion only when Bash resolves
 both spellings identically. Shadowing aliases and functions remain distinct;
 Unix executable suffixes remain literal.
+
+Completed, unquoted Bash aliases resolve to catalog commands for argument suggestions.
+For example, `g='git'`, `gs='git switch'`, and `gr="git -C 'repo folder'"` share the
+existing Git semantics and repository selection. Acceptance edits the original
+argument and preserves the typed alias. Literal chains and self aliases with fixed
+arguments are supported; quoted or escaped command words bypass alias expansion.
+Resolution is bounded to 16 definitions, 64 expanded words, and 4096 UTF-16 units
+per definition. Cycles, assignments, operators, substitutions, globbing, incomplete
+quotes, and trailing-blank expansion are not interpreted. Such aliases do not inherit
+a potentially shadowed catalog command's grammar; ordinary unknown-command sources
+remain available. Alias metadata is never executed.
 
 Bash argument and executable-path suggestions continue to use existing specs and
 host sources. Installed Bash argument completers, guest filesystem completion, and

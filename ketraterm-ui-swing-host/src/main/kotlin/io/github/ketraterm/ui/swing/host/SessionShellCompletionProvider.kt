@@ -29,6 +29,13 @@ import io.github.ketraterm.session.TerminalShellCompletionKind
 public class SessionShellCompletionProvider(
     private val session: TerminalSession,
 ) : TerminalCompletionShellProvider {
+    override fun commandAliases(): Map<String, String> =
+        buildMap {
+            for (command in session.shellCompletionCommands.value.orEmpty()) {
+                command.aliasExpansion?.let { put(command.displayText, it) }
+            }
+        }
+
     override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,

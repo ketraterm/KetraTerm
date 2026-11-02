@@ -52,24 +52,29 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 shopt -s expand_aliases
                 ketra_native_function() { :; }
                 alias ketra_native_alias='printf alias'
+                alias ketra_same='git switch'
+                alias ketra_literal='git ${'$'}(touch alias-executed)'
                 printf '#!/bin/sh\n' > 'ketra native executable'
                 chmod +x 'ketra native executable'
                 export PATH="${'$'}PWD:/usr/bin:/bin"
                 cp "${'$'}(type -P true)" ketra_native_exe.exe
                 __ketraterm_publish_commands test
                 alias ketra_native_exe='printf shadowed'
+                alias ketra_same='git checkout'
                 unalias ketra_native_alias
                 unset -f ketra_native_function
                 rm 'ketra native executable'
                 __ketraterm_publish_commands test
                 unalias ketra_native_exe
+                unalias ketra_same
+                unalias ketra_literal
                 rm ketra_native_exe.exe
                 __ketraterm_publish_commands test
                 """.trimIndent()
         val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script, workingDirectory = tempDir)
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
         val inventories =
-            Regex("\u001b]633;KetraTermCommands;1;Result;test;([^\u0007]*)\u0007")
+            Regex("\u001b]633;KetraTermCommands;2;Result;test;([^\u0007]*)\u0007")
                 .findAll(result.stdout)
                 .map {
                     Base64
@@ -79,21 +84,25 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         ).toString(Charsets.UTF_8)
                         .removeSuffix("\u0000")
                         .split('\u0000')
-                        .chunked(2)
+                        .chunked(4)
                 }.toList()
         assertEquals(3, inventories.size, visibleEscapes(result.stdout))
-        assertTrue(inventories[0].contains(listOf("ketra_native_function", "ketra_native_function")))
-        assertTrue(inventories[0].contains(listOf("ketra_native_alias", "ketra_native_alias")))
-        assertTrue(inventories[0].contains(listOf("ketra native executable", "'ketra native executable'")))
-        assertTrue(inventories[0].contains(listOf("printf", "printf")))
+        assertTrue(inventories[0].contains(listOf("ketra_native_function", "ketra_native_function", "Command", "")))
+        assertTrue(inventories[0].contains(listOf("ketra_native_alias", "ketra_native_alias", "Alias", "printf alias")))
+        assertTrue(inventories[0].contains(listOf("ketra_same", "ketra_same", "Alias", "git switch")))
+        assertTrue(inventories[0].contains(listOf("ketra_literal", "ketra_literal", "Alias", "git ${'$'}(touch alias-executed)")))
+        assertTrue(Files.notExists(tempDir.resolve("alias-executed")), "Discovery must not execute alias definitions")
+        assertTrue(inventories[1].contains(listOf("ketra_same", "ketra_same", "Alias", "git checkout")))
+        assertTrue(inventories[0].contains(listOf("ketra native executable", "'ketra native executable'", "Command", "")))
+        assertTrue(inventories[0].contains(listOf("printf", "printf", "Command", "")))
         assertTrue(inventories.all { inventory -> inventory.none { it[0] == "!" || it[0] == "if" } })
         val executableReplacement = if (isWindows()) "ketra_native_exe" else "ketra_native_exe.exe"
         assertTrue(
-            inventories[0].contains(listOf("ketra_native_exe.exe", executableReplacement)),
+            inventories[0].contains(listOf("ketra_native_exe.exe", executableReplacement, "Command", "")),
             inventories[0].filter { it[0].startsWith("ketra") }.toString(),
         )
-        assertTrue(inventories[1].contains(listOf("ketra_native_exe.exe", "ketra_native_exe.exe")))
-        assertTrue(inventories[1].contains(listOf("ketra_native_exe", "ketra_native_exe")))
+        assertTrue(inventories[1].contains(listOf("ketra_native_exe.exe", "ketra_native_exe.exe", "Command", "")))
+        assertTrue(inventories[1].contains(listOf("ketra_native_exe", "ketra_native_exe", "Alias", "printf shadowed")))
         assertTrue(inventories[2].none { it[0].startsWith("ketra") })
         assertTrue(inventories.all { it.size <= 8192 && it.map { entry -> entry[0] }.distinct().size == it.size })
     }
@@ -139,6 +148,22 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                     session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 3, candidate.replacementText))),
                 )
                 awaitLine("printf")
+                for (definition in listOf("git switch", "git checkout")) {
+                    session.submitInput(
+                        listOf(
+                            TerminalTextReplacementEvent(0, 6, "alias ketra_same='$definition'"),
+                            TerminalKeyEvent.key(TerminalKey.ENTER),
+                        ),
+                    )
+                    awaitLine("")
+                    withTimeout(15.seconds) {
+                        session.shellCompletionCommands.first { commands ->
+                            commands?.any { it.displayText == "ketra_same" && it.aliasExpansion == definition } == true
+                        }
+                    }
+                    session.submitInput(TerminalPasteEvent("printf"))
+                    awaitLine("printf")
+                }
             }
         }
 

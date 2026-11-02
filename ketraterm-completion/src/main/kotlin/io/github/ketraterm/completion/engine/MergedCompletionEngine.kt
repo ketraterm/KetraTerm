@@ -72,7 +72,7 @@ internal class MergedCompletionEngine(
                 return@channelFlow
             }
 
-            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs)
+            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs, shellProvider?.commandAliases().orEmpty())
             if (!completionContext.isCompletionAllowed) {
                 send(emptyList())
                 return@channelFlow

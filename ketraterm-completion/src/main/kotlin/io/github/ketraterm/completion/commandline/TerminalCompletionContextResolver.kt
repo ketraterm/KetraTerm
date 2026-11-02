@@ -33,17 +33,20 @@ internal object TerminalCompletionContextResolver {
         cursorOffset: Int,
         commandSpecs: List<TerminalCommandSpec>,
         shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+        commandAliases: Map<String, String> = emptyMap(),
     ): TerminalCompletionContext =
         resolve(
             commandLine = commandLine,
             lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellSyntax),
             commandSpecs = commandSpecs,
+            commandAliases = if (shellSyntax == TerminalShellSyntax.POSIX) commandAliases else emptyMap(),
         )
 
     fun resolve(
         commandLine: String,
         lineContext: TerminalCommandLineContext,
         commandSpecs: List<TerminalCommandSpec>,
+        commandAliases: Map<String, String> = emptyMap(),
     ): TerminalCompletionContext {
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) {
             return TerminalCompletionContext(
@@ -64,7 +67,8 @@ internal object TerminalCompletionContextResolver {
             )
         }
 
-        val commandToken = lineContext.tokens.getOrNull(commandTokenIndex)
+        val semanticLine = expandCommandAlias(commandLine, lineContext, commandTokenIndex, commandAliases)
+        val commandToken = semanticLine?.tokens?.getOrNull(commandTokenIndex)
         val root =
             commandToken
                 ?.let { findSpec(commandSpecs, normalizeTerminalCommandToken(it.text)) }
@@ -84,9 +88,9 @@ internal object TerminalCompletionContextResolver {
 
         val analysis =
             analyzeCommandTokens(
-                tokens = lineContext.tokens,
+                tokens = semanticLine.tokens,
                 startIndex = commandTokenIndex + 1,
-                endIndexExclusive = lineContext.activeTokenIndex,
+                endIndexExclusive = semanticLine.activeTokenIndex,
                 rootSpec = root,
             )
         val optionsTerminated = analysis.optionsTerminated
@@ -133,10 +137,10 @@ internal object TerminalCompletionContextResolver {
                 determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
             }
         val expectedHiddenPathPolicy = determineExpectedHiddenPathPolicy(activeOption, activePositionalArgument, lastCommand)
-        val gitCompletion = resolveGitCompletion(analysis, activePosition, expectedValueDomain, lineContext)
+        val gitCompletion = resolveGitCompletion(analysis, activePosition, expectedValueDomain, semanticLine)
 
         return TerminalCompletionContext(
-            commandLineContext = lineContext,
+            commandLineContext = semanticLine,
             commandTokenIndex = commandTokenIndex,
             command = root,
             commandPath = commandPath,

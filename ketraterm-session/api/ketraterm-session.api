@@ -283,13 +283,17 @@ public final class io/github/ketraterm/session/TerminalShellCommandLineState {
 
 public final class io/github/ketraterm/session/TerminalShellCompletionCandidate {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Lio/github/ketraterm/session/TerminalShellCompletionKind;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;)Lio/github/ketraterm/session/TerminalShellCompletionCandidate;
-	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellCompletionCandidate;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellCompletionCandidate;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;Ljava/lang/String;)Lio/github/ketraterm/session/TerminalShellCompletionCandidate;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellCompletionCandidate;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/session/TerminalShellCompletionKind;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellCompletionCandidate;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAliasExpansion ()Ljava/lang/String;
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getDisplayText ()Ljava/lang/String;
 	public final fun getKind ()Lio/github/ketraterm/session/TerminalShellCompletionKind;

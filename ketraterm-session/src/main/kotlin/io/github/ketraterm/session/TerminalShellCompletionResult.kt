@@ -21,13 +21,19 @@ public enum class TerminalShellCompletionKind { COMMAND, OPTION, FILE, DIRECTORY
 /**
  * One native candidate. [replacementText] is already escaped by the shell.
  * [displayText] and [description] are presentation only.
+ * [aliasExpansion] is a literal Bash alias definition for a command inventory entry;
+ * null means not an alias, while empty means an empty or unavailable definition.
+ * Consumers must never execute this metadata.
  */
-public data class TerminalShellCompletionCandidate(
-    val replacementText: String,
-    val displayText: String,
-    val description: String,
-    val kind: TerminalShellCompletionKind,
-)
+public data class TerminalShellCompletionCandidate
+    @JvmOverloads
+    constructor(
+        val replacementText: String,
+        val displayText: String,
+        val description: String,
+        val kind: TerminalShellCompletionKind,
+        val aliasExpansion: String? = null,
+    )
 
 /**
  * Native shell completion for one exact command buffer and UTF-16 cursor.

@@ -46,6 +46,7 @@ public class TerminalShellCompletionChannel internal constructor(
     public fun publishCommands(commands: List<TerminalShellCompletionCandidate>?) {
         require(commands == null || commands.size <= 8192)
         require(commands == null || commands.all { it.kind == TerminalShellCompletionKind.COMMAND })
+        require(commands == null || commands.all { (it.aliasExpansion?.length ?: 0) <= 4096 })
         synchronized(lock) {
             mutableCommands.value = commands?.let { java.util.List.copyOf(it) }
         }

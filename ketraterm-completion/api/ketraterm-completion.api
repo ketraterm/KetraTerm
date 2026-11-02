@@ -88,12 +88,14 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionContext 
 	public final fun precedingOptionValues (Ljava/lang/String;)Ljava/util/List;
 	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;Ljava/util/Map;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 }
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionContext$Companion {
 	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
-	public static synthetic fun resolve$default (Lio/github/ketraterm/completion/api/TerminalCompletionContext$Companion;Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;Ljava/util/Map;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public static synthetic fun resolve$default (Lio/github/ketraterm/completion/api/TerminalCompletionContext$Companion;Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 }
 
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionEngine {
@@ -194,7 +196,12 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionRequest 
 }
 
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionShellProvider {
+	public fun commandAliases ()Ljava/util/Map;
 	public abstract fun complete (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionShellProvider$DefaultImpls {
+	public static fun commandAliases (Lio/github/ketraterm/completion/api/TerminalCompletionShellProvider;)Ljava/util/Map;
 }
 
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionSource {

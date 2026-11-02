@@ -20,7 +20,7 @@
 __ketraterm_completion_base64=$(builtin type -P base64 || :)
 __ketraterm_publish_commands() {
     if [[ -z $__ketraterm_completion_base64 ]]; then return; fi
-    local LC_ALL=C name replacement size=0 count=0 encoded bare resolved REPLY
+    local LC_ALL=C name replacement size=0 count=0 encoded bare resolved REPLY kind expansion
     local -a entries=() available=() keywords=()
     local -A seen=()
     # Reserved grammar tokens are not executable command names; quoting them
@@ -44,31 +44,39 @@ __ketraterm_publish_commands() {
             if [[ -n $resolved && -n $REPLY && $resolved -ef $REPLY ]]; then replacement=$bare; fi
         fi
         if [[ $replacement == *[^a-zA-Z0-9_./-]* ]]; then replacement="'${replacement//\'/\'\\\'\'}'"; fi
-        size=$((size + ${#name} + ${#replacement} + 2))
+        kind=Command
+        expansion=
+        if [[ ${BASH_ALIASES[$name]+present} ]]; then
+            kind=Alias
+            expansion=${BASH_ALIASES[$name]}
+            # Retain alias identity even when its definition exceeds the metadata budget.
+            if ((${#expansion} > 4096)); then expansion=; fi
+        fi
+        size=$((size + ${#name} + ${#replacement} + ${#kind} + ${#expansion} + 4))
         ((size < 180000 && count < 8192)) || break
-        entries+=("$name" "$replacement")
+        entries+=("$name" "$replacement" "$kind" "$expansion")
         ((count+=1))
     done
     encoded=$(
         if ((count)); then printf '%s\0' "${entries[@]}"; fi | command "$__ketraterm_completion_base64"
-    ) || { printf '\033]633;KetraTermCommands;1;Result;%s;Unavailable\a' "$1"; return; }
+    ) || { printf '\033]633;KetraTermCommands;2;Result;%s;Unavailable\a' "$1"; return; }
     encoded=${encoded//$'\n'/}
     encoded=${encoded//$'\r'/}
-    printf '\033]633;KetraTermCommands;1;Result;%s;%s\a' "$1" "$encoded"
+    printf '\033]633;KetraTermCommands;2;Result;%s;%s\a' "$1" "$encoded"
 }
 
 __ketraterm_completion_ready() {
     [[ $- == *i* && -t 1 ]] || return
     [[ -n $__ketraterm_completion_base64 ]] || return
     local signature epoch
-    signature=$(declare -p PATH; printf '%q\n' "$PWD"; builtin compgen -A alias -A function -A builtin)
+    signature=$(declare -p PATH BASH_ALIASES; printf '%q\n' "$PWD"; builtin compgen -A function -A builtin)
     if [[ $signature != "${__ketraterm_completion_signature-}" ]]; then
         __ketraterm_completion_signature=$signature
         printf -v __ketraterm_completion_epoch '%04x%04x%04x%04x%04x%04x%04x%04x' \
             "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM"
     fi
     epoch=$__ketraterm_completion_epoch
-    printf '\033]633;KetraTermCommands;1;Begin;%s\a' "$epoch"
+    printf '\033]633;KetraTermCommands;2;Begin;%s\a' "$epoch"
     # Reuse a completed inventory while the same environment refreshes. Never
     # accumulate scans; changed environments reject the old worker's result.
     if [[ -n ${__ketraterm_completion_pid:-} ]] && builtin kill -0 "$__ketraterm_completion_pid" 2>/dev/null; then return; fi
