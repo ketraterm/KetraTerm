@@ -16,10 +16,8 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
-import java.awt.BorderLayout
-import java.awt.Component
-import java.awt.Dimension
-import java.awt.Font
+import io.github.ketraterm.ui.swing.render.SwingColors
+import java.awt.*
 import java.awt.event.*
 import java.util.regex.Pattern
 import javax.swing.*
@@ -66,11 +64,8 @@ internal class SwingCompletionPopupView(
 
     init {
         isFocusable = false
-        border =
-            BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") ?: foreground.darker(), 1, true),
-                BorderFactory.createEmptyBorder(4, 4, 4, 4),
-            )
+        isOpaque = false
+        border = BorderFactory.createEmptyBorder(6, 6, 6, 6)
         background = UIManager.getColor("PopupMenu.background") ?: background
         list.isFocusable = false
         list.font = list.font.deriveFont(Font.PLAIN)
@@ -96,8 +91,23 @@ internal class SwingCompletionPopupView(
             },
         )
         position.border = BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        position.foreground = UIManager.getColor("Label.disabledForeground") ?: list.foreground
+        position.font = list.font.deriveFont((list.font.size2D - 1f).coerceAtLeast(10f))
         add(scrollPane, BorderLayout.CENTER)
         add(position, BorderLayout.SOUTH)
+    }
+
+    override fun paintComponent(graphics: Graphics) {
+        val canvas = graphics.create() as Graphics2D
+        try {
+            canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            canvas.color = background
+            canvas.fillRoundRect(0, 0, width, height, 12, 12)
+            canvas.color = UIManager.getColor("Component.borderColor") ?: list.foreground.darker()
+            canvas.drawRoundRect(0, 0, width - 1, height - 1, 12, 12)
+        } finally {
+            canvas.dispose()
+        }
     }
 
     override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
@@ -134,7 +144,7 @@ internal class SwingCompletionPopupView(
         if (snapshot.visibleSuggestions.isEmpty()) {
             Dimension(0, 0)
         } else {
-            super.getPreferredSize().apply { width = width.coerceIn(220, 480) }
+            super.getPreferredSize().apply { width = width.coerceIn(260, 480) }
         }
 
     override fun doLayout() {
@@ -175,6 +185,8 @@ private class CompletionRenderer(
     private var suggestions = emptyList<SwingShellSuggestion>()
     private var rows = emptyArray<CompletionRow>()
     private val rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+    private val icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it) }
+    private var selected = false
     private val fallbackAccessibleName = messages.message("completion.suggestionAccessibleName")
     private val roles =
         Array(SwingShellSuggestionAccentRole.entries.size) {
@@ -204,19 +216,29 @@ private class CompletionRenderer(
         val suggestion = value as? SwingShellSuggestion ?: return this
         val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
         text = row.html
-        icon =
-            UIManager.getIcon(
-                when (suggestion.accentRole) {
-                    SwingShellSuggestionAccentRole.PATH -> "FileView.directoryIcon"
-                    SwingShellSuggestionAccentRole.COMMAND -> "FileView.computerIcon"
-                    else -> "Tree.leafIcon"
-                },
-            )
+        selected = isSelected
+        isOpaque = false
+        icon = icons[suggestion.accentRole.ordinal]
+        iconTextGap = 8
         border = rowBorder
         toolTipText = row.tooltip
         getAccessibleContext().accessibleName = row.accessibleName
         getAccessibleContext().accessibleDescription = row.accessibleDescription
         return this
+    }
+
+    override fun paintComponent(graphics: Graphics) {
+        if (selected) {
+            val canvas = graphics.create() as Graphics2D
+            try {
+                canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                canvas.color = background
+                canvas.fillRoundRect(0, 0, width, height, 8, 8)
+            } finally {
+                canvas.dispose()
+            }
+        }
+        super.paintComponent(graphics)
     }
 
     private fun presentation(suggestion: SwingShellSuggestion): CompletionRow {
@@ -257,6 +279,97 @@ private class CompletionRenderer(
             accessibleName = primary.ifEmpty { fallbackAccessibleName },
             accessibleDescription = accessibleDescription,
         )
+    }
+}
+
+/** Distinct shapes and contrast-aware accents identify categories without relying on color alone. */
+private class CompletionIcon(
+    private val role: SwingShellSuggestionAccentRole,
+) : Icon {
+    override fun getIconWidth(): Int = 16
+
+    override fun getIconHeight(): Int = 16
+
+    override fun paintIcon(
+        component: Component,
+        graphics: Graphics,
+        x: Int,
+        y: Int,
+    ) {
+        val canvas = graphics.create() as Graphics2D
+        try {
+            canvas.translate(x, y)
+            canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val light = LIGHT_SURFACE_COLORS[role.ordinal]
+            val dark = DARK_SURFACE_COLORS[role.ordinal]
+            val background = component.background.rgb
+            val accent =
+                if (SwingColors.contrastRatio(light.rgb, background) >=
+                    SwingColors.contrastRatio(dark.rgb, background)
+                ) {
+                    light
+                } else {
+                    dark
+                }
+            canvas.color = if (SwingColors.contrastRatio(accent.rgb, background) >= 3.0) accent else component.foreground
+            canvas.stroke = STROKE
+            when (role) {
+                SwingShellSuggestionAccentRole.COMMAND -> {
+                    val composite = canvas.composite
+                    canvas.composite = TINT
+                    canvas.fillRoundRect(1, 2, 13, 11, 3, 3)
+                    canvas.composite = composite
+                    canvas.drawRoundRect(1, 2, 13, 11, 3, 3)
+                    canvas.drawLine(4, 5, 6, 7)
+                    canvas.drawLine(6, 7, 4, 9)
+                    canvas.drawLine(8, 10, 11, 10)
+                }
+                SwingShellSuggestionAccentRole.PATH -> {
+                    val composite = canvas.composite
+                    canvas.composite = TINT
+                    canvas.fillRoundRect(1, 6, 13, 7, 2, 2)
+                    canvas.composite = composite
+                    canvas.drawLine(1, 4, 6, 4)
+                    canvas.drawLine(6, 4, 8, 6)
+                    canvas.drawLine(8, 6, 14, 6)
+                    canvas.drawLine(14, 6, 14, 13)
+                    canvas.drawLine(14, 13, 1, 13)
+                    canvas.drawLine(1, 13, 1, 4)
+                }
+                SwingShellSuggestionAccentRole.HISTORY -> {
+                    canvas.drawArc(2, 2, 12, 12, 135, -300)
+                    canvas.drawLine(1, 2, 1, 6)
+                    canvas.drawLine(1, 6, 5, 6)
+                    canvas.drawLine(8, 5, 8, 8)
+                    canvas.drawLine(8, 8, 11, 9)
+                }
+                SwingShellSuggestionAccentRole.OPTION -> {
+                    canvas.drawLine(2, 5, 5, 5)
+                    canvas.drawOval(5, 3, 4, 4)
+                    canvas.drawLine(9, 5, 14, 5)
+                    canvas.drawLine(2, 11, 8, 11)
+                    canvas.drawOval(8, 9, 4, 4)
+                    canvas.drawLine(12, 11, 14, 11)
+                }
+                SwingShellSuggestionAccentRole.OTHER -> {
+                    canvas.drawLine(2, 3, 8, 3)
+                    canvas.drawLine(8, 3, 14, 9)
+                    canvas.drawLine(14, 9, 9, 14)
+                    canvas.drawLine(9, 14, 2, 7)
+                    canvas.drawLine(2, 7, 2, 3)
+                    canvas.fillOval(4, 5, 2, 2)
+                }
+            }
+        } finally {
+            canvas.dispose()
+        }
+    }
+
+    private companion object {
+        val STROKE = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        val TINT: AlphaComposite = AlphaComposite.SrcOver.derive(0.14f)
+        val LIGHT_SURFACE_COLORS = arrayOf(Color(0x2E62AE), Color(0x8A6200), Color(0x7549AF), Color(0x18796E), Color(0x526479))
+        val DARK_SURFACE_COLORS = arrayOf(Color(0x82AFFC), Color(0xE6B95A), Color(0xBD9AF7), Color(0x6FCFC0), Color(0xAEBBCF))
     }
 }
 

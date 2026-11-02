@@ -16,8 +16,11 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
+import io.github.ketraterm.ui.swing.render.SwingColors
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import java.awt.Color
 import java.awt.Font
 import java.awt.event.MouseEvent
@@ -31,6 +34,95 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
+    @ParameterizedTest
+    @CsvSource("true, 1", "true, 2", "false, 1", "false, 2")
+    fun `rounded popup retains theme colors and selection at display scales`(
+        dark: Boolean,
+        scale: Int,
+    ) = onEdt {
+        val surface = if (dark) Color(0x292A2D) else Color(0xFAFAFA)
+        val selected = if (dark) Color(0x3A3D44) else Color(0xDDE7F5)
+        val keys =
+            mapOf(
+                "PopupMenu.background" to surface,
+                "Panel.background" to surface,
+                "List.background" to surface,
+                "List.foreground" to if (dark) Color(0xDFE1E5) else Color(0x27282B),
+                "List.selectionBackground" to selected,
+                "List.selectionForeground" to if (dark) Color.WHITE else Color(0x17181B),
+                "Component.borderColor" to if (dark) Color(0x45474C) else Color(0xCBCDD2),
+            )
+        val old = keys.mapValues { javax.swing.UIManager.get(it.key) }
+        try {
+            keys.forEach { (key, value) -> javax.swing.UIManager.put(key, value) }
+            val view = createView(RecordingListener())
+            try {
+                val items =
+                    listOf("git", "src/", "--verbose", "git status", "production").mapIndexed { index, text ->
+                        suggestion(
+                            text,
+                            "Suggestion details",
+                            "PowerShell",
+                        ).copy(accentRole = SwingShellSuggestionAccentRole.entries[index])
+                    }
+                view.update(snapshot(items, 0, items.size, 0))
+                view.size = view.preferredSize
+                view.doLayout()
+                val image = BufferedImage(view.width * scale, view.height * scale, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    graphics.scale(scale.toDouble(), scale.toDouble())
+                    view.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertEquals(0, image.getRGB(0, 0) ushr 24, "Rounded corners must expose the terminal underneath")
+                val row = view.list.getCellBounds(0, 0)
+                val sample = SwingUtilities.convertPoint(view.list, row.width - 10, row.y + row.height / 2, view)
+                assertEquals(selected.rgb, image.getRGB(sample.x * scale, sample.y * scale))
+                val preferred = view.preferredSize
+                view.update(snapshot(items, 2, items.size, 0))
+                assertEquals(preferred, view.preferredSize, "Selection must not resize the popup")
+            } finally {
+                view.close()
+            }
+        } finally {
+            old.forEach { (key, value) -> javax.swing.UIManager.put(key, value) }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("292A2D, DFE1E5", "FAFAFA, 27282B", "2459A6, FFFFFF")
+    fun `category icons have distinct silhouettes and readable accents`(
+        backgroundHex: String,
+        foregroundHex: String,
+    ) = onEdt {
+        val view = createView(RecordingListener())
+        try {
+            val silhouettes = mutableSetOf<List<Boolean>>()
+            for (role in SwingShellSuggestionAccentRole.entries) {
+                val candidate = suggestion("example").copy(accentRole = role)
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+                row.background = Color(backgroundHex.toInt(16))
+                row.foreground = Color(foregroundHex.toInt(16))
+                val image = BufferedImage(row.icon.iconWidth, row.icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    row.icon.paintIcon(row, graphics, 0, 0)
+                } finally {
+                    graphics.dispose()
+                }
+                val pixels = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+                val strokes = pixels.filter { it ushr 24 == 255 }
+                assertTrue(strokes.isNotEmpty(), "$role must have a visible silhouette")
+                assertTrue(strokes.all { SwingColors.contrastRatio(it, row.background.rgb) >= 3.0 }, "$role must contrast with its row")
+                assertTrue(silhouettes.add(pixels.map { it ushr 24 >= 128 }), "$role must be distinguishable without color")
+            }
+        } finally {
+            view.close()
+        }
+    }
+
     @Test
     fun `compact rows show command text and retain details in tooltip and accessibility`() =
         onEdt {
