@@ -41,7 +41,10 @@ progress can finish.
   It drops pending work, but cannot undo file I/O already in progress.
 - `resetLearning()` clears memory immediately and schedules an empty snapshot
   **even when persistence is disabled**. It supersedes an in-flight load and
-  allows replacement of a previously rejected file.
+  allows replacement of a previously rejected file. Its `Deferred<Unit>` completes
+  only after that replacement succeeds, or fails with the write error. Hosts must
+  await it before reporting a successful reset. Overlapping requests share the
+  completion of the latest reset; cancelling a waiter leaves the worker running.
 
 A missing file is normal. An unreadable, malformed, oversized, or unsupported
 file blocks ordinary writes for that coordinator's lifetime. The load-failure

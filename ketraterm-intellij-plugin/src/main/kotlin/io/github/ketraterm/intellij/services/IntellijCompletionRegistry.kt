@@ -28,6 +28,7 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import java.nio.file.Path
 
 /**
@@ -177,12 +178,12 @@ internal class IntellijCompletionRegistry(
         }
     }
 
-    /** Removes all session and persisted completion learning. */
-    fun resetLearning() {
+    /** Clears session learning immediately; completes after saved learning has been cleared. */
+    fun resetLearning(): Deferred<Unit> =
         synchronized(lock) {
-            if (!closed) learning.resetLearning()
+            check(!closed) { "IntelliJ completion registry is closed" }
+            learning.resetLearning()
         }
-    }
 
     /** Disables learning and stops persistence without a final write. */
     suspend fun closeWithoutFlush() {

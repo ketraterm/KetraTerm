@@ -29,6 +29,8 @@ import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DisposableHandle
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -45,7 +47,14 @@ internal class SettingsDialog(
     parent: JFrame,
     private val settings: KetraTermSettings,
     profileRegistry: TerminalProfileRegistry,
+    private val resetCompletionLearning: () -> Deferred<Unit>,
 ) : JDialog(parent, appMessages.text("settings.title"), true) {
+    private var learningResetObserver: DisposableHandle? = null
+    private val resetLearningButton =
+        JButton(appMessages.text("settings.resetLearning")).apply {
+            addActionListener { confirmLearningReset() }
+        }
+    private val learningResetStatus = JLabel()
     private val cardLayout = CardLayout()
 
     // Opaque panel is critical for CardLayout to clear previous artifacts correctly
@@ -620,8 +629,21 @@ internal class SettingsDialog(
             persistentSuggestionLearningCheckbox,
             appMessages.text("settings.persistSuggestionLearning.description"),
         )
+        suggestionsSection.add(
+            JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+                isOpaque = false
+                add(resetLearningButton)
+                add(Box.createHorizontalStrut(12))
+                add(learningResetStatus)
+            },
+            GridBagConstraints().apply {
+                gridy = 8
+                gridwidth = 2
+                anchor = GridBagConstraints.WEST
+                insets = Insets(4, 0, 12, 0)
+            },
+        )
         panel.add(suggestionsSection)
-        // TODO(host/profile): Reconnect the host learning-reset callback before restoring its confirmation button.
 
         panel.add(SectionHeader(appMessages.text("settings.mouse")))
         val mouseSection = createSectionPanel()
@@ -935,6 +957,41 @@ internal class SettingsDialog(
         }.execute()
     }
 
+    private fun confirmLearningReset() {
+        val choice =
+            SwingMessageDialogs.show(
+                this,
+                SwingDialogRequest(
+                    appMessages.text("settings.resetLearning.title"),
+                    appMessages.text("settings.resetLearning.confirmation"),
+                    SwingDialogRequest.Severity.WARNING,
+                    options = listOf(appMessages.text("settings.resetLearning.confirm"), appMessages.text("button.cancel")),
+                ),
+            )
+        if (choice != 0) return
+        resetLearningButton.isEnabled = false
+        learningResetStatus.text = appMessages.text("settings.resetLearning.progress")
+        learningResetStatus.toolTipText = null
+        try {
+            learningResetObserver =
+                resetCompletionLearning().invokeOnCompletion { failure ->
+                    SwingUtilities.invokeLater { if (isDisplayable) finishLearningReset(failure) }
+                }
+        } catch (failure: Exception) {
+            finishLearningReset(failure)
+        }
+    }
+
+    private fun finishLearningReset(failure: Throwable?) {
+        learningResetObserver = null
+        resetLearningButton.isEnabled = !saving
+        learningResetStatus.text =
+            appMessages.text(
+                if (failure == null) "settings.resetLearning.complete" else "settings.resetLearning.error",
+            )
+        learningResetStatus.toolTipText = failure?.message
+    }
+
     private fun setSaving(value: Boolean) {
         saving = value
 
@@ -943,11 +1000,16 @@ internal class SettingsDialog(
             if (component is Container) component.components.forEach(::updateEnabled)
         }
         updateEnabled(contentPane)
+        resetLearningButton.isEnabled = !value && learningResetObserver == null
         updateApplyButtonState()
     }
 
     override fun dispose() {
-        if (!saving) super.dispose()
+        if (!saving) {
+            learningResetObserver?.dispose()
+            learningResetObserver = null
+            super.dispose()
+        }
     }
 
     private fun updateApplyButtonState() {

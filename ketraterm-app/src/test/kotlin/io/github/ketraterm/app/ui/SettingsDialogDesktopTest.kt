@@ -24,13 +24,15 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Tag
-import java.awt.Component
-import java.awt.Container
-import java.awt.GraphicsEnvironment
+import java.awt.*
+import java.awt.event.AWTEventListener
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.io.IOException
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
@@ -199,7 +201,12 @@ class SettingsDialogDesktopTest {
         val (frame, dialog) =
             onEdt {
                 val frame = JFrame()
-                val dialog = SettingsDialog(frame, settings, TerminalProfileRegistry(executableExists = { false }))
+                val dialog =
+                    SettingsDialog(
+                        frame,
+                        settings,
+                        TerminalProfileRegistry(executableExists = { false }),
+                    ) { error("Unexpected learning reset") }
                 dialog.addWindowListener(
                     object : WindowAdapter() {
                         override fun windowClosed(event: WindowEvent) {
@@ -350,10 +357,81 @@ class SettingsDialogDesktopTest {
         }
     }
 
+    @Test
+    fun `learning reset requires confirmation and waits for persistence before reporting success`() {
+        var calls = 0
+        val reset = CompletableDeferred<Unit>()
+        withDialog(resetLearning = {
+            calls++
+            reset
+        }) { settings, dialog, _ ->
+            settings.update(settings.config.copy(smartSuggestionsEnabled = false, persistentSuggestionLearningEnabled = false))
+            onEdt {
+                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                respondToReset(dialog, "Cancel")
+                assertEquals(0, calls)
+                respondToReset(dialog, "Reset")
+                assertEquals(1, calls)
+                assertFalse(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertTrue(components(dialog).filterIsInstance<JLabel>().any { it.text == "Clearing learned suggestions..." })
+            }
+            reset.complete(Unit)
+            onEdt {
+                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertTrue(components(dialog).filterIsInstance<JLabel>().any { it.text == "Learned suggestions cleared." })
+                assertFalse(button(dialog, "Apply").isEnabled)
+            }
+        }
+    }
+
+    @Test
+    fun `failed learning reset offers retry and closing settings does not cancel the reset`() {
+        var reset = CompletableDeferred<Unit>()
+        withDialog(resetLearning = { reset }) { _, dialog, _ ->
+            onEdt { respondToReset(dialog, "Reset") }
+            reset.completeExceptionally(IOException("Read-only destination"))
+            onEdt {
+                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                val status =
+                    components(
+                        dialog,
+                    ).filterIsInstance<JLabel>().single { it.text == "Could not clear saved learning. Try again." }
+                assertEquals("Read-only destination", status.toolTipText)
+                reset = CompletableDeferred()
+                respondToReset(dialog, "Reset")
+                dialog.dispose()
+                assertFalse(reset.isCancelled)
+            }
+            reset.complete(Unit)
+        }
+    }
+
+    private fun respondToReset(
+        dialog: SettingsDialog,
+        choice: String,
+    ) {
+        val listener =
+            AWTEventListener { event ->
+                if (event is WindowEvent && event.id == WindowEvent.WINDOW_OPENED) {
+                    val confirmation = event.window as? JDialog
+                    if (confirmation?.owner === dialog) {
+                        components(confirmation).filterIsInstance<JButton>().single { it.text == choice }.doClick()
+                    }
+                }
+            }
+        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.WINDOW_EVENT_MASK)
+        try {
+            button(dialog, "Reset learned suggestions...").doClick()
+        } finally {
+            Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
+        }
+    }
+
     private fun withDialog(
         profileRegistry: TerminalProfileRegistry = TerminalProfileRegistry(executableExists = { false }),
         shellPath: String = KetraTermConfig.DEFAULT_SHELL_PATH,
         fontFamily: String = KetraTermConfig.DEFAULT_FONT_FAMILY,
+        resetLearning: () -> Deferred<Unit> = { error("Unexpected learning reset") },
         block: (KetraTermSettings, SettingsDialog, CountDownLatch) -> Unit,
     ) {
         assumeFalse(GraphicsEnvironment.isHeadless())
@@ -378,7 +456,7 @@ class SettingsDialogDesktopTest {
         val (frame, dialog) =
             onEdt {
                 val frame = JFrame()
-                val dialog = SettingsDialog(frame, settings, profileRegistry)
+                val dialog = SettingsDialog(frame, settings, profileRegistry, resetLearning)
                 dialog.addWindowListener(
                     object : WindowAdapter() {
                         override fun windowClosed(event: WindowEvent) {

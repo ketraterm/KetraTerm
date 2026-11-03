@@ -28,6 +28,16 @@ writes but does not clear in-memory learning or cancel a file operation already
 in progress. An unreadable/rejected file blocks ordinary writes until an explicit
 learning reset or a new coordinator lifecycle.
 
+The confirmed **Reset learned suggestions...** action clears both the active store
+and the product's saved learning, including while persistence or suggestions are
+disabled. It replaces the saved snapshot with an empty versioned snapshot; the file
+remains, containing no ranking or replay rows. The reset is serialized after earlier
+writes and supersedes any in-flight hydration so they cannot restore old learning.
+Completion is reported only after the empty snapshot is written successfully.
+A write failure is shown in settings and can be retried. Closing settings does not
+cancel a reset already accepted by the product owner. Later learning follows the
+existing preferences; shell history and terminal output are not cleared.
+
 Dirty state is checkpointed every 30 seconds and on shutdown. Products allow up
 to 500 ms for final persistence, so shutdown is not an unconditional durability
 guarantee. Files are bounded; replacement is atomic where the filesystem supports

@@ -196,12 +196,12 @@ internal class StandaloneCompletionRegistry private constructor(
         }
     }
 
-    /** Removes all session and persisted completion learning. */
-    fun resetLearning() {
+    /** Clears session learning immediately; completes after saved learning has been cleared. */
+    fun resetLearning(): Deferred<Unit> =
         synchronized(lifecycleLock) {
-            if (!closed) learning.resetLearning()
+            check(!closed) { "standalone completion registry is closed" }
+            learning.resetLearning()
         }
-    }
 
     /** Disables learning and stops persistence without a final write. */
     suspend fun closeWithoutFlush() {

@@ -95,14 +95,103 @@ class TerminalCompletionLearningCoordinatorTest {
             val coordinator = coordinator(learning, files, enabled = false)
             coordinator.recordCommandResult("old command", true, null, null, 1L)
 
-            coordinator.resetLearning()
+            val reset = coordinator.resetLearning()
+            assertFalse(reset.isCompleted)
             coordinator.recordCommandResult("new command", true, null, null, 2L)
 
             assertEquals(listOf("new command"), learning.snapshot().replayCommands.map { it.commandLine })
             runCurrent()
+            reset.await()
             assertEquals(listOf(TerminalCompletionLearningSnapshot.EMPTY), files.writes)
             coordinator.closeAndFlush()
             assertEquals(1, files.writeAttempts.get())
+        }
+
+    @Test
+    fun `reset reports persistence failure and a repeated reset can recover while disabled`() =
+        runTest {
+            val failure = IOException("read-only learning file")
+            val files = RecordingSnapshotFiles(writeFailure = failure)
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, enabled = false)
+            coordinator.recordCommandResult("git status", true, null, null, 1L)
+
+            try {
+                val reset = coordinator.resetLearning()
+                runCurrent()
+                assertEquals(failure.message, assertFailsWith<IOException> { reset.await() }.message)
+                assertTrue(learning.snapshot().rankingStats.isEmpty())
+                assertTrue(learning.snapshot().replayCommands.isEmpty())
+                assertTrue(files.writes.isEmpty())
+
+                files.writeFailure = null
+                coordinator.resetLearning().await()
+                assertEquals(listOf(TerminalCompletionLearningSnapshot.EMPTY), files.writes)
+            } finally {
+                coordinator.closeWithoutFlush()
+            }
+        }
+
+    @Test
+    fun `reset waits for an earlier write and overlapping resets clear the latest state`() =
+        runTest {
+            val loadFinished = CompletableDeferred<Unit>()
+            val writeStarted = CompletableDeferred<Unit>()
+            val releaseWrite = CountDownLatch(1)
+            val files =
+                RecordingSnapshotFiles(
+                    afterLoad = { loadFinished.complete(Unit) },
+                    beforePersist = { attempt ->
+                        if (attempt == 1) {
+                            writeStarted.complete(Unit)
+                            check(releaseWrite.await(5, TimeUnit.SECONDS)) { "test write was not released" }
+                        }
+                    },
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
+            try {
+                loadFinished.await()
+                runCurrent()
+                coordinator.recordCommandResult("old command", true, null, null, 1L)
+                runCurrent()
+                advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+                runCurrent()
+                writeStarted.await()
+
+                val first = coordinator.resetLearning()
+                coordinator.recordCommandResult("intermediate command", true, null, null, 2L)
+                val second = coordinator.resetLearning()
+                assertFalse(first.isCompleted)
+                assertFalse(second.isCompleted)
+                releaseWrite.countDown()
+                first.await()
+                second.await()
+
+                assertTrue(learning.snapshot().rankingStats.isEmpty())
+                assertEquals(
+                    listOf("old command"),
+                    files.writes
+                        .first()
+                        .replayCommands
+                        .map { it.commandLine },
+                )
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.writes.last())
+            } finally {
+                releaseWrite.countDown()
+                coordinator.closeWithoutFlush()
+            }
+        }
+
+    @Test
+    fun `non-flushing close cancels an unstarted reset completion`() =
+        runTest {
+            val files = RecordingSnapshotFiles()
+            val coordinator = coordinator(TerminalCompletionLearningStore(), files, enabled = false)
+            val reset = coordinator.resetLearning()
+            coordinator.closeWithoutFlush()
+            assertFailsWith<CancellationException> { reset.await() }
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test

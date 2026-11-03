@@ -19,6 +19,9 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorColorsScheme
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.TestDialog
+import com.intellij.openapi.ui.TestDialogManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.host.TerminalClipboardPermission
@@ -26,14 +29,99 @@ import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.workspace.TerminalProfile
+import kotlinx.coroutines.CompletableDeferred
 import java.awt.Color
 import java.awt.Component
 import java.awt.Container
+import java.io.IOException
 import javax.swing.AbstractButton
 import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testLearningResetConfirmsAndWaitsForSavedDataWhenSuggestionsAreDisabled() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        var calls = 0
+        val reset = CompletableDeferred<Unit>()
+        val configurable =
+            KetraTermSettingsConfigurable(emptyList()) {
+                calls++
+                reset
+            }
+        val previousDialog = TestDialogManager.setTestDialog(TestDialog { Messages.CANCEL })
+        try {
+            settings.replaceState(original.copy(smartSuggestionsEnabled = false, completionLearningPersistenceEnabled = false))
+            val component = configurable.createComponent()
+            val button =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")
+                }
+            assertTrue(button.isEnabled)
+            button.doClick()
+            assertEquals(0, calls)
+            TestDialogManager.setTestDialog(TestDialog { Messages.OK })
+            button.doClick()
+            assertEquals(1, calls)
+            assertFalse(button.isEnabled)
+            assertTrue(
+                descendants(component).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.progress")
+                },
+            )
+            reset.complete(Unit)
+            UIUtil.dispatchAllInvocationEvents()
+            assertTrue(button.isEnabled)
+            assertTrue(
+                descendants(component).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.complete")
+                },
+            )
+            assertFalse(configurable.isModified())
+        } finally {
+            TestDialogManager.setTestDialog(previousDialog)
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
+    fun testFailedLearningResetOffersRetryAndDisposingSettingsLeavesResetRunning() {
+        var reset = CompletableDeferred<Unit>()
+        val configurable = KetraTermSettingsConfigurable(emptyList()) { reset }
+        val previousDialog = TestDialogManager.setTestDialog(TestDialog { Messages.OK })
+        try {
+            val component = configurable.createComponent()
+            val button =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")
+                }
+            button.doClick()
+            reset.completeExceptionally(IOException("Read-only destination"))
+            UIUtil.dispatchAllInvocationEvents()
+            assertTrue(button.isEnabled)
+            val status =
+                descendants(component).filterIsInstance<JLabel>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.error")
+                }
+            assertTrue(status.toolTipText.contains("Read-only destination"))
+            reset = CompletableDeferred()
+            button.doClick()
+            configurable.disposeUIResources()
+            assertFalse(reset.isCancelled)
+            val replacement = configurable.createComponent()
+            reset.complete(Unit)
+            UIUtil.dispatchAllInvocationEvents()
+            assertFalse(
+                descendants(replacement).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.complete")
+                },
+            )
+        } finally {
+            TestDialogManager.setTestDialog(previousDialog)
+            configurable.disposeUIResources()
+        }
+    }
+
     fun testStickyCommandHeadersApplyAndReset() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

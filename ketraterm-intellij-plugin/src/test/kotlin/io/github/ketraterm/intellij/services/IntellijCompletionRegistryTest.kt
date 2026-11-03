@@ -17,10 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -405,6 +402,57 @@ class IntellijCompletionRegistryTest {
 
             assertEquals(listOf("git status"), learningStore.snapshot().replayCommands.map { it.commandLine })
             assertEquals(listOf("git status"), persistedSnapshot(path).replayCommands.map { it.commandLine })
+        }
+
+    @Test
+    fun `reset clears saved and session learning while persistence is disabled`() =
+        runBlocking {
+            val path = memoryOnlyPath()
+            val seedLearning = TerminalCompletionLearningStore()
+            val seed =
+                IntellijCompletionRegistry(
+                    learningStore = seedLearning,
+                    persistencePath = path,
+                    persistenceEnabled = true,
+                    coroutineScope = this,
+                )
+            seed.recordFinishedCommand(
+                profileId = "bash",
+                metadata =
+                    TerminalShellIntegrationCommandMetadata(
+                        recordId = 1,
+                        commandText = "git status",
+                        lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                        workingDirectoryUri = null,
+                        exitCode = 0,
+                        startedAtEpochMillis = 1L,
+                        finishedAtEpochMillis = 2L,
+                    ),
+            )
+            seed.closeAndFlush()
+            assertFalse(persistedSnapshot(path).replayCommands.isEmpty())
+
+            val learning =
+                TerminalCompletionLearningStore().apply {
+                    recordCommandResult("npm test", true, null, null, 2L)
+                }
+            val registry =
+                IntellijCompletionRegistry(
+                    learningStore = learning,
+                    persistencePath = path,
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                registry.resetLearning().await()
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
+                registry.setPersistenceEnabled(true)
+            } finally {
+                registry.closeAndFlush()
+            }
+            assertThrows(IllegalStateException::class.java) { registry.resetLearning() }
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
         }
 
     private suspend fun persistedSnapshot(path: Path) =

@@ -44,46 +44,86 @@ import kotlin.time.Duration.Companion.milliseconds
  * that remains alive until final learning persistence has completed.
  */
 @Service(Service.Level.APP)
-internal class KetraTermCompletionService : Disposable {
+internal class KetraTermCompletionService(
+    private val persistencePath: Path,
+) : Disposable {
+    constructor() : this(
+        PathManager.getSystemDir().resolve("ketraterm").resolve(TerminalCompletionLearningCoordinator.currentFileName()),
+    )
+
     private val lifecycle = IntellijCompletionLifecycle()
     private val settings = KetraTermIntellijSettings.getInstance()
-    private val persistencePath =
-        PathManager
-            .getSystemDir()
-            .resolve("ketraterm")
-            .resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     @Volatile private var completionRuntime: CompletionRuntime? = null
     private val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @Volatile private var shutdownJob: Job? = null
+    @Volatile private var completionTransition: Job? = null
     private val providersByTab = java.util.IdentityHashMap<TerminalWorkspaceTab, SwingShellSuggestionProvider>()
     private val providerListeners = CopyOnWriteArrayList<() -> Unit>()
     private val settingsListener: () -> Unit = {
         lifecycle.ifOpen {
+            if (completionTransition != null) return@ifOpen
             if (!settings.state.smartSuggestionsEnabled) {
                 val retiring = completionRuntime
                 completionRuntime = null
                 if (retiring != null) {
                     providersByTab.clear()
-                    shutdownJob =
-                        lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    startCompletionTransition(
+                        lifecycleScope.launch(start = CoroutineStart.LAZY) {
                             try {
                                 retiring.registry.closeWithoutFlush()
                             } finally {
                                 retiring.scope.cancel()
-                                SwingUtilities.invokeLater {
-                                    lifecycle.ifOpen { shutdownJob = null }
-                                    notifyProviderListeners()
-                                }
                             }
-                        }
+                        },
+                    )
                 }
             } else {
                 completionRuntime?.registry?.setPersistenceEnabled(settings.completionLearningPersistenceEnabled())
             }
         }
         notifyProviderListeners()
+    }
+
+    /** Clears shared and persisted learning even if suggestions or persistence are disabled. */
+    fun resetLearning(): Deferred<Unit> {
+        val reset =
+            lifecycle.requireOpen {
+                val previous = completionTransition
+                providersByTab.clear()
+                lifecycleScope
+                    .async(start = CoroutineStart.LAZY) {
+                        previous?.join()
+                        val persisted =
+                            lifecycle.requireOpen {
+                                val runtime =
+                                    completionRuntime ?: createCompletionRuntime(persistencePath, persistenceEnabled = false)
+                                        .also { completionRuntime = it }
+                                runtime.registry.resetLearning()
+                            }
+                        persisted.await()
+                    }.also(::startCompletionTransition)
+            }
+        notifyProviderListeners()
+        return reset
+    }
+
+    // Serializes reset with retirement so a former owner cannot restore the cleared snapshot.
+    private fun startCompletionTransition(transition: Job) {
+        completionTransition = transition
+        transition.invokeOnCompletion {
+            SwingUtilities.invokeLater {
+                var reconcile = false
+                lifecycle.ifOpen {
+                    if (completionTransition === transition) {
+                        completionTransition = null
+                        reconcile = true
+                    }
+                }
+                if (reconcile) settingsListener()
+            }
+        }
+        transition.start()
     }
 
     fun addProviderListener(listener: () -> Unit) {
@@ -116,7 +156,7 @@ internal class KetraTermCompletionService : Disposable {
         tab: TerminalWorkspaceTab,
     ): SwingShellSuggestionProvider? =
         lifecycle.requireOpen {
-            if (!settings.state.smartSuggestionsEnabled || shutdownJob != null) return@requireOpen null
+            if (!settings.state.smartSuggestionsEnabled || completionTransition != null) return@requireOpen null
             providersByTab.getOrPut(tab) {
                 val runtime =
                     completionRuntime ?: createCompletionRuntime(persistencePath, settings.completionLearningPersistenceEnabled())
@@ -209,7 +249,7 @@ internal class KetraTermCompletionService : Disposable {
         providersByTab.clear()
         val runtime = completionRuntime
         completionRuntime = null
-        val stopping = shutdownJob
+        val stopping = completionTransition
         if (runtime == null && stopping == null) {
             lifecycleScope.cancel()
             return

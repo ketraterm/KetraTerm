@@ -191,6 +191,7 @@ internal class WindowFactory(
                         parent = frame,
                         settings = settings,
                         profileRegistry = profileRegistry,
+                        resetCompletionLearning = tabManager::resetCompletionLearning,
                     ).isVisible = true
                 }
             }

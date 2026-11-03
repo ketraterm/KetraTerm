@@ -34,6 +34,14 @@ in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Explicit saved preferences remain effective.
 Library hosts enable and configure their own provider and presentation.
 
+Both products offer **Reset learned suggestions...** in settings. After confirmation,
+this clears learned commands and ranking signals from memory and saved data, even
+when suggestions or persistence are disabled. Open suggestion lists are invalidated.
+Success is reported after saved data is cleared; a failure leaves the action available
+for retry. New activity can be learned again, and shell history is unaffected.
+See the [storage contract](../reference/storage.md#completion-learning) for reset and
+persistence semantics.
+
 Terminal suggestions require an editable command context, normally supplied by
 [shell hooks](shells.md#prompt-hooks-and-completion-dialects).
 Unsupported shells do not gain command tracking merely by enabling completion.

@@ -15,22 +15,29 @@
  */
 package io.github.ketraterm.intellij.settings
 
+import com.intellij.CommonBundle
+import com.intellij.ide.setToolTipText
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.SearchableConfigurable
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.ketraterm.intellij.KetraTermBundle
+import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.services.intellijTerminalProfileRegistry
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import io.github.ketraterm.workspace.TerminalProfile
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DisposableHandle
 import java.awt.Component
 import java.util.*
 import javax.swing.*
@@ -45,12 +52,19 @@ private const val KETRATERM_SETTINGS_CONFIGURABLE_ID = "io.github.ketraterm.term
  */
 class KetraTermSettingsConfigurable internal constructor(
     shellProfiles: List<TerminalProfile>,
+    private val resetCompletionLearning: () -> Deferred<Unit> = { KetraTermCompletionService.getInstance().resetLearning() },
 ) : SearchableConfigurable {
     constructor() : this(intellijTerminalProfileRegistry().availableProfiles())
 
     private val settings: KetraTermIntellijSettings
         get() = KetraTermIntellijSettings.getInstance()
 
+    private var learningResetObserver: DisposableHandle? = null
+    private val resetLearningButton =
+        JButton(KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")).apply {
+            addActionListener { confirmLearningReset() }
+        }
+    private val learningResetStatus = JLabel()
     private val themeCombo = ComboBox(themeOptions())
     private val fontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
     private val fallbackFontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
@@ -265,7 +279,10 @@ class KetraTermSettingsConfigurable internal constructor(
                         cell(completionLearningPersistenceCheckBox)
                             .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
                     }
-                    // TODO(host/profile): Reconnect the completion service's learning-reset action before restoring its button.
+                    row {
+                        cell(resetLearningButton)
+                        cell(learningResetStatus)
+                    }
                     row {
                         cell(scrollOnOutputCheckBox)
                     }
@@ -296,6 +313,9 @@ class KetraTermSettingsConfigurable internal constructor(
                 }
             }
         panel = created
+        resetLearningButton.isEnabled = true
+        learningResetStatus.text = ""
+        learningResetStatus.toolTipText = null
         reset()
         return created
     }
@@ -311,7 +331,50 @@ class KetraTermSettingsConfigurable internal constructor(
     }
 
     override fun disposeUIResources() {
+        learningResetObserver?.dispose()
+        learningResetObserver = null
         panel = null
+    }
+
+    private fun confirmLearningReset() {
+        val owner = panel ?: return
+        val choice =
+            Messages.showOkCancelDialog(
+                owner,
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmation"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmationTitle"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirm"),
+                CommonBundle.getCancelButtonText(),
+                Messages.getWarningIcon(),
+            )
+        if (choice != Messages.OK) return
+        resetLearningButton.isEnabled = false
+        learningResetStatus.text = KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.progress")
+        learningResetStatus.toolTipText = null
+        try {
+            learningResetObserver =
+                resetCompletionLearning().invokeOnCompletion { failure ->
+                    SwingUtilities.invokeLater { if (panel === owner) finishLearningReset(failure) }
+                }
+        } catch (failure: Exception) {
+            finishLearningReset(failure)
+        }
+    }
+
+    private fun finishLearningReset(failure: Throwable?) {
+        learningResetObserver = null
+        resetLearningButton.isEnabled = true
+        learningResetStatus.text =
+            KetraTermBundle.message(
+                if (failure ==
+                    null
+                ) {
+                    "settings.ketraterm.resetCompletionLearning.complete"
+                } else {
+                    "settings.ketraterm.resetCompletionLearning.error"
+                },
+            )
+        learningResetStatus.setToolTipText(failure?.message?.let(HtmlChunk::text))
     }
 
     private fun applyState(state: KetraTermIntellijSettings.State) {
