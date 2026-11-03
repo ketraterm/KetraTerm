@@ -378,7 +378,8 @@ public fun interface SwingShellSuggestionProvider {
  *
  * Listeners are registered on one [io.github.ketraterm.ui.swing.api.SwingTerminal]
  * and invoked synchronously on the Swing Event Dispatch Thread after its active
- * provider collection is cancelled and its popup is hidden.
+ * provider collection is cancelled and its editing capability is closed. During automatic
+ * refresh, the last painted rows may remain visible until the next publication; they cannot be accepted.
  * A callback failure, including cancellation, propagates to the invoking operation;
  * subsequent listeners and input submission are skipped.
  */

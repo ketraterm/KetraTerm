@@ -506,7 +506,7 @@ public class SwingTerminal
                         shellSuggestionController?.handleKeyPressed(event) == true
 
                     override fun invalidateShellSuggestions() {
-                        invalidateShellSuggestionsOnEdt()
+                        invalidateShellSuggestionsOnEdt(retainPresentation = true)
                     }
 
                     override fun hideShellSuggestions() {
@@ -2127,8 +2127,10 @@ public class SwingTerminal
                             }
                         }
                     },
-                    hideSuggestions = {
-                        if (activeSuggestionIsAutomatic) cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden")
+                    hideSuggestions = { refreshing ->
+                        if (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) {
+                            cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden", retainPresentation = refreshing)
+                        }
                     },
                 ).also { suggestionScheduler = it }
             scheduler.start(bound)
@@ -2162,20 +2164,28 @@ public class SwingTerminal
                     it.commandText == request.commandText && it.cursorOffset == request.cursorOffset
                 }
             val revision = suggestionRevision + 1
-            cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced", SwingShellSuggestionCloseReason.SUPERSEDED)
+            cancelAndHideShellSuggestionsOnEdt(
+                "Shell suggestion request replaced",
+                SwingShellSuggestionCloseReason.SUPERSEDED,
+                retainPresentation = automatic,
+            )
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
             val captured =
                 when {
                     editTarget != null -> editTarget.capture(request)
                     bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, request)
                     else -> SwingShellSuggestionHandler.NONE
-                } ?: return null
+                } ?: run {
+                    if (suggestionRevision == revision) shellSuggestionController?.hide()
+                    return null
+                }
             if (disposed ||
                 suggestionRevision != revision ||
                 session !== bound ||
                 (observed != null && bound.activeShellCommandLine() != observed)
             ) {
                 captured.close()
+                if (suggestionRevision == revision) shellSuggestionController?.hide()
                 return null
             }
             val handler =
@@ -2242,6 +2252,7 @@ public class SwingTerminal
                                 cancelAndHideShellSuggestionsOnEdt(
                                     "Active shell command changed",
                                     SwingShellSuggestionCloseReason.INVALIDATED,
+                                    retainPresentation = automatic,
                                 )
                             }
                         }
@@ -2747,8 +2758,8 @@ public class SwingTerminal
             return true
         }
 
-        private fun invalidateShellSuggestionsOnEdt() {
-            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
+        private fun invalidateShellSuggestionsOnEdt(retainPresentation: Boolean = false) {
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input", retainPresentation = retainPresentation)
             suggestionScheduler?.onInvalidated()
             suggestionInvalidationListeners.forEach { listener ->
                 listener.onShellSuggestionsInvalidated()
@@ -3043,7 +3054,11 @@ public class SwingTerminal
             if (revision != automaticSuggestionEligibilityRevision) return
             val liveViewport = isLiveViewportOnEdt()
             var failure: Throwable? = null
-            if (!settings.smartSuggestionsEnabled || !liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
+            if (!settings.smartSuggestionsEnabled ||
+                !liveViewport ||
+                !settings.shellSuggestionsEnabled &&
+                (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true)
+            ) {
                 try {
                     cancelAndHideShellSuggestionsOnEdt(
                         if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
@@ -3076,11 +3091,20 @@ public class SwingTerminal
         private fun cancelAndHideShellSuggestionsOnEdt(
             reason: String,
             closeReason: SwingShellSuggestionCloseReason = SwingShellSuggestionCloseReason.CANCELLED,
+            retainPresentation: Boolean = false,
         ) {
             val revision = ++suggestionRevision
             val interaction = activeSuggestionInteraction
             val scope = suggestionScope
             val target = activeSuggestionTarget
+            val retain =
+                retainPresentation &&
+                    target == null &&
+                    shellSuggestionProvider != null &&
+                    (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) &&
+                    terminalFocused &&
+                    isAutomaticShellSuggestionEligible()
+            if (retain) shellSuggestionController?.retainPresentation()
             activeSuggestionInteraction = null
             suggestionScope = null
             activeSuggestionIsAutomatic = false
@@ -3088,7 +3112,7 @@ public class SwingTerminal
             scope?.cancel(CancellationException(reason))
             cleanupSwingResources(
                 { interaction?.close(closeReason) },
-                { if (suggestionRevision == revision) shellSuggestionController?.hide() },
+                { if (suggestionRevision == revision && !retain) shellSuggestionController?.hide() },
                 { hideCapturedSuggestionTarget(target, revision) },
             )
         }

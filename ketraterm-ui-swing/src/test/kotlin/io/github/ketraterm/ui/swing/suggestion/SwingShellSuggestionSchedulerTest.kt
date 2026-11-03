@@ -156,7 +156,7 @@ class SwingShellSuggestionSchedulerTest {
         }
 
     @Test
-    fun `changed shell snapshot hides old results before debounce fires`() =
+    fun `changed shell snapshot invalidates old actions while retaining presentation during debounce`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
             fixture.start()
@@ -169,6 +169,7 @@ class SwingShellSuggestionSchedulerTest {
             runCurrent()
 
             assertEquals(hides + 1, fixture.hideCount)
+            assertEquals(true, fixture.refreshing.last())
             assertEquals(listOf(snapshot("git s")), fixture.requests)
             advanceTimeBy(75.milliseconds)
             runCurrent()
@@ -524,6 +525,7 @@ class SwingShellSuggestionSchedulerTest {
         val requests = ArrayList<TerminalShellCommandLineSnapshot>()
         var feedbackHandler: SwingShellSuggestionFeedbackHandler? = null
         var hideCount = 0
+        val refreshing = ArrayList<Boolean>()
         var onHide: (() -> Unit)? = null
         val scheduler =
             SwingShellSuggestionScheduler(
@@ -536,8 +538,9 @@ class SwingShellSuggestionSchedulerTest {
                     requests += snapshot
                     feedbackHandler = feedback
                 },
-                hideSuggestions = {
+                hideSuggestions = { retain ->
                     assertTrue(SwingUtilities.isEventDispatchThread())
+                    refreshing += retain
                     hideCount++
                     onHide?.invoke()
                 },

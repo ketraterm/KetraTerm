@@ -169,6 +169,38 @@ class SwingTerminalInputControllerTest {
     @Nested
     inner class SuggestionInvalidation {
         @Test
+        fun `unavailable input closes any retained presentation instead of waiting for shell echo`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyTyped(keyTyped('a'))
+
+            assertEquals(1, host.invalidationCount)
+            assertEquals(1, host.hideShellSuggestionsCount)
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = [KeyEvent.VK_BACK_SPACE, KeyEvent.VK_DELETE])
+        fun `ordinary edits retain presentation while shortcuts and navigation hide before invalidation`(keyCode: Int) {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+            val events =
+                listOf(
+                    keyTyped('a'),
+                    keyPressed(keyCode, 0),
+                    keyPressed(keyCode, InputEvent.CTRL_DOWN_MASK),
+                    keyPressed(KeyEvent.VK_LEFT, 0),
+                    keyPressed(KeyEvent.VK_ENTER, 0),
+                )
+            for (event in events) {
+                host.suggestionsVisible = true
+                if (event.id == KeyEvent.KEY_TYPED) controller.keyListener.keyTyped(event) else controller.keyListener.keyPressed(event)
+            }
+
+            assertEquals(listOf(true, true, false, false, false), host.visibilityAtInvalidation)
+        }
+
+        @Test
         fun `printable typing invalidates suggestions`() {
             val host = RecordingInputHost()
             val controller = SwingTerminalInputController(host)
@@ -321,6 +353,8 @@ class SwingTerminalInputControllerTest {
         var hostKeyPressCount = 0
         var shellSuggestionKeyPressCount = 0
         var invalidationCount = 0
+        var suggestionsVisible = true
+        val visibilityAtInvalidation = ArrayList<Boolean>()
 
         override fun updatePointerModifiers(modifiers: Int) {
             hyperlinkHoverUpdates += modifiers and hyperlinkNavigationModifierMask != 0
@@ -355,12 +389,14 @@ class SwingTerminalInputControllerTest {
 
         override fun invalidateShellSuggestions() {
             invalidationCount++
+            visibilityAtInvalidation += suggestionsVisible
         }
 
         var hideShellSuggestionsCount = 0
 
         override fun hideShellSuggestions() {
             hideShellSuggestionsCount++
+            suggestionsVisible = false
         }
     }
 }

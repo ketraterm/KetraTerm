@@ -31,19 +31,189 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @Test
+    fun `automatic popup stays mounted through shell echo debounce and a delayed provider`() {
+        val dispatcher = StandardTestDispatcher()
+        val release = CompletableDeferred<Unit>()
+        val started = CompletableDeferred<Unit>()
+        Fixture(
+            settings = SwingSettings.create { it.smartSuggestionsEnabled = true },
+            sessionHandler = true,
+            suggestionDispatcher = dispatcher,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+            provider = { request ->
+                flow {
+                    if (request.commandText == "git st") {
+                        started.complete(Unit)
+                        release.await()
+                    }
+                    emit(listOf(suggestion(request)))
+                }
+            },
+        ).use { fixture ->
+            try {
+                onEdt {
+                    fixture.session.start(30, 4)
+                    fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                    dispatcher.scheduler.runCurrent()
+                    dispatcher.scheduler.advanceTimeBy(75)
+                    dispatcher.scheduler.runCurrent()
+                }
+                assertEquals("git s", fixture.awaitRequest().commandText)
+                fixture.view.awaitVisible()
+                val visibility = onEdt { fixture.view.visibilityChanges.toList() }
+                onEdt {
+                    val typed = KeyEvent(fixture.terminal, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 't')
+                    fixture.terminal.keyListeners.forEach { it.keyTyped(typed) }
+                    assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                    fixture.editableSource.value = snapshot().copy(commandText = "git st", cursorOffset = 6, cursorColumn = 6)
+                    dispatcher.scheduler.runCurrent()
+                    assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                    dispatcher.scheduler.advanceTimeBy(75)
+                    dispatcher.scheduler.runCurrent()
+                }
+                assertEquals("git st", fixture.awaitRequest().commandText)
+                started.awaitCompletion()
+                onEdt {
+                    assertEquals(visibility, fixture.view.visibilityChanges)
+                    assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                }
+                release.complete(Unit)
+                fixture.view.awaitVisible()
+                onEdt {
+                    assertEquals(visibility, fixture.view.visibilityChanges)
+                    assertEquals(
+                        6,
+                        fixture.view.snapshot.visibleSuggestions
+                            .single()
+                            .replacementEndOffset,
+                    )
+                }
+            } finally {
+                release.complete(Unit)
+            }
+        }
+    }
+
+    @Test
+    fun `automatic typing retains rows and selection until a fresh publication without admitting stale actions`() {
+        val dispatcher = StandardTestDispatcher()
+        Fixture(
+            settings = SwingSettings.create { it.smartSuggestionsEnabled = true },
+            suggestionDispatcher = dispatcher,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+        ).use { fixture ->
+            fixture.session.start(30, 4)
+            onEdt {
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                val first =
+                    fixture.terminal.beginActiveShellSuggestionInteraction(
+                        SwingShellSuggestionTrigger.AUTOMATIC,
+                        editTarget = fixture.editTarget,
+                    ) ?: error("Initial capture failed")
+                fixture.terminal.presentShellSuggestions(first)
+                first.publish(listOf(suggestion(first.request)), selectedIndex = 0)
+                val painted = fixture.view.snapshot
+                val visibility = fixture.view.visibilityChanges.toList()
+
+                val typed = KeyEvent(fixture.terminal, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 't')
+                fixture.terminal.keyListeners.forEach { it.keyTyped(typed) }
+                assertTrue(first.isClosed)
+                assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                assertSame(painted, fixture.view.snapshot)
+                fixture.terminal.doLayout()
+                assertTrue(fixture.view.component.width > 0)
+                fixture.view.listener.onSuggestionClicked(painted, 0)
+                assertTrue(fixture.accepted.isEmpty())
+                assertTrue(fixture.feedback.isEmpty())
+
+                fixture.source.value = snapshot().copy(commandText = "git st", cursorOffset = 6, cursorColumn = 6)
+                val next =
+                    fixture.terminal.beginActiveShellSuggestionInteraction(
+                        SwingShellSuggestionTrigger.AUTOMATIC,
+                        editTarget = fixture.editTarget,
+                    ) ?: error("Updated capture failed")
+                fixture.terminal.presentShellSuggestions(next)
+                assertSame(painted, fixture.view.snapshot, "An unpublished request must keep the previous rows")
+                fixture.view.listener.onSuggestionClicked(painted, 0)
+                assertTrue(fixture.accepted.isEmpty())
+                next.publish(listOf(suggestion(next.request)))
+                assertEquals(0, next.snapshot.selectedIndex, "The selected replacement outcome survives typing")
+                assertEquals(visibility, fixture.view.visibilityChanges, "Refreshing must never toggle popup visibility")
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
+                assertEquals(listOf(next.request), fixture.accepted.map { it.request })
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = ["empty", "escape", "enter", "tab", "shortcut", "navigation", "focus", "settings", "provider", "unbind", "failure"],
+    )
+    fun `retained automatic rows close when refresh ends or becomes ineligible`(end: String) {
+        val dispatcher = StandardTestDispatcher()
+        Fixture(
+            settings = SwingSettings.create { it.smartSuggestionsEnabled = true },
+            suggestionDispatcher = dispatcher,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+        ).use { fixture ->
+            fixture.session.start(30, 4)
+            onEdt {
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                val first =
+                    fixture.terminal.beginActiveShellSuggestionInteraction(
+                        SwingShellSuggestionTrigger.AUTOMATIC,
+                        editTarget = fixture.editTarget,
+                    ) ?: error("Initial capture failed")
+                fixture.terminal.presentShellSuggestions(first)
+                first.publish(listOf(suggestion(first.request)), selectedIndex = 0)
+                fixture.press(KeyEvent.VK_BACK_SPACE)
+                assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                when (end) {
+                    "empty", "failure" -> {
+                        val next =
+                            fixture.terminal.beginActiveShellSuggestionInteraction(
+                                SwingShellSuggestionTrigger.AUTOMATIC,
+                                editTarget = fixture.editTarget,
+                            ) ?: error("Updated capture failed")
+                        fixture.terminal.presentShellSuggestions(next)
+                        if (end == "empty") next.publish(emptyList()) else next.close(SwingShellSuggestionCloseReason.FAILED)
+                    }
+                    "escape" -> fixture.press(KeyEvent.VK_ESCAPE)
+                    "enter" -> fixture.press(KeyEvent.VK_ENTER)
+                    "tab" -> fixture.press(KeyEvent.VK_TAB)
+                    "shortcut" -> fixture.press(KeyEvent.VK_BACK_SPACE, InputEvent.CTRL_DOWN_MASK)
+                    "navigation" -> fixture.press(KeyEvent.VK_LEFT)
+                    "focus" -> fixture.terminal.focusListeners.forEach { it.focusLost(FocusEvent(fixture.terminal, FocusEvent.FOCUS_LOST)) }
+                    "settings" -> {
+                        fixture.settings = fixture.settings.copy { it.shellSuggestionsEnabled = false }
+                        fixture.terminal.reloadSettings()
+                    }
+                    "provider" -> fixture.terminal.setShellSuggestionProvider(null)
+                    "unbind" -> fixture.terminal.unbind()
+                }
+                assertFalse(fixture.terminal.currentShellSuggestionState().visible)
+                assertFalse(fixture.view.component.isVisible)
+                assertTrue(fixture.accepted.isEmpty())
+                assertTrue(fixture.feedback.isEmpty())
+            }
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["fresh", "metadata", "aba", "close", "span"])
     fun `session handler reports acceptance only for a valid admitted edit`(change: String) =
@@ -795,6 +965,7 @@ class SwingTerminalSuggestionContextTest {
         bind: Boolean = true,
         provider: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(listOf(suggestion(it))) },
         workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        suggestionDispatcher: CoroutineDispatcher? = null,
         uiDispatcher: TerminalUiDispatcher = TerminalUiDispatcher.SWING,
         sessionHandler: Boolean = false,
         versionedModel: Boolean = sessionHandler,
@@ -861,6 +1032,7 @@ class SwingTerminalSuggestionContextTest {
                             draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
                         },
                     searchDispatcher = Dispatchers.Default,
+                    suggestionDispatcher = suggestionDispatcher,
                     mutationDispatcher = mutationDispatcher,
                 ).also { terminal ->
                     terminal.size = terminal.preferredGridSize(30, 4)
@@ -886,8 +1058,11 @@ class SwingTerminalSuggestionContextTest {
                 withTimeout(5_000.milliseconds) { source.subscriptionCount.first { (it > 0) == active } }
             }
 
-        fun press(keyCode: Int): KeyEvent {
-            val event = KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0L, 0, keyCode, KeyEvent.CHAR_UNDEFINED)
+        fun press(
+            keyCode: Int,
+            modifiers: Int = 0,
+        ): KeyEvent {
+            val event = KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0L, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED)
             terminal.keyListeners.forEach { it.keyPressed(event) }
             return event
         }
@@ -919,7 +1094,14 @@ class SwingTerminalSuggestionContextTest {
     }
 
     private class RecordingView : SwingShellSuggestionView {
-        override val component = JPanel()
+        val visibilityChanges = ArrayList<Boolean>()
+        override val component =
+            object : JPanel() {
+                override fun setVisible(visible: Boolean) {
+                    if (isVisible != visible) visibilityChanges += visible
+                    super.setVisible(visible)
+                }
+            }
         lateinit var listener: SwingShellSuggestionViewListener
         var snapshot = SwingShellSuggestionViewSnapshot.EMPTY
             private set

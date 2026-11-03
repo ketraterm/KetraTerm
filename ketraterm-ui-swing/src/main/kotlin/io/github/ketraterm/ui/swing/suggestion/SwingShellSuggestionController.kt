@@ -30,6 +30,8 @@ internal class SwingShellSuggestionController(
     private var anchorRow = 0
     private var presentationRevision = 0L
     private var visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    var isRefreshing: Boolean = false
+        private set
     private val changeListener =
         SwingShellSuggestionInteractionListener { changed ->
             if (interaction === changed) updatePresentation()
@@ -75,6 +77,15 @@ internal class SwingShellSuggestionController(
 
     val popup get() = view.component
 
+    /** Keeps only the last painted rows. Their closed publication cannot admit pointer or keyboard actions. */
+    fun retainPresentation() {
+        if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return
+        presentationRevision++
+        interaction?.removeChangeListener(changeListener)
+        interaction = null
+        isRefreshing = true
+    }
+
     fun present(
         interaction: SwingShellSuggestionInteraction,
         anchorColumn: Int = 0,
@@ -99,6 +110,7 @@ internal class SwingShellSuggestionController(
         presentationRevision++
         interaction?.removeChangeListener(changeListener)
         interaction = null
+        isRefreshing = false
         viewportStartIndex = 0
         val changed = view.component.isVisible || visualSnapshot.visibleSuggestions.isNotEmpty()
         visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
@@ -114,16 +126,14 @@ internal class SwingShellSuggestionController(
     fun close() = cleanupSwingResources({ hide() }, view::close)
 
     fun state(): SwingShellSuggestionState {
-        val active = interaction ?: return SwingShellSuggestionState.EMPTY
-        val current = active.snapshot
-        if (!active.isActive || !view.component.isVisible || current.suggestions.isEmpty()) return SwingShellSuggestionState.EMPTY
+        if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return SwingShellSuggestionState.EMPTY
         return SwingShellSuggestionState(
             true,
-            current.suggestions.size,
-            current.selectedIndex,
+            visualSnapshot.totalSuggestionCount,
+            visualSnapshot.absoluteSelectedIndex,
             anchorColumn,
             anchorRow,
-            current.selectedSuggestion,
+            visualSnapshot.selectedSuggestion,
         )
     }
 
@@ -239,6 +249,20 @@ internal class SwingShellSuggestionController(
             hide()
             return
         }
+        if (isRefreshing && !active.hasPublication) return
+        if (isRefreshing) {
+            isRefreshing = false
+            val previous = visualSnapshot.publication
+            val outcome = previous?.selectedSuggestion?.commandTextAfterReplacement(previous.owner.request)
+            if (outcome != null) {
+                val current = active.snapshot
+                val retained = current.suggestions.indexOfFirst { it.commandTextAfterReplacement(active.request) == outcome }
+                if (retained >= 0 && retained != current.selectedIndex) {
+                    active.select(current, retained)
+                    return
+                }
+            }
+        }
         val revision = ++presentationRevision
         val current = active.snapshot
         val items = current.suggestions
@@ -270,13 +294,30 @@ internal class SwingShellSuggestionController(
     }
 }
 
+/**
+ * EDT-only component services borrowed by [SwingShellSuggestionController].
+ *
+ * The controller owns popup presentation; the host supplies current policy and Swing lifecycle
+ * operations. Callbacks can reenter the controller, so publication identity is checked after
+ * each callback. Failures propagate after the applicable lifecycle cleanup is attempted.
+ */
 internal interface SwingShellSuggestionHost {
+    /** Current immutable settings; read when handling or presenting an interaction. */
     val settings: SwingSettings
+
+    /** Host shortcut policy used to interpret suggestion actions before terminal input routing. */
     val suggestionKeymap: SwingShellSuggestionKeymap
 
+    /** Requests component layout after popup visibility or preferred size changes. */
     fun revalidate()
 
+    /** Schedules painting of the component regions affected by a presentation change. */
     fun repaint()
 
+    /**
+     * Requests terminal focus after an accepted edit or explicit dismissal.
+     *
+     * @return true when Swing accepts the focus request; this does not guarantee focus transfer.
+     */
     fun requestFocusInWindow(): Boolean
 }

@@ -75,16 +75,16 @@ public fun interface SwingShellSuggestionInteractionListener {
 public class SwingShellSuggestionInteraction(
     public val request: SwingShellSuggestionRequest,
     private val handler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
-    feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+    private var feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
 ) : AutoCloseable {
     private enum class Phase { ACTIVE, ACCEPTING, CLOSED }
 
     private var phase = Phase.ACTIVE
-    private var feedbackHandler = feedbackHandler
     private var listeners: List<SwingShellSuggestionInteractionListener> = emptyList()
     private var revision = 0L
     private var handlerClosed = false
     private var published = false
+    internal val hasPublication: Boolean get() = published
     private var sourceAttached = false
     internal var contextIsCurrent: (() -> Boolean)? = null
 

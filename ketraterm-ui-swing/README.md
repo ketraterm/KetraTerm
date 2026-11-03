@@ -238,6 +238,9 @@ directory changes. It immediately cancels pending work and closes existing
 suggestions, including explicit requests. Automatic suggestions then refresh
 after the normal debounce; with automatic popups disabled, request them explicitly again.
 
+The embedded automatic popup updates in place as you type. Previous rows remain
+visible while results refresh, but cannot be accepted until fresh results arrive.
+
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 `AUTOMATIC`; pass `EXPLICIT` for an explicit command. The host must replace or hide

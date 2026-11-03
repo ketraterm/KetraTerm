@@ -31,7 +31,7 @@ internal class SwingShellSuggestionScheduler(
     private val isFocused: () -> Boolean,
     private val isEligible: () -> Boolean,
     private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Unit,
-    private val hideSuggestions: () -> Unit,
+    private val hideSuggestions: (refreshing: Boolean) -> Unit,
     private val debounceMillis: Int = 75,
     private val minimumNonWhitespaceCharacters: Int = 2,
 ) {
@@ -99,7 +99,7 @@ internal class SwingShellSuggestionScheduler(
                             }
                             invalidatedRevision = null
                             invalidatedSnapshot = null
-                            if (!initialRevision) cancelAndHide()
+                            if (!initialRevision) cancelAndHide(refreshing = true)
                             if (lifecycleRevision == revision) scheduleRefresh()
                         }
                     }
@@ -157,7 +157,7 @@ internal class SwingShellSuggestionScheduler(
         if (dismissed) dismissedCommandText = snapshot?.commandText
         invalidatedRevision = invalidation
         invalidatedSnapshot = snapshot
-        cancelAndHide()
+        cancelAndHide(refreshing = !dismissed)
     }
 
     fun onEligibilityChanged(eligible: Boolean) {
@@ -198,10 +198,10 @@ internal class SwingShellSuggestionScheduler(
         }
     }
 
-    private fun cancelAndHide() {
+    private fun cancelAndHide(refreshing: Boolean = false) {
         refreshes.value = null
         lastRequest = null
-        hideSuggestions()
+        hideSuggestions(refreshing)
     }
 
     private fun isEligibleNow(): Boolean = isFocused() && isEligible()
