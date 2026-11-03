@@ -193,6 +193,9 @@ not an exhaustive schema for every version of these tools.
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+After Escape, automatic suggestions remain dismissed across cursor movement and
+focus changes until the command text changes. Completion candidates that leave the
+command text unchanged are omitted; explicit completion remains available.
 Enter acceptance and automatic popups are preferences; IntelliJ also uses its
 active keymap. Shell-native Tab completion remains a separate facility.
 

@@ -217,6 +217,7 @@ internal class MergedCompletionEngine(
             .project(request, context, candidates)
             .filter { it.hasValidReplacementRangeFor(request) }
             .filter(available)
+            .filter { changesText(request, it) }
             .boundedTo(SOURCE_CANDIDATE_LIMIT)
     }
 
@@ -288,6 +289,7 @@ internal class MergedCompletionEngine(
         return pathCommandSpecCandidateProjector
             .project(request, context, candidates)
             .filter { it.hasValidReplacementRangeFor(request) }
+            .filter { changesText(request, it) }
             .filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
             .boundedTo(SOURCE_CANDIDATE_LIMIT)
     }

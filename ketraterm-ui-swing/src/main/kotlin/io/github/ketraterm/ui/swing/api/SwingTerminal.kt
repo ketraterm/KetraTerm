@@ -2217,7 +2217,11 @@ public class SwingTerminal
                             { hideCapturedSuggestionTarget(presentationTarget, revision) },
                             {
                                 if (!interaction.isClosed || interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED) {
-                                    if (suggestionRevision == revision) suggestionScheduler?.onInvalidated()
+                                    if (suggestionRevision == revision) {
+                                        suggestionScheduler?.onInvalidated(
+                                            dismissed = interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED,
+                                        )
+                                    }
                                     for (listener in suggestionInvalidationListeners) {
                                         if (suggestionRevision != revision) break
                                         listener.onShellSuggestionsInvalidated()

@@ -44,6 +44,7 @@ internal class SwingShellSuggestionScheduler(
     private var refreshSequence = 0L
     private var lifecycleRevision = 0L
     private var lastRequest: TerminalShellCommandLineSnapshot? = null
+    private var dismissedCommandText: String? = null
 
     val feedbackHandler =
         SwingShellSuggestionFeedbackHandler {
@@ -125,6 +126,7 @@ internal class SwingShellSuggestionScheduler(
         invalidatedRevision = null
         invalidatedSnapshot = null
         lastRequest = null
+        dismissedCommandText = null
         observation?.cancel()
     }
 
@@ -145,13 +147,14 @@ internal class SwingShellSuggestionScheduler(
         if (observationJob != null) cancelAndHide()
     }
 
-    fun onInvalidated() {
+    fun onInvalidated(dismissed: Boolean = false) {
         checkEdt()
         val revisions = shellCommandLineRevisions ?: return
         val revision = lifecycleRevision
         val invalidation = revisions.value
-        val snapshot = if (invalidation < 0L) activeCommandLine?.invoke() else null
+        val snapshot = if (dismissed || invalidation < 0L) activeCommandLine?.invoke() else null
         if (lifecycleRevision != revision) return
+        if (dismissed) dismissedCommandText = snapshot?.commandText
         invalidatedRevision = invalidation
         invalidatedSnapshot = snapshot
         cancelAndHide()
@@ -178,6 +181,8 @@ internal class SwingShellSuggestionScheduler(
         val revision = lifecycleRevision
         val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
+        if (dismissedCommandText != null && snapshot?.commandText == dismissedCommandText) return
+        dismissedCommandText = null
         if (snapshot == null || !shouldRequest(snapshot)) {
             cancelAndHide()
             return

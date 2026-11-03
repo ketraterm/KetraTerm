@@ -535,7 +535,14 @@ class SwingTerminalCompletionLifecycleTest {
                     runCurrent()
                     assertEquals(1, target.interactions.size)
 
-                    session.model.value = snapshot
+                    if (!accept) {
+                        session.model.value = snapshot.copy(cursorOffset = 4, cursorColumn = 4)
+                        runCurrent()
+                        advanceTimeBy(75.milliseconds)
+                        runCurrent()
+                        assertEquals(1, target.interactions.size, "Cursor movement must retain explicit dismissal")
+                    }
+                    session.model.value = snapshot.copy(commandText = "git st", cursorOffset = 6, cursorColumn = 6)
                     runCurrent()
                     advanceTimeBy(75.milliseconds)
                     runCurrent()

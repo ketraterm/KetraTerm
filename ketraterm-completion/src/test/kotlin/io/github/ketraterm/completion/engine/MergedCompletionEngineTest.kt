@@ -28,6 +28,69 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class MergedCompletionEngineTest {
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `late empty source does not clear or republish useful results`() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry({ _, _, _ -> listOf(candidate("useful", source = "fast")) }, priority = 0),
+                        entry({ _, _, _ ->
+                            release.await()
+                            emptyList()
+                        }, priority = 0),
+                    ),
+                    commandSpecs = emptyList(),
+                )
+            val emissions = mutableListOf<List<TerminalCompletionCandidate>>()
+            val collection = launch { engine.completions(request()).toList(emissions) }
+            runCurrent()
+            assertEquals(listOf("useful"), emissions.single().map { it.replacementText })
+            release.complete(Unit)
+            collection.join()
+            assertEquals(1, emissions.size)
+        }
+
+    @Test
+    fun `no-op host candidates do not suppress useful native argument fallback`() =
+        runTest {
+            var nativeQueries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        TerminalCompletionSourceEntry({ _, context, _ ->
+                            listOf(
+                                TerminalCompletionCandidate(
+                                    "main",
+                                    context.replacementStartOffset,
+                                    context.replacementEndOffset,
+                                    "host",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
+                            )
+                        }),
+                    ),
+                    shellProvider =
+                        TerminalCompletionShellProvider { _, context, _ ->
+                            nativeQueries++
+                            listOf(
+                                TerminalCompletionCandidate(
+                                    "main-next",
+                                    context.replacementStartOffset,
+                                    context.replacementEndOffset,
+                                    "shell",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
+                            )
+                        },
+                )
+            val result = engine.complete(TerminalCompletionRequest("git switch main", 15))
+            assertEquals(listOf("main-next"), result.map { it.replacementText })
+            assertEquals(1, nativeQueries)
+        }
+
+    @Test
     fun `option values do not activate positional providers but retain explicit path completion`() =
         runBlocking {
             var directoryCalls = 0

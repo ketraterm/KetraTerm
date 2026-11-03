@@ -269,6 +269,32 @@ class SwingShellSuggestionSchedulerTest {
         }
 
     @Test
+    fun `dismissal survives cursor movement and focus refresh until command text changes`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            fixture.scheduler.refreshNow()
+            fixture.scheduler.onInvalidated(dismissed = true)
+            fixture.active = assertNotNull(fixture.active).copy(cursorOffset = 4)
+            fixture.revisions.value++
+            runCurrent()
+            fixture.scheduler.onFocusLost()
+            fixture.scheduler.onFocusGained()
+            fixture.scheduler.refresh()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+            fixture.active = snapshot("git st")
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf("git s", "git st"), fixture.requests.map { it.commandText })
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `stop releases observation without hiding an explicit request or cancelling its owner`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
