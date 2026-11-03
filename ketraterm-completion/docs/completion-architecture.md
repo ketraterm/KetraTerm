@@ -13,9 +13,8 @@ contracts below. See the [stability policy](../../docs/features/completion.md#st
 Consumers use `io.github.ketraterm.completion.api` and
 `io.github.ketraterm.completion.model`.
 
-`TerminalCompletionEngines.fromSources` retains the original overloads and their
-Kotlin default-argument entry points. Native-completion overloads require an
-explicit `shellProvider`; omitting it selects the original factory contract.
+Pass `shellProvider` to `TerminalCompletionEngines.fromSources` to use live shell
+command discovery and completion alongside the catalog and host sources.
 
 | Contract | Purpose |
 |----------|---------|
@@ -66,9 +65,11 @@ Literal Bash and ordinary zsh aliases expand only the completed command prefix i
 token list, reusing the shared tokenizer and command analyzer. Fixed arguments
 therefore participate in option, subcommand, and repository resolution without
 another source or shell query. Editable tokens retain their original offsets;
-the request text is never rewritten. Custom engines may supply the same map to
-`TerminalCompletionContext.resolve`. Definitions are not evaluated; see the
-[supported subset and bounds](../../docs/features/completion.md#sources-by-host).
+the request text is never rewritten. Expansion is bounded to 16 definitions,
+64 expanded words, and 4,096 UTF-16 units per definition. Custom engines may supply
+the same map to `TerminalCompletionContext.resolve`. Definitions are not evaluated; see the
+[supported alias behavior](../../docs/features/completion.md#bash-and-zsh-suggestions)
+and [inventory bounds](../../docs/reference/protocol.md#private-bash-command-inventory).
 
 An optional `shellProvider` answers command positions before initial publication.
 Its returned candidates define the verified command names; an empty list offers none.

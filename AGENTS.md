@@ -116,6 +116,11 @@ Useful entry points: `ketraterm-core/docs/terminal-core-contract.md`,
 
 ## Documentation
 
+For documentation work and changes that affect documented behavior, APIs, setup,
+or defaults, follow the [documentation skill](.agents/skills/terminal-documentation/SKILL.md).
+Check affected READMEs and linked instructions before finishing; update them when
+they no longer describe the implementation.
+
 Use `docs/README.md` as the documentation index. Root `docs/features/` contains
 capability catalogs, `docs/library/` cross-module embedding guides,
 `docs/reference/` protocol and storage references, and `docs/development/`

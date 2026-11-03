@@ -3,9 +3,8 @@
 JMH measurements for parser, core, input, session, render-cache, completion, and
 Swing behavior. This is a development module, not a consumer library.
 
-The [shell inventory measurement](results/shell-command-inventory/README.md) records
-snapshot retention, construction, and prefix/alias lookup costs with their workload
-and reproducible commands.
+The [shell inventory guide](results/shell-command-inventory/README.md) explains how
+to measure snapshot construction, lookups, and native shell discovery.
 
 ## Build and run
 
