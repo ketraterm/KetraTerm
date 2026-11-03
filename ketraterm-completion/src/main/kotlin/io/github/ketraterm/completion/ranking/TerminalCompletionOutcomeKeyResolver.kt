@@ -36,43 +36,24 @@ internal class TerminalCompletionOutcomeKeyResolver {
             candidate.kind == TerminalCompletionCandidateKind.PATH ||
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
 
-        val lineContext = context.commandLineContext
-        val isSimpleSingleToken =
-            candidate.replacementStartOffset == lineContext.replacementStartOffset &&
-                candidate.replacementEndOffset == lineContext.replacementEndOffset &&
-                lineContext.activeTokenIndex in lineContext.tokens.indices &&
-                !hasSpecialSyntax(candidate.replacementText)
-
-        val (tokens, activeIndex) =
-            if (isSimpleSingleToken) {
-                val baseTokens = lineContext.tokens
-                val activeIdx = lineContext.activeTokenIndex
-                val projectedTokens = ArrayList<TerminalCommandLineToken>(baseTokens.size)
-                for (i in baseTokens.indices) {
-                    if (i == activeIdx) {
-                        projectedTokens +=
-                            TerminalCommandLineToken(
-                                text = candidate.replacementText,
-                                startOffset = candidate.replacementStartOffset,
-                                endOffset = candidate.replacementStartOffset + candidate.replacementText.length,
-                            )
-                    } else {
-                        projectedTokens += baseTokens[i]
-                    }
-                }
-                projectedTokens to activeIdx
-            } else {
-                val projectedCursorOffset =
-                    (candidate.replacementStartOffset + candidate.replacementText.length).coerceIn(0, commandLine.length)
-                val projectedContext =
-                    TerminalCommandLineTokenizer.parse(
-                        commandLine,
-                        projectedCursorOffset,
-                        request.shellCapabilities.syntax,
-                    )
-                projectedContext.tokens to projectedContext.activeTokenIndex
-            }
-
+        // Outcome identity describes the edited input, not alias-expanded semantic tokens.
+        val projectedContext =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                candidate.replacementStartOffset + candidate.replacementText.length,
+                request.shellCapabilities.syntax,
+            )
+        val tokens = projectedContext.tokens
+        val activeIndex = projectedContext.activeTokenIndex
+        // Whole-line history may append arguments; match the user's original word,
+        // not the last word inserted by that candidate or an alias-generated word.
+        val originalActiveIndex =
+            TerminalCommandLineTokenizer
+                .parse(
+                    request.commandLine,
+                    request.cursorOffset,
+                    request.shellCapabilities.syntax,
+                ).activeTokenIndex
         if (tokens.firstCommandTokenIndex() >= tokens.size) return null
         val outcomeKey =
             outcomeKey(
@@ -85,7 +66,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
             groupKey = outcomeKey,
             exactCommandLine = commandLine,
             activeValue =
-                outcomeKey.getOrNull(lineContext.activeTokenIndex)?.let { value ->
+                outcomeKey.getOrNull(originalActiveIndex)?.let { value ->
                     if (context.attachedOptionValue == null) value else value.substringAfter('=')
                 },
         )
@@ -107,16 +88,6 @@ internal class TerminalCompletionOutcomeKeyResolver {
             index++
         }
         return resultTokens
-    }
-
-    private fun hasSpecialSyntax(text: String): Boolean {
-        for (i in 0 until text.length) {
-            val c = text[i]
-            if (c.isWhitespace() || c == '\'' || c == '"' || c == '\\' || c == '|' || c == '&' || c == ';') {
-                return true
-            }
-        }
-        return false
     }
 
     private fun normalizePathToken(

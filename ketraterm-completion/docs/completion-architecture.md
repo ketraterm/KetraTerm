@@ -29,6 +29,8 @@ explicit `shellProvider`; omitting it selects the original factory contract.
 | `TerminalCompletionLearningStore` | Bounded learning, immutable snapshots, and host-recorded outcomes. |
 
 Candidate replacement offsets address the original request's command line.
+Outcome grouping tokenizes the edited input, independently of alias-expanded
+semantic context, so equivalent whole-line, token, and quoted edits merge consistently.
 They are inclusive at the start, exclusive at the end, and must preserve UTF-16
 scalar boundaries. The engine filters edits outside the request or not spanning
 its cursor before ranking. `displayText`, `detail`, and `matchedRanges` describe

@@ -123,12 +123,11 @@ public class SwingShellSuggestionInteraction(
         val previous = snapshot.selectedSuggestion.takeIf { preserveSelection }
         val copied = Collections.unmodifiableList(ArrayList(suggestions))
         var selection = selectedIndex
-        if (previous != null) {
+        val previousOutcome = previous?.commandTextAfterReplacement(request)
+        if (previousOutcome != null) {
             val retained =
                 copied.indexOfFirst {
-                    it.replacementStartOffset == previous.replacementStartOffset &&
-                        it.replacementEndOffset == previous.replacementEndOffset &&
-                        it.replacementText == previous.replacementText
+                    it.commandTextAfterReplacement(request) == previousOutcome
                 }
             if (retained >= 0) selection = retained
         }
