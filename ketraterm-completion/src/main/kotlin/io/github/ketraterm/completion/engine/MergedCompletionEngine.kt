@@ -72,7 +72,8 @@ internal class MergedCompletionEngine(
                 return@channelFlow
             }
 
-            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs, shellProvider?.commandAliases().orEmpty())
+            val aliases = callShellProvider { shellProvider?.commandAliases() }.orEmpty()
+            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs, aliases)
             if (!completionContext.isCompletionAllowed) {
                 send(emptyList())
                 return@channelFlow
@@ -264,13 +265,21 @@ internal class MergedCompletionEngine(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate>? =
-        try {
+        callShellProvider {
             val result = shellProvider?.complete(request, context, SOURCE_CANDIDATE_LIMIT)
-            currentCoroutineContext().ensureActive()
             result
                 ?.filter { it.hasValidReplacementRangeFor(request) }
                 ?.filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
                 ?.boundedTo(SOURCE_CANDIDATE_LIMIT)
+        }
+
+    /** Both shell entry points share diagnostics and preserve request cancellation. */
+    private suspend fun <T> callShellProvider(action: suspend () -> T): T? =
+        try {
+            currentCoroutineContext().ensureActive()
+            val result = action()
+            currentCoroutineContext().ensureActive()
+            result
         } catch (_: CancellationException) {
             currentCoroutineContext().ensureActive()
             null

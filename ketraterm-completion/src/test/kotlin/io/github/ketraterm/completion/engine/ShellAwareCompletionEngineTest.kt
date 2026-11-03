@@ -25,12 +25,113 @@ import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
+    @Test
+    fun `request cancellation during metadata capture prevents shell queries and publication`() =
+        runTest {
+            var metadataRead = false
+            var shellQueries = 0
+            val publications = mutableListOf<List<TerminalCompletionCandidate>>()
+            val failures = mutableListOf<Throwable>()
+            val collection =
+                launch {
+                    val owner = currentCoroutineContext().job
+                    val engine =
+                        TerminalCompletionEngines.fromSources(
+                            emptyList(),
+                            sourceFailureHandler = { _, _, failure -> failures += failure },
+                            shellProvider =
+                                object : TerminalCompletionShellProvider {
+                                    override fun commandAliases(): Map<String, String> {
+                                        metadataRead = true
+                                        owner.cancel()
+                                        return emptyMap()
+                                    }
+
+                                    override suspend fun complete(
+                                        request: TerminalCompletionRequest,
+                                        context: TerminalCompletionContext,
+                                        limit: Int,
+                                    ): List<TerminalCompletionCandidate>? {
+                                        shellQueries++
+                                        return null
+                                    }
+                                },
+                        )
+                    engine.completions(request("ca")).toList(publications)
+                }
+            collection.join()
+            assertTrue(metadataRead)
+            assertTrue(collection.isCancelled)
+            assertEquals(0, shellQueries)
+            assertTrue(publications.isEmpty())
+            assertTrue(failures.isEmpty())
+        }
+
+    @Test
+    fun `alias metadata failures are diagnosed without losing shell authority and subsequent requests recover`() =
+        runTest {
+            val failure = IllegalStateException("metadata unavailable")
+            val reported = mutableListOf<Throwable>()
+            var failing = true
+            var shellQueries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    emptyList(),
+                    commandSpecs = listOf(TerminalCommandSpec("cargo"), TerminalCommandSpec("cat")),
+                    sourceFailureHandler = { _, _, error -> reported += error },
+                    shellProvider =
+                        object : TerminalCompletionShellProvider {
+                            override fun commandAliases(): Map<String, String> {
+                                if (failing) throw failure
+                                return emptyMap()
+                            }
+
+                            override suspend fun complete(
+                                request: TerminalCompletionRequest,
+                                context: TerminalCompletionContext,
+                                limit: Int,
+                            ): List<TerminalCompletionCandidate> {
+                                shellQueries++
+                                return listOf(TerminalCompletionCandidate("cargo", 0, 2, "shell", TerminalCompletionCandidateKind.COMMAND))
+                            }
+                        },
+                )
+            repeat(2) {
+                assertEquals(listOf("cargo"), engine.completions(request("ca")).last().map { it.replacementText })
+                failing = false
+            }
+            assertSame(failure, reported.single())
+            assertEquals(2, shellQueries)
+        }
+
+    @Test
+    fun `fatal alias metadata failure propagates and is reported without querying the shell`() =
+        runTest {
+            val failure = AssertionError("fatal metadata failure")
+            val reported = mutableListOf<Throwable>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    emptyList(),
+                    sourceFailureHandler = { _, _, error -> reported += error },
+                    shellProvider =
+                        object : TerminalCompletionShellProvider {
+                            override fun commandAliases(): Map<String, String> = throw failure
+
+                            override suspend fun complete(
+                                request: TerminalCompletionRequest,
+                                context: TerminalCompletionContext,
+                                limit: Int,
+                            ): List<TerminalCompletionCandidate> = error("must not query after fatal failure")
+                        },
+                )
+            assertEquals(failure.message, assertFailsWith<AssertionError> { engine.completions(request("ca")).last() }.message)
+            assertSame(failure, reported.single())
+        }
+
     @Test
     fun `branch prefixes use runtime or native results without filesystem noise after shortening and quoting`() =
         runTest {

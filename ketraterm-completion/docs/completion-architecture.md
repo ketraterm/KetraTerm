@@ -158,6 +158,9 @@ Ordinary source exceptions reach `TerminalCompletionSourceFailureHandler` and
 contribute an empty result. Unexpected errors are reported, fail collection,
 and cancel sibling sources. Independent source cancellation contributes an
 empty result; cancelling the request collection cancels all source work.
+Shell alias-metadata reads use the same failure boundary as shell completion
+queries. An unavailable alias snapshot contributes no definitions, while shell
+command authority is still queried normally; fatal errors stop the request.
 Failure handlers may run concurrently and must return promptly without
 throwing. Sources must cooperate with cancellation and must not launch their
 own jobs. A shared engine can evaluate concurrent requests, so host providers
