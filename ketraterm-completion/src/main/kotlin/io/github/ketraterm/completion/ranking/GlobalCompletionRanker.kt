@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.completion.source.hasNonPathValueDomain
+import kotlin.math.abs
 
 /** One source's bounded candidate surplus plus stable composition metadata. */
 internal data class CompletionSourceCandidates(
@@ -74,7 +75,6 @@ internal class GlobalCompletionRanker {
 
         fun ingest(sourceResult: CompletionSourceCandidates) {
             val locallyRanked = sourceResult.candidates.sortedLocally()
-            val bestByOutcome = LinkedHashMap<Any, RankedContribution>()
             for (candidateIndex in locallyRanked.indices) {
                 val candidate = locallyRanked[candidateIndex]
                 val resolved = outcomeResolver.resolve(request, candidate, context)
@@ -95,12 +95,6 @@ internal class GlobalCompletionRanker {
                                 if (sourceResult.isFallback) fallbackContextAdjustment(candidate) else 0,
                         exactLearningAdjustment = learnedIndex?.adjustment(resolved, learningContext, now) ?: 0,
                     )
-                val existing = bestByOutcome[key]
-                if (existing == null || EDIT_REPRESENTATIVE_ORDER.compare(contribution, existing) < 0) {
-                    bestByOutcome[key] = contribution
-                }
-            }
-            for ((key, contribution) in bestByOutcome) {
                 val outcome = outcomes[key]
                 if (outcome == null) {
                     outcomes[key] = RankedOutcome(contribution, preferLiveResults = context.hasNonPathValueDomain())
@@ -141,6 +135,7 @@ internal class GlobalCompletionRanker {
         private var sourcePrior = first.sourcePrior
         private var semanticRelevance = first.semanticRelevance
         private var matchRelevance = first.matchRelevance
+        private var exactLearningAdjustment = first.exactLearningAdjustment
 
         fun add(contribution: RankedContribution) {
             if (EDIT_REPRESENTATIVE_ORDER.compare(contribution, representative) < 0) representative = contribution
@@ -149,12 +144,20 @@ internal class GlobalCompletionRanker {
             strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
             semanticRelevance = maxOf(semanticRelevance, contribution.semanticRelevance)
             matchRelevance = maxOf(matchRelevance, contribution.matchRelevance)
+            val learning = contribution.exactLearningAdjustment
+            // Keep the strongest signed preference, independently of presentation.
+            // Repeated providers cannot multiply it; equal conflicting evidence favors dismissal.
+            if (abs(learning) > abs(exactLearningAdjustment) ||
+                (abs(learning) == abs(exactLearningAdjustment) && learning < exactLearningAdjustment)
+            ) {
+                exactLearningAdjustment = learning
+            }
         }
 
         // Keep the public numeric score consistent with the same lexicographic ranking policy.
         val score: Long
             get() {
-                val evidence = reciprocalRank(bestLocalRank) + sourcePrior + strongestContext + representative.exactLearningAdjustment
+                val evidence = reciprocalRank(bestLocalRank) + sourcePrior + strongestContext + exactLearningAdjustment
                 return semanticRelevance * SEMANTIC_RELEVANCE_SCALE + matchRelevance * MATCH_RELEVANCE_SCALE +
                     (if (preferLiveResults && !representative.isFallback) LIVE_RESULT_SCALE else 0L) +
                     evidence.coerceIn(-EVIDENCE_SCORE_BOUND, EVIDENCE_SCORE_BOUND)

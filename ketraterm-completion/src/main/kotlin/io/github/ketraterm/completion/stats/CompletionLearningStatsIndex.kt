@@ -97,7 +97,12 @@ internal class CompletionLearningStatsIndex(
             previous.copy(
                 acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
                 dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
-                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                lastUsedEpochMillis =
+                    if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
+                        maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis)
+                    } else {
+                        previous.lastUsedEpochMillis
+                    },
             )
         }
 

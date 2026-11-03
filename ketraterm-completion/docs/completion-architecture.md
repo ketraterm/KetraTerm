@@ -368,6 +368,12 @@ a redundant trailing separator; it does not resolve `..`, symlinks, URI
 authorities, environment variables, or filesystem case.
 
 Semantic context and bounded exact learning evidence adjust the fused result.
+Recency reflects executions and accepted suggestions; dismissal reduces preference
+without renewing the command's usage timestamp. Equivalent contributing edits
+retain the strongest signed learning adjustment independently of the chosen
+presentation. Evidence is never summed across providers; equal-strength conflicting
+adjustments favor dismissal. An edit with no evidence cannot erase another edit's
+positive or negative preference.
 Failed executions do not penalize ordering. Ranking evidence never becomes an
 extra provider vote. Learned candidates act as a fallback, allowing live semantic
 providers to supply presentation while matching learned evidence strengthens

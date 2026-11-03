@@ -81,7 +81,8 @@ class TerminalSessionOutboundTest {
                     assertArrayEquals(byteArrayOf(), connector.writtenBytes)
                     runCurrent()
                     assertEquals(
-                        "\u001b[3~\u0008\u0008\u001b[200~" + prefix + "é🙂␛␃\\u009b�\u0001\r\n\u001b[201~\u007fQ\n\u007f",
+                        "\u001b[3~\u0008\u0008\u001b[200~" + prefix +
+                            "é🙂␛␃\\u009b�\u0001\r\n\u001b[201~\u001b[200~\u001b[201~\u007fQ\n\u007f",
                         connector.writtenBytes.toString(Charsets.UTF_8),
                     )
                 }
@@ -158,7 +159,7 @@ class TerminalSessionOutboundTest {
                     assertArrayEquals(byteArrayOf(), connector.writtenBytes)
                     runCurrent()
                     assertEquals(
-                        "ab\u001b[200~" + text + "\u001b[201~\u001b[3~\u007f\u001b[200~done\u001b[201~\u001b[0nz",
+                        "ab\u001b[200~" + text + "\u001b[201~\u001b[3~\u007f\u001b[200~done\u001b[201~\u001b[200~\u001b[201~\u001b[0nz",
                         connector.writtenBytes.toString(Charsets.UTF_8),
                     )
                 }

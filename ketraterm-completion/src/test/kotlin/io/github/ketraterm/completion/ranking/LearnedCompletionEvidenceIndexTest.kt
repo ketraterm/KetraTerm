@@ -15,10 +15,12 @@
  */
 package io.github.ketraterm.completion.ranking
 
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
@@ -27,6 +29,69 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LearnedCompletionEvidenceIndexTest {
+    @Test
+    fun `dismissal without usage retains only negative preference`() {
+        val store = TerminalCompletionLearningStore()
+        store.recordSuggestionFeedback("git status", TerminalCompletionFeedbackKind.DISMISSED, null, null, NOW)
+
+        assertEquals(
+            0L,
+            store
+                .snapshot()
+                .rankingStats
+                .single()
+                .lastUsedEpochMillis,
+        )
+        assertEquals(
+            -10,
+            store.indexesFor(TerminalShellSyntax.POSIX).evidence.exactAdjustment(
+                terminalCompletionRankingIdentity("git status"),
+                CompletionLearningContextKey.of(null, null),
+                NOW,
+            ),
+        )
+        assertTrue(store.snapshot().replayCommands.isEmpty())
+    }
+
+    @Test
+    fun `dismissal reduces old positive evidence without renewing its recency`() {
+        val store = TerminalCompletionLearningStore()
+        val old = NOW - 40L * 24L * 60L * 60L * 1000L
+        store.recordCommandResult("git status", true, "profile", "file:///repo", old)
+        val context = CompletionLearningContextKey.of("profile", "file:///repo")
+
+        fun adjustment() =
+            store.indexesFor(TerminalShellSyntax.POSIX).evidence.exactAdjustment(
+                terminalCompletionRankingIdentity("git status"),
+                context,
+                NOW,
+            )
+        val before = adjustment()
+
+        store.recordSuggestionFeedback("git status", TerminalCompletionFeedbackKind.DISMISSED, "profile", "file:///repo", NOW)
+
+        assertEquals(before - 10, adjustment())
+        assertEquals(
+            old,
+            store
+                .snapshot()
+                .rankingStats
+                .single()
+                .lastUsedEpochMillis,
+        )
+
+        store.recordSuggestionFeedback("git status", TerminalCompletionFeedbackKind.ACCEPTED, "profile", "file:///repo", NOW)
+        assertEquals(before + 60, adjustment())
+        assertEquals(
+            NOW,
+            store
+                .snapshot()
+                .rankingStats
+                .single()
+                .lastUsedEpochMillis,
+        )
+    }
+
     @Test
     fun `empty evidence has a zero adjustment`() {
         val index = CompletionLearningIndexCache().indexesFor(TerminalCompletionLearningSnapshot.EMPTY, TerminalShellSyntax.POSIX).evidence

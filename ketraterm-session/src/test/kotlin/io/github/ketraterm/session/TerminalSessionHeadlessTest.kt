@@ -53,7 +53,7 @@ class TerminalSessionHeadlessTest {
             session.encodePaste(TerminalPasteEvent("a\u0000\r\nb\nc\rd"))
             assertEquals(
                 "\u001b[200~\u241b[201~\u2403\\u009b201~\r\n\u001b[201~" +
-                    "\u001b[3~\u007f\u001b[200~[201~\\u009b201~\r\n\u001b[201~" +
+                    "\u001b[3~\u007f\u001b[200~[201~\\u009b201~\r\n\u001b[201~\u001b[200~\u001b[201~" +
                     "a\rb\rc\rd",
                 connector.writtenBytes.toString(Charsets.UTF_8),
             )

@@ -33,7 +33,8 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * @property failureCount number of unsuccessful executions. This is observational and does not penalize ranking.
  * @property acceptedCount number of accepted suggestions producing this outcome.
  * @property dismissedCount number of dismissed suggestions producing this outcome.
- * @property lastUsedEpochMillis newest execution or feedback timestamp represented by this row.
+ * @property lastUsedEpochMillis newest execution or acceptance timestamp represented by this row;
+ * dismissal does not renew usage recency.
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
  * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
  */

@@ -93,7 +93,7 @@ class SwingCompletionFeedbackRecorderTest {
             assertEquals("bash", ranking.profileId)
             assertEquals("file:///repo/", ranking.workingDirectoryUri)
             assertEquals(1, ranking.dismissedCount)
-            assertEquals(2_000L, ranking.lastUsedEpochMillis)
+            assertEquals(0L, ranking.lastUsedEpochMillis)
             assertTrue(
                 TerminalCompletionEngines
                     .fromSources(

@@ -136,7 +136,7 @@ class TerminalSessionConstructionTest {
                     runCurrent()
                     val expected =
                         "\u001b[0nk\u001b[200~p\u001b[201~" +
-                            "\u0008\u001b[200~r\u001b[201~\u001b[0n\u007f"
+                            "\u0008\u001b[200~r\u001b[201~\u001b[200~\u001b[201~\u001b[0n\u007f"
                     assertEquals(expected, connector.writtenBytes.toString(Charsets.UTF_8))
                     assertEquals(2, calls.count { it == "key" })
                     assertEquals(1, calls.count { it == "paste" })

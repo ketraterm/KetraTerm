@@ -89,7 +89,7 @@ class CompletionLearningStatsIndexTest {
         assertEquals(1, two.failureCount)
         assertEquals(1, two.acceptedCount)
         assertEquals(1, two.dismissedCount)
-        assertEquals(4L, two.lastUsedEpochMillis)
+        assertEquals(3L, two.lastUsedEpochMillis)
     }
 
     @Test

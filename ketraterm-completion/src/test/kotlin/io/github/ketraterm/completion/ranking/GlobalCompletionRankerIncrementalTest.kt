@@ -15,14 +15,104 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlin.test.*
 
 class GlobalCompletionRankerIncrementalTest {
+    @Test
+    fun `conflicting equivalent preferences use strongest magnitude with negative ties in either arrival order`() {
+        val request = TerminalCompletionRequest("g", 1, shellCapabilities = TerminalShellCapabilities.POSIX)
+        val context = TerminalCompletionContext.resolve(request)
+        val live = TerminalCompletionCandidate("git", 0, 1, "shell", TerminalCompletionCandidateKind.COMMAND)
+        val quoted = live.copy(replacementText = "'git'")
+
+        fun score(
+            acceptances: Int,
+            dismissals: Int,
+            reversed: Boolean,
+        ): Int {
+            val store = TerminalCompletionLearningStore()
+            repeat(acceptances) { store.recordSuggestionFeedback("git", TerminalCompletionFeedbackKind.ACCEPTED, null, null, 0) }
+            repeat(dismissals) { store.recordSuggestionFeedback("'git'", TerminalCompletionFeedbackKind.DISMISSED, null, null, 0) }
+            val state =
+                GlobalCompletionRanker().createRequestState(
+                    request,
+                    context,
+                    10,
+                    0,
+                    store.indexesFor(TerminalShellSyntax.POSIX).evidence,
+                )
+            val sources =
+                listOf(
+                    CompletionSourceCandidates(0, 0, candidates = listOf(live)),
+                    CompletionSourceCandidates(1, 0, candidates = listOf(quoted)),
+                )
+            for (source in if (reversed) sources.reversed() else sources) state.ingest(source)
+            return state.rankedCandidates().single().score
+        }
+        val baseline = score(0, 0, false)
+        for (reversed in listOf(false, true)) {
+            assertEquals(baseline + 30, score(3, 2, reversed))
+            assertEquals(baseline - 30, score(2, 3, reversed))
+            assertEquals(baseline - 20, score(2, 2, reversed))
+        }
+    }
+
+    @Test
+    fun `equivalent edits retain positive and negative learning independently of presentation and provider count`() {
+        val request = TerminalCompletionRequest("cd ", 3, shellCapabilities = TerminalShellCapabilities.POSIX)
+        val context = TerminalCompletionContext.resolve(request)
+        val live = TerminalCompletionCandidate("build/", 3, 3, "path", TerminalCompletionCandidateKind.PATH)
+        val learned = live.copy(replacementText = "'build'", source = "learned")
+        val now = 2_000_000_000_000L
+
+        fun rank(
+            feedback: TerminalCompletionFeedbackKind?,
+            together: Boolean,
+            reversed: Boolean,
+            duplicate: Boolean,
+        ): Int {
+            val store = TerminalCompletionLearningStore()
+            if (feedback != null) store.recordSuggestionFeedback("cd 'build'", feedback, null, null, now)
+            val state =
+                GlobalCompletionRanker().createRequestState(
+                    request,
+                    context,
+                    10,
+                    now,
+                    store.indexesFor(TerminalShellSyntax.POSIX).evidence,
+                )
+            val sources =
+                if (together) {
+                    listOf(CompletionSourceCandidates(0, 0, candidates = listOf(live, learned)))
+                } else {
+                    listOf(
+                        CompletionSourceCandidates(0, 0, candidates = listOf(live)),
+                        CompletionSourceCandidates(1, 0, isFallback = true, candidates = listOf(learned)),
+                    )
+                }
+            for (source in if (reversed) sources.reversed() else sources) state.ingest(source)
+            if (duplicate) state.ingest(CompletionSourceCandidates(2, 0, isFallback = true, candidates = listOf(learned, learned)))
+            val result = state.rankedCandidates().single()
+            assertEquals("build/", result.replacementText)
+            assertEquals("path", result.source)
+            return result.score
+        }
+
+        for (together in listOf(false, true)) {
+            val baseline = rank(null, together, false, false)
+            for (reversed in listOf(false, true)) {
+                for (duplicate in listOf(false, true)) {
+                    assertEquals(baseline + 70, rank(TerminalCompletionFeedbackKind.ACCEPTED, together, reversed, duplicate))
+                    assertEquals(baseline - 10, rank(TerminalCompletionFeedbackKind.DISMISSED, together, reversed, duplicate))
+                }
+            }
+        }
+    }
+
     @Test
     fun `progressive merges preserve final ordering metadata and scores across all source arrival orders`() {
         val token = Any()

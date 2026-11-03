@@ -16,6 +16,7 @@
 package io.github.ketraterm.workspace
 
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.session.TerminalInputAdmission
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -108,12 +109,16 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
     }
 
     @Test
-    fun `Bash inventory survives deletion and guarded acceptance through real Readline`(): Unit =
+    fun `Bash inventory survives deletion and guarded acceptance through real Readline`(
+        @TempDir tempDir: Path,
+    ): Unit =
         runBlocking {
             assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
             val bash = installedExecutable("bash", "bash.exe")
             assumeTrue(bash != null, "Bash is not installed")
             assumeBashCommandInventory(bash!!)
+            val inputrc = tempDir.resolve("inputrc")
+            Files.writeString(inputrc, "set enable-active-region on\nset enable-bracketed-paste on\nset editing-mode emacs\n")
             TerminalWorkspace().use { workspace ->
                 val tab =
                     workspace.openTab(
@@ -121,7 +126,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                             "bash",
                             "Bash",
                             listOf(bash, "--noprofile", "--norc", "-i"),
-                            environment = mapOf("PS1" to "ketra> ", "PATH" to "/usr/bin:/bin"),
+                            environment = mapOf("PS1" to "ketra> ", "PATH" to "/usr/bin:/bin", "INPUTRC" to inputrc.toString()),
                         ),
                         TerminalWorkspaceOpenOptions(),
                     )
@@ -132,12 +137,40 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == line }
                     }
                 }
+
+                suspend fun awaitRenderedLine(
+                    line: String,
+                    highlighted: Boolean,
+                ) {
+                    withTimeout(15.seconds) {
+                        session.renderGeneration.first {
+                            val command = session.activeShellCommandLine()
+                            if (command?.commandText != line) return@first false
+                            var matches = false
+                            session.readRenderFrame { frame ->
+                                val attrs = LongArray(frame.columns)
+                                frame.copyLine(
+                                    command.cursorRow,
+                                    IntArray(frame.columns),
+                                    attrWords = attrs,
+                                    flags = IntArray(frame.columns),
+                                )
+                                val start = command.cursorColumn - line.length
+                                matches = start >= 0 &&
+                                    (start until command.cursorColumn).all { column ->
+                                        TerminalRenderAttrs.isInverse(attrs[column]) == highlighted
+                                    }
+                            }
+                            matches
+                        }
+                    }
+                }
                 awaitLine("")
                 withTimeout(15.seconds) {
                     session.shellCompletionCommands.first { commands -> commands?.any { it.displayText == "printf" } == true }
                 }
                 session.submitInput(TerminalPasteEvent("prin"))
-                awaitLine("prin")
+                awaitRenderedLine("prin", highlighted = true)
                 session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
                 awaitLine("pri")
                 val expected = assertNotNull(session.captureCommandEdit())
@@ -147,6 +180,11 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 3, candidate.replacementText))),
                 )
+                awaitRenderedLine("printf", highlighted = false)
+                session.submitInput(TerminalTextReplacementEvent(0, 0, "123"))
+                awaitRenderedLine("printf123", highlighted = false)
+                // An empty closing paste must not create another undo step.
+                session.submitInput(TerminalKeyEvent.codepoint('_'.code, TerminalModifiers.CTRL))
                 awaitLine("printf")
                 for (definition in listOf("git switch", "git checkout")) {
                     session.submitInput(

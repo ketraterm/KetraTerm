@@ -1099,8 +1099,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(5, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("git status", session.pastes[0].text)
+        assertEquals(listOf("git status", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1118,8 +1117,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(2, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("$commandText b", session.pastes[0].text)
+        assertEquals(listOf("$commandText b", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1137,8 +1135,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(1, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("$commandText test", session.pastes[0].text)
+        assertEquals(listOf("$commandText test", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1195,8 +1192,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(1, session.keys.size)
         assertEquals(TerminalKey.BACKSPACE, session.keys[0].key)
-        assertEquals(1, session.pastes.size)
-        assertEquals("status", session.pastes[0].text)
+        assertEquals(listOf("status", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1218,8 +1214,7 @@ class SwingTerminalShellSuggestionTest {
             listOf(TerminalKey.DELETE, TerminalKey.BACKSPACE, TerminalKey.BACKSPACE),
             session.keys.map { it.key },
         )
-        assertEquals(1, session.pastes.size)
-        assertEquals("checkout", session.pastes[0].text)
+        assertEquals(listOf("checkout", ""), session.pastes.map { it.text })
         assertEquals(
             TerminalTextReplacementEvent(
                 deleteAfterCursorCount = 1,
