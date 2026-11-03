@@ -606,6 +606,12 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
         assertTrue(result.stdout.contains("space%20%25%20directory"), visibleEscapes(result.stdout))
+        val directoryUri = assertNotNull(Regex("\u001b]7;([^\u0007]*)\u0007").find(result.stdout)).groupValues[1]
+        assertEquals(
+            workingDirectory.toAbsolutePath().normalize(),
+            Path.of(URI("file", null, URI(directoryUri).path, null)).toAbsolutePath().normalize(),
+            "The shell directory must resolve to the native host directory",
+        )
     }
 
     @Test

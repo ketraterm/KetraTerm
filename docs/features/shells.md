@@ -66,6 +66,8 @@ Bash 5.3+ with `base64` starts background command discovery at each terminal pro
 launches inside WSL. It installs no completion key binding and does not invoke
 programmable argument completers. Prompt-time discovery includes session aliases
 and functions as well as builtins and executable commands from the shell's `PATH`.
+Git Bash and Cygwin publish native Windows directory URIs so local path and Git
+completion resolve the same directory as the shell.
 Literal alias definitions feed shared argument analysis while accepted edits preserve
 the user's alias; see the [supported alias subset](completion.md#sources-by-host).
 

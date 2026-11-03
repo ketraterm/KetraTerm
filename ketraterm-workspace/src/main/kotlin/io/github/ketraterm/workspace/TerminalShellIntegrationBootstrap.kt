@@ -474,7 +474,13 @@ internal object TerminalShellIntegrationBootstrap {
                 REPLY=${'$'}__ketraterm_encoded
             }
             __ketraterm_osc7() {
-                __ketraterm_encode_uri_path "${'$'}PWD"
+                local __ketraterm_directory=${'$'}PWD
+                # MSYS/Cygwin mount paths are not native Windows file URI paths.
+                if [[ (${'$'}OSTYPE == msys* || ${'$'}OSTYPE == cygwin*) && -x /usr/bin/cygpath ]]; then
+                    __ketraterm_directory=${'$'}(/usr/bin/cygpath -m -- "${'$'}PWD") || __ketraterm_directory=${'$'}PWD
+                    [[ ${'$'}__ketraterm_directory == /* ]] || __ketraterm_directory=/"${'$'}__ketraterm_directory"
+                fi
+                __ketraterm_encode_uri_path "${'$'}__ketraterm_directory"
                 printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_hostname" "${'$'}REPLY"
             }
             __ketraterm_install_prompt_end() {
