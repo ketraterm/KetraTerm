@@ -87,6 +87,9 @@ or replay guesses. No candidates are published while a native query could
 invalidate their captured editing context.
 PowerShell path outcomes normalize slash direction, leading `./`, quoting, and
 trailing directory separators; insertion keeps the chosen source's original edit.
+POSIX and plain-syntax backslashes remain literal filename characters. An `=`
+introduces a separately normalized path only for a resolved attached option value;
+an `=` within an ordinary filename remains part of that path.
 
 After any initial shell query, each request captures one compiled learning-index
 set before ordinary source evaluation.

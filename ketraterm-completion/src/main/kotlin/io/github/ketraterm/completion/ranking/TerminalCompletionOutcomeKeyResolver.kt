@@ -60,6 +60,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
                 tokens = tokens,
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
+                attachedOptionValue = context.attachedOptionValue != null && activeIndex == originalActiveIndex,
                 shellSyntax = request.shellCapabilities.syntax,
             ) ?: return null
         return ResolvedCompletionOutcome(
@@ -76,6 +77,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         tokens: List<TerminalCommandLineToken>,
         pathTokenIndex: Int,
         pathAware: Boolean,
+        attachedOptionValue: Boolean,
         shellSyntax: TerminalShellSyntax,
     ): List<String>? {
         if (tokens.isEmpty()) return null
@@ -84,7 +86,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         var index = 0
         while (index < tokens.size) {
             val tokenText = tokens[index].text
-            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText, shellSyntax) else tokenText
+            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText, shellSyntax, attachedOptionValue) else tokenText
             index++
         }
         return resultTokens
@@ -93,15 +95,18 @@ internal class TerminalCompletionOutcomeKeyResolver {
     private fun normalizePathToken(
         token: String,
         shellSyntax: TerminalShellSyntax,
+        attachedOptionValue: Boolean,
     ): String {
-        val separatorIndex = token.indexOf('=')
+        // An equals sign in a positional filename is literal, not an option/value boundary.
+        val separatorIndex = if (attachedOptionValue) token.indexOf('=') else -1
+        val windowsSeparators = shellSyntax == TerminalShellSyntax.POWERSHELL
 
         fun path(value: String): String {
-            var normalized = if (shellSyntax == TerminalShellSyntax.POWERSHELL) value.replace('\\', '/') else value
-            if (shellSyntax == TerminalShellSyntax.POWERSHELL) {
+            var normalized = if (windowsSeparators) value.replace('\\', '/') else value
+            if (windowsSeparators) {
                 while (normalized.length > 2 && normalized.startsWith("./")) normalized = normalized.substring(2)
             }
-            return stripRedundantTrailingSeparators(normalized)
+            return stripRedundantTrailingSeparators(normalized, windowsSeparators)
         }
         return if (separatorIndex > 0) {
             token.substring(0, separatorIndex + 1) + path(token.substring(separatorIndex + 1))
@@ -110,21 +115,24 @@ internal class TerminalCompletionOutcomeKeyResolver {
         }
     }
 
-    private fun stripRedundantTrailingSeparators(value: String): String {
+    private fun stripRedundantTrailingSeparators(
+        value: String,
+        windowsSeparators: Boolean,
+    ): String {
         var end = value.length
-        while (end > 1 && isPathSeparator(value[end - 1]) && !isRoot(value, end)) end--
+        // PowerShell backslashes are normalized above; remaining backslashes are literal filename characters.
+        while (end > 1 && value[end - 1] == '/' && !isRoot(value, end, windowsSeparators)) end--
         return if (end == value.length) value else value.substring(0, end)
     }
 
     private fun isRoot(
         value: String,
         end: Int,
+        windowsSeparators: Boolean,
     ): Boolean =
         end == 1 ||
-            (end == WINDOWS_ROOT_LENGTH && value[1] == ':' && isPathSeparator(value[2])) ||
-            (end == UNC_ROOT_LENGTH && isPathSeparator(value[0]) && isPathSeparator(value[1]))
-
-    private fun isPathSeparator(value: Char): Boolean = value == '/' || value == '\\'
+            (windowsSeparators && end == WINDOWS_ROOT_LENGTH && value[1] == ':' && value[2] == '/') ||
+            (end == UNC_ROOT_LENGTH && value[0] == '/' && value[1] == '/')
 
     private companion object {
         private const val NO_PATH_TOKEN = -1
