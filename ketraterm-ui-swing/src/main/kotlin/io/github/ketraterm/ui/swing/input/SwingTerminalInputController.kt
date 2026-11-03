@@ -76,7 +76,6 @@ internal class SwingTerminalInputController(
                 host.resetCursorBlink()
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
-                host.invalidateShellSuggestions()
                 submitKey(keyEvent)
                 event.consume()
             }
@@ -99,18 +98,17 @@ internal class SwingTerminalInputController(
                     return
                 }
                 val keyEvent = keyMapper.keyTyped(event) ?: return
-                host.invalidateShellSuggestions()
                 submitKey(keyEvent)
                 event.consume()
             }
         }
 
     private fun submitKey(event: TerminalKeyEvent) {
-        if (host.session?.submitInput(event) != TerminalInputAdmission.ACCEPTED) return
-        // Admission also accepts suppressed events; modifier and system keys do not request editing/navigation.
+        // Modifier and system keys can be reported to the shell without editing
+        // the command line. Keep popup invalidation and viewport following aligned.
         val key = event.key
-        if (key != null &&
-            (
+        val preservesCommandLine =
+            key != null && (
                 key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal ||
                     key == TerminalKey.CAPS_LOCK ||
                     key == TerminalKey.NUM_LOCK ||
@@ -119,10 +117,10 @@ internal class SwingTerminalInputController(
                     key == TerminalKey.PAUSE ||
                     key == TerminalKey.MENU
             )
-        ) {
-            return
+        if (!preservesCommandLine) host.invalidateShellSuggestions()
+        if (host.session?.submitInput(event) == TerminalInputAdmission.ACCEPTED && !preservesCommandLine) {
+            host.scrollToLiveViewport()
         }
-        host.scrollToLiveViewport()
     }
 
     val focusListener =

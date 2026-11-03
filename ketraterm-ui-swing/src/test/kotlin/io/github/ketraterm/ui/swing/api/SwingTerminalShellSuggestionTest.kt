@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
@@ -481,6 +482,73 @@ class SwingTerminalShellSuggestionTest {
             assertTrue(component.currentShellSuggestionState().visible)
             assertEquals(2, component.currentShellSuggestionState().count)
             component.dispose()
+        }
+    }
+
+    @Test
+    fun `shift keeps popup selection and forwards key events until text is typed`() {
+        val encoders = ArrayList<RecordingInputEncoder>()
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(30, 4),
+                connector = RecordingConnector(),
+                inputEncoderFactory = { _, _, _ -> RecordingInputEncoder().also(encoders::add) },
+                workerDispatcher = mutationDispatcher,
+                ioDispatcher = mutationDispatcher,
+            )
+        SwingUtilities.invokeAndWait {
+            val component = newTerminal(settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } })
+            try {
+                session.start(columns = 30, rows = 4)
+                component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
+                component.size = component.preferredGridSize(12, 4)
+                component.showSuggestions(request(), suggestions(), selectedIndex = 1)
+                val selected = component.currentShellSuggestionState().selectedSuggestion
+                val invalidations = ArrayList<Boolean>()
+                component.addShellSuggestionInvalidationListener { invalidations += component.currentShellSuggestionState().visible }
+
+                val press =
+                    KeyEvent(
+                        component,
+                        KeyEvent.KEY_PRESSED,
+                        0L,
+                        InputEvent.SHIFT_DOWN_MASK,
+                        KeyEvent.VK_SHIFT,
+                        KeyEvent.CHAR_UNDEFINED,
+                        KeyEvent.KEY_LOCATION_LEFT,
+                    )
+                component.keyListeners.forEach { it.keyPressed(press) }
+                assertTrue(component.currentShellSuggestionState().visible)
+                val release =
+                    KeyEvent(
+                        component,
+                        KeyEvent.KEY_RELEASED,
+                        0L,
+                        0,
+                        KeyEvent.VK_SHIFT,
+                        KeyEvent.CHAR_UNDEFINED,
+                        KeyEvent.KEY_LOCATION_LEFT,
+                    )
+                component.keyListeners.forEach { it.keyReleased(release) }
+                mutationDispatcher.scheduler.runCurrent()
+
+                assertTrue(component.currentShellSuggestionState().visible)
+                assertEquals(selected, component.currentShellSuggestionState().selectedSuggestion)
+                assertTrue(invalidations.isEmpty())
+                val encodedKeys = encoders.flatMap { it.keys }
+                assertEquals(listOf(TerminalKey.LEFT_SHIFT, TerminalKey.LEFT_SHIFT), encodedKeys.map { it.key })
+                assertEquals(listOf(TerminalKeyEventType.PRESS, TerminalKeyEventType.RELEASE), encodedKeys.map { it.type })
+
+                val typed = KeyEvent(component, KeyEvent.KEY_TYPED, 0L, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_UNDEFINED, 'A')
+                component.keyListeners.forEach { it.keyTyped(typed) }
+                assertFalse(component.currentShellSuggestionState().visible)
+                assertEquals(listOf(false), invalidations)
+            } finally {
+                component.dispose()
+                session.close()
+                mutationDispatcher.scheduler.runCurrent()
+            }
         }
     }
 

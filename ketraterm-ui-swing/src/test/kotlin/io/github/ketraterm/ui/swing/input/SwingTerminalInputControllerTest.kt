@@ -200,6 +200,49 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(0, host.invalidationCount)
         }
+
+        @ParameterizedTest
+        @ValueSource(
+            ints = [
+                KeyEvent.VK_SHIFT, KeyEvent.VK_CONTROL, KeyEvent.VK_ALT, KeyEvent.VK_META,
+                KeyEvent.VK_WINDOWS, KeyEvent.VK_ALT_GRAPH, KeyEvent.VK_CAPS_LOCK,
+                KeyEvent.VK_NUM_LOCK, KeyEvent.VK_SCROLL_LOCK, KeyEvent.VK_PRINTSCREEN,
+                KeyEvent.VK_PAUSE, KeyEvent.VK_CONTEXT_MENU,
+            ],
+        )
+        fun `modifier and system key presses and releases preserve suggestions`(keyCode: Int) {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(keyCode, 0))
+            controller.keyListener.keyReleased(keyReleased(keyCode, 0))
+
+            assertEquals(0, host.invalidationCount)
+            assertEquals(0, host.hideShellSuggestionsCount)
+            assertEquals(2, host.hyperlinkHoverUpdates.size)
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = [KeyEvent.VK_BACK_SPACE, KeyEvent.VK_DELETE, KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT])
+        fun `shift modified editing and navigation still invalidate suggestions`(keyCode: Int) {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(keyCode, InputEvent.SHIFT_DOWN_MASK))
+
+            assertEquals(1, host.invalidationCount)
+        }
+
+        @Test
+        fun `typing after pressing shift invalidates suggestions once`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_SHIFT, InputEvent.SHIFT_DOWN_MASK))
+            controller.keyListener.keyTyped(keyTyped('A'))
+
+            assertEquals(1, host.invalidationCount)
+        }
     }
 
     @Nested
