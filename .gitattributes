@@ -1,3 +1,6 @@
 ketraterm-app/src/main/resources/io/github/ketraterm/app/cli/* text eol=lf
+ketraterm-workspace/src/main/resources/io/github/ketraterm/workspace/*.sh text eol=lf
+ketraterm-workspace/src/main/resources/io/github/ketraterm/workspace/*.bash text eol=lf
+ketraterm-workspace/src/main/resources/io/github/ketraterm/workspace/*.zsh text eol=lf
 ketraterm-ui-swing/src/test/resources/hyperlinks/*.ansi -text
 website/** text=auto eol=lf

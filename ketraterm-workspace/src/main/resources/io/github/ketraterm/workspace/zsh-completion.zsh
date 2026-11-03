@@ -58,6 +58,9 @@ function __ketraterm_zsh_publish_commands() {
         fi
         available[-1]=()
         for name in "${available[@]}"; do [[ -z $name ]] || discovered[$name]=1; done
+        # PATH is already scanned. Inspect the existing hash table without
+        # triggering another whole-PATH enumeration through $commands.
+        builtin unsetopt HASH_LIST_ALL
         # Keep explicitly hashed commands outside PATH without rechecking every
         # normally discovered executable through its full absolute path.
         for name in "${(@ok)commands}"; do

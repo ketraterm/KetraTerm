@@ -257,7 +257,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 unsetopt ALIASES
                 __ketraterm_zsh_publish_commands test 1 Local
                 __ketraterm_zsh_publish_commands test 1 Path
-                [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_UNSET && ! -o ALIASES ]] || exit 12
+                [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_UNSET && ! -o ALIASES && -o HASH_LIST_ALL ]] || exit 12
                 """.trimIndent()
         val result = runProcess(listOf(zsh!!, "-f"), standardInput = script, workingDirectory = tempDir)
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))

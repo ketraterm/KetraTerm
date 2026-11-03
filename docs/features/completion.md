@@ -174,6 +174,10 @@ A PATH change during a running scan requires another prompt after it finishes. R
 epochs are discarded. Failed refreshes retain the previous complete snapshot for
 the same source environment. Prefix lookup uses the sorted snapshot and alias
 lookup is built at publication. These snapshots are per session and memory-only.
+Unix/WSL use compatible native `find` for directory enumeration and shell checks
+for executable access. MSYS/Cygwin use builtin enumeration. Missing/incompatible
+tools or failed directory scans use shell globbing; partial scan output is discarded.
+Slow mounted or remote directories can still delay the complete PATH snapshot.
 See the [inventory protocol](../reference/protocol.md#private-bash-command-inventory)
 for validation, memory bounds, and lifecycle details.
 Reading the inventory sends no input and causes no prompt redraw.

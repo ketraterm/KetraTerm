@@ -18,7 +18,7 @@
 # basenames after chdir avoids repeated traversal of mounted/network ancestors.
 # Emit NUL-delimited names only; neither filenames nor PATH entries are evaluated.
 __ketraterm_collect_path_commands() (
-    builtin local -a cd_options
+    builtin local -a cd_options files
     cd_options=()
     if [[ -n ${ZSH_VERSION-} ]]; then
         builtin emulate -L zsh
@@ -31,7 +31,21 @@ __ketraterm_collect_path_commands() (
         builtin shopt -s nullglob dotglob
         builtin set +f
     fi
-    builtin local LC_ALL=C origin="$PWD" remaining="$PATH:" directory name count=0 size=0
+    builtin local LC_ALL=C origin="$PWD" remaining="$PATH:" directory name count=0 size=0 enumerated=0
+    builtin local finder
+    # Process startup outweighs directory-type savings in Windows POSIX layers.
+    if [[ ${OSTYPE-} == msys* || ${OSTYPE-} == cygwin* ]]; then
+        finder=
+    elif [[ -n ${ZSH_VERSION-} ]]; then
+        finder=$(builtin whence -p find 2>/dev/null) || finder=
+    else
+        finder=$(builtin type -P find 2>/dev/null) || finder=
+    fi
+    # Probe options without walking a directory. An individual directory may
+    # still fail (for example a symlink loop); only that directory falls back.
+    if [[ -n $finder ]]; then
+        command "$finder" -L . -mindepth 0 -maxdepth 0 ! -type d -print0 >/dev/null 2>&1 || finder=
+    fi
     builtin local -A directories names
     directories=()
     names=()
@@ -49,9 +63,28 @@ __ketraterm_collect_path_commands() (
         fi
         [[ -z ${directories[$PWD]-} ]] || continue
         directories[$PWD]=1
-        for name in *; do
+        # find can use directory-entry types without a second stat for every
+        # executable. Keep the shell's own -x check (including ACLs/mount rules).
+        # A completion marker rejects partial output; unsupported find variants
+        # fall back to shell globbing without admitting incomplete output.
+        enumerated=0
+        if [[ -n $finder ]]; then
+            if [[ -n ${ZSH_VERSION-} ]]; then
+                files=("${(@0)$(command "$finder" -L . -mindepth 1 -maxdepth 1 ! -type d -print0 2>/dev/null && builtin printf '__ketraterm_inventory_end')}")
+            else
+                builtin mapfile -d '' -t files < <(command "$finder" -L . -mindepth 1 -maxdepth 1 ! -type d -print0 2>/dev/null && builtin printf '__ketraterm_inventory_end')
+            fi
+            if [[ ${files[-1]-} == __ketraterm_inventory_end ]]; then
+                builtin unset 'files[-1]'
+                enumerated=1
+            fi
+        fi
+        if (( ! enumerated )); then files=(*); fi
+        for name in "${files[@]}"; do
+            name=${name#./}
             [[ -z ${names[$name]-} ]] || continue
-            [[ -x $name && ! -d $name ]] || continue
+            [[ -x $name ]] || continue
+            [[ $enumerated == 1 || ! -d $name ]] || continue
             names[$name]=1
             ((count+=1))
             ((size+=${#name}+1))
