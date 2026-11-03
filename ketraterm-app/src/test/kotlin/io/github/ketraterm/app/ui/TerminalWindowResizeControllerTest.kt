@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -40,6 +41,7 @@ import kotlin.test.*
 
 class TerminalWindowResizeControllerTest {
     @Test
+    @Tag("desktop")
     fun `real window geometry preserves grid sizing across prompt style changes`() {
         assumeFalse(GraphicsEnvironment.isHeadless())
         onEdt {

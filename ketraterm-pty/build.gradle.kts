@@ -40,6 +40,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.named<Test>("nativeTest") {
     inputs.file(rootProject.layout.projectDirectory.file("tools/osc52/osc52.mjs"))
-    systemProperty("terminal.pty.host", providers.systemProperty("terminal.pty.host").getOrElse("false"))
 }

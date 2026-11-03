@@ -45,9 +45,26 @@ internal enum class StandaloneSuggestionShell(
     val isGuest: Boolean get() = profileId == "wsl" || profileId == "ubuntu"
     val isPowerShell: Boolean get() = this == WINDOWS_POWERSHELL || this == POWERSHELL
 
+    private fun requireAvailable(
+        available: Boolean,
+        reason: String,
+    ) {
+        val required =
+            System
+                .getProperty("terminal.test.requiredShells", "")
+                .split(',')
+                .filter(String::isNotBlank)
+                .map { valueOf(it.trim()) }
+                .toSet()
+        if (this in required) {
+            assertTrue(available, "$name: $reason")
+        } else {
+            assumeTrue(available, reason)
+        }
+    }
+
     fun profile(directory: Path): TerminalProfile {
-        assumeTrue(System.getProperty("terminal.pty.host") == "true", "Requires -Dterminal.pty.host=true")
-        assumeTrue(!GraphicsEnvironment.isHeadless(), "Requires a desktop or virtual display for the Swing popup")
+        assertTrue(!GraphicsEnvironment.isHeadless(), "Run desktopTest with a desktop or virtual display")
         val registry = TerminalProfileRegistry()
         val discovered =
             registry.availableProfiles().firstOrNull { it.id == profileId }
@@ -57,13 +74,13 @@ internal enum class StandaloneSuggestionShell(
                 } else {
                     null
                 }
-        assumeTrue(discovered != null, "$profileId is not installed or discoverable on this host")
+        requireAvailable(discovered != null, "$profileId is not installed or discoverable on this host")
         val base = requireNotNull(discovered)
         val prefix =
             when (profileId) {
                 "wsl" -> {
                     val distribution = System.getProperty("terminal.pty.wsl.distribution", "")
-                    assumeTrue(distribution.isNotBlank(), "Set terminal.pty.wsl.distribution to enable WSL cases")
+                    requireAvailable(distribution.isNotBlank(), "Set terminal.pty.wsl.distribution to enable WSL cases")
                     listOf(base.command.first(), "-d", distribution, "--")
                 }
                 "ubuntu" -> listOf(base.command.first(), "run")
@@ -71,7 +88,7 @@ internal enum class StandaloneSuggestionShell(
             }
         if (isGuest) {
             assertTrue(probe(prefix + "true"), "$profileId distribution could not be started")
-            assumeTrue(probe(prefix + listOf("sh", "-c", "command -v $executable")), "$executable is not installed in $profileId")
+            requireAvailable(probe(prefix + listOf("sh", "-c", "command -v $executable")), "$executable is not installed in $profileId")
         }
         val arguments =
             when {
@@ -100,6 +117,8 @@ internal enum class StandaloneSuggestionShell(
                     profile.command.dropLast(1) + listOf("-c", "zmodload zsh/parameter && (( ${'$'}+commands[base64] ))"),
                 )
             else -> false
+        }.also { supported ->
+            if (executable != "fish") requireAvailable(supported, "Live command discovery prerequisites are missing")
         }
 
     private fun probe(command: List<String>): Boolean {

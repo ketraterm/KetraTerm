@@ -31,6 +31,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
@@ -39,7 +40,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.time.Duration.Companion.milliseconds
 
-class TerminalStartupCommandPtyTest {
+@Tag("native")
+class TerminalStartupCommandNativeTest {
     @Test
     fun `PowerShell runs startup once and accepts another command`(
         @TempDir directory: Path,
@@ -59,22 +61,26 @@ class TerminalStartupCommandPtyTest {
         directory: Path,
     ): Unit =
         runBlocking {
-            assumeTrue(System.getenv("KETRATERM_TEST_NATIVE_PTY") == "true", "Set KETRATERM_TEST_NATIVE_PTY=true to run native PTY tests")
             val windows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-            val executable =
-                if (shell == "powershell") {
-                    if (windows) {
-                        Path.of(
-                            System.getenv("SystemRoot"),
-                            "System32/WindowsPowerShell/v1.0/powershell.exe",
-                        )
-                    } else {
-                        Path.of("/usr/bin/pwsh")
-                    }
-                } else {
-                    if (windows) Path.of(System.getenv("ProgramFiles"), "Git/bin/bash.exe") else Path.of("/bin/bash")
+            val registry = TerminalProfileRegistry()
+            val profileId =
+                when {
+                    shell == "powershell" && windows -> "windows-powershell"
+                    shell == "bash" && windows -> "git-bash"
+                    else -> shell
                 }
-            assumeTrue(Files.isRegularFile(executable), "$shell is not installed")
+            val executable =
+                registry
+                    .availableProfiles()
+                    .firstOrNull { it.id == profileId }
+                    ?.command
+                    ?.first()
+                    ?: if (shell == "powershell" && registry.isValidShellPath("pwsh")) {
+                        "pwsh"
+                    } else {
+                        null
+                    }
+            assumeTrue(executable != null, "$shell is not installed")
             val journal = directory.resolve("journal.txt")
             val result = directory.resolve("result.txt")
             val startup =
@@ -99,7 +105,7 @@ class TerminalStartupCommandPtyTest {
                 TerminalProfile(
                     id = shell,
                     displayName = shell,
-                    command = listOf(executable.toString(), if (shell == "powershell") "-NoProfile" else "-i"),
+                    command = listOf(requireNotNull(executable), if (shell == "powershell") "-NoProfile" else "-i"),
                     workingDirectory = directory,
                     environment = if (shell == "bash") mapOf("HOME" to directory.toString()) else emptyMap(),
                     startupCommand = TerminalStartupCommand(startup),

@@ -106,6 +106,8 @@ Tests assert terminal semantics, not implementation quirks. For behavior changes
 - Run `./gradlew spotlessApply`, then the narrowest relevant tests. Use
   `./gradlew :<module>:test` or `./gradlew test` when broad verification is
   warranted.
+- Use the shared `nativeTest` and `desktopTest` suites for external-tool and real-window
+  tests. Follow [test organization](docs/development/testing.md) for tags, fixtures, and CI.
 - Update feature/gap maps when capability or scope changes.
 - Leave no silent no-ops, unrelated formatting churn, or architecture drift.
 

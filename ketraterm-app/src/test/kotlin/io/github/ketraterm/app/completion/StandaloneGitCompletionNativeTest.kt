@@ -20,6 +20,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
 import java.nio.file.Files
@@ -29,7 +30,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class StandaloneGitCompletionIntegrationTest {
+@Tag("native")
+class StandaloneGitCompletionNativeTest {
     @Test
     fun `registry follows cwd and Git overrides for live references and file arguments`(
         @TempDir directory: Path,

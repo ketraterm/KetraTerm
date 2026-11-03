@@ -51,8 +51,6 @@ application {
 
 tasks.test {
     useJUnitPlatform()
-    systemProperty("terminal.pty.host", providers.systemProperty("terminal.pty.host").getOrElse("false"))
-    systemProperty("terminal.pty.wsl.distribution", providers.systemProperty("terminal.pty.wsl.distribution").getOrElse(""))
 }
 
 val appVersionResources = layout.buildDirectory.dir("generated/resources/app-version")

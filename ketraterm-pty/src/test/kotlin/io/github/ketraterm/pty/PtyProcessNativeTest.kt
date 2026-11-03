@@ -31,7 +31,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -44,7 +44,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
-class PtyRealProcessTest {
+@Tag("native")
+class PtyProcessNativeTest {
     private val sessions = mutableListOf<TerminalSession>()
 
     @AfterEach
@@ -56,7 +57,6 @@ class PtyRealProcessTest {
     @ValueSource(booleans = [false, true])
     fun `OSC 52 harness validates real PTY request and reply bytes`(deny: Boolean) =
         runBlocking {
-            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
             val script = Path.of("../tools/osc52/osc52.mjs").toAbsolutePath().normalize()
             assertTrue(Files.isRegularFile(script), "OSC 52 harness is missing")
             val expectedFile = Files.createTempFile("ketraterm-osc52-", ".txt")
@@ -320,10 +320,6 @@ class PtyRealProcessTest {
         rows: Int = 5,
         readBufferSize: Int = 8192,
     ): TerminalSession {
-        assumeTrue(
-            System.getProperty("terminal.pty.host") == "true",
-            "Set -Dterminal.pty.host=true to run native PTY host tests",
-        )
         val ready = CountDownLatch(1)
         val listener =
             object : PtyEventListener by PtyEventListener.NONE {

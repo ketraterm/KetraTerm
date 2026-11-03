@@ -38,8 +38,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Exercises the installed product key dispatcher, actual panes, and PTY-backed tab lifecycle. */
-@Tag("native")
-class TabManagerNavigationTest {
+@Tag("desktop")
+class TabManagerNavigationDesktopTest {
     @Test
     fun `control tab follows the displayed tabs through wrapping and deletion`(
         @TempDir directory: Path,

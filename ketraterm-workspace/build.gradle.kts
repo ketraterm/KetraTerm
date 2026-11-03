@@ -32,10 +32,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
-tasks.test {
-    systemProperty("terminal.pty.host", providers.systemProperty("terminal.pty.host").getOrElse("false"))
-}
-
 val defaultDispatcherTest =
     tasks.register<Test>("defaultDispatcherTest") {
         description = "Checks default workspace startup dispatch with two CPU workers."

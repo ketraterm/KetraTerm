@@ -60,7 +60,9 @@ public class TerminalShellCommandInventory(
             val sameText = replacement == name
             textLength += name.length + (if (sameText) 0 else replacement.length) + (alias?.length ?: 0)
             require(textLength <= MAX_TEXT_LENGTH)
-            owned += if (sameText && replacement != name) candidate.copy(replacementText = name) else candidate
+            // Identity avoids copying candidates whose name and insertion already share the same string.
+            @Suppress("StringReferentialEquality")
+            owned += if (sameText && replacement !== name) candidate.copy(replacementText = name) else candidate
         }
         owned.sortBy { it.displayText }
         val aliasMap = LinkedHashMap<String, String>()

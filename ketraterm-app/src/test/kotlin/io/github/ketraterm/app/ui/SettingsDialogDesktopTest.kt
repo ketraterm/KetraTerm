@@ -25,6 +25,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Tag
 import java.awt.Component
 import java.awt.Container
 import java.awt.GraphicsEnvironment
@@ -41,7 +42,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class SettingsDialogTest {
+@Tag("desktop")
+class SettingsDialogDesktopTest {
     @Test
     fun `command alert controls reset and persist independently of completion`() {
         withDialog { settings, dialog, closed ->

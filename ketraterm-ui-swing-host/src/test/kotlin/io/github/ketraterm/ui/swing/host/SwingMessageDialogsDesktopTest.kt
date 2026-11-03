@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt.Decision
 import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Tag
 import java.awt.Component
 import java.awt.Container
 import java.awt.DefaultKeyboardFocusManager
@@ -28,7 +29,8 @@ import java.lang.reflect.InvocationTargetException
 import javax.swing.*
 import kotlin.test.*
 
-class SwingMessageDialogsTest {
+@Tag("desktop")
+class SwingMessageDialogsDesktopTest {
     @Test
     fun `owner cleanup completes before an EDT assertion failure reaches the caller`() {
         assumeFalse(GraphicsEnvironment.isHeadless())

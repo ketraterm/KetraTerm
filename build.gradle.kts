@@ -26,6 +26,8 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
+apply(from = "gradle/test-suites.gradle.kts")
+
 // Keep shared libraries compatible with IntelliJ 2026.2's bundled 1.10.2-intellij-1 runtime.
 // The IDE plugin excludes our coroutines dependency; newer compiled calls can fail at runtime.
 // Raise this version only when the minimum supported IDE provides a compatible runtime.
@@ -64,7 +66,7 @@ val cleanLibraryPublicationRepository =
 
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     kotlinGradle {
-        target("*.gradle.kts")
+        target("*.gradle.kts", "gradle/*.gradle.kts")
         ktlint("1.3.1")
     }
 }

@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
 import java.net.URI
@@ -39,7 +40,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-class TerminalShellIntegrationBootstrapIntegrationTest {
+@Tag("native")
+class TerminalShellIntegrationBootstrapNativeTest {
     @Test
     fun `Bash collector preserves PATH semantics and isolates directory and glob state`(
         @TempDir tempDir: Path,
@@ -118,7 +120,6 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
 
     @Test
     fun `Bash PATH discovery identity changes with cwd only for relative entries`() {
-        assumeTrue(System.getProperty("terminal.pty.host") == "true")
         val bash = installedExecutable("bash", "bash.exe")
         assumeTrue(bash != null, "Bash is not installed")
         assumeBashCommandInventory(bash!!)
@@ -127,7 +128,6 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
 
     @Test
     fun `zsh PATH discovery identity changes with cwd only for relative entries`() {
-        assumeTrue(System.getProperty("terminal.pty.host") == "true")
         val zsh = installedExecutable("zsh", "zsh.exe")
         assumeTrue(zsh != null, "zsh is not installed")
         assertPathDiscoveryIdentity(listOf(zsh!!, "-f", "-i"), "__ketraterm_zsh_completion")
@@ -297,7 +297,6 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         @TempDir tempDir: Path,
     ): Unit =
         runBlocking {
-            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
             val zsh = installedExecutable("zsh", "zsh.exe")
             assumeTrue(zsh != null, "zsh is not installed")
             TerminalWorkspace().use { workspace ->
@@ -431,7 +430,6 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         @TempDir tempDir: Path,
     ): Unit =
         runBlocking {
-            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
             val bash = installedExecutable("bash", "bash.exe")
             assumeTrue(bash != null, "Bash is not installed")
             assumeBashCommandInventory(bash!!)
@@ -520,7 +518,6 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
     fun `PowerShell native completion round trips through real PSReadLine and PTY`(): Unit =
         runBlocking {
-            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
             val executable = installedExecutable("pwsh", "powershell.exe")
             assumeTrue(executable != null, "PowerShell is not installed")
             TerminalWorkspace().use { workspace ->

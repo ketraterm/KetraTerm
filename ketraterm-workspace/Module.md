@@ -69,6 +69,6 @@ clipboard routing, and shell bootstrap behavior. Native shell integration and
 startup-command tests are environment-dependent; inspect their assumptions when
 validating changes to launch behavior.
 
-Use `./gradlew :ketraterm-workspace:test -Dterminal.pty.host=true` to include the
-real PSReadLine/PTY completion smoke test when PowerShell is installed. Quote
-`'-Dterminal.pty.host=true'` when invoking the Windows wrapper from PowerShell.
+Use `./gradlew :ketraterm-workspace:nativeTest` for real shell/bootstrap and
+PSReadLine/PTY tests. The [shared test guide](../docs/development/testing.md)
+defines the suite selection and environment requirements.

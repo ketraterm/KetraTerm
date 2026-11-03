@@ -19,6 +19,7 @@ import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalShellEnvironment
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
@@ -234,6 +235,7 @@ class KetraTermCliTest {
     }
 
     @Test
+    @Tag("native")
     fun `native helper prints the active version and diagnostic configuration path`() {
         val config = directory.resolve("custom settings & extra!(profile)/config.toml")
         val prepared = KetraTermCli(config, directory.resolve("helpers")).prepare(profile(), emptyMap())
@@ -251,6 +253,7 @@ class KetraTermCliTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["help", "--help", "-h", ""])
+    @Tag("native")
     fun `native helper documents its supported commands`(argument: String) {
         val prepared = KetraTermCli(directory.resolve("config.toml"), directory.resolve("helpers")).prepare(profile(), emptyMap())
 
@@ -264,6 +267,7 @@ class KetraTermCliTest {
     }
 
     @Test
+    @Tag("native")
     fun `native helper rejects an unknown command and missing configuration`() {
         val prepared = KetraTermCli(directory.resolve("config.toml"), directory.resolve("helpers")).prepare(profile(), emptyMap())
         val unknown = runHelper(prepared.environment, "unsupported-command")
@@ -277,6 +281,7 @@ class KetraTermCliTest {
 
     @ParameterizedTest
     @ValueSource(ints = [0, 9])
+    @Tag("native")
     fun `native helper opens the configuration as one editor argument and preserves editor exit status`(editorExitCode: Int) {
         val config = directory.resolve("custom settings & extra!(profile)/config file.toml")
         Files.createDirectories(config.parent)
@@ -301,6 +306,7 @@ class KetraTermCliTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
+    @Tag("native")
     fun `Windows helper retains editor command arguments`() {
         val config = directory.resolve("custom settings/config.toml")
         val editor = directory.resolve("editor with spaces.bat")

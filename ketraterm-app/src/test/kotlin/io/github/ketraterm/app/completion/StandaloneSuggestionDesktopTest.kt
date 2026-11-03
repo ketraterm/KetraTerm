@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.swing.Swing
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -38,8 +39,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-/** Native PTY scenarios using standalone sources and the default Swing popup. Opt in with terminal.pty.host. */
-class StandaloneSuggestionIntegrationTest {
+/** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
+@Tag("desktop")
+class StandaloneSuggestionDesktopTest {
     @ParameterizedTest(name = "editing and cancellation [{0}]")
     @EnumSource(StandaloneSuggestionShell::class)
     internal fun `deletion cancels a slow request and accepts the refreshed edit`(
@@ -147,7 +149,8 @@ class StandaloneSuggestionIntegrationTest {
                 } else {
                     val paths = awaitPopup("cd al", "alpha/")
                     assertTrue(paths.visibleSuggestions.none { it.displayText == "also.txt" })
-                    capturePopup(Path.of("build", "reports", "suggestion-smoke", "$shell.png"))
+                    val artifacts = Path.of(System.getProperty("terminal.test.artifactsDirectory", "build/test-artifacts/desktopTest"))
+                    capturePopup(artifacts.resolve("suggestions").resolve("$shell.png"))
                     selectAndAccept("alpha/", execute = true)
                     awaitExecution("cd alpha/")
                     awaitLine("")

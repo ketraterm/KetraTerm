@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.suggestion
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import io.github.ketraterm.ui.swing.render.SwingColors
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -314,6 +315,7 @@ class SwingCompletionPopupViewTest {
         }
 
     @Test
+    @Tag("desktop") // Swing's list mouse handler queries the platform shortcut modifier through Toolkit.
     fun `mouse click and wheel remain controller-owned interactions`() =
         onEdt {
             val listener = RecordingListener()

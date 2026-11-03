@@ -23,11 +23,7 @@ import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellCommandLineState
-import io.github.ketraterm.session.TerminalShellIntegrationFactory
-import io.github.ketraterm.session.TerminalShellIntegrationState
-import io.github.ketraterm.session.TerminalShellIntegrationView
+import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -60,8 +56,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
-@Tag("native")
-class TabManagerStartupTest {
+@Tag("desktop")
+class TabManagerStartupDesktopTest {
     @ParameterizedTest
     @ValueSource(
         strings = [

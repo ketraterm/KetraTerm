@@ -20,7 +20,7 @@ promise stable APIs or behavior.
 | `TODO(host/profile)` | A standalone quick/drop-down terminal with platform-appropriate activation and focus handling. Ordinary terminal windows do not provide this workflow. |
 | `TODO(host/profile)` | A product read-only session toggle that blocks outbound user input while retaining output, selection, and search. Read-only render frames and closed-session presentation are different capabilities. |
 | `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
-| `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: opt-in native PTY tests (`-Dterminal.pty.host=true`), package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. Ordinary CI runs tests and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
+| `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: JVM, native PTY and desktop suites, package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. [Standard CI](development/testing.md#ci) runs all three test suites and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
 
 ## Transports and execution environments

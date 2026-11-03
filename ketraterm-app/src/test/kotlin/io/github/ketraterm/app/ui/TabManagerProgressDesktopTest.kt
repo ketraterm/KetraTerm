@@ -49,8 +49,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Drives actual OSC bytes through session/workspace while native progress publication is recorded. */
-@Tag("native")
-class TabManagerProgressTest {
+@Tag("desktop")
+class TabManagerProgressDesktopTest {
     @Test
     fun `application progress decorates tab and window and survives title changes until clear`(
         @TempDir directory: Path,

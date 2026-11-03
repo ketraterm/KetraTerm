@@ -82,10 +82,10 @@ process-control guarantee.
 ## Native validation
 
 Ordinary module tests use fake process streams and do not require a native shell.
-`PtyRealProcessTest` is skipped unless `terminal.pty.host=true`:
+`PtyProcessNativeTest` belongs to the native suite:
 
 ```text
-./gradlew :ketraterm-pty:test --tests "io.github.ketraterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
+./gradlew :ketraterm-pty:nativeTest
 ```
 
 The native suite requires working Pty4J support and a local shell: `/bin/sh` on
