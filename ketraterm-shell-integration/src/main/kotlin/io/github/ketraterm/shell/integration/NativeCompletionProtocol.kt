@@ -28,7 +28,13 @@ import java.util.*
 internal class NativeCompletionProtocol(
     private val channel: TerminalShellCompletionChannel,
 ) {
-    private var commandsEpoch: String? = null
+    private val inventory = ShellCommandInventoryProtocol(channel)
+
+    fun acceptsPathEpoch(epoch: String): Boolean = inventory.acceptsPathEpoch(epoch)
+
+    fun clear() = inventory.clear()
+
+    fun outputProcessed() = inventory.expire()
 
     fun observe(
         command: Int,
@@ -39,24 +45,8 @@ internal class NativeCompletionProtocol(
         if (command != 633 || length > MAX_PAYLOAD_BYTES) return
         for (index in offset until offset + length) if (payload[index].toInt() !in 32..126) return
         val fields = String(payload, offset, length, Charsets.US_ASCII).split(';')
-        if (fields.size >= 4 && fields[0] == "KetraTermCommands" && fields[1] == "2") {
-            val epoch = fields[3]
-            if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return
-            if (fields.size == 4 && fields[2] == "Begin") {
-                if (commandsEpoch != epoch) channel.publishCommands(emptyList())
-                commandsEpoch = epoch
-                return
-            }
-            if (fields.size != 5 || fields[2] != "Result" || epoch != commandsEpoch) return
-            val commands =
-                try {
-                    decodeCommands(fields[4])
-                } catch (_: IllegalArgumentException) {
-                    null
-                } catch (_: CharacterCodingException) {
-                    null
-                }
-            channel.publishCommands(commands)
+        if (fields.firstOrNull() == "KetraTermCommands" || fields.firstOrNull() == "KetraTermShellCommands") {
+            inventory.observe(fields)
             return
         }
         if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "1") return
@@ -77,28 +67,6 @@ internal class NativeCompletionProtocol(
                 null
             }
         channel.respond(epoch, id, result)
-    }
-
-    private fun decodeCommands(encoded: String): List<TerminalShellCompletionCandidate> {
-        val body = text(encoded, MAX_PAYLOAD_BYTES)
-        if (body.isEmpty()) return emptyList()
-        require(body.endsWith('\u0000'))
-        val fields = body.dropLast(1).split('\u0000')
-        require(fields.size % 4 == 0 && fields.size <= 8192 * 4)
-        return fields
-            .chunked(4)
-            .map { (name, replacement, kind, expansion) ->
-                require(name.isNotEmpty() && name.length <= 512 && name.none { it.isISOControl() })
-                require(replacement.isNotEmpty() && replacement.length <= 4096 && replacement.none { it.isISOControl() })
-                require(kind == "Command" && expansion.isEmpty() || kind == "Alias" && expansion.length <= 4096)
-                TerminalShellCompletionCandidate(
-                    replacement,
-                    name,
-                    "",
-                    TerminalShellCompletionKind.COMMAND,
-                    aliasExpansion = expansion.takeIf { kind == "Alias" },
-                )
-            }.sortedBy { it.displayText }
     }
 
     private fun decode(fields: List<String>): TerminalShellCompletionResult? {

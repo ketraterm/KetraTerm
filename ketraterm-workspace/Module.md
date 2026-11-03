@@ -22,6 +22,9 @@ All types are in `io.github.ketraterm.workspace`.
 | `TerminalShellEnvironment` | Host-selected environment overrides and a PATH prefix. |
 | Internal shell bootstrappers | Prepare shell startup hooks and environment reapplication without interpreting terminal output. |
 | `powershell-completion.ps1` resource | Install the PSReadLine chord, read the live buffer, and serialize bounded native completion results. |
+| `path-commands.sh` resource | Shared Bash/zsh PATH enumeration with directory-relative executable checks in an isolated subshell. |
+| Internal `ShellCommandInventoryFiles` | Own the private session mailbox, bounded I/O polling, and cleanup; forward bytes to the shell-integration decoder. |
+| `bash-completion.bash`, `zsh-completion.zsh` resources | Combine shell tables with discovered executables and publish bounded inventory snapshots. |
 
 ## Lifecycle and concurrency
 

@@ -30,25 +30,24 @@ public class TerminalShellCompletionChannel internal constructor(
     private val lock: Any,
 ) {
     private var epoch: String? = null
+    private var closed = false
     private var nextRequestId = 0L
     private var requestInput: List<TerminalInputEvent> = emptyList()
     internal var pending: Pending? = null
         private set
     private var receipt: Receipt? = null
-    private val mutableCommands = MutableStateFlow<List<TerminalShellCompletionCandidate>?>(null)
+    private val mutableCommands = MutableStateFlow<TerminalShellCommandInventory?>(null)
     internal val commands = mutableCommands.asStateFlow()
 
     /**
      * Publishes a detached command inventory from the current shell environment.
-     * Null means unavailable; an empty list is authoritative. Producers refresh it
-     * at prompt boundaries. It does not grant editing authority or install a query hook.
+     * Null means no installed inventory producer. Pending/failed producers publish
+     * an explicit inventory status. It grants no editing authority or query hook.
      */
-    public fun publishCommands(commands: List<TerminalShellCompletionCandidate>?) {
-        require(commands == null || commands.size <= 8192)
-        require(commands == null || commands.all { it.kind == TerminalShellCompletionKind.COMMAND })
-        require(commands == null || commands.all { (it.aliasExpansion?.length ?: 0) <= 4096 })
+    public fun publishCommands(commands: TerminalShellCommandInventory?) {
         synchronized(lock) {
-            mutableCommands.value = commands?.let { java.util.List.copyOf(it) }
+            if (closed) return
+            mutableCommands.value = commands
         }
     }
 
@@ -141,6 +140,7 @@ public class TerminalShellCompletionChannel internal constructor(
 
     internal fun close(): Pending? =
         synchronized(lock) {
+            closed = true
             epoch = null
             mutableCommands.value = null
             receipt = null

@@ -669,12 +669,12 @@ public class TerminalSession private constructor(
         get() = synchronized(mutationLock) { isAcceptingInput() && runtime.shellCompletion.isReady }
 
     /**
-     * Immutable command inventories published by the shell; null means unavailable.
-     * An empty inventory may mean discovery is pending. Snapshots describe prompt-time
+     * Immutable command inventories published by the shell; null means no producer.
+     * Pending/failed discovery has an explicit status. Snapshots describe prompt-time
      * availability, carry no edit authority, and do not imply interactive argument
      * completion. Session closure publishes null. Reading/subscribing sends no input.
      */
-    public val shellCompletionCommands: StateFlow<List<TerminalShellCompletionCandidate>?>
+    public val shellCommandInventory: StateFlow<TerminalShellCommandInventory?>
         get() = runtime.shellCompletion.commands
 
     /**
@@ -1852,6 +1852,7 @@ public class TerminalSession private constructor(
             synchronized(mutationAdmission) {
                 synchronized(mutationLock) {
                     cleanup { parser.endOfInput() }
+                    cleanup { runtime.shellIntegration?.sessionClosed() }
                     cleanup {
                         val request = pendingRenderRequest.get()
                         runtime.publisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))

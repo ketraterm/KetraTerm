@@ -91,6 +91,12 @@ public interface TerminalShellIntegration {
     /** Optional synchronous finalization after a parser batch, before startup submission. */
     public fun outputProcessed(): Unit = Unit
 
+    /**
+     * Releases session-scoped buffers after parser EOF, under session serialization.
+     * This does not dispose a borrowed host model. Must not block or mutate the session.
+     */
+    public fun sessionClosed(): Unit = Unit
+
     /** Maximum complete custom OSC envelope collected for this producer. Ordinary built-in limits stay unchanged. */
     public val customOscPayloadLimitBytes: Int get() = 4096
 

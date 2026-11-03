@@ -30,11 +30,9 @@ public class SessionShellCompletionProvider(
     private val session: TerminalSession,
 ) : TerminalCompletionShellProvider {
     override fun commandAliases(): Map<String, String> =
-        buildMap {
-            for (command in session.shellCompletionCommands.value.orEmpty()) {
-                command.aliasExpansion?.let { put(command.displayText, it) }
-            }
-        }
+        session.shellCommandInventory.value
+            ?.aliases
+            .orEmpty()
 
     override suspend fun complete(
         request: TerminalCompletionRequest,
@@ -45,11 +43,9 @@ public class SessionShellCompletionProvider(
         val syntax = request.shellCapabilities.syntax
         if (syntax == TerminalShellSyntax.POSIX) {
             if (context.activePosition != TerminalCompletionActivePosition.COMMAND || '/' in context.activePrefix) return null
-            val commands = session.shellCompletionCommands.value ?: return null
-            return commands
-                .asSequence()
-                .filter { it.displayText.startsWith(context.activePrefix) }
-                .take(limit)
+            val inventory = session.shellCommandInventory.value ?: return null
+            return inventory
+                .matchingCommands(context.activePrefix, limit)
                 .map { item ->
                     TerminalCompletionCandidate(
                         replacementText = item.replacementText,
@@ -59,7 +55,7 @@ public class SessionShellCompletionProvider(
                         source = "shell",
                         kind = TerminalCompletionCandidateKind.COMMAND,
                     )
-                }.toList()
+                }
         }
         if (syntax != TerminalShellSyntax.POWERSHELL) return null
         if (!session.shellCompletionAvailable) return null

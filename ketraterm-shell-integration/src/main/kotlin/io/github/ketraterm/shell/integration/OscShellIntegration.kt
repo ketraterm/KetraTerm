@@ -48,10 +48,22 @@ public object OscShellIntegration : TerminalShellIntegrationFactory {
      * Set [promptMarkersExpected] only when compatible prompt hooks were configured.
      * False still accepts OSC metadata, including manually installed or nested-shell hooks.
      * The expectation neither enables startup input nor changes protocol handling.
+     * Supply [commandInventoryInput] for independently transported PATH snapshots;
+     * bind it to one session and let the launching host own transport and cleanup.
      */
     @JvmStatic
-    public fun configured(promptMarkersExpected: Boolean): TerminalShellIntegrationFactory =
-        if (promptMarkersExpected) configuredPromptFactory else this
+    @JvmOverloads
+    public fun configured(
+        promptMarkersExpected: Boolean,
+        commandInventoryInput: ShellCommandInventoryInput? = null,
+    ): TerminalShellIntegrationFactory =
+        if (commandInventoryInput != null) {
+            TerminalShellIntegrationFactory { OscShellIntegrationSession(it, promptMarkersExpected, commandInventoryInput) }
+        } else if (promptMarkersExpected) {
+            configuredPromptFactory
+        } else {
+            this
+        }
 
     private val configuredPromptFactory = TerminalShellIntegrationFactory { OscShellIntegrationSession(it, true) }
 }
@@ -59,8 +71,14 @@ public object OscShellIntegration : TerminalShellIntegrationFactory {
 private class OscShellIntegrationSession(
     private val context: TerminalShellIntegrationContext,
     override val promptMarkersExpected: Boolean,
+    private val commandInventoryInput: ShellCommandInventoryInput? = null,
 ) : TerminalShellIntegration {
     private val shellCompletion = NativeCompletionProtocol(context.shellCompletion)
+
+    init {
+        commandInventoryInput?.bind(context, shellCompletion)
+    }
+
     override val customOscPayloadLimitBytes: Int get() = NativeCompletionProtocol.MAX_PAYLOAD_BYTES
 
     override fun observeCustomOsc(
@@ -108,7 +126,13 @@ private class OscShellIntegrationSession(
     }
 
     override fun outputProcessed() {
+        shellCompletion.outputProcessed()
         if (readinessPromptStarted) context.readRenderFrame(readinessFrameConsumer)
+    }
+
+    override fun sessionClosed() {
+        commandInventoryInput?.close()
+        shellCompletion.clear()
     }
 
     private fun observeReadiness(

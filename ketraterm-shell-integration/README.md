@@ -39,6 +39,13 @@ the hooks and decides whether they are expected from startup. The standard
 adaptation for supported profiles. Direct PTY users pass the chosen factory
 through `PtyOptions.shellIntegration`.
 
+For independently transported PATH inventories, create one
+`ShellCommandInventoryInput` per session and pass it as `commandInventoryInput`
+to `OscShellIntegration.configured`. Deliver complete bounded snapshots through
+`accept(bytes)`; `false` means their live-shell epoch is not current yet. The host
+owns transport, retry, and cleanup. Workspace manages the private file mailbox
+automatically. Background workers must not write metadata to the live PTY.
+
 `OscShellIntegration` and `configured(false)` still accept later reports, such as
 hooks installed manually or by a nested shell. `configured(true)` sets the
 immutable launch expectation exposed by `session.promptMarkersExpected`; it

@@ -61,7 +61,7 @@ When PSReadLine is loaded, the PowerShell bootstrap also installs the private
 reads the live editing buffer and calls `TabExpansion2` without submitting or
 replacing the command. Each prompt announces a fresh completion epoch.
 
-Bash 5.3+ with `base64` starts background command discovery at each terminal prompt for
+Bash 5.3+ with `base64` checks background command discovery at each terminal prompt for
 [command suggestions](completion.md#sources-by-host), including explicit Bash
 launches inside WSL. It installs no completion key binding and does not invoke
 programmable argument completers. Prompt-time discovery includes session aliases
@@ -73,8 +73,11 @@ the user's alias; see the [supported alias subset](completion.md#sources-by-host
 
 zsh uses the same inventory protocol, command authority, and alias analysis.
 With `zsh/parameter` and `base64` available, it discovers enabled ordinary aliases,
-functions (including autoloads), builtins, and executable commands in a background
-snapshot at each terminal prompt. This includes explicit zsh launches inside WSL
+functions (including autoloads), and builtins at terminal prompts. Executable
+discovery runs independently in the background. Same-environment scans are coalesced;
+complete snapshots replace command authority atomically without silent truncation.
+See [completion discovery and bounds](completion.md#sources-by-host).
+This includes explicit zsh launches inside WSL
 and has been verified with zsh 5.9. Discovery does not invoke ZLE, load autoloaded
 functions, or run argument completers. Global and suffix aliases are not modeled;
 normal shell Tab completion remains available.

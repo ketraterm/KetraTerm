@@ -1,0 +1,23 @@
+{
+  "command": [
+    "wsl.exe",
+    "-d",
+    "Ubuntu",
+    "--",
+    "bash",
+    "--noprofile",
+    "--norc",
+    "-s"
+  ],
+  "synthetic_count": 10000,
+  "samples": [
+    {
+      "milliseconds": {
+        "local": 8.239,
+        "path": 537.128,
+        "alias": 7.143
+      },
+      "path_entries": 10976
+    }
+  ]
+}

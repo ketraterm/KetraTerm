@@ -18,6 +18,7 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.session.TerminalInputAdmission
+import io.github.ketraterm.session.TerminalSession
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -40,12 +41,185 @@ import kotlin.time.Duration.Companion.seconds
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
+    fun `Bash collector preserves PATH semantics and isolates directory and glob state`(
+        @TempDir tempDir: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        assumeBashCommandInventory(bash!!)
+        assertPathCollector(listOf(bash, "--noprofile", "--norc"), tempDir)
+    }
+
+    @Test
+    fun `zsh collector preserves PATH semantics and isolates directory and glob state`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        assertPathCollector(listOf(zsh!!, "-f"), tempDir)
+    }
+
+    @Test
+    fun `Bash incomplete or overflowing collector never publishes successful PATH inventory`() {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        assumeBashCommandInventory(bash!!)
+        val hook = checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+        for ((output, reason) in listOf("git\\0" to "Unavailable", "__ketraterm_inventory_overflow" to "Overflow")) {
+            val script = hook + "\n__ketraterm_collect_path_commands() { printf '$output'; }\n__ketraterm_publish_commands test 1 Path\n"
+            val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script)
+            assertTrue(result.stdout.contains("KetraTermCommands;3;Fail;test;1;$reason"))
+            assertTrue(!result.stdout.contains("KetraTermCommands;3;End;"))
+        }
+    }
+
+    private suspend fun TerminalSession.awaitLine(line: String) {
+        try {
+            withTimeout(15.seconds) {
+                activeShellCommandLineRevision.first { activeShellCommandLine()?.commandText == line }
+            }
+        } catch (failure: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("Expected editable line '$line', observed ${activeShellCommandLine()}, session ${state.value}", failure)
+        }
+    }
+
+    private fun assertPathCollector(
+        command: List<String>,
+        directory: Path,
+    ) {
+        val collector = checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            collector + "\n" +
+                """
+                mkdir 'first dir' second 'first dir/not-a-command'
+                for file in 'first dir/ketra tool' 'second/ketra tool' second/ketra-other .ketra-hidden ketra-current; do
+                    printf '#!/bin/sh\n' > "${'$'}file"
+                    chmod +x "${'$'}file"
+                done
+                printf 'not executable' > second/ketra-not-executable
+                chmod -x second/ketra-not-executable
+                origin=${'$'}PWD
+                chpwd() { printf 'unexpected chpwd hook'; }
+                ketra_directory_hook() { printf 'unexpected directory hook'; }
+                chpwd_functions=(ketra_directory_hook)
+                PATH='first dir:missing:second:first dir::'
+                set -f
+                __ketraterm_collect_path_commands
+                [[ ${'$'}PWD == "${'$'}origin" ]] || exit 11
+                [[ ${'$'}- == *f* ]] || exit 12
+                """.trimIndent()
+        val result = runProcess(command, standardInput = script, workingDirectory = directory)
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val records = result.stdout.split('\u0000')
+        assertEquals("__ketraterm_inventory_end", records.last())
+        assertEquals(setOf("ketra tool", "ketra-other", ".ketra-hidden", "ketra-current"), records.dropLast(1).toSet())
+        assertEquals(5, records.size)
+    }
+
+    @Test
+    fun `Bash PATH discovery identity changes with cwd only for relative entries`() {
+        assumeTrue(System.getProperty("terminal.pty.host") == "true")
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        assumeBashCommandInventory(bash!!)
+        assertPathDiscoveryIdentity(listOf(bash, "--noprofile", "--norc", "-i"), "__ketraterm_completion")
+    }
+
+    @Test
+    fun `zsh PATH discovery identity changes with cwd only for relative entries`() {
+        assumeTrue(System.getProperty("terminal.pty.host") == "true")
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        assertPathDiscoveryIdentity(listOf(zsh!!, "-f", "-i"), "__ketraterm_zsh_completion")
+    }
+
+    private fun assertPathDiscoveryIdentity(
+        command: List<String>,
+        prefix: String,
+    ): Unit =
+        runBlocking {
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile("discovery", "Discovery", command),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
+                withTimeout(15.seconds) {
+                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "" }
+                }
+                for ((path, directory, operator, marker) in listOf(
+                    listOf("/usr/bin:/bin", "/", "==", "ketra_absolute_ok"),
+                    listOf(".:/usr/bin:/bin", "/tmp", "!=", "ketra_relative_ok"),
+                    listOf(":/usr/bin:/bin", "/", "!=", "ketra_empty_entry_ok"),
+                )) {
+                    val script =
+                        "PATH=$path; ${prefix}_ready; before=\"${'$'}${prefix}_path_epoch\"; " +
+                            "cd $directory; ${prefix}_ready; " +
+                            "[[ ${'$'}before $operator ${'$'}${prefix}_path_epoch ]] && $marker() { :; }"
+                    session.submitInput(listOf(TerminalPasteEvent(script), TerminalKeyEvent.key(TerminalKey.ENTER)))
+                    withTimeout(15.seconds) {
+                        session.shellCommandInventory.first { it?.commands?.any { c -> c.displayText == marker } == true }
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "" }
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `Bash inventories cross old limits and report overflow without a successful partial end`() {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        assumeBashCommandInventory(bash!!)
+        assertLargeInventory(listOf(bash, "--noprofile", "--norc"), "bash-completion.bash", "__ketraterm_publish_commands")
+    }
+
+    @Test
+    fun `zsh inventories cross old limits and report overflow without a successful partial end`() {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        assertLargeInventory(listOf(zsh!!, "-f"), "zsh-completion.zsh", "__ketraterm_zsh_publish_commands")
+    }
+
+    private fun assertLargeInventory(
+        command: List<String>,
+        resource: String,
+        publisher: String,
+    ) {
+        val hook =
+            checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) } + "\n" +
+                checkNotNull(javaClass.getResourceAsStream(resource)).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            hook + "\n" +
+                """
+                PATH=/usr/bin:/bin
+                for ((i=0; i<10000; i++)); do eval "ketra_large_command_${'$'}i() { :; }"; done
+                $publisher test 1 Local
+                printf -v long_definition '%4096s' x
+                for ((i=0; i<513; i++)); do alias "ketra_overflow_${'$'}i=${'$'}long_definition"; done
+                $publisher test 2 Local
+                """.trimIndent()
+        val result = runProcess(command, standardInput = script)
+        assertEquals(0, result.exitCode)
+        val secondStart = result.stdout.indexOf("\u001b]633;KetraTermShellCommands;3;Begin;test;2\u0007")
+        assertTrue(secondStart > 0)
+        val complete = commandInventories(result.stdout.substring(0, secondStart)).single()
+        assertTrue(complete.size > 10000)
+        assertTrue(complete.any { it[0] == "ketra_large_command_9999" })
+        val overflow = result.stdout.substring(secondStart)
+        assertTrue(overflow.contains("KetraTermShellCommands;3;Fail;test;2;Overflow"))
+        assertTrue(!overflow.contains("KetraTermShellCommands;3;End;"))
+    }
+
+    @Test
     fun `zsh inventory reflects enabled commands and literal aliases without executing user code`(
         @TempDir tempDir: Path,
     ) {
         val zsh = installedExecutable("zsh", "zsh.exe")
         assumeTrue(zsh != null, "zsh is not installed")
-        val hook = checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val hook =
+            checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) } + "\n" +
+                checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }
         val script =
             hook + "\n" +
                 """
@@ -68,7 +242,8 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 printf '#!/bin/sh\n' > 'ketra-λ'
                 chmod +x 'ketra executable' "ketra'quoted" 'ketra-λ'
                 hash ketra_cached="${'$'}PWD/ketra executable"
-                __ketraterm_zsh_publish_commands test
+                __ketraterm_zsh_publish_commands test 1 Local
+                __ketraterm_zsh_publish_commands test 1 Path
                 alias ketra_alias='git checkout'
                 unfunction ketra_function
                 rm 'ketra executable'
@@ -76,16 +251,24 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 printf '#!/bin/sh\n' > next/ketra_next
                 chmod +x next/ketra_next
                 PATH="${'$'}PWD/next:/usr/bin:/bin"
-                __ketraterm_zsh_publish_commands test
+                __ketraterm_zsh_publish_commands test 1 Local
+                __ketraterm_zsh_publish_commands test 1 Path
                 setopt KSH_ARRAYS SH_WORD_SPLIT NO_UNSET
                 unsetopt ALIASES
-                __ketraterm_zsh_publish_commands test
+                __ketraterm_zsh_publish_commands test 1 Local
+                __ketraterm_zsh_publish_commands test 1 Path
                 [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_UNSET && ! -o ALIASES ]] || exit 12
                 """.trimIndent()
         val result = runProcess(listOf(zsh!!, "-f"), standardInput = script, workingDirectory = tempDir)
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
-        val inventories = commandInventories(result.stdout)
+        val inventories =
+            commandInventories(result.stdout).chunked(2).map { (local, path) ->
+                (path + local).associateBy { it[0] }.values.toList()
+            }
         assertEquals(3, inventories.size)
+        val sourceSnapshots = commandInventories(result.stdout)
+        assertTrue(sourceSnapshots[0].none { it[0] == "ketra executable" })
+        assertTrue(sourceSnapshots[1].none { it[0] == "ketra_function" || it[2] == "Alias" })
         val first = inventories[0].associateBy { it[0] }
         assertEquals(listOf("ketra_alias", "ketra_alias", "Alias", "git switch"), first["ketra_alias"])
         assertEquals("git ${'$'}(touch alias-executed)", first["ketra_literal"]?.get(3))
@@ -130,44 +313,41 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                     )
                 val session = tab.session
 
-                suspend fun awaitLine(line: String) {
-                    withTimeout(15.seconds) {
-                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == line }
-                    }
-                }
-                awaitLine("")
+                session.awaitLine("")
                 withTimeout(15.seconds) {
-                    session.shellCompletionCommands.first { commands -> commands?.any { it.displayText == "printf" } == true }
+                    session.shellCommandInventory.first { commands -> commands?.commands?.any { it.displayText == "printf" } == true }
                 }
                 for (definition in listOf("git switch", "git checkout")) {
                     session.submitInput(
                         listOf(TerminalPasteEvent("alias ketra_live='$definition'"), TerminalKeyEvent.key(TerminalKey.ENTER)),
                     )
                     withTimeout(15.seconds) {
-                        session.shellCompletionCommands.first { commands ->
-                            commands?.any { it.displayText == "ketra_live" && it.aliasExpansion == definition } == true
+                        session.shellCommandInventory.first { commands ->
+                            commands?.commands?.any { it.displayText == "ketra_live" && it.aliasExpansion == definition } == true
                         }
                     }
-                    awaitLine("")
+                    session.awaitLine("")
                 }
                 session.submitInput(TerminalPasteEvent("ketra_l"))
-                awaitLine("ketra_l")
+                session.awaitLine("ketra_l")
                 val expected = assertNotNull(session.captureCommandEdit())
-                val candidate = assertNotNull(session.shellCompletionCommands.value).single { it.displayText == "ketra_live" }
+                val candidate = assertNotNull(session.shellCommandInventory.value).commands.single { it.displayText == "ketra_live" }
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, candidate.replacementText))),
                 )
-                awaitLine("ketra_live")
+                session.awaitLine("ketra_live")
                 session.submitInput(
                     listOf(TerminalTextReplacementEvent(0, 10, "unalias ketra_live"), TerminalKeyEvent.key(TerminalKey.ENTER)),
                 )
                 withTimeout(15.seconds) {
-                    session.shellCompletionCommands.first { commands ->
-                        commands != null && commands.any { it.displayText == "printf" } && commands.none { it.displayText == "ketra_live" }
+                    session.shellCommandInventory.first { commands ->
+                        commands != null &&
+                            commands.commands.any { it.displayText == "printf" } &&
+                            commands.commands.none { it.displayText == "ketra_live" }
                     }
                 }
-                awaitLine("")
+                session.awaitLine("")
             }
         }
 
@@ -178,7 +358,9 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         val bash = installedExecutable("bash", "bash.exe")
         assumeTrue(bash != null, "Bash is not installed")
         assumeBashCommandInventory(bash!!)
-        val hook = checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val hook =
+            checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) } + "\n" +
+                checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
         val script =
             hook + "\n" +
                 """
@@ -191,22 +373,34 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 chmod +x 'ketra native executable'
                 export PATH="${'$'}PWD:/usr/bin:/bin"
                 cp "${'$'}(type -P true)" ketra_native_exe.exe
-                __ketraterm_publish_commands test
+                printf '#!/bin/sh\n' > KETRA_CASE
+                chmod +x KETRA_CASE
+                cp "${'$'}(type -P true)" ketra_case.exe
+                cp "${'$'}(type -P true)" ketra_hashed.exe
+                hash -p "${'$'}(type -P false)" ketra_hashed.exe
+                __ketraterm_publish_commands test 1 Local
+                __ketraterm_publish_commands test 1 Path
                 alias ketra_native_exe='printf shadowed'
                 alias ketra_same='git checkout'
                 unalias ketra_native_alias
                 unset -f ketra_native_function
                 rm 'ketra native executable'
-                __ketraterm_publish_commands test
+                __ketraterm_publish_commands test 1 Local
+                __ketraterm_publish_commands test 1 Path
                 unalias ketra_native_exe
                 unalias ketra_same
                 unalias ketra_literal
-                rm ketra_native_exe.exe
-                __ketraterm_publish_commands test
+                hash -d ketra_hashed.exe
+                rm ketra_native_exe.exe ketra_case.exe KETRA_CASE ketra_hashed.exe
+                __ketraterm_publish_commands test 1 Local
+                __ketraterm_publish_commands test 1 Path
                 """.trimIndent()
         val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script, workingDirectory = tempDir)
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
-        val inventories = commandInventories(result.stdout)
+        val inventories =
+            commandInventories(result.stdout).chunked(2).map { (local, path) ->
+                (path + local).associateBy { it[0] }.values.toList()
+            }
         assertEquals(3, inventories.size, visibleEscapes(result.stdout))
         assertTrue(inventories[0].contains(listOf("ketra_native_function", "ketra_native_function", "Command", "")))
         assertTrue(inventories[0].contains(listOf("ketra_native_alias", "ketra_native_alias", "Alias", "printf alias")))
@@ -217,6 +411,10 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertTrue(inventories[0].contains(listOf("ketra native executable", "'ketra native executable'", "Command", "")))
         assertTrue(inventories[0].contains(listOf("printf", "printf", "Command", "")))
         assertTrue(inventories.all { inventory -> inventory.none { it[0] == "!" || it[0] == "if" } })
+        if (isWindows()) {
+            assertEquals("ketra_case.exe", inventories[0].single { it[0] == "ketra_case.exe" }[1])
+            assertEquals("ketra_hashed.exe", inventories[0].single { it[0] == "ketra_hashed.exe" }[1])
+        }
         val executableReplacement = if (isWindows()) "ketra_native_exe" else "ketra_native_exe.exe"
         assertTrue(
             inventories[0].contains(listOf("ketra_native_exe.exe", executableReplacement, "Command", "")),
@@ -225,7 +423,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertTrue(inventories[1].contains(listOf("ketra_native_exe.exe", "ketra_native_exe.exe", "Command", "")))
         assertTrue(inventories[1].contains(listOf("ketra_native_exe", "ketra_native_exe", "Alias", "printf shadowed")))
         assertTrue(inventories[2].none { it[0].startsWith("ketra") })
-        assertTrue(inventories.all { it.size <= 8192 && it.map { entry -> entry[0] }.distinct().size == it.size })
+        assertTrue(inventories.all { it.size <= 32768 && it.map { entry -> entry[0] }.distinct().size == it.size })
     }
 
     @Test
@@ -245,18 +443,12 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         TerminalProfile(
                             "bash",
                             "Bash",
-                            listOf(bash, "--noprofile", "--norc", "-i"),
+                            listOf(bash, "--noprofile", "--norc", "-i", "-u"),
                             environment = mapOf("PS1" to "ketra> ", "PATH" to "/usr/bin:/bin", "INPUTRC" to inputrc.toString()),
                         ),
                         TerminalWorkspaceOpenOptions(),
                     )
                 val session = tab.session
-
-                suspend fun awaitLine(line: String) {
-                    withTimeout(15.seconds) {
-                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == line }
-                    }
-                }
 
                 suspend fun awaitRenderedLine(
                     line: String,
@@ -285,16 +477,16 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         }
                     }
                 }
-                awaitLine("")
+                session.awaitLine("")
                 withTimeout(15.seconds) {
-                    session.shellCompletionCommands.first { commands -> commands?.any { it.displayText == "printf" } == true }
+                    session.shellCommandInventory.first { commands -> commands?.commands?.any { it.displayText == "printf" } == true }
                 }
                 session.submitInput(TerminalPasteEvent("prin"))
                 awaitRenderedLine("prin", highlighted = true)
                 session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
-                awaitLine("pri")
+                session.awaitLine("pri")
                 val expected = assertNotNull(session.captureCommandEdit())
-                val candidate = assertNotNull(session.shellCompletionCommands.value).single { it.displayText == "printf" }
+                val candidate = assertNotNull(session.shellCommandInventory.value).commands.single { it.displayText == "printf" }
                 session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE))
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
@@ -305,7 +497,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 awaitRenderedLine("printf123", highlighted = false)
                 // An empty closing paste must not create another undo step.
                 session.submitInput(TerminalKeyEvent.codepoint('_'.code, TerminalModifiers.CTRL))
-                awaitLine("printf")
+                session.awaitLine("printf")
                 for (definition in listOf("git switch", "git checkout")) {
                     session.submitInput(
                         listOf(
@@ -313,14 +505,14 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                             TerminalKeyEvent.key(TerminalKey.ENTER),
                         ),
                     )
-                    awaitLine("")
+                    session.awaitLine("")
                     withTimeout(15.seconds) {
-                        session.shellCompletionCommands.first { commands ->
-                            commands?.any { it.displayText == "ketra_same" && it.aliasExpansion == definition } == true
+                        session.shellCommandInventory.first { commands ->
+                            commands?.commands?.any { it.displayText == "ketra_same" && it.aliasExpansion == definition } == true
                         }
                     }
                     session.submitInput(TerminalPasteEvent("printf"))
-                    awaitLine("printf")
+                    session.awaitLine("printf")
                 }
             }
         }
@@ -338,25 +530,20 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         TerminalWorkspaceOpenOptions(),
                     )
                 val session = tab.session
-                withTimeout(15.seconds) {
-                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "" }
-                }
+
+                session.awaitLine("")
                 val emptyContext = assertNotNull(session.captureCommandEdit())
                 val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
-                withTimeout(15.seconds) {
-                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-Chi" }
-                }
+                session.awaitLine("Get-Chi")
                 val expected = assertNotNull(session.captureCommandEdit())
                 val result = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                 assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
-                withTimeout(15.seconds) {
-                    session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-ChildItem" }
-                }
+                session.awaitLine("Get-ChildItem")
                 repeat(3) {
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
@@ -370,9 +557,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                             ),
                         ),
                     )
-                    withTimeout(15.seconds) {
-                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-Chi" }
-                    }
+                    session.awaitLine("Get-Chi")
                     val afterDeletion = assertNotNull(session.captureCommandEdit())
                     val refreshed = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                     assertTrue(refreshed.candidates.any { it.replacementText == "Get-ChildItem" })
@@ -384,10 +569,23 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(afterDeletion, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
                     )
-                    withTimeout(15.seconds) {
-                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "Get-ChildItem" }
+                    session.awaitLine("Get-ChildItem")
+                }
+                val command = "Write-Output 'ketra-accepted'"
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(
+                        assertNotNull(session.captureCommandEdit()),
+                        listOf(TerminalTextReplacementEvent(0, "Get-ChildItem".length, command), TerminalKeyEvent.key(TerminalKey.ENTER)),
+                    ),
+                )
+                withTimeout(15.seconds) {
+                    session.shellIntegrationState.revision.first {
+                        val state = session.shellIntegrationState
+                        state.commandText(state.latestCommandRecordId()) == command
                     }
                 }
+                session.awaitLine("")
             }
         }
 
@@ -865,18 +1063,41 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
     }
 
-    private fun commandInventories(output: String): List<List<List<String>>> =
-        Regex("\u001b]633;KetraTermCommands;2;Result;test;([^\u0007]*)\u0007")
-            .findAll(output)
-            .map {
-                Base64
-                    .getDecoder()
-                    .decode(it.groupValues[1])
-                    .toString(Charsets.UTF_8)
-                    .removeSuffix("\u0000")
-                    .split('\u0000')
-                    .chunked(4)
-            }.toList()
+    private fun commandInventories(output: String): List<List<List<String>>> {
+        val snapshots = mutableListOf<List<List<String>>>()
+        var entries = mutableListOf<List<String>>()
+        var chunks = 0
+        var bytes = 0
+        for (message in Regex("\u001b]633;KetraTerm(?:Shell)?Commands;3;([^\u0007]*)\u0007").findAll(output)) {
+            val fields = message.groupValues[1].split(';')
+            when (fields[0]) {
+                "Begin" -> {
+                    entries = mutableListOf()
+                    chunks = 0
+                    bytes = 0
+                }
+                "Chunk" -> {
+                    assertEquals(chunks++, fields[3].toInt())
+                    val decoded = Base64.getDecoder().decode(fields[4])
+                    assertTrue(decoded.size <= 49_152)
+                    bytes += decoded.size
+                    val body = decoded.toString(Charsets.UTF_8)
+                    assertTrue(body.endsWith('\u0000'))
+                    entries +=
+                        body.dropLast(1).split('\u0000').chunked(4).map { record ->
+                            assertEquals(4, record.size)
+                            listOf(record[0], record[1].ifEmpty { record[0] }, if (record[2] == "A") "Alias" else "Command", record[3])
+                        }
+                }
+                "End" -> {
+                    assertEquals(listOf(chunks, entries.size, bytes), fields.drop(3).map(String::toInt))
+                    snapshots += entries.toList()
+                }
+                "Fail" -> error("Inventory failed: $fields")
+            }
+        }
+        return snapshots
+    }
 
     private fun assertMarkerOrder(
         output: String,

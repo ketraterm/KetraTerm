@@ -459,25 +459,71 @@ for the validation required before suggestion acceptance.
 
 ## Private Bash command inventory
 
-The optional OSC shell producer accepts `OSC 633;KetraTermCommands;2;Begin;epoch BEL`
-and `OSC 633;KetraTermCommands;2;Result;epoch;data BEL` (or ST). An epoch has 32
-lowercase hexadecimal characters. A changed Begin epoch clears the old inventory;
-the same epoch retains it during refresh. Results for superseded epochs are ignored.
-Workspace epochs identify the shell environment used for command discovery.
-`data` is standard Base64 of UTF-8 NUL-terminated groups of four fields: display name,
-shell-escaped insertion text, kind (`Command` or `Alias`), and alias definition.
-Command definitions must be empty. Alias definitions are literal metadata, never
-executed; an empty definition also represents an alias exceeding the producer's
-4096-byte bound. Empty data is an authoritative empty inventory.
-The existing 256 KiB custom OSC limit applies; the decoded inventory permits at
-most 8192 entries, 512 UTF-16 units per name and 4096 per insertion or definition.
-Empty names/insertions, controls in names/insertions, invalid UTF-8, unknown kinds,
-and incomplete groups are rejected. A malformed received
-inventory withdraws previous command authority; valid inventories replace it
-atomically and expose immutable, alphabetically ordered snapshots.
+Bash and zsh share a versioned snapshot protocol. Each message uses
+`OSC 633;KetraTermCommands;3;... BEL` for PATH executables and
+`OSC 633;KetraTermShellCommands;3;... BEL` for shell-local commands (or ST).
+Each source has independent epochs, scan order, deadlines, and atomic snapshots:
 
-Workspace Bash hooks discover commands in a background snapshot at each terminal
-prompt, with at most one outstanding scan. This is one-way shell
+Workspace PATH workers write their `Begin`/`Chunk`/`End` or `Fail` envelopes to
+`path.pending` in a private session directory, then rename it to `path.ready`.
+They never write to the PTY: concurrent terminal writes can split and interleave
+OSC envelopes with Readline/ZLE redraws or prompt markers. `Ready` and shell-local
+metadata remain foreground output. The host supplies the mailbox through
+`KetraTerm_COMMAND_INVENTORY_DIRECTORY` (WSL receives a translated guest path).
+The optional `ShellCommandInventoryInput` accepts only complete BEL-terminated
+PATH envelopes, at most 8 MiB encoded and 258 frames, and checks the live epoch
+before passing records to the same inventory decoder. It cannot inject terminal
+text, prompt markers, native completion replies, or environment announcements.
+File arrival may precede `Ready`; the host retains one bounded pending file and
+retries, replacing it when a newer file arrives. Terminal bytes are never injected
+or replayed to deliver file metadata. Session closure detaches the input.
+
+| Suffix | Meaning |
+| --- | --- |
+| `Ready;epoch` | Announce the current shell environment. |
+| `Begin;epoch;scan` | Start a complete replacement snapshot. |
+| `Chunk;epoch;scan;sequence;data` | Append complete records; sequences start at zero. |
+| `End;epoch;scan;chunks;entries;bytes` | Verify exact totals and atomically publish. |
+| `Fail;epoch;scan;reason` | Abandon the scan (`Overflow` or `Unavailable` from workspace hooks). |
+
+Epochs have 32 lowercase hexadecimal characters; scan IDs are positive increasing
+integers within an epoch. A changed Ready epoch clears that source's old command authority and
+publishes `PENDING`. Same-environment refresh keeps the last complete snapshot,
+including when refresh fails. Without a complete snapshot, failure publishes
+`UNAVAILABLE`; it does not enable unverified catalog fallback. Other ready sources
+remain usable. Shell-local names override matching PATH entries. The merged
+snapshot enforces the same entry/text limits; combined overflow publishes
+unavailable rather than truncating. READY can contain one ready source while
+another is pending. Retained source snapshots share candidate strings with the
+merged index; at most two bounded source assemblies can exist. Null session inventory
+means no installed producer. Superseded epoch/scan messages cannot publish results.
+
+`data` is standard Base64 of UTF-8 NUL-terminated quadruples: display name,
+shell-escaped insertion, kind (`C` command or `A` alias), and literal alias definition.
+An empty insertion reuses the name. Command definitions must be empty; empty alias
+definitions also represent definitions exceeding the producer's 4096-byte bound.
+Definitions are never executed. Zero chunks/entries/bytes at End publishes a complete
+empty inventory. Duplicate names, controls in names/insertions, invalid UTF-8,
+unknown kinds, incomplete records, missing/repeated/out-of-order chunks, and
+incorrect totals reject the entire scan.
+
+Decoded chunks are at most 48 KiB, with at most 256 chunks, 4 MiB decoded bytes,
+32,768 entries, and 2,097,152 retained UTF-16 text units per snapshot. Names allow
+512 units and insertions/definitions 4096 each. Identical name/insertion strings
+share storage. Workspace hooks enforce conservative UTF-8 byte budgets for text.
+The existing 256 KiB custom OSC bound still applies independently. Overflow emits
+Fail, never a successful truncated End. Assemblies expire after 60 seconds when
+protocol/output activity next checks the deadline; idle partial buffers remain
+bounded and are released at session closure. Completed snapshots expose an immutable
+sorted list, binary prefix lookup, and a cached alias map.
+
+Workspace hooks check shell-local state and PATH independently at each prompt,
+with at most one background PATH worker. Bounded shell-local state publishes
+at the prompt, independently of PATH I/O. Unchanged PATH discovery is eligible 60 seconds after a prompt observes its
+worker completing. Shell-local changes reuse executable authority; only PATH
+changes, or directory changes with relative/empty PATH entries, invalidate it.
+PATH changes during an active worker require a subsequent prompt after it finishes.
+This is one-way shell
 metadata, not a terminal query: it emits no host reply, installs no key binding,
 and grants no editing authority. Consumers retain ordinary conditional-edit checks.
 It supplies command availability and alias definitions for semantic argument analysis;

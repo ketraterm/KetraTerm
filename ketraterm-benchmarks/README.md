@@ -3,6 +3,10 @@
 JMH measurements for parser, core, input, session, render-cache, completion, and
 Swing behavior. This is a development module, not a consumer library.
 
+The [shell inventory measurement](results/shell-command-inventory/README.md) records
+snapshot retention, construction, and prefix/alias lookup costs with their workload
+and reproducible commands.
+
 ## Build and run
 
 Use JDK 25 and the repository Gradle wrapper; see the

@@ -33,6 +33,7 @@ promise stable APIs or behavior.
 | `TODO(host/profile)` | Opt-in SSH shell helpers for terminal-environment forwarding and remote terminfo setup. These helpers are separate from a built-in SSH connector and must handle unavailable remote tools and rejected environment forwarding. |
 | `TODO(host/profile)` | WSL-aware directory, JDK, and startup-command mapping. Existing explicit-shell hooks do not provide guest filesystem completion or remote process metadata; see [shell support](features/shells.md). |
 | `TODO(host/profile)` | Optional integration of Bash and zsh programmable argument completers without prompt redraws invalidating guarded edits. Popup arguments currently use command specifications and host runtime sources; Bash and zsh additionally publish prompt-time command inventories and literal alias definitions. Complex alias expansion and zsh global/suffix aliases remain outside the supported subset. See [completion sources](features/completion.md#sources-by-host). |
+| `TODO(host/profile)` | Reduce initial shell-command discovery latency for large or slow mounted `PATH` directories. Complete inventories are bounded and refreshes coalesced, but zsh still validates executable paths individually; a WSL scan spanning Windows directories can take tens of seconds. This affects initial command availability, not cached prefix lookup. |
 | `TODO(host/profile)` | Dev Container launch contexts and container-aware host services; no built-in container-session integration exists. |
 
 ## Shell integration

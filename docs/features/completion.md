@@ -129,21 +129,54 @@ inside PowerShell. Native results remain subject to bounded protocol validation
 and stale-edit checks. The OSC producer still requires an unambiguous visible
 command line with the cursor at its end.
 
-Bash and zsh start command discovery at each interactive terminal prompt, after user startup files
-and environment overrides have run. Discovery runs in a background shell snapshot
-so scanning a large `PATH` does not delay prompt editing. Bare command suggestions use the inventory
+Bash and zsh check command discovery at each interactive terminal prompt, after user startup files
+and environment overrides have run. Filesystem discovery runs in a background shell snapshot. Bounded shell-local
+metadata is published at the prompt without filesystem enumeration. Bare command suggestions use the inventory
 as availability authority, while catalog descriptions and existing ranking enrich
 the matches. This also applies to explicitly configured Bash or zsh inside WSL: command
 discovery uses the guest's environment, never the Windows host's `PATH`.
-The inventory includes at most 8192 names within a 180 KB raw payload; names over
-512 UTF-8 bytes are omitted. Changes to functions, aliases, and `PATH` take effect
-after discovery for a subsequent prompt completes. A completed inventory remains
-usable while the same environment refreshes. Changes to `PATH`, the directory,
-or alias definitions/function/builtin names invalidate it immediately. Only one scan may run
-at a time; results for superseded environments are discarded and a later prompt
-retries. Initial discovery and invalidated inventories supply no command candidates
-until a matching scan completes.
+Shell-local commands and PATH executables have independent, bounded snapshots. Each
+source publishes only after its complete snapshot passes validation. The merged
+inventory is limited to 32,768 entries and 2,097,152 retained UTF-16 text units;
+each source additionally allows at most 4 MiB decoded wire data. Overflow is
+unavailable, never a successful truncated snapshot. Names over 512 UTF-8 bytes
+are omitted.
+
+Bash and zsh share a PATH collector that checks executable basenames from inside
+each directory, avoiding repeated traversal of mounted or network ancestors.
+It preserves executable-permission checks, hidden names, empty and relative PATH
+entries, and valid shell command hashes. Directory and glob changes are confined
+to a subshell; discovery never evaluates command names or alias definitions.
+The collector rejects overflow or incomplete output instead of publishing a
+successful partial inventory. Directory glob expansion itself still depends on
+the size of each directory; the snapshot limits are not a shell-process heap cap.
+
+Aliases, functions, and builtins publish before expensive PATH discovery. Their
+changes refresh shell-local authority while retaining valid executable results.
+Shell-local names take precedence over matching executable names. PATH changes
+invalidate executable authority immediately; directory changes do so only when
+PATH has an empty or relative entry. Ready sources remain usable while another
+source is pending or unavailable. READY therefore means verified candidates are
+available, not that every discovery source has finished.
+
+At most one background PATH worker runs at a time. An unchanged PATH refresh is eligible
+60 seconds after a prompt observes worker completion, and starts at a subsequent
+prompt. Shell-local changes publish at the next prompt even while PATH discovery is busy.
+A PATH change during a running scan requires another prompt after it finishes. Results for superseded source
+epochs are discarded. Failed refreshes retain the previous complete snapshot for
+the same source environment. Prefix lookup uses the sorted snapshot and alias
+lookup is built at publication. These snapshots are per session and memory-only.
+See the [inventory protocol](../reference/protocol.md#private-bash-command-inventory)
+for validation, memory bounds, and lifecycle details.
 Reading the inventory sends no input and causes no prompt redraw.
+Background PATH results use a private per-session file mailbox, not the terminal
+byte stream. The worker atomically replaces a complete snapshot; the workspace
+checks for replacement every 100 ms on its I/O dispatcher. Shell-local metadata
+and environment announcements remain foreground prompt output. Early files wait
+for their matching live environment announcement; obsolete files cannot restore
+invalidated authority. Files and polling are released on session closure.
+The mailbox admits at most 8 MiB of encoded data and retains at most one pending
+file in memory, in addition to the decoded inventory budgets above.
 On Git Bash/Cygwin, `.exe` commands use the bare insertion only when Bash resolves
 both spellings identically. Shadowing aliases and functions remain distinct;
 Unix executable suffixes remain literal.

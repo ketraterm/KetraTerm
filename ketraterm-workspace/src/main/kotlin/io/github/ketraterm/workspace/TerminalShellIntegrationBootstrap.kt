@@ -36,11 +36,14 @@ internal object TerminalShellIntegrationBootstrap {
      *
      * @param scriptDirectory persistent directory used for generated shell
      *   startup wrappers required by shells without an init-command argument.
+     * @param commandInventoryDirectory session-owned mailbox for background PATH
+     *   snapshots. Without it, Bash/zsh do not start inventory workers.
      */
     fun apply(
         profile: TerminalProfile,
         enabled: Boolean,
         scriptDirectory: Path = defaultScriptDirectory(),
+        commandInventoryDirectory: Path? = null,
     ): ShellIntegrationLaunch {
         require(profile.startupCommand == null || enabled) {
             "Startup commands require shell integration. Enable it or clear the startup command."
@@ -70,12 +73,34 @@ internal object TerminalShellIntegrationBootstrap {
                 "Remove explicit command/script arguments or clear the startup command."
         }
         val promptMarkersExpected = integrated !== profile
-        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(integrated)
+        val inventoryProfile =
+            if (promptMarkersExpected && commandInventoryDirectory != null) {
+                var environment =
+                    integrated.environment +
+                        ("KetraTerm_COMMAND_INVENTORY_DIRECTORY" to commandInventoryDirectory.toString().replace('\\', '/'))
+                if (profile.kind == TerminalProfileKind.WSL || profile.kind == TerminalProfileKind.UBUNTU) {
+                    environment = environment.withWslEnvironmentExport("KetraTerm_COMMAND_INVENTORY_DIRECTORY/up")
+                }
+                integrated.copy(environment = environment)
+            } else {
+                integrated
+            }
+        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(inventoryProfile)
         return ShellIntegrationLaunch(
             profile = if (promptMarkersExpected) TerminalShellEnvironmentBootstrap.withMarkers(launchProfile) else launchProfile,
             promptMarkersExpected = promptMarkersExpected,
         )
     }
+
+    fun supportsCommandInventory(profile: TerminalProfile): Boolean =
+        when (profile.kind) {
+            TerminalProfileKind.BASH, TerminalProfileKind.GIT_BASH, TerminalProfileKind.ZSH -> true
+            TerminalProfileKind.WSL, TerminalProfileKind.UBUNTU -> {
+                val index = explicitWslShellIndex(profile.command)
+                index >= 0 && executableName(profile.command[index]) in setOf("bash", "bash.exe", "zsh", "zsh.exe")
+            }
+            else -> false
+        }
 
     private fun withExplicitWslShellIntegration(
         profile: TerminalProfile,
@@ -449,8 +474,12 @@ internal object TerminalShellIntegrationBootstrap {
             "-f",
         )
 
+    private val pathCommandsScript =
+        checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) }
+
     private val bashCompletionScript =
-        checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+        pathCommandsScript + "\n" +
+            checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
 
     private val BASH_PROMPT_COMMAND =
         """
@@ -569,6 +598,7 @@ internal object TerminalShellIntegrationBootstrap {
         """
         if [[ -z ${'$'}{__KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             typeset -g __KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED=1
+            $pathCommandsScript
             ${checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }}
             typeset -g __ketraterm_zsh_command_started=0
             function __ketraterm_osc133() {

@@ -65,14 +65,16 @@ class StandaloneCompletionRegistryTest {
                     shellIntegration =
                         TerminalShellIntegrationFactory { context ->
                             context.shellCompletion.publishCommands(
-                                listOf(
-                                    TerminalShellCompletionCandidate(
-                                        "cargo-session",
-                                        "cargo-session",
-                                        "",
-                                        TerminalShellCompletionKind.COMMAND,
+                                TerminalShellCommandInventory(
+                                    listOf(
+                                        TerminalShellCompletionCandidate(
+                                            "cargo-session",
+                                            "cargo-session",
+                                            "",
+                                            TerminalShellCompletionKind.COMMAND,
+                                        ),
+                                        TerminalShellCompletionCandidate("git", "git.exe", "", TerminalShellCompletionKind.COMMAND),
                                     ),
-                                    TerminalShellCompletionCandidate("git", "git.exe", "", TerminalShellCompletionKind.COMMAND),
                                 ),
                             )
                             host.create(context)
@@ -87,7 +89,7 @@ class StandaloneCompletionRegistryTest {
                         )
                     val suggestions = provider.suggestions(request("car")).last()
                     assertEquals(listOf("cargo-session"), suggestions.map { it.replacementText })
-                    assertEquals("bash", suggestions.single().source)
+                    assertEquals("shell", suggestions.single().source)
                     assertEquals(listOf("git"), provider.suggestions(request("gi")).last().map { it.replacementText })
                     assertTrue(provider.suggestions(request("git s")).last().any { it.replacementText == "status" })
                 }

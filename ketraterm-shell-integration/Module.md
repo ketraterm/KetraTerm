@@ -17,10 +17,23 @@ bounded command-text extraction, immutable styled prompt-row capture, and primit
 provides serialized frame access and owns shared observation, outbound writes,
 and startup submission. The producer owns no threads or coroutine scope.
 
-`PowerShellCompletionProtocol` validates the bounded private OSC 633 metadata
+`NativeCompletionProtocol` validates the bounded private OSC 633 metadata
 and publishes prompt readiness/results through the session-owned completion
 channel. Session owns key-chord admission, request lifetime, and edit validation;
 workspace owns the installed PowerShell script. The producer performs no shell I/O.
+
+`ShellCommandInventoryProtocol` assembles independent ordered, bounded shell-local and PATH snapshots,
+then merges them with shell-local precedence
+and validates its totals before publication. It preserves completed authority
+during same-environment refresh, expires partial state on output activity, and
+releases buffers on session closure. Wire limits and failure semantics live in
+the [protocol reference](../docs/reference/protocol.md#private-bash-command-inventory).
+
+`ShellCommandInventoryInput` provides independent ingestion of completed PATH
+snapshots. It validates the complete envelope, checks the live-shell epoch, and
+uses the same decoder under session serialization without touching the terminal
+parser or grid. The launching host owns file access and observation; closure
+detaches the input. This keeps background inventory output out of the PTY.
 
 `ShellIntegrationCommandTextExtractor` is internal. It consumes primitive render
 data, preserves hard breaks and soft wraps, and fails closed when the required

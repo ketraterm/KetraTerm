@@ -35,6 +35,23 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionShellCompletionProviderTest {
     @Test
+    fun `pending and unavailable inventories suppress unverified catalog fallback`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), "git").use { f ->
+                val request = TerminalCompletionRequest("git", 3, shellCapabilities = TerminalShellCapabilities.POSIX)
+                val context = TerminalCompletionContext.resolve(request)
+                assertNull(f.source.complete(request, context, 10))
+                for (status in TerminalShellCommandInventoryStatus.entries) {
+                    f.channel.publishCommands(
+                        TerminalShellCommandInventory(emptyList(), status),
+                    )
+                    assertEquals(emptyList(), f.source.complete(request, context, 10))
+                    assertTrue(f.source.commandAliases().isEmpty())
+                }
+            }
+        }
+
+    @Test
     fun `native directory fallback merges equivalent history and paths before Swing adaptation`() =
         runTest {
             val line = "cd Do"
@@ -257,7 +274,7 @@ class SessionShellCompletionProviderTest {
         line: String,
     ) : AutoCloseable {
         val connector = MockConnector()
-        private lateinit var channel: TerminalShellCompletionChannel
+        lateinit var channel: TerminalShellCompletionChannel
         private val commandLine = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot(line, line.length, line.length, 0))
         private val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
         val session =
@@ -284,7 +301,10 @@ class SessionShellCompletionProviderTest {
             connector.feedFromHost(byteArrayOf())
         }
 
-        fun publishCommands(commands: List<TerminalShellCompletionCandidate>) = channel.publishCommands(commands)
+        fun publishCommands(commands: List<TerminalShellCompletionCandidate>) =
+            channel.publishCommands(
+                TerminalShellCommandInventory(commands),
+            )
 
         override fun close() = session.close()
     }

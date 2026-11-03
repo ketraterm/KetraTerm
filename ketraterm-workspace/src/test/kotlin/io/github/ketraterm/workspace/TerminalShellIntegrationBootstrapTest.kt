@@ -366,9 +366,9 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(profile.command, integrated.command)
         assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("]133;"))
         assertEquals("EXISTING/u:PROMPT_COMMAND/u", integrated.environment["WSLENV"])
-        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("compgen -V available -c"))
-        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("KetraTermCommands;2;Begin;"))
-        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("declare -p PATH BASH_ALIASES"))
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("__ketraterm_collect_path_commands"))
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("633;%s;3;Begin;"))
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("declare -p BASH_ALIASES"))
         assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
     }
 

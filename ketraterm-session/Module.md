@@ -33,6 +33,11 @@ selection;
 admission. Optional OSC interpretation and grid extraction belong to
 `ketraterm-shell-integration`, which this module does not depend on.
 
+`TerminalShellCommandInventory` owns a validated immutable command snapshot, its
+binary prefix lookup, and cached alias definitions. `TerminalShellCompletionChannel`
+publishes readiness/status and snapshots without copying them per request. Session
+closure clears the channel and notifies the producer to release partial buffers.
+
 `ClipboardReadHandler` owns one bounded OSC 52 request and reply lifetime.
 Platform consent and native clipboard access stay in the supplied provider.
 `ForegroundProcessTracker` shares best-effort connector queries only while

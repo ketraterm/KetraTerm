@@ -617,33 +617,48 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
     ): TerminalSession {
-        val launch =
-            TerminalShellIntegrationBootstrap.apply(
-                profile = profile,
-                enabled = options.shellIntegrationEnabled,
-            )
-        val launchProfile = launch.profile
-        return TerminalSessions.createLocalPty(
-            PtyOptions.create { draft ->
-                draft.command = launchProfile.command
-                draft.environment =
-                    TerminalShellEnvironmentBootstrap.inheritEnvironment(launchProfile.environment, PtyOptions.defaultEnvironment())
-                draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
-                draft.columns = options.columns
-                draft.rows = options.rows
-                draft.treatAmbiguousAsWide = options.treatAmbiguousAsWide
-                draft.inputPolicy =
-                    PtyOptions
-                        .defaultInputPolicy()
-                        .copy(pasteControlPolicy = options.pasteControlPolicy)
-                draft.maxHistory = options.maxHistory
-                draft.eventListener = eventListener
-                draft.hostPolicy = options.hostPolicy
-                draft.startupCommand = launchProfile.startupCommand
-                draft.modeReportCapabilities = options.modeReportCapabilities
-                draft.shellIntegration = OscShellIntegration.configured(launch.promptMarkersExpected)
-            },
-        )
+        val files =
+            if (options.shellIntegrationEnabled && TerminalShellIntegrationBootstrap.supportsCommandInventory(profile)) {
+                ShellCommandInventoryFiles()
+            } else {
+                null
+            }
+        try {
+            val launch =
+                TerminalShellIntegrationBootstrap.apply(
+                    profile = profile,
+                    enabled = options.shellIntegrationEnabled,
+                    commandInventoryDirectory = files?.directory,
+                )
+            val launchProfile = launch.profile
+            val inventoryFiles = files?.takeIf { launch.promptMarkersExpected }
+            if (inventoryFiles == null) files?.close()
+            return TerminalSessions
+                .createLocalPty(
+                    PtyOptions.create { draft ->
+                        draft.command = launchProfile.command
+                        draft.environment =
+                            TerminalShellEnvironmentBootstrap.inheritEnvironment(launchProfile.environment, PtyOptions.defaultEnvironment())
+                        draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
+                        draft.columns = options.columns
+                        draft.rows = options.rows
+                        draft.treatAmbiguousAsWide = options.treatAmbiguousAsWide
+                        draft.inputPolicy =
+                            PtyOptions
+                                .defaultInputPolicy()
+                                .copy(pasteControlPolicy = options.pasteControlPolicy)
+                        draft.maxHistory = options.maxHistory
+                        draft.eventListener = eventListener
+                        draft.hostPolicy = options.hostPolicy
+                        draft.startupCommand = launchProfile.startupCommand
+                        draft.modeReportCapabilities = options.modeReportCapabilities
+                        draft.shellIntegration = OscShellIntegration.configured(launch.promptMarkersExpected, inventoryFiles?.input)
+                    },
+                ).also { inventoryFiles?.observe(it) }
+        } catch (failure: Throwable) {
+            files?.close()
+            throw failure
+        }
     }
 
     private val DEFAULT_WORKING_DIRECTORY: Path = Path.of(System.getProperty("user.home"))
