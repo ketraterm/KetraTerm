@@ -384,21 +384,28 @@ class SwingShellSuggestionControllerTest {
             val request = request(commandText = "git s")
             val first = suggestions(3, endOffset = request.commandText.length)
             controller.show(request, first, selectedIndex = 1)
+            val enriched = first[1].copy(detail = "Updated catalog description", source = "live")
 
             controller.showPreservingSelectedOutcome(
                 request,
-                listOf(first[2], first[1], first[0]),
+                listOf(first[2], first[0], enriched),
                 fallbackSelectedIndex = 0,
             )
-            assertEquals(1, controller.state().selectedIndex)
-            assertSame(first[1], controller.state().selectedSuggestion)
+            assertEquals(2, controller.state().selectedIndex)
+            assertSame(enriched, controller.state().selectedSuggestion)
 
-            controller.showPreservingSelectedOutcome(
-                request(commandText = "git st"),
-                first,
-                fallbackSelectedIndex = 0,
-            )
-            assertEquals(0, controller.state().selectedIndex)
+            for (line in listOf("git st", "git s", "git ")) {
+                val updated = suggestions(3, endOffset = line.length)
+                controller.showPreservingSelectedOutcome(
+                    request(commandText = line),
+                    updated,
+                    fallbackSelectedIndex = -1,
+                )
+                assertEquals(-1, controller.state().selectedIndex)
+                assertNull(controller.state().selectedSuggestion)
+                assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)))
+                assertSame(updated.first(), controller.state().selectedSuggestion)
+            }
         }
 
     @Test

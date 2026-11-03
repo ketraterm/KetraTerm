@@ -110,7 +110,11 @@ internal class MergedCompletionEngine(
             var hasStructuredCandidates = false
 
             suspend fun publish() {
-                val ranked = rankingState.rankedCandidates()
+                val ranked =
+                    rankingState.rankedCandidates().let { candidates ->
+                        // Enrich the winning row, so later equivalent edits cannot erase catalog details.
+                        if (commandPosition && shellCandidates != null) candidates.map { describeCommand(request, it) } else candidates
+                    }
                 if (ranked != lastPublished) {
                     lastPublished = ranked
                     send(ranked)
@@ -149,7 +153,7 @@ internal class MergedCompletionEngine(
                         priority = TerminalCompletionSourcePrior.NATIVE_SHELL,
                         candidates =
                             shellCandidates.filter { changesText(request, it) }.map {
-                                if (commandPosition) enrichCommand(request, completionContext, it) else it
+                                if (commandPosition) rankShellCommand(request, completionContext, it) else it
                             },
                     ),
                 )
@@ -334,18 +338,13 @@ internal class MergedCompletionEngine(
                 candidate.replacementText.length,
             )
 
-    private fun enrichCommand(
+    private fun rankShellCommand(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         candidate: TerminalCompletionCandidate,
     ): TerminalCompletionCandidate {
         if (candidate.kind != TerminalCompletionCandidateKind.COMMAND) return candidate
-        val name = commandName(request, candidate)
-        val spec = commandSpecs.firstOrNull { it.name == name || name in it.aliases }
-        val detail =
-            spec?.description?.takeIf { it.isNotBlank() }?.let { description ->
-                if (candidate.detail.isBlank() || candidate.detail == description) description else description + "\n" + candidate.detail
-            } ?: candidate.detail
+        val spec = commandSpec(request, candidate)
         val display =
             if (spec != null &&
                 candidate.replacementText == spec.name
@@ -357,10 +356,30 @@ internal class MergedCompletionEngine(
         val match = CompletionMatcher.match(display, context.activePrefix)
         return candidate.copy(
             displayText = display,
-            detail = detail,
             matchedRanges = match?.matchedRanges ?: candidate.matchedRanges,
             score = match?.score ?: candidate.score,
         )
+    }
+
+    private fun describeCommand(
+        request: TerminalCompletionRequest,
+        candidate: TerminalCompletionCandidate,
+    ): TerminalCompletionCandidate {
+        if (candidate.kind != TerminalCompletionCandidateKind.COMMAND) return candidate
+        val description = commandSpec(request, candidate)?.description?.takeIf { it.isNotBlank() } ?: return candidate
+        if (candidate.detail == description) return candidate
+        return candidate.copy(detail = if (candidate.detail.isBlank()) description else description + "\n" + candidate.detail)
+    }
+
+    private fun commandSpec(
+        request: TerminalCompletionRequest,
+        candidate: TerminalCompletionCandidate,
+    ): TerminalCommandSpec? {
+        val name = commandName(request, candidate) ?: return null
+        val ignoreCase = request.shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL && '/' !in name && '\\' !in name
+        return commandSpecs.firstOrNull { spec ->
+            spec.name.equals(name, ignoreCase) || spec.aliases.any { it.equals(name, ignoreCase) }
+        }
     }
 
     private fun reportSourceFailure(

@@ -30,6 +30,159 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
     @Test
+    fun `PowerShell catalog enrichment respects command case without rewriting shell edits`() =
+        runTest {
+            for (name in listOf("get-widget", "widget")) {
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        sources = emptyList(),
+                        commandSpecs = listOf(TerminalCommandSpec("Get-Widget", aliases = listOf("Widget"), description = "Widget tools")),
+                        shellProvider =
+                            TerminalCompletionShellProvider { _, _, _ ->
+                                listOf(candidate(name, 1, "shell", TerminalCompletionCandidateKind.COMMAND).copy(detail = "Native help"))
+                            },
+                    )
+                val powershell = engine.completions(request(name.take(1))).last().single()
+                assertEquals(name, powershell.replacementText)
+                assertEquals("Widget tools\nNative help", powershell.detail)
+                val posix =
+                    engine
+                        .completions(
+                            request(name.take(1)).copy(shellCapabilities = TerminalShellCapabilities.POSIX),
+                        ).last()
+                        .single()
+                assertEquals("Native help", posix.detail)
+            }
+        }
+
+    @Test
+    fun `duplicate live commands retain catalog descriptions regardless of provider arrival`() =
+        runTest {
+            for (command in listOf("git", "docker")) {
+                for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                    val release = CompletableDeferred<Unit>()
+                    val publications = mutableListOf<List<TerminalCompletionCandidate>>()
+                    val prefix = command.take(2)
+                    val engine =
+                        TerminalCompletionEngines.fromSources(
+                            sources =
+                                listOf(
+                                    TerminalCompletionSourceEntry(
+                                        { _, _, _ ->
+                                            release.await()
+                                            listOf(
+                                                candidate(command, prefix.length, "host", TerminalCompletionCandidateKind.COMMAND),
+                                            )
+                                        },
+                                        priority = TerminalCompletionSourcePrior.NATIVE_SHELL,
+                                    ),
+                                ),
+                            commandSpecs = listOf(TerminalCommandSpec(command, description = "$command description")),
+                            shellProvider =
+                                TerminalCompletionShellProvider { _, _, _ ->
+                                    listOf(candidate(command, prefix.length, "shell", TerminalCompletionCandidateKind.COMMAND))
+                                },
+                        )
+                    val job = launch { engine.completions(request(prefix).copy(shellCapabilities = shell)).toList(publications) }
+                    runCurrent()
+                    assertEquals(1, publications.size)
+                    release.complete(Unit)
+                    job.join()
+                    for (publication in publications) {
+                        val result = publication.single()
+                        assertEquals(command, result.replacementText)
+                        assertEquals("$command description", result.detail)
+                        assertEquals(0, result.replacementStartOffset)
+                        assertEquals(prefix.length, result.replacementEndOffset)
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `authoritative empty discovery excludes learned and host commands after prefix deletion`() =
+        runTest {
+            val learning =
+                TerminalCompletionLearningStore().apply {
+                    repeat(20) { recordCommandResult("cargo build", true, null, null, 10) }
+                }
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        sources =
+                            listOf(
+                                TerminalCompletionSourceEntry({ _, context, _ ->
+                                    listOf(
+                                        candidate("cargo", context.replacementEndOffset, "host", TerminalCompletionCandidateKind.COMMAND),
+                                    )
+                                }),
+                            ),
+                        learningStore = learning,
+                        shellProvider = TerminalCompletionShellProvider { _, _, _ -> emptyList() },
+                    )
+                for (prefix in listOf("car", "carg", "ca", "c")) {
+                    val publications = engine.completions(request(prefix).copy(shellCapabilities = shell)).toList()
+                    assertTrue(publications.isNotEmpty())
+                    assertTrue(publications.all { it.isEmpty() }, "$shell: $prefix -> $publications")
+                }
+            }
+        }
+
+    @Test
+    fun `cd merges learned directories with live paths without files or native noise after deletion`() =
+        runTest {
+            val learning =
+                TerminalCompletionLearningStore().apply {
+                    repeat(12) { recordCommandResult("cd Documents/", true, null, "file:///home/user", 10) }
+                    recordCommandResult("cd Documents/projects/", true, null, "file:///home/user", 10)
+                }
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val engine =
+                    MergedCompletionEngine(
+                        sources =
+                            listOf(
+                                TerminalCompletionSourceEntry(
+                                    TerminalCompletionSources.path {
+                                        listOf(
+                                            TerminalFileEntry("Downloads", true),
+                                            TerminalFileEntry("Documents", true),
+                                            TerminalFileEntry("Document.txt", false),
+                                        )
+                                    },
+                                    priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
+                                ),
+                            ),
+                        learningStore = learning,
+                        clockEpochMillis = { 2_000_000_000_000L },
+                        shellProvider =
+                            TerminalCompletionShellProvider { _, _, _ ->
+                                error("Native completer must not run for populated cd paths")
+                            },
+                        sourceFailureHandler = { _, _, failure -> throw AssertionError("Unexpected provider failure", failure) },
+                    )
+                for (prefix in listOf("D", "Doc", "Do", "D")) {
+                    val line = "cd $prefix"
+                    val results =
+                        engine
+                            .completions(
+                                request(line).copy(shellCapabilities = shell, workingDirectoryUri = "file:///home/user"),
+                            ).last()
+                    val outcomes = results.map { line.replaceRange(it.replacementStartOffset, it.replacementEndOffset, it.replacementText) }
+                    // Repeated use promotes Documents; one old nested visit stays below a live sibling.
+                    val expected =
+                        if (prefix == "Doc") {
+                            listOf("cd Documents/", "cd Documents/projects/")
+                        } else {
+                            listOf("cd Documents/", "cd Downloads/", "cd Documents/projects/")
+                        }
+                    assertEquals(expected, outcomes)
+                    assertEquals("path", results.first().source)
+                    assertTrue(results.all { it.kind == TerminalCompletionCandidateKind.PATH })
+                }
+            }
+        }
+
+    @Test
     fun `request cancellation during metadata capture prevents shell queries and publication`() =
         runTest {
             var metadataRead = false

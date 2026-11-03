@@ -383,8 +383,13 @@ One representative supplies both the edit and its complete presentation metadata
 including `feedbackToken`. Selection favors primary providers, semantic fit,
 shorter replacement text, source prior, local rank, and stable tie-breakers.
 Each outcome retains that representative and aggregate relevance values; it does
-not retain the contributing candidate list. The engine replaces only the chosen
-candidate's score with the global score. Ordering is deterministic for the same
+not retain the contributing candidate list. The ranker replaces the chosen
+candidate's score with the global score. For shell-verified commands, the engine
+adds catalog descriptions to the winning row after merging, preserving its edit,
+source, feedback token, and provider detail. Later duplicate providers therefore
+cannot remove catalog descriptions. Bare PowerShell command and catalog alias
+lookup ignores case; POSIX lookup remains case-sensitive.
+Ordering is deterministic for the same
 request, source results, learning snapshot, and evaluation time.
 
 ## Ranking Calibration
