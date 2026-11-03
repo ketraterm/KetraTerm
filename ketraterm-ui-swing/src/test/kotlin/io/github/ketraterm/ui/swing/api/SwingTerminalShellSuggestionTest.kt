@@ -25,6 +25,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -50,6 +51,51 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalShellSuggestionTest {
     private val mutationDispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `popup color settings apply initially and reload without replacing the interaction`() {
+        var settings =
+            SwingSettings.create {
+                it.smartSuggestionsEnabled = true
+                it.shellSuggestionStyle = SwingShellSuggestionStyle(background = 0xFF102030.toInt())
+            }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                val interaction =
+                    terminal.beginShellSuggestionInteraction(request(), editTarget = SwingShellSuggestionEditTarget.NONE)
+                        ?: error("Display capture failed")
+                terminal.presentShellSuggestions(interaction)
+                interaction.publish(suggestions(), selectedIndex = 1)
+                val publication = interaction.snapshot
+                val popup = terminal.components.filterIsInstance<SwingCompletionPopupView>().single()
+                assertEquals(0xFF102030.toInt(), popup.background.rgb)
+
+                settings =
+                    settings.copy {
+                        it.shellSuggestionStyle =
+                            SwingShellSuggestionStyle(
+                                background = 0xFF304050.toInt(),
+                                foreground = 0xFFABCDEF.toInt(),
+                                selectionBackground = 0xFF506070.toInt(),
+                            )
+                    }
+                terminal.reloadSettings()
+                assertEquals(settings.shellSuggestionStyle.background, popup.background.rgb)
+                assertEquals(settings.shellSuggestionStyle.foreground, popup.list.foreground.rgb)
+                assertEquals(settings.shellSuggestionStyle.selectionBackground, popup.list.selectionBackground.rgb)
+                assertSame(publication, interaction.snapshot)
+                assertTrue(interaction.isActive)
+                assertTrue(terminal.currentShellSuggestionState().visible)
+
+                settings = settings.copy { it.shellSuggestionStyle = SwingShellSuggestionStyle() }
+                terminal.reloadSettings()
+                assertEquals(SwingShellSuggestionStyle().foreground, popup.list.foreground.rgb)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
 
     private fun newTerminal(
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },

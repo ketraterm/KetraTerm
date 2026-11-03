@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import io.github.ketraterm.ui.swing.render.SwingColors
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import java.awt.*
 import java.awt.event.*
 import java.awt.geom.RoundRectangle2D
@@ -27,6 +28,7 @@ import javax.swing.*
 internal class SwingCompletionPopupView(
     private val listener: SwingShellSuggestionViewListener,
     private val messages: SwingTerminalMessages = SwingTerminalMessages.forLocale(),
+    initialStyle: SwingShellSuggestionStyle = SwingShellSuggestionStyle(),
 ) : JPanel(BorderLayout()),
     SwingShellSuggestionView {
     override val component: JComponent get() = this
@@ -34,9 +36,10 @@ internal class SwingCompletionPopupView(
     private var updating = false
     private var closed = false
     internal val list = JList<SwingShellSuggestion>()
-    private val renderer = CompletionRenderer(messages)
+    private val renderer = CompletionRenderer(messages, initialStyle)
     private val scrollPane = JScrollPane(list)
     private val position = JLabel()
+    private var borderColor = Color(initialStyle.border, true)
     private val selectionListener =
         javax.swing.event.ListSelectionListener {
             if (!updating && !closed && !it.valueIsAdjusting && list.selectedIndex >= 0) {
@@ -67,7 +70,6 @@ internal class SwingCompletionPopupView(
         isFocusable = false
         isOpaque = false
         border = BorderFactory.createEmptyBorder(6, 6, 6, 6)
-        background = UIManager.getColor("PopupMenu.background") ?: background
         list.isFocusable = false
         list.font = list.font.deriveFont(Font.PLAIN)
         list.background = background
@@ -92,10 +94,32 @@ internal class SwingCompletionPopupView(
             },
         )
         position.border = BorderFactory.createEmptyBorder(2, 6, 2, 6)
-        position.foreground = UIManager.getColor("Label.disabledForeground") ?: list.foreground
         position.font = list.font.deriveFont((list.font.size2D - 1f).coerceAtLeast(10f))
         add(scrollPane, BorderLayout.CENTER)
         add(position, BorderLayout.SOUTH)
+        applyStyle(initialStyle)
+    }
+
+    /**
+     * Applies built-in colors without changing candidates, selection, or request lifetime.
+     *
+     * @param style complete immutable palette; each color is applied exactly.
+     * @throws IllegalStateException if called outside the EDT.
+     */
+    fun applyStyle(style: SwingShellSuggestionStyle) {
+        check(SwingUtilities.isEventDispatchThread()) { "completion style must update on the EDT" }
+        background = Color(style.background, true)
+        foreground = Color(style.foreground, true)
+        list.background = background
+        list.foreground = foreground
+        list.selectionBackground = Color(style.selectionBackground, true)
+        list.selectionForeground = Color(style.selectionForeground, true)
+        scrollPane.background = background
+        scrollPane.viewport.background = background
+        position.foreground = Color(style.secondaryForeground, true)
+        borderColor = Color(style.border, true)
+        renderer.style = style
+        repaint()
     }
 
     override fun paintComponent(graphics: Graphics) {
@@ -104,7 +128,7 @@ internal class SwingCompletionPopupView(
             canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             canvas.color = background
             canvas.fillRoundRect(0, 0, width, height, 12, 12)
-            canvas.color = UIManager.getColor("Component.borderColor") ?: list.foreground.darker()
+            canvas.color = borderColor
             // Keep the entire centered stroke inside the component, including at fractional display scales.
             canvas.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
             canvas.draw(RoundRectangle2D.Float(0.5f, 0.5f, width - 1f, height - 1f, 12f, 12f))
@@ -184,6 +208,7 @@ internal class SwingCompletionPopupView(
 
 private class CompletionRenderer(
     private val messages: SwingTerminalMessages,
+    var style: SwingShellSuggestionStyle,
 ) : DefaultListCellRenderer() {
     private var suggestions = emptyList<SwingShellSuggestion>()
     private var rows = emptyArray<CompletionRow>()
@@ -218,7 +243,9 @@ private class CompletionRenderer(
         super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus)
         val suggestion = value as? SwingShellSuggestion ?: return this
         val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
-        text = row.html
+        val matchBackground = if (isSelected) style.selectionMatchBackground else style.matchBackground
+        val matchColor = if (isSelected) style.selectionMatchForeground else style.matchForeground
+        text = row.html(matchColor, matchBackground, isSelected)
         selected = isSelected
         isOpaque = false
         icon = icons[suggestion.accentRole.ordinal]
@@ -245,17 +272,23 @@ private class CompletionRenderer(
     }
 
     private fun presentation(suggestion: SwingShellSuggestion): CompletionRow {
-        val primary = displayText(suggestion.displayText, 4096)
+        val primaryLimit = 4096
+        val primary = displayText(suggestion.displayText, primaryLimit)
+        val matches =
+            if (suggestion.displayText.length > primaryLimit) {
+                suggestion.matchedRanges.truncatedTo(suggestion.displayText, primary.length - 1)
+            } else {
+                suggestion.matchedRanges
+            }
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
         val html =
             buildString {
                 append("<html>")
                 var offset = 0
-                for (range in 0 until suggestion.matchedRanges.rangeCount) {
-                    val start = suggestion.matchedRanges.startOffset(range)
-                    if (start >= primary.length) break
-                    val end = suggestion.matchedRanges.endOffset(range).coerceAtMost(primary.length)
+                for (range in 0 until matches.rangeCount) {
+                    val start = matches.startOffset(range)
+                    val end = matches.endOffset(range)
                     append(escapeHtml(primary.substring(offset, start)))
                     append("<b>").append(escapeHtml(primary.substring(start, end))).append("</b>")
                     offset = end
@@ -377,11 +410,48 @@ private class CompletionIcon(
 }
 
 private class CompletionRow(
-    val html: String,
+    private val html: String,
     val tooltip: String,
     val accessibleName: String,
     val accessibleDescription: String,
-)
+) {
+    private val hasMatches = "<b>" in html
+    private val matchColors = IntArray(2)
+    private val matchBackgrounds = IntArray(2)
+    private val coloredHtml = arrayOfNulls<String>(2)
+
+    /**
+     * Colors prepared match spans without reprocessing provider text or matching again.
+     * Selected and ordinary markup have separate cache entries; theme changes replace them.
+     *
+     * @param matchColor opaque ARGB foreground for matched fragments.
+     * @param matchBackground opaque ARGB fragment fill.
+     * @param selected whether this markup is for the selected row.
+     * @return escaped label markup, retaining the ordinary foreground outside matched spans.
+     */
+    fun html(
+        matchColor: Int,
+        matchBackground: Int,
+        selected: Boolean,
+    ): String {
+        if (!hasMatches) return html
+        val index = if (selected) 1 else 0
+        val cached = coloredHtml[index]
+        if (cached != null && matchColors[index] == matchColor && matchBackgrounds[index] == matchBackground) return cached
+        val css =
+            buildString {
+                append("color:").append(matchColor.toHtmlColor())
+                append(";background-color:").append(matchBackground.toHtmlColor())
+            }
+        val colored = html.replace("<b>", "<b style=\"$css\">")
+        matchColors[index] = matchColor
+        matchBackgrounds[index] = matchBackground
+        coloredHtml[index] = colored
+        return colored
+    }
+}
+
+private fun Int.toHtmlColor(): String = "#" + (this and 0xFFFFFF).toString(16).padStart(6, '0')
 
 /** Bound hostile provider text without splitting an extended grapheme or exposing display controls. */
 private fun displayText(

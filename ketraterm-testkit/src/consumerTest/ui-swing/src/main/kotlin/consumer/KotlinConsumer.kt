@@ -44,6 +44,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -83,6 +84,13 @@ fun main() =
                 it.copyOnSelection = true
                 it.middleClickPaste = true
                 it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
+                it.shellSuggestionStyle =
+                    SwingShellSuggestionStyle(
+                        background = 0xFF202124.toInt(),
+                        foreground = 0xFFE8EAED.toInt(),
+                        matchForeground = 0xFF82AFFC.toInt(),
+                        selectionMatchForeground = 0xFFBBDDFF.toInt(),
+                    )
                 it.columnSpacing = -1
                 it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
                 it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
@@ -105,6 +113,7 @@ fun main() =
         check(interactionSettings == interactionSettings.copy {})
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
         check(SwingSettings().minimumContrastRatio == 3.0)
+        check(interactionSettings.copy {}.shellSuggestionStyle.matchForeground == 0xFF82AFFC.toInt())
         check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)

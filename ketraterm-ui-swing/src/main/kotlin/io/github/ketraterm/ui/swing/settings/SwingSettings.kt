@@ -312,6 +312,10 @@ public class SwingSettings private constructor(
     @ExperimentalShellSuggestionsApi
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
 
+    /** Colors for the built-in suggestion popup; custom views retain their own presentation policy. */
+    @ExperimentalShellSuggestionsApi
+    public val shellSuggestionStyle: SwingShellSuggestionStyle = builder.shellSuggestionStyle
+
     /**
      * Returns to live output when new rows enter history. Disabled by default so reading
      * scrollback keeps its content anchored; admitted typing and paste still reveal live input.
@@ -540,6 +544,10 @@ public class SwingSettings private constructor(
         @ExperimentalShellSuggestionsApi
         public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
 
+        /** Draft value for [SwingSettings.shellSuggestionStyle]; defaults to the built-in dark palette. */
+        @ExperimentalShellSuggestionsApi
+        public var shellSuggestionStyle: SwingShellSuggestionStyle = source?.shellSuggestionStyle ?: SwingShellSuggestionStyle()
+
         /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */
         public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: false
 
@@ -609,6 +617,7 @@ public class SwingSettings private constructor(
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
+            shellSuggestionStyle == other.shellSuggestionStyle &&
             scrollOnOutput == other.scrollOnOutput &&
             osc8HyperlinkPresentation == other.osc8HyperlinkPresentation &&
             osc8HyperlinkActivation == other.osc8HyperlinkActivation
@@ -668,6 +677,7 @@ public class SwingSettings private constructor(
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
+        result = 31 * result + shellSuggestionStyle.hashCode()
         result = 31 * result + scrollOnOutput.hashCode()
         result = 31 * result + osc8HyperlinkPresentation.hashCode()
         result = 31 * result + osc8HyperlinkActivation.hashCode()

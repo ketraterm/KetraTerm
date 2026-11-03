@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.commandline.isTerminalOptionToken
 import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
+import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.stats.saturatedCounterSum
 
@@ -102,6 +103,7 @@ internal class LearnedObservedTokenIndex private constructor(
                     TerminalCompletionCandidateKind.ARGUMENT
                 },
             score = score(),
+            matchedRanges = CompletionMatcher.match(token, context.activePrefix)?.matchedRanges ?: TerminalCompletionMatchRanges.EMPTY,
         )
     }
 

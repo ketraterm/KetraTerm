@@ -77,6 +77,11 @@ internal class SwingShellSuggestionController(
 
     val popup get() = view.component
 
+    /** Reloads built-in colors without imposing style policy on a custom presentation. */
+    fun reloadStyle() {
+        (view as? SwingCompletionPopupView)?.applyStyle(host.settings.shellSuggestionStyle)
+    }
+
     /** Keeps only the last painted rows. Their closed publication cannot admit pointer or keyboard actions. */
     fun retainPresentation() {
         if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return
@@ -93,6 +98,7 @@ internal class SwingShellSuggestionController(
     ): Boolean {
         require(anchorColumn >= 0 && anchorRow >= 0) { "suggestion anchor must be nonnegative" }
         if (!host.settings.smartSuggestionsEnabled || !interaction.isActive) return false
+        reloadStyle()
         if (this.interaction !== interaction) {
             this.interaction?.removeChangeListener(changeListener)
             this.interaction = interaction

@@ -72,7 +72,19 @@ internal fun projectLearnedCommandCandidate(
         kind = kind,
         score = score,
         valueDomain = completionContext.expectedValueDomain,
+        matchedRanges = literalPrefixRanges(replacementText, completionContext.activePrefix),
     )
+}
+
+/** Projects only literal prefix evidence; shell escape syntax must not be mistaken for matching text. */
+private fun literalPrefixRanges(
+    displayText: String,
+    prefix: String,
+): TerminalCompletionMatchRanges {
+    if (prefix.isEmpty()) return TerminalCompletionMatchRanges.EMPTY
+    val start = if (displayText.firstOrNull() == '\'' || displayText.firstOrNull() == '"') 1 else 0
+    if (!displayText.regionMatches(start, prefix, 0, prefix.length, ignoreCase = true)) return TerminalCompletionMatchRanges.EMPTY
+    return TerminalCompletionMatchRanges.fromOwnedPackedOffsets(displayText, intArrayOf(start, start + prefix.length))
 }
 
 private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {

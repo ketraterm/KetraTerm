@@ -197,7 +197,7 @@ not an exhaustive schema for every version of these tools.
 | Sources | Register custom asynchronous sources with bounded priorities and a failure-reporting callback. |
 | Source adapters | Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, Git snapshots, or dynamic argument values. |
 | Learning | Supply a shared learning store and replay policy; enable ranking evidence independently of command replay. |
-| Presentation | Replace the provider, popup view, suggestion keymap, or entire presentation target; customize source labels. |
+| Presentation | Configure built-in popup colors and source labels, or replace the provider, view, keymap, or entire presentation target. |
 | Editing and feedback | Supply request-scoped edit authority and observe acceptance/dismissal outcomes. |
 
 The engine performs no host I/O itself. Source adapters use host-supplied data;

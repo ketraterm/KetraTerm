@@ -18,6 +18,8 @@ package io.github.ketraterm.completion.engine
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalOptionSpec
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
@@ -28,6 +30,59 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LearnedHistoryCompletionEngineTest {
+    @Test
+    fun `saved commands publish display-relative prefix matches including quoted paths`() =
+        runBlocking {
+            val cases =
+                listOf(
+                    Triple("cd IdeaProjects/KetraTerm/", "cd Idea", intArrayOf(0, 4)),
+                    Triple("cd IdeaProjects/KetraTerm/", "cd idea", intArrayOf(0, 4)),
+                    Triple("cd 'Idea Projects/KetraTerm/'", "cd 'Idea Pro", intArrayOf(1, 9)),
+                    Triple("cd 'Idea Projects/KetraTerm/'", "cd Idea", intArrayOf(1, 5)),
+                    Triple("cd \"Idea Projects/KetraTerm/\"", "cd \"Idea", intArrayOf(1, 5)),
+                    Triple("git switch main", "git switch ma", intArrayOf(0, 2)),
+                    Triple("git switch main", "git switch ", intArrayOf()),
+                )
+            for ((recorded, typed, offsets) in cases) {
+                val store = TerminalCompletionLearningStore()
+                store.recordCommandResult(recorded, true, null, null, 10)
+                val candidate =
+                    engine(store)
+                        .complete(request(typed, shellCapabilities = TerminalShellCapabilities.POSIX))
+                        .single { it.source == "learned" }
+                assertTrue(offsets.contentEquals(candidate.matchedRanges.copyPackedOffsets()), "$typed: ${candidate.matchedRanges}")
+                assertEquals(
+                    recorded,
+                    typed.replaceRange(candidate.replacementStartOffset, candidate.replacementEndOffset, candidate.replacementText),
+                )
+            }
+        }
+
+    @Test
+    fun `saved attached path values highlight relative to their projected label`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            store.recordCommandResult("tool --path=IdeaProjects/KetraTerm/", true, null, null, 10)
+            val spec =
+                TerminalCommandSpec(
+                    name = "tool",
+                    options =
+                        listOf(
+                            TerminalOptionSpec(
+                                names = listOf("--path"),
+                                requiresValue = true,
+                                valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                            ),
+                        ),
+                )
+            val candidate =
+                engine(store, commandSpecs = listOf(spec))
+                    .complete(request("tool --path=Idea", shellCapabilities = TerminalShellCapabilities.POSIX))
+                    .single { it.source == "learned" }
+            assertEquals("IdeaProjects/KetraTerm/", candidate.displayText)
+            assertTrue(intArrayOf(0, 4).contentEquals(candidate.matchedRanges.copyPackedOffsets()))
+        }
+
     @Test
     fun `learned history matches case-insensitively while preserving exact command case`() =
         runBlocking {

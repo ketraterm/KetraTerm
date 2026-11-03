@@ -43,6 +43,7 @@ class LearnedObservedTokenIndexTest {
         val optionValues = candidates(index, "abc --config ")
 
         assertEquals(listOf("de"), firstArguments.map { it.replacementText })
+        assertTrue(intArrayOf(0, 1).contentEquals(firstArguments.single().matchedRanges.copyPackedOffsets()))
         assertEquals(setOf("-f", "-g"), options.map { it.replacementText }.toSet())
         assertTrue(optionValues.isEmpty())
         assertTrue(firstArguments.all { it.kind == TerminalCompletionCandidateKind.ARGUMENT })

@@ -241,6 +241,36 @@ after the normal debounce; with automatic popups disabled, request them explicit
 The embedded automatic popup updates in place as you type. Previous rows remain
 visible while results refresh, but cannot be accepted until fresh results arrive.
 
+Use `SwingSettings.shellSuggestionStyle` to customize the built-in popup:
+
+```kotlin
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun suggestionSettings() = SwingSettings.create {
+    it.shellSuggestionStyle = SwingShellSuggestionStyle(
+        background = 0xFF202124.toInt(),
+        foreground = 0xFFE8EAED.toInt(),
+        selectionBackground = 0xFF334455.toInt(),
+        selectionForeground = 0xFFFFFFFF.toInt(),
+        matchForeground = 0xFF82AFFC.toInt(),
+        selectionMatchForeground = 0xFFBBDDFF.toInt(),
+    )
+}
+```
+
+The style also exposes match backgrounds, border, and overflow text colors. Every
+role has a concrete default in the built-in dark palette. Colors are packed ARGB;
+text and fills must be opaque, while a transparent border removes the outline.
+Colors are rendered exactly, with no theme lookup or automatic contrast changes.
+Call `reloadSettings()` after changing settings; the popup updates without
+replacing its suggestions or selection.
+Custom views retain control of their own styling. Providers supply label-relative
+`matchedRanges`, including disjoint fuzzy matches; the default view colors those
+fragments without repeating the match.
+
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 `AUTOMATIC`; pass `EXPLICIT` for an explicit command. The host must replace or hide

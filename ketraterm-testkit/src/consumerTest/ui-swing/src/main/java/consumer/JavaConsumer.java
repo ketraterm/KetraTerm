@@ -37,6 +37,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler;
 import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteRequest;
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle;
 import io.github.ketraterm.ui.swing.settings.SwingPasteSource;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion;
@@ -125,6 +126,9 @@ public final class JavaConsumer {
             draft.setCopyOnSelection(true);
             draft.setMiddleClickPaste(true);
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
+            draft.setShellSuggestionStyle(new SwingShellSuggestionStyle(
+                0xFF202124, 0xFFE8EAED, 0xFF334455, 0xFFFFFFFF,
+                0xFF82AFFC, 0xFFBBDDFF));
             draft.setColumnSpacing(-1);
             draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
             draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
@@ -140,6 +144,8 @@ public final class JavaConsumer {
             draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getShellSuggestionStyle().getMatchForeground() != 0xFF82AFFC)
+            throw new AssertionError("Java suggestion style did not survive copying");
         if (copiedSettings.getShellIntegrationPromptDotHoverColor() != 0xFFFFFFFF
             || copiedSettings.getShellIntegrationFailedPromptDotHoverColor() != 0xFFFF8A8A
             || copiedSettings.getShellIntegrationPromptDotHoverHaloColor() != 0x404B6EAF
