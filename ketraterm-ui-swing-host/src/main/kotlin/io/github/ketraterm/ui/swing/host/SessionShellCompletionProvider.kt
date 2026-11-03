@@ -21,7 +21,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
 
 /**
- * Adapts a session's installed native shell completer to the completion engine.
+ * Adapts session command inventories and the installed native shell completer to the completion engine.
  * The session owns request admission, correlation, cancellation, and stale-edit validation.
  * Native replacement text is already escaped and is preserved verbatim.
  */
@@ -56,7 +56,7 @@ public class SessionShellCompletionProvider(
                         replacementStartOffset = context.replacementStartOffset,
                         replacementEndOffset = context.replacementEndOffset,
                         displayText = item.displayText,
-                        source = "bash",
+                        source = "shell",
                         kind = TerminalCompletionCandidateKind.COMMAND,
                     )
                 }.toList()

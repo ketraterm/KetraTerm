@@ -109,7 +109,7 @@ public class TerminalCompletionContext
          * Decoded words after the executable and strictly before the active token,
          * in input order. Includes subcommands, option names, values, and `--`.
          * Leading environment assignments and the executable are excluded.
-         * Supported Bash aliases contribute their fixed arguments without changing edit offsets.
+         * Supported POSIX aliases contribute their fixed arguments without changing edit offsets.
          * Available even without a command spec; empty at command/operator positions.
          *
          * Only the cursor's command segment is included, according to the request's
@@ -200,7 +200,7 @@ public class TerminalCompletionContext
              * @param commandSpecs the same catalog used by the caller's spec-aware sources;
              * defaults to the bundled command specifications. An empty catalog resolves lexical
              * context without inferred command, option, or positional metadata.
-             * @param commandAliases captured Bash alias definitions; only literal command-prefix
+             * @param commandAliases captured POSIX alias definitions; only literal command-prefix
              * aliases are interpreted for POSIX requests. No shell expressions are evaluated.
              * @return request-owned context with consistent derived fields and replacement offsets.
              */

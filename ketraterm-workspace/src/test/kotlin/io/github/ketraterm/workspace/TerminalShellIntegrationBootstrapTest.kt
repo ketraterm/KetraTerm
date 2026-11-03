@@ -278,6 +278,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_preexec"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("]133;"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_osc7"))
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_completion_ready"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("'%%%02X'"))
         assertTrue(zshDirectory.resolve(".zlogin").exists())
         assertTrue(zshDirectory.resolve(".zlogout").exists())

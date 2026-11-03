@@ -28,10 +28,10 @@ package io.github.ketraterm.completion.api
 @ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionShellProvider {
     /**
-     * Captures current Bash alias definitions for semantic argument resolution.
+     * Captures current Bash or ordinary zsh alias definitions for POSIX argument resolution.
      * Called once before source work; must be cheap, non-blocking, and return a map
      * that is not mutated during resolution. Empty means no known aliases. Definitions
-     * are data only: the engine never evaluates shell code. Other shell syntaxes ignore them.
+     * are data only: the engine never evaluates shell code. Non-POSIX shell syntaxes ignore them.
      */
     public fun commandAliases(): Map<String, String> = emptyMap()
 

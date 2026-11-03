@@ -48,6 +48,7 @@ This table describes the sources available when completion is enabled.
 | Built-in command specifications | Yes | Yes |
 | Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
 | Bash command inventory | Commands, alias definitions, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
+| zsh command inventory | Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires `zsh/parameter` and `base64`; verified with zsh 5.9. Literal aliases inform argument semantics. | Same inventory and command authority. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | Project filename lookup and matching. |
 | Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
@@ -128,11 +129,11 @@ inside PowerShell. Native results remain subject to bounded protocol validation
 and stale-edit checks. The OSC producer still requires an unambiguous visible
 command line with the cursor at its end.
 
-Bash starts command discovery at each interactive terminal prompt, after user startup files
+Bash and zsh start command discovery at each interactive terminal prompt, after user startup files
 and environment overrides have run. Discovery runs in a background shell snapshot
-so scanning a large `PATH` does not delay prompt editing. Bare command suggestions use its inventory
+so scanning a large `PATH` does not delay prompt editing. Bare command suggestions use the inventory
 as availability authority, while catalog descriptions and existing ranking enrich
-the matches. This also applies to explicitly configured Bash inside WSL: command
+the matches. This also applies to explicitly configured Bash or zsh inside WSL: command
 discovery uses the guest's environment, never the Windows host's `PATH`.
 The inventory includes at most 8192 names within a 180 KB raw payload; names over
 512 UTF-8 bytes are omitted. Changes to functions, aliases, and `PATH` take effect
@@ -147,7 +148,7 @@ On Git Bash/Cygwin, `.exe` commands use the bare insertion only when Bash resolv
 both spellings identically. Shadowing aliases and functions remain distinct;
 Unix executable suffixes remain literal.
 
-Completed, unquoted Bash aliases resolve to catalog commands for argument suggestions.
+Completed, unquoted Bash and ordinary zsh aliases resolve to catalog commands for argument suggestions.
 For example, `g='git'`, `gs='git switch'`, and `gr="git -C 'repo folder'"` share the
 existing Git semantics and repository selection. Acceptance edits the original
 argument and preserves the typed alias. Literal chains and self aliases with fixed
@@ -157,10 +158,15 @@ per definition. Cycles, assignments, operators, substitutions, globbing, incompl
 quotes, and trailing-blank expansion are not interpreted. Such aliases do not inherit
 a potentially shadowed catalog command's grammar; ordinary unknown-command sources
 remain available. Alias metadata is never executed.
+zsh discovery excludes disabled functions/builtins and aliases when alias expansion
+is disabled. Global and suffix aliases are not modeled. Autoloaded functions are
+listed without loading their bodies. Command names requiring quoting use literal
+shell quoting; alias names requiring quoting are omitted because quoting would
+bypass their expansion.
 
-Bash argument and executable-path suggestions continue to use existing specs and
-host sources. Installed Bash argument completers, guest filesystem completion, and
-zsh native completion are not integrated. Older Bash and shells without an inventory
+Bash and zsh argument and executable-path suggestions continue to use existing specs and
+host sources. Installed Bash/zsh argument completers and guest filesystem completion
+are not integrated. Older Bash and shells without an inventory
 retain their existing sources. Normal shell Tab completion remains available.
 
 ## Built-in command catalog

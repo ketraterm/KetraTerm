@@ -21,7 +21,7 @@ public enum class TerminalShellCompletionKind { COMMAND, OPTION, FILE, DIRECTORY
 /**
  * One native candidate. [replacementText] is already escaped by the shell.
  * [displayText] and [description] are presentation only.
- * [aliasExpansion] is a literal Bash alias definition for a command inventory entry;
+ * [aliasExpansion] is a literal shell alias definition for a command inventory entry;
  * null means not an alias, while empty means an empty or unavailable definition.
  * Consumers must never execute this metadata.
  */

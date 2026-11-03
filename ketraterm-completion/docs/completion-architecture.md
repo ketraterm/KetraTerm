@@ -62,7 +62,7 @@ result with static and host sources and the global ranker. The same catalog
 supplies the static source automatically.
 
 Before resolution, the engine captures `shellProvider.commandAliases()` once.
-Literal Bash aliases expand only the completed command prefix in the semantic
+Literal Bash and ordinary zsh aliases expand only the completed command prefix in the semantic
 token list, reusing the shared tokenizer and command analyzer. Fixed arguments
 therefore participate in option, subcommand, and repository resolution without
 another source or shell query. Editable tokens retain their original offsets;

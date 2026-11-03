@@ -569,6 +569,7 @@ internal object TerminalShellIntegrationBootstrap {
         """
         if [[ -z ${'$'}{__KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             typeset -g __KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED=1
+            ${checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }}
             typeset -g __ketraterm_zsh_command_started=0
             function __ketraterm_osc133() {
                 printf '\033]133;%s\a' "${'$'}1"
@@ -602,6 +603,7 @@ internal object TerminalShellIntegrationBootstrap {
                     __ketraterm_zsh_command_started=0
                 fi
                 __ketraterm_zsh_osc7
+                __ketraterm_zsh_completion_ready
                 __ketraterm_osc133 A
                 return ${'$'}code
             }

@@ -71,6 +71,14 @@ completion resolve the same directory as the shell.
 Literal alias definitions feed shared argument analysis while accepted edits preserve
 the user's alias; see the [supported alias subset](completion.md#sources-by-host).
 
+zsh uses the same inventory protocol, command authority, and alias analysis.
+With `zsh/parameter` and `base64` available, it discovers enabled ordinary aliases,
+functions (including autoloads), builtins, and executable commands in a background
+snapshot at each terminal prompt. This includes explicit zsh launches inside WSL
+and has been verified with zsh 5.9. Discovery does not invoke ZLE, load autoloaded
+functions, or run argument completers. Global and suffix aliases are not modeled;
+normal shell Tab completion remains available.
+
 ## Features supplied by shell metadata
 
 | Feature | Description |

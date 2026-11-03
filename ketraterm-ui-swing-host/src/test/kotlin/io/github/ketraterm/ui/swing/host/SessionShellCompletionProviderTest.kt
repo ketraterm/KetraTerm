@@ -142,7 +142,7 @@ class SessionShellCompletionProviderTest {
         }
 
     @Test
-    fun `Bash command requests preserve native authority and source`() =
+    fun `POSIX command inventories preserve native authority without assuming Bash`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
                 val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POSIX)
@@ -151,7 +151,7 @@ class SessionShellCompletionProviderTest {
                 )
                 val candidates = assertNotNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
                 runCurrent()
-                assertEquals("bash", candidates.single().source)
+                assertEquals("shell", candidates.single().source)
                 assertEquals("toolbox", candidates.single().replacementText)
                 assertTrue(fixture.connector.writtenBytes.isEmpty())
             }

@@ -152,7 +152,7 @@ internal class StandaloneCompletionRegistry private constructor(
                         engine
                     },
                 contextProvider = contextProvider,
-                sourceLabels = mapOf("powershell" to "PowerShell", "bash" to "Bash", StandaloneGitCompletionLoader.SOURCE_ID to "Git"),
+                sourceLabels = mapOf("powershell" to "PowerShell", StandaloneGitCompletionLoader.SOURCE_ID to "Git"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

@@ -40,6 +40,138 @@ import kotlin.time.Duration.Companion.seconds
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
+    fun `zsh inventory reflects enabled commands and literal aliases without executing user code`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val hook = checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            hook + "\n" +
+                """
+                PATH="${'$'}PWD:/usr/bin:/bin"
+                ketra_function() { touch function-executed; }
+                ketra_disabled() { touch function-executed; }
+                disable -f ketra_disabled
+                disable pushd
+                autoload -Uz ketra_autoload
+                alias ketra_alias='git switch'
+                alias ketra_literal='git ${'$'}(touch alias-executed)'
+                printf -v long_definition '%4097s' x
+                alias ketra_long="${'$'}long_definition"
+                alias -g ketra_global='| cat'
+                alias -s ketra_suffix=cat
+                functions[${'$'}'ketra\ninvalid']=':'
+                functions[${'$'}'ketra\u0085invalid']=':'
+                printf '#!/bin/sh\n' > 'ketra executable'
+                printf '#!/bin/sh\n' > "ketra'quoted"
+                printf '#!/bin/sh\n' > 'ketra-λ'
+                chmod +x 'ketra executable' "ketra'quoted" 'ketra-λ'
+                hash ketra_cached="${'$'}PWD/ketra executable"
+                __ketraterm_zsh_publish_commands test
+                alias ketra_alias='git checkout'
+                unfunction ketra_function
+                rm 'ketra executable'
+                mkdir next
+                printf '#!/bin/sh\n' > next/ketra_next
+                chmod +x next/ketra_next
+                PATH="${'$'}PWD/next:/usr/bin:/bin"
+                __ketraterm_zsh_publish_commands test
+                setopt KSH_ARRAYS SH_WORD_SPLIT NO_UNSET
+                unsetopt ALIASES
+                __ketraterm_zsh_publish_commands test
+                [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_UNSET && ! -o ALIASES ]] || exit 12
+                """.trimIndent()
+        val result = runProcess(listOf(zsh!!, "-f"), standardInput = script, workingDirectory = tempDir)
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val inventories = commandInventories(result.stdout)
+        assertEquals(3, inventories.size)
+        val first = inventories[0].associateBy { it[0] }
+        assertEquals(listOf("ketra_alias", "ketra_alias", "Alias", "git switch"), first["ketra_alias"])
+        assertEquals("git ${'$'}(touch alias-executed)", first["ketra_literal"]?.get(3))
+        assertEquals(listOf("ketra_long", "ketra_long", "Alias", ""), first["ketra_long"])
+        assertEquals(listOf("ketra_function", "ketra_function", "Command", ""), first["ketra_function"])
+        assertEquals("Command", first["ketra_autoload"]?.get(2))
+        assertEquals("Command", first["printf"]?.get(2))
+        assertEquals("'ketra executable'", first["ketra executable"]?.get(1))
+        assertEquals("'ketra'\\''quoted'", first["ketra'quoted"]?.get(1))
+        assertEquals("'ketra-λ'", first["ketra-λ"]?.get(1))
+        assertEquals("Command", first["ketra_cached"]?.get(2))
+        val second = inventories[1].associateBy { it[0] }
+        assertEquals("git checkout", second["ketra_alias"]?.get(3))
+        assertEquals("Command", second["ketra_next"]?.get(2))
+        assertTrue(listOf("ketra_function", "ketra executable", "ketra_cached", "ketra'quoted").none { it in second })
+        assertTrue(inventories[2].none { it[2] == "Alias" })
+        val excluded = setOf("ketra_disabled", "ketra_global", "ketra_suffix", "pushd", "if", "!")
+        assertTrue(inventories.all { entries -> entries.none { it[0] in excluded || it[0].startsWith("__ketraterm_") } })
+        assertTrue(inventories.all { entries -> entries.none { it[0].any(Char::isISOControl) } })
+        assertTrue(Files.notExists(tempDir.resolve("alias-executed")))
+        assertTrue(Files.notExists(tempDir.resolve("function-executed")))
+    }
+
+    @Test
+    fun `zsh inventory refreshes at prompts and permits guarded acceptance through ZLE`(
+        @TempDir tempDir: Path,
+    ): Unit =
+        runBlocking {
+            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
+            val zsh = installedExecutable("zsh", "zsh.exe")
+            assumeTrue(zsh != null, "zsh is not installed")
+            TerminalWorkspace().use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile(
+                            "zsh",
+                            "Zsh",
+                            listOf(zsh!!, "-d", "-i"),
+                            environment = mapOf("ZDOTDIR" to tempDir.toString(), "PROMPT" to "ketra> ", "PATH" to "/usr/bin:/bin"),
+                        ),
+                        TerminalWorkspaceOpenOptions(),
+                    )
+                val session = tab.session
+
+                suspend fun awaitLine(line: String) {
+                    withTimeout(15.seconds) {
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == line }
+                    }
+                }
+                awaitLine("")
+                withTimeout(15.seconds) {
+                    session.shellCompletionCommands.first { commands -> commands?.any { it.displayText == "printf" } == true }
+                }
+                for (definition in listOf("git switch", "git checkout")) {
+                    session.submitInput(
+                        listOf(TerminalPasteEvent("alias ketra_live='$definition'"), TerminalKeyEvent.key(TerminalKey.ENTER)),
+                    )
+                    withTimeout(15.seconds) {
+                        session.shellCompletionCommands.first { commands ->
+                            commands?.any { it.displayText == "ketra_live" && it.aliasExpansion == definition } == true
+                        }
+                    }
+                    awaitLine("")
+                }
+                session.submitInput(TerminalPasteEvent("ketra_l"))
+                awaitLine("ketra_l")
+                val expected = assertNotNull(session.captureCommandEdit())
+                val candidate = assertNotNull(session.shellCompletionCommands.value).single { it.displayText == "ketra_live" }
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, candidate.replacementText))),
+                )
+                awaitLine("ketra_live")
+                session.submitInput(
+                    listOf(TerminalTextReplacementEvent(0, 10, "unalias ketra_live"), TerminalKeyEvent.key(TerminalKey.ENTER)),
+                )
+                withTimeout(15.seconds) {
+                    session.shellCompletionCommands.first { commands ->
+                        commands != null && commands.any { it.displayText == "printf" } && commands.none { it.displayText == "ketra_live" }
+                    }
+                }
+                awaitLine("")
+            }
+        }
+
+    @Test
     fun `Bash command inventory refreshes functions aliases and executable availability`(
         @TempDir tempDir: Path,
     ) {
@@ -74,19 +206,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 """.trimIndent()
         val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script, workingDirectory = tempDir)
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
-        val inventories =
-            Regex("\u001b]633;KetraTermCommands;2;Result;test;([^\u0007]*)\u0007")
-                .findAll(result.stdout)
-                .map {
-                    Base64
-                        .getDecoder()
-                        .decode(
-                            it.groupValues[1],
-                        ).toString(Charsets.UTF_8)
-                        .removeSuffix("\u0000")
-                        .split('\u0000')
-                        .chunked(4)
-                }.toList()
+        val inventories = commandInventories(result.stdout)
         assertEquals(3, inventories.size, visibleEscapes(result.stdout))
         assertTrue(inventories[0].contains(listOf("ketra_native_function", "ketra_native_function", "Command", "")))
         assertTrue(inventories[0].contains(listOf("ketra_native_alias", "ketra_native_alias", "Alias", "printf alias")))
@@ -744,6 +864,19 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
     }
+
+    private fun commandInventories(output: String): List<List<List<String>>> =
+        Regex("\u001b]633;KetraTermCommands;2;Result;test;([^\u0007]*)\u0007")
+            .findAll(output)
+            .map {
+                Base64
+                    .getDecoder()
+                    .decode(it.groupValues[1])
+                    .toString(Charsets.UTF_8)
+                    .removeSuffix("\u0000")
+                    .split('\u0000')
+                    .chunked(4)
+            }.toList()
 
     private fun assertMarkerOrder(
         output: String,
