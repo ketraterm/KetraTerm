@@ -38,6 +38,63 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @Test
+    fun `font changes scale rows icons and popup bounds without replacing the publication`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidates = List(8) { suggestion("command-$it", detail = "Description $it") }
+                view.update(snapshot(candidates, selectedIndex = 7, total = 20, start = 4))
+                view.size = view.preferredSize
+                view.doLayout()
+                val model = view.list.model
+                val row =
+                    view.list.cellRenderer.getListCellRendererComponent(
+                        view.list,
+                        candidates[0],
+                        0,
+                        false,
+                        false,
+                    ) as javax.swing.JLabel
+                val originalIconWidth = row.icon.iconWidth
+                val originalRowHeight = view.list.getCellBounds(0, 0).height
+                val originalPopupWidth = view.preferredSize.width
+
+                val enlargedFont = Font(Font.MONOSPACED, Font.PLAIN, 26)
+                view.font = enlargedFont
+                view.size = view.preferredSize
+                view.doLayout()
+
+                assertEquals(enlargedFont, view.list.font)
+                assertSame(model, view.list.model)
+                assertSame(candidates[0], model.getElementAt(0))
+                assertEquals(7, view.list.selectedIndex)
+                assertTrue(view.list.getCellBounds(0, 0).height >= originalRowHeight * 1.8)
+                assertEquals(originalPopupWidth * 2, view.preferredSize.width)
+                val enlargedRow =
+                    view.list.cellRenderer.getListCellRendererComponent(view.list, candidates[0], 0, false, false) as javax.swing.JLabel
+                assertEquals(originalIconWidth * 2, enlargedRow.icon.iconWidth)
+                assertEquals("<html>Description&nbsp;0</html>", enlargedRow.toolTipText)
+                assertTrue(
+                    view.list.accessibleContext.accessibleDescription
+                        .contains("20"),
+                )
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `closing the popup releases its font binding`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            val originalFont = view.list.font
+            view.close()
+            view.close()
+            view.font = originalFont.deriveFont(30f)
+            assertEquals(originalFont, view.list.font)
+        }
+
+    @Test
     fun `argument hints are escaped styled separately and never inserted`() =
         onEdt {
             val view = createView(RecordingListener())

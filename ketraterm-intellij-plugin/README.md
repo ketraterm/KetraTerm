@@ -38,6 +38,7 @@ focus, and their text omits the command line.
 
 Completion is enabled by default and configurable in KetraTerm settings; see
 [completion availability](../docs/features/completion.md#availability).
+The popup follows IDE colors and your configured terminal font.
 
 The **Project** settings page accepts a single startup command. The command is
 submitted once after shell readiness, including in restored tabs; typing before

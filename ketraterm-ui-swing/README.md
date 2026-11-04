@@ -266,6 +266,8 @@ argument-hint colors (`argumentHintForeground` and `selectionArgumentHintForegro
 role has a concrete default in the built-in dark palette. Colors are packed ARGB;
 text and fills must be opaque, while a transparent border removes the outline.
 Colors are rendered exactly, with no theme lookup or automatic contrast changes.
+The built-in popup uses `SwingSettings.font`; icons, spacing, and size bounds scale
+with that font.
 Call `reloadSettings()` after changing settings; the popup updates without
 replacing its suggestions or selection.
 Custom views retain control of their own styling. Providers supply label-relative

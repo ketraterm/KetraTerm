@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.awt.Font
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
@@ -51,6 +52,40 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalShellSuggestionTest {
     private val mutationDispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `font-only settings reload updates a mounted popup without replacing selection or rows`() {
+        var settings =
+            SwingSettings.create {
+                it.smartSuggestionsEnabled = true
+                it.font = Font(Font.MONOSPACED, Font.PLAIN, 13)
+            }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                val interaction =
+                    terminal.beginShellSuggestionInteraction(request(), editTarget = SwingShellSuggestionEditTarget.NONE)
+                        ?: error("Display capture failed")
+                terminal.presentShellSuggestions(interaction)
+                interaction.publish(suggestions(), selectedIndex = 1)
+                val publication = interaction.snapshot
+                val popup = terminal.components.filterIsInstance<SwingCompletionPopupView>().single()
+                val model = popup.list.model
+                assertEquals(settings.font, popup.list.font)
+                settings = settings.copy { it.font = it.font.deriveFont(26f) }
+
+                terminal.reloadSettings()
+
+                assertEquals(settings.font, popup.list.font)
+                assertSame(model, popup.list.model)
+                assertSame(publication, interaction.snapshot)
+                assertEquals(1, popup.list.selectedIndex)
+                assertTrue(interaction.isActive)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
 
     @Test
     fun `popup color settings apply initially and reload without replacing the interaction`() {

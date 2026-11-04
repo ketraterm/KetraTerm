@@ -16,7 +16,9 @@
 package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.components.*
+import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBFont
+import com.intellij.util.ui.UIUtil
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Property
 import io.github.ketraterm.host.*
@@ -26,6 +28,7 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import kotlinx.collections.immutable.persistentListOf
@@ -507,6 +510,8 @@ internal object KetraTermIntellijSettingsMapper {
         val fallbackFontFamily = SwingSettings.resolveFontFamily(state.fallbackFontFamily)
 
         val palette = paletteForThemeId(state.themeId)
+        val selectionForeground = UIUtil.getListSelectionForeground(true).rgb
+        val secondaryForeground = UIUtil.getContextHelpForeground().rgb
 
         return SwingSettings.create { draft ->
             draft.font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize))
@@ -527,6 +532,19 @@ internal object KetraTermIntellijSettingsMapper {
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled
             draft.acceptSelectedSuggestionWithEnter = state.acceptSelectedSuggestionWithEnter
+            draft.shellSuggestionStyle =
+                SwingShellSuggestionStyle(
+                    background = UIUtil.getListBackground().rgb,
+                    foreground = UIUtil.getListForeground().rgb,
+                    selectionBackground = UIUtil.getListSelectionBackground(true).rgb,
+                    selectionForeground = selectionForeground,
+                    matchForeground = JBColor.namedColor("CompletionPopup.matchForeground", JBColor(0x0B57D0, 0x78A9FF)).rgb,
+                    selectionMatchForeground = selectionForeground,
+                    border = JBColor.border().rgb,
+                    secondaryForeground = secondaryForeground,
+                    argumentHintForeground = secondaryForeground,
+                    selectionArgumentHintForeground = selectionForeground,
+                )
             draft.scrollOnOutput = state.scrollOnOutput
         }
     }

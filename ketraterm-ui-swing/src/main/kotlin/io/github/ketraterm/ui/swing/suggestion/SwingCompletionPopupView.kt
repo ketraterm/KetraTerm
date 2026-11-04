@@ -21,8 +21,10 @@ import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import java.awt.*
 import java.awt.event.*
 import java.awt.geom.RoundRectangle2D
+import java.beans.PropertyChangeListener
 import java.util.regex.Pattern
 import javax.swing.*
+import kotlin.math.roundToInt
 
 /** Standard Swing list presentation; the controller retains selection and acceptance ownership. */
 internal class SwingCompletionPopupView(
@@ -39,6 +41,8 @@ internal class SwingCompletionPopupView(
     private val renderer = CompletionRenderer(messages, initialStyle)
     private val scrollPane = JScrollPane(list)
     private val position = JLabel()
+    private var contentScale = 1f
+    private val fontListener = PropertyChangeListener { event -> (event.newValue as? Font)?.let(::applyTypography) }
     private var borderColor = Color(initialStyle.border, true)
     private val selectionListener =
         javax.swing.event.ListSelectionListener {
@@ -97,7 +101,22 @@ internal class SwingCompletionPopupView(
         position.font = list.font.deriveFont((list.font.size2D - 1f).coerceAtLeast(10f))
         add(scrollPane, BorderLayout.CENTER)
         add(position, BorderLayout.SOUTH)
+        addPropertyChangeListener("font", fontListener)
+        applyTypography(list.font)
         applyStyle(initialStyle)
+    }
+
+    private fun applyTypography(font: Font) {
+        contentScale = (font.size2D / COMPLETION_DESIGN_FONT_SIZE).coerceAtLeast(1f / COMPLETION_DESIGN_FONT_SIZE)
+        list.font = font
+        position.font = font.deriveFont(font.size2D * 12f / COMPLETION_DESIGN_FONT_SIZE)
+        val outerInset = (6 * contentScale).roundToInt()
+        val footerInset = (2 * contentScale).roundToInt()
+        border = BorderFactory.createEmptyBorder(outerInset, outerInset, outerInset, outerInset)
+        position.border = BorderFactory.createEmptyBorder(footerInset, outerInset, footerInset, outerInset)
+        renderer.applyScale(contentScale)
+        revalidate()
+        repaint()
     }
 
     /**
@@ -127,11 +146,14 @@ internal class SwingCompletionPopupView(
         try {
             canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             canvas.color = background
-            canvas.fillRoundRect(0, 0, width, height, 12, 12)
+            val arc = (12 * contentScale).roundToInt()
+            canvas.fillRoundRect(0, 0, width, height, arc, arc)
             canvas.color = borderColor
             // Keep the entire centered stroke inside the component, including at fractional display scales.
             canvas.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
-            canvas.draw(RoundRectangle2D.Float(0.5f, 0.5f, width - 1f, height - 1f, 12f, 12f))
+            canvas.stroke = BasicStroke(contentScale)
+            val inset = contentScale / 2f
+            canvas.draw(RoundRectangle2D.Float(inset, inset, width - contentScale, height - contentScale, arc.toFloat(), arc.toFloat()))
         } finally {
             canvas.dispose()
         }
@@ -171,7 +193,9 @@ internal class SwingCompletionPopupView(
         if (snapshot.visibleSuggestions.isEmpty()) {
             Dimension(0, 0)
         } else {
-            super.getPreferredSize().apply { width = width.coerceIn(260, 480) }
+            super.getPreferredSize().apply {
+                width = width.coerceIn((260 * contentScale).roundToInt(), (480 * contentScale).roundToInt())
+            }
         }
 
     override fun doLayout() {
@@ -194,6 +218,7 @@ internal class SwingCompletionPopupView(
         check(SwingUtilities.isEventDispatchThread()) { "completion view must close on the EDT" }
         if (closed) return
         closed = true
+        removePropertyChangeListener("font", fontListener)
         list.removeListSelectionListener(selectionListener)
         list.removeMouseListener(pointerHandler)
         list.removeMouseMotionListener(pointerHandler)
@@ -212,8 +237,9 @@ private class CompletionRenderer(
 ) : DefaultListCellRenderer() {
     private var suggestions = emptyList<SwingShellSuggestion>()
     private var rows = emptyArray<CompletionRow>()
-    private val rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
-    private val icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it) }
+    private var rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+    private var icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it, COMPLETION_ICON_SIZE) }
+    private var cornerArc = 8
     private var selected = false
     private val fallbackAccessibleName = messages.message("completion.suggestionAccessibleName")
     private val roles =
@@ -226,6 +252,16 @@ private class CompletionRenderer(
                 SwingShellSuggestionAccentRole.OTHER -> messages.message("completion.role.other")
             }
         }
+
+    fun applyScale(scale: Float) {
+        val horizontalInset = (6 * scale).roundToInt()
+        val verticalInset = (4 * scale).roundToInt()
+        rowBorder = BorderFactory.createEmptyBorder(verticalInset, horizontalInset, verticalInset, horizontalInset)
+        iconTextGap = (8 * scale).roundToInt()
+        cornerArc = (8 * scale).roundToInt()
+        val iconSize = (COMPLETION_ICON_SIZE * scale).roundToInt().coerceAtLeast(1)
+        icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it, iconSize) }
+    }
 
     fun update(suggestions: List<SwingShellSuggestion>) {
         val preparedRows = Array(suggestions.size) { presentation(suggestions[it]) }
@@ -250,7 +286,6 @@ private class CompletionRenderer(
         selected = isSelected
         isOpaque = false
         icon = icons[suggestion.accentRole.ordinal]
-        iconTextGap = 8
         border = rowBorder
         toolTipText = row.tooltip
         getAccessibleContext().accessibleName = row.accessibleName
@@ -264,7 +299,7 @@ private class CompletionRenderer(
             try {
                 canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                 canvas.color = background
-                canvas.fillRoundRect(0, 0, width, height, 8, 8)
+                canvas.fillRoundRect(0, 0, width, height, cornerArc, cornerArc)
             } finally {
                 canvas.dispose()
             }
@@ -318,10 +353,11 @@ private class CompletionRenderer(
 /** Distinct shapes and contrast-aware accents identify categories without relying on color alone. */
 private class CompletionIcon(
     private val role: SwingShellSuggestionAccentRole,
+    private val size: Int,
 ) : Icon {
-    override fun getIconWidth(): Int = 16
+    override fun getIconWidth(): Int = size
 
-    override fun getIconHeight(): Int = 16
+    override fun getIconHeight(): Int = size
 
     override fun paintIcon(
         component: Component,
@@ -332,6 +368,8 @@ private class CompletionIcon(
         val canvas = graphics.create() as Graphics2D
         try {
             canvas.translate(x, y)
+            val scale = size.toDouble() / COMPLETION_ICON_SIZE
+            canvas.scale(scale, scale)
             canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             val light = LIGHT_SURFACE_COLORS[role.ordinal]
             val dark = DARK_SURFACE_COLORS[role.ordinal]
@@ -504,3 +542,5 @@ private fun escapeHtml(text: String): String =
         .replace("\"", "&quot;")
 
 private val GRAPHEME = Pattern.compile("\\X")
+private const val COMPLETION_DESIGN_FONT_SIZE = 13f
+private const val COMPLETION_ICON_SIZE = 16

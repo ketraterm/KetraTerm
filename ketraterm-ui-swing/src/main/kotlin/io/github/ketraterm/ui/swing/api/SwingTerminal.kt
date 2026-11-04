@@ -1584,7 +1584,9 @@ public class SwingTerminal
                         next.promptDecoration != previous.promptDecoration
                 if (geometryChanged) viewportController.finishScroll()
                 settings = next
-                if (next.shellSuggestionStyle != previous.shellSuggestionStyle) shellSuggestionController?.reloadStyle()
+                if (next.shellSuggestionStyle != previous.shellSuggestionStyle || next.font != previous.font) {
+                    shellSuggestionController?.reloadAppearance()
+                }
                 if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                     next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
                 ) {
