@@ -14,37 +14,46 @@
 # limitations under the License.
 #
 
-# A subshell isolates cwd and glob options from the interactive shell. Checking
+# A subshell isolates cwd and shell options from the interactive shell. Checking
 # basenames after chdir avoids repeated traversal of mounted/network ancestors.
 # Emit NUL-delimited names only; neither filenames nor PATH entries are evaluated.
 __ketraterm_collect_path_commands() (
-    builtin local -a cd_options files
+    builtin local -a cd_options find_options files
     cd_options=()
+    find_options=()
     if [[ -n ${ZSH_VERSION-} ]]; then
         builtin emulate -L zsh
-        builtin setopt NULL_GLOB GLOB_DOTS
         # Even builtin cd invokes user chpwd hooks unless explicitly suppressed.
         cd_options=(-q)
-    else
-        builtin unset GLOBIGNORE
-        builtin shopt -u failglob
-        builtin shopt -s nullglob dotglob
-        builtin set +f
     fi
     builtin local LC_ALL=C origin="$PWD" remaining="$PATH:" directory name count=0 size=0 enumerated=0
+    builtin local path_count=0 scanned_count=0 scanned_size=0
+    # Validate before locating find, since that lookup also traverses PATH.
+    while [[ -n $remaining ]]; do
+        ((path_count+=1))
+        if ((path_count > 4096)); then
+            builtin printf '__ketraterm_inventory_overflow'
+            return
+        fi
+        remaining=${remaining#*:}
+    done
+    remaining="$PATH:"
     builtin local finder
-    # Process startup outweighs directory-type savings in Windows POSIX layers.
-    if [[ ${OSTYPE-} == msys* || ${OSTYPE-} == cygwin* ]]; then
-        finder=
-    elif [[ -n ${ZSH_VERSION-} ]]; then
+    if [[ -n ${ZSH_VERSION-} ]]; then
         finder=$(builtin whence -p find 2>/dev/null) || finder=
     else
         finder=$(builtin type -P find 2>/dev/null) || finder=
     fi
-    # Probe options without walking a directory. An individual directory may
-    # still fail (for example a symlink loop); only that directory falls back.
-    if [[ -n $finder ]]; then
-        command "$finder" -L . -mindepth 0 -maxdepth 0 ! -type d -print0 >/dev/null 2>&1 || finder=
+    [[ -z $finder || $finder == /* ]] || finder=$origin/$finder
+    # Probe without walking a directory. The standard utility path also works
+    # when PATH was customized or resolves Windows' unrelated find.exe.
+    if [[ -z $finder ]] || ! builtin command "$finder" . -mindepth 1 -maxdepth 0 -print0 >/dev/null 2>&1; then
+        finder=find
+        find_options=(-p)
+        if ! builtin command "${find_options[@]}" "$finder" . -mindepth 1 -maxdepth 0 -print0 >/dev/null 2>&1; then
+            builtin printf '__ketraterm_inventory_unavailable'
+            return
+        fi
     fi
     builtin local -A directories names
     directories=()
@@ -63,37 +72,49 @@ __ketraterm_collect_path_commands() (
         fi
         [[ -z ${directories[$PWD]-} ]] || continue
         directories[$PWD]=1
-        # find can use directory-entry types without a second stat for every
-        # executable. Keep the shell's own -x check (including ACLs/mount rules).
-        # A completion marker rejects partial output; unsupported find variants
-        # fall back to shell globbing without admitting incomplete output.
+        # Stream every entry, including directories and non-executables. Budget
+        # before filtering so sparse executable directories cannot evade limits.
+        # An empty record is the success marker; filenames can never be empty.
         enumerated=0
-        if [[ -n $finder ]]; then
+        while :; do
             if [[ -n ${ZSH_VERSION-} ]]; then
-                files=("${(@0)$(command "$finder" -L . -mindepth 1 -maxdepth 1 ! -type d -print0 2>/dev/null && builtin printf '__ketraterm_inventory_end')}")
+                IFS= builtin read -r -d '' name || break
+                files=("$name")
             else
-                builtin mapfile -d '' -t files < <(command "$finder" -L . -mindepth 1 -maxdepth 1 ! -type d -print0 2>/dev/null && builtin printf '__ketraterm_inventory_end')
+                # Use Bash's array reader without retaining a whole directory.
+                builtin mapfile -d '' -n 256 -t files || break
+                ((${#files[@]})) || break
             fi
-            if [[ ${files[-1]-} == __ketraterm_inventory_end ]]; then
-                builtin unset 'files[-1]'
-                enumerated=1
-            fi
+            for name in "${files[@]}"; do
+                if [[ -z $name ]]; then
+                    enumerated=1
+                    break 2
+                fi
+                ((scanned_count+=1))
+                ((scanned_size+=${#name}+1))
+                if ((scanned_count > 131072 || scanned_size > 16777216)); then
+                    builtin printf '__ketraterm_inventory_overflow'
+                    return
+                fi
+                name=${name#./}
+                [[ -z ${names[$name]-} ]] || continue
+                [[ -x $name && ! -d $name ]] || continue
+                names[$name]=1
+                ((count+=1))
+                ((size+=${#name}+1))
+                if ((count > 32768 || size > 2097152)); then
+                    builtin printf '__ketraterm_inventory_overflow'
+                    return
+                fi
+                builtin printf '%s\0' "$name"
+            done
+        done < <(builtin command "${find_options[@]}" "$finder" . -mindepth 1 -maxdepth 1 -print0 2>/dev/null && builtin printf '\0')
+        # Returning early closes the pipe; a still-enumerating finder receives
+        # SIGPIPE instead of finishing an unbounded scan in the background.
+        if (( ! enumerated )); then
+            builtin printf '__ketraterm_inventory_unavailable'
+            return
         fi
-        if (( ! enumerated )); then files=(*); fi
-        for name in "${files[@]}"; do
-            name=${name#./}
-            [[ -z ${names[$name]-} ]] || continue
-            [[ -x $name ]] || continue
-            [[ $enumerated == 1 || ! -d $name ]] || continue
-            names[$name]=1
-            ((count+=1))
-            ((size+=${#name}+1))
-            if ((count > 32768 || size > 2097152)); then
-                builtin printf '__ketraterm_inventory_overflow'
-                return
-            fi
-            builtin printf '%s\0' "$name"
-        done
     done
     builtin printf '__ketraterm_inventory_end'
 )

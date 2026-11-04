@@ -525,6 +525,16 @@ protocol/output activity next checks the deadline; idle partial buffers remain
 bounded and are released at session closure. Completed snapshots expose an immutable
 sorted list, binary prefix lookup, and a cached alias map.
 
+The workspace PATH collector streams immediate directory entries under separate
+scan budgets: 4,096 PATH components, 131,072 entries, and 16 MiB of entry bytes
+(including `./` and NUL delimiters). Components count even when empty, repeated,
+or inaccessible; entries count before duplicate, executable, or directory filtering.
+Emitted names remain limited to 32,768 unique executables and 2 MiB including
+NUL terminators. Exceeding any budget emits `Overflow`. The collector requires a
+compatible `find` from PATH or the shell's standard utility path. Missing tools
+and incomplete enumeration emit `Unavailable`. These budgets bound the collector's
+own storage and work, not the external utility's memory or filesystem call duration.
+
 Workspace hooks check shell-local state and PATH independently at each prompt,
 with at most one background PATH worker. Bounded shell-local state publishes
 at the prompt, independently of PATH I/O. Unchanged PATH discovery is eligible 60 seconds after a prompt observes its

@@ -52,40 +52,32 @@ class ShellCommandCollectorNativeTest {
                     command ln -s . first/loop
                 fi
                 native_find=${'$'}(command -v find)
-                export KETRA_TEST_REAL_FIND="${'$'}native_find" KETRA_TEST_FIXTURE="${'$'}PWD"
+                export KETRA_TEST_REAL_FIND="${'$'}native_find"
                 command cat > tools/find <<'FINDER'
                 #!/bin/sh
                 case "${'$'}KETRA_TEST_MODE" in
                     unsupported) exit 2 ;;
-                    partial)
-                        printf '%s\n' "${'$'}PWD" >> "${'$'}KETRA_TEST_FIXTURE/calls"
-                        if [ "${'$'}6" = 1 ] && [ "${'$'}PWD" = "${'$'}KETRA_TEST_FIXTURE/first" ]; then
-                            printf './duplicate\0'
-                            exit 1
-                        fi
-                        ;;
                 esac
                 exec "${'$'}KETRA_TEST_REAL_FIND" "${'$'}@"
                 FINDER
                 command chmod +x tools/find
+                find() { printf 'unexpected find function'; }
                 chpwd() { printf 'unexpected directory hook'; }
                 on_directory() { printf 'unexpected directory hook'; }
                 chpwd_functions=(on_directory)
                 origin=${'$'}PWD
-                for mode in native unsupported partial missing; do
+                for mode in native unsupported missing relative; do
                     export KETRA_TEST_MODE=${'$'}mode
                     PATH="${'$'}origin/tools:first:second:first:missing:"
                     if [[ ${'$'}mode == missing ]]; then
                         PATH='first:second:first:missing:' 
+                    elif [[ ${'$'}mode == relative ]]; then
+                        PATH='tools:first:second:first:missing:'
                     fi
                     set -f
                     __ketraterm_collect_path_commands
                     printf '\0'
                     [[ ${'$'}PWD == "${'$'}origin" && ${'$'}- == *f* ]] || exit 20
-                    if [[ ${'$'}mode == partial && ${'$'}OSTYPE != msys* && ${'$'}OSTYPE != cygwin* ]]; then
-                        calls=${'$'}(<calls)
-                        [[ ${'$'}calls == *"${'$'}origin/second"* ]] || exit 21
-                    fi
                 done
                 """.trimIndent(),
             )
@@ -129,6 +121,122 @@ class ShellCommandCollectorNativeTest {
         assertEquals(32768, records.size - 1)
         assertEquals(32768, records.dropLast(1).toSet().size)
         assertTrue(records.dropLast(1).all { it == "find" || it.startsWith("command_") })
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
+    fun `raw entry overflow and failed directory streams never publish successful partial inventory`(shell: String) {
+        val zsh = shell.endsWith("zsh")
+        val resource = if (zsh) "zsh-completion.zsh" else "bash-completion.bash"
+        val publisher = if (zsh) "__ketraterm_zsh_publish_commands" else "__ketraterm_publish_commands"
+        val hook = checkNotNull(javaClass.getResourceAsStream(resource)).use { it.readBytes().toString(UTF_8) }
+        for ((mode, reason) in listOf("partial" to "Unavailable", "overflow" to "Overflow")) {
+            val output =
+                runCollector(
+                    shell,
+                    hook + "\n" +
+                        """
+                        command mkdir directory
+                        printf '#!/bin/sh\n' > command
+                        command chmod +x command
+                        printf 'data' > not-executable
+                        command chmod -x not-executable
+                        cat_command=${'$'}(command -v cat)
+                        export KETRA_TEST_CAT="${'$'}cat_command" KETRA_TEST_STREAM="${'$'}PWD/raw-stream" KETRA_TEST_MODE=$mode
+                        if [[ ${'$'}KETRA_TEST_MODE == overflow ]]; then
+                            # Exactly 131,073 records. Fixed-size batches keep setup
+                            # bounded and let cat emulate find's buffered output.
+                            for ((start=0; start<43691; start+=256)); do
+                                batch=()
+                                for ((i=start; i<start+256 && i<43691; i++)); do
+                                    batch+=(./not-executable ./directory ./command)
+                                done
+                                printf '%s\0' "${'$'}{batch[@]}"
+                            done > raw-stream
+                        fi
+                        command cat > find <<'FINDER'
+                        #!/bin/sh
+                        [ "${'$'}5" != 0 ] || exit 0
+                        if [ "${'$'}KETRA_TEST_MODE" = partial ]; then
+                            printf './command\0'
+                            exit 1
+                        fi
+                        exec "${'$'}KETRA_TEST_CAT" "${'$'}KETRA_TEST_STREAM"
+                        FINDER
+                        command chmod +x find
+                        PATH=${'$'}PWD
+                        __ketraterm_collect_path_commands > inventory
+                        command "${'$'}cat_command" inventory
+                        __ketraterm_collect_path_commands() { command "${'$'}cat_command" inventory; }
+                        $publisher test 1 Path
+                        """.trimIndent(),
+                )
+            val marker = if (mode == "overflow") "__ketraterm_inventory_overflow" else "__ketraterm_inventory_unavailable"
+            assertEquals(
+                "command\u0000$marker" +
+                    "\u001b]633;KetraTermCommands;3;Begin;test;1\u0007" +
+                    "\u001b]633;KetraTermCommands;3;Fail;test;1;$reason\u0007",
+                output,
+                mode,
+            )
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
+    fun `raw filename bytes are bounded independently of executable and entry counts`(shell: String) {
+        val output =
+            runCollector(
+                shell,
+                """
+                printf -v KETRA_TEST_NAME '%0170d' 0
+                export KETRA_TEST_NAME
+                printf '#!/bin/sh\n' > "${'$'}KETRA_TEST_NAME"
+                command chmod +x "${'$'}KETRA_TEST_NAME"
+                export KETRA_TEST_CAT=${'$'}(command -v cat) KETRA_TEST_STREAM="${'$'}PWD/raw-stream"
+                # 100,000 entries remain below the entry limit but exceed 16 MiB.
+                # Repeated executable names must count before deduplication.
+                for ((start=0; start<100000; start+=256)); do
+                    batch=()
+                    for ((i=start; i<start+256 && i<100000; i++)); do
+                        batch+=("./${'$'}KETRA_TEST_NAME")
+                    done
+                    printf '%s\0' "${'$'}{batch[@]}"
+                done > raw-stream
+                command cat > find <<'FINDER'
+                #!/bin/sh
+                [ "${'$'}5" != 0 ] || exit 0
+                exec "${'$'}KETRA_TEST_CAT" "${'$'}KETRA_TEST_STREAM"
+                FINDER
+                command chmod +x find
+                PATH=${'$'}PWD
+                __ketraterm_collect_path_commands
+                """.trimIndent(),
+            )
+        assertEquals("0".repeat(170) + "\u0000__ketraterm_inventory_overflow", output)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
+    fun `PATH component budget counts repeated directories before deduplication`(shell: String) {
+        val output =
+            runCollector(
+                shell,
+                """
+                printf '#!/bin/sh\n' > command
+                command chmod +x command
+                PATH=.
+                for ((i=1; i<4096; i++)); do PATH=${'$'}PATH:.; done
+                __ketraterm_collect_path_commands
+                printf '\0'
+                PATH=${'$'}PATH:.
+                __ketraterm_collect_path_commands
+                """.trimIndent(),
+            )
+        assertEquals(
+            "command\u0000__ketraterm_inventory_end\u0000__ketraterm_inventory_overflow",
+            output,
+        )
     }
 
     @ParameterizedTest

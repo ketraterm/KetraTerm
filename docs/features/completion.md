@@ -167,8 +167,9 @@ function changes are picked up at the next prompt. PATH changes invalidate the
 previous executable inventory; directory changes do so when PATH contains empty
 or relative entries. An unchanged PATH can be re-scanned after 60 seconds, with
 refresh starting at a later prompt. Failed refreshes retain the last complete
-snapshot for the same environment. Large inventories are bounded; an incomplete
-overflowed scan is never presented as a complete command list.
+snapshot for the same environment. Executable discovery streams directory entries
+under scan budgets, including non-executable files and directories; an incomplete
+or overflowed scan is never presented as a complete command list.
 
 Simple aliases also inform argument suggestions. For example, `g='git'` and
 `gs='git switch'` inherit the corresponding Git arguments while acceptance keeps

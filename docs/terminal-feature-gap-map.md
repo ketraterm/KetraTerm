@@ -36,7 +36,6 @@ Maintainability, scalability, and deferred capability work:
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(completion)` | Reuse the original request's parsed context during outcome-key resolution. `TerminalCompletionOutcomeKeyResolver` currently reparses unchanged input for every candidate; candidate-specific edited input still needs its own analysis. |
-| `TODO(host/profile)` | Bound raw PATH enumeration before materializing directory contents in `path-commands.sh`. Existing command-count and text limits apply after executable filtering, so directories with many non-executable entries can consume unbounded temporary worker memory and scan time. Preserve explicit incomplete-inventory handling. |
 | `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 
 ## Transports and execution environments
