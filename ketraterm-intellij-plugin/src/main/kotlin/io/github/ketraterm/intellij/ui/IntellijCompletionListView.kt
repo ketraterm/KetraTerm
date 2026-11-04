@@ -16,6 +16,8 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.setToolTipText
+import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
@@ -267,7 +269,9 @@ internal data class IntellijCompletionListItem(
     val sourceDisplayText: String,
     val icon: Icon,
     val accessibleText: String,
-)
+) {
+    val tooltip: HtmlChunk? = detailDisplayText.takeIf { it.isNotEmpty() }?.let { HtmlChunk.text(it).wrapWith("html") }
+}
 
 internal fun prepareCompletionListItem(suggestion: SwingShellSuggestion): IntellijCompletionListItem {
     val boundedDisplayText =
@@ -498,7 +502,7 @@ private class CompletionSuggestionList(
         val index = locationToIndex(event.point)
         if (index !in 0 until model.size) return null
         if (getCellBounds(index, index)?.contains(event.point) != true) return null
-        return model.getElementAt(index).accessibleText
+        return model.getElementAt(index).tooltip?.toString()
     }
 }
 
@@ -536,7 +540,7 @@ private class IntellijCompletionCellRenderer : ColoredListCellRenderer<IntellijC
         if (sourceStart > 0) appendTextPadding(sourceStart) else append("  ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         append(value.sourceDisplayText, SimpleTextAttributes.GRAYED_ATTRIBUTES)
 
-        toolTipText = value.accessibleText
+        setToolTipText(value.tooltip)
         getAccessibleContext().accessibleDescription = value.accessibleText
     }
 

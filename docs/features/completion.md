@@ -205,7 +205,7 @@ not an exhaustive schema for every version of these tools.
 | Paths | Directory traversal, shell-aware escaping, and hidden entries when explicitly requested. |
 | Ranking | Merged sources, deterministic ordering, contextual priority, and bounded learning boosts. |
 | Progressive results | Sources can update results asynchronously; obsolete requests are cancelled. |
-| Presentation | Compact matched-text rows, keyboard/pointer navigation, descriptions and source metadata in tooltips/accessibility, and custom UI support. |
+| Presentation | Compact matched-text rows, keyboard/pointer navigation, description-only hover tooltips, full row context for accessibility, and custom UI support. |
 | Acceptance | A stale editing context is rejected before replacement is admitted. |
 
 ## Library customization

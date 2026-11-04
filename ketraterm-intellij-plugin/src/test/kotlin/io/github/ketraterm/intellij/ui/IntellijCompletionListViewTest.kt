@@ -266,11 +266,36 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             assertSame(publication, listener.hoveredSnapshot)
             assertSame(publication, listener.clickedSnapshot)
             assertSame(publication, listener.scrollSnapshot)
-            assertNotNull(list.getToolTipText(moved))
+            assertEquals("<html>detail for candidate-1</html>", list.getToolTipText(moved))
             assertEquals(KetraTermBundle.message("completion.list.accessibleName"), list.accessibleContext.accessibleName)
             val item = list.model.getElementAt(1)
             val rendered = list.cellRenderer.getListCellRendererComponent(list, item, 1, false, false)
             assertEquals(item.accessibleText, rendered.accessibleContext.accessibleDescription)
+        } finally {
+            view.close()
+        }
+    }
+
+    fun testTooltipsContainOnlyEscapedDescriptionsAndClearForUndescribedRows() {
+        val view = IntellijCompletionListView(RecordingListener())
+        try {
+            for (detail in listOf("Ajouter <fichier> & index", "")) {
+                val candidate =
+                    suggestion("add", SwingShellSuggestionAccentRole.COMMAND, detail = detail, sourceDisplayText = "Built-in")
+                view.update(snapshot(listOf(candidate)))
+                val list = view.suggestionList
+                list.setSize(480, list.fixedCellHeight)
+                list.doLayout()
+                val row = checkNotNull(list.getCellBounds(0, 0))
+                val event = mouseEvent(list, MouseEvent.MOUSE_MOVED, row.x + 1, row.y + 1, MouseEvent.NOBUTTON)
+                val expected = if (detail.isEmpty()) null else "<html>Ajouter &lt;fichier&gt; &amp; index</html>"
+                assertEquals(expected, list.getToolTipText(event))
+                val item = list.model.getElementAt(0)
+                val renderer = list.cellRenderer.getListCellRendererComponent(list, item, 0, false, false) as javax.swing.JComponent
+                assertEquals(expected, renderer.toolTipText)
+                assertEquals(item.accessibleText, renderer.accessibleContext.accessibleDescription)
+                assertTrue(item.accessibleText.contains("Built-in"))
+            }
         } finally {
             view.close()
         }

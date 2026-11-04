@@ -293,8 +293,7 @@ class SwingCompletionPopupViewTest {
                 assertTrue(row.text.contains("btop.exe"))
                 assertFalse(row.text.contains("C:"))
                 assertFalse(row.text.contains("PowerShell"))
-                assertTrue(row.toolTipText.contains("PowerShell"))
-                assertTrue(row.toolTipText.contains("C:\\tools\\btop.exe"))
+                assertEquals("<html>C:\\tools\\btop.exe</html>", row.toolTipText)
                 assertTrue(row.accessibleContext.accessibleDescription.contains("PowerShell"))
                 assertTrue(view.preferredSize.width < 320)
             } finally {
@@ -329,7 +328,6 @@ class SwingCompletionPopupViewTest {
                             completion.empty=0 possibilités ; affichage 0 à 0
                             completion.role.command=Commande
                             completion.row.description={2} de {1} : {0}
-                            completion.row.tooltip=Depuis {2} : <{0}> — {1}
                             """.trimIndent(),
                         ),
                     ),
@@ -342,7 +340,7 @@ class SwingCompletionPopupViewTest {
                 }
             val view = createView(RecordingListener(), messages)
             try {
-                val candidate = suggestion("git", detail = "Branche", sourceDisplayText = "Projet")
+                val candidate = suggestion("git", detail = "Branche <locale> & projet", sourceDisplayText = "Projet")
                 view.update(snapshot(listOf(candidate), 0, 12, 4))
                 assertEquals("Suggestions de commande", view.list.accessibleContext.accessibleName)
                 assertEquals("12 possibilités ; affichage 5 à 5", view.list.accessibleContext.accessibleDescription)
@@ -352,9 +350,8 @@ class SwingCompletionPopupViewTest {
                 repeat(5) {
                     val renderer =
                         view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
-                    assertEquals("Commande de Projet : Branche", renderer.accessibleContext.accessibleDescription)
-                    assertTrue(renderer.toolTipText.contains("Depuis&nbsp;Projet&nbsp;:&nbsp;&lt;git&gt;"))
-                    assertFalse(renderer.toolTipText.contains("<git>"))
+                    assertEquals("Commande de Projet : Branche <locale> & projet", renderer.accessibleContext.accessibleDescription)
+                    assertEquals("<html>Branche&nbsp;&lt;locale&gt;&nbsp;&amp;&nbsp;projet</html>", renderer.toolTipText)
                 }
                 assertEquals(1, rowMessages)
 
@@ -492,7 +489,7 @@ class SwingCompletionPopupViewTest {
         }
 
     @Test
-    fun `tooltips retain bounded full row context`() =
+    fun `hover tooltips show only the description and disappear for rows without one`() =
         onEdt {
             val view = createView(RecordingListener())
             view.update(
@@ -517,11 +514,18 @@ class SwingCompletionPopupViewTest {
                     false,
                 )
 
-            val tooltip = view.list.getToolTipText(event)
-            assertNotNull(tooltip)
-            assertTrue(tooltip!!.contains("git&nbsp;checkout&nbsp;feature/terminal"))
-            assertTrue(tooltip.contains("Switch&nbsp;branch"))
-            assertTrue(tooltip.contains("Git"))
+            try {
+                assertEquals("<html>Switch&nbsp;branch</html>", view.list.getToolTipText(event))
+                val undescribed = suggestion("git", sourceDisplayText = "Built-in")
+                view.update(snapshot(listOf(undescribed), selectedIndex = 0, total = 1, start = 0))
+                assertNull(view.list.getToolTipText(event))
+                val renderer =
+                    view.list.cellRenderer.getListCellRendererComponent(view.list, undescribed, 0, false, false) as javax.swing.JLabel
+                assertNull(renderer.toolTipText)
+                assertTrue(renderer.accessibleContext.accessibleDescription.contains("Built-in"))
+            } finally {
+                view.close()
+            }
         }
 
     @Test
@@ -752,7 +756,7 @@ class SwingCompletionPopupViewTest {
                 fun label(text: String): javax.swing.JLabel =
                     view.list.cellRenderer.getListCellRendererComponent(
                         view.list,
-                        suggestion(text),
+                        suggestion(text, detail = text),
                         0,
                         false,
                         false,

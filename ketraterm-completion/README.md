@@ -118,10 +118,12 @@ also applies to imported replay rows; `clear()` removes learning without
 replacing the filter or capacity. See the [learning and privacy contract](docs/completion-architecture.md#learning-and-privacy)
 for concurrency, failure, and retention rules.
 
-Use `TerminalCommandSpecs.defaults(locale)` for localized catalog descriptions
-and `TerminalCompletionMessages` with the engine and applicable source factories
-for generated descriptions. Canonical command tokens and insertion behavior
-remain unchanged; provider-supplied descriptions remain provider-owned.
+Use `TerminalCommandSpecs.defaults(locale)` for catalog descriptions and argument
+labels, or the `ResourceBundle` and localization-callback overloads to supply your
+own translations. The bundled catalog text is English. Use
+`TerminalCompletionMessages` with the engine and applicable source factories for
+generated descriptions. Canonical command tokens and insertion behavior remain
+unchanged; descriptions supplied by shells or custom providers remain provider-owned.
 
 ## Further reading
 

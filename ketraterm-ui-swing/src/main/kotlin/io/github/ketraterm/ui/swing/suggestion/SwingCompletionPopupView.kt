@@ -299,12 +299,6 @@ private class CompletionRenderer(
                 if (hint.isNotEmpty()) append("&nbsp;&nbsp;<span>").append(escapeHtml(hint)).append("</span>")
                 append("</html>")
             }
-        val tooltip =
-            if (detail.isEmpty()) {
-                messages.message("completion.row.tooltipWithoutDetail", displayText(primary, 1024), source)
-            } else {
-                messages.message("completion.row.tooltip", displayText(primary, 1024), detail, source)
-            }
         val role = roles[suggestion.accentRole.ordinal]
         val accessibleDescription =
             if (detail.isEmpty()) {
@@ -314,7 +308,7 @@ private class CompletionRenderer(
             }
         return CompletionRow(
             html = html,
-            tooltip = "<html>" + escapeHtml(tooltip) + "</html>",
+            tooltip = detail.takeIf { it.isNotEmpty() }?.let { "<html>" + escapeHtml(it) + "</html>" },
             accessibleName = (primary + if (hint.isEmpty()) "" else " $hint").ifEmpty { fallbackAccessibleName },
             accessibleDescription = accessibleDescription,
         )
@@ -414,7 +408,7 @@ private class CompletionIcon(
 
 private class CompletionRow(
     private val html: String,
-    val tooltip: String,
+    val tooltip: String?,
     val accessibleName: String,
     val accessibleDescription: String,
 ) {
