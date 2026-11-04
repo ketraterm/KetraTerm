@@ -24,6 +24,61 @@ import kotlin.test.*
 
 class PathCompletionSourceTest {
     @Test
+    fun `file arguments include navigation directories without changing their expected path kind`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({
+                    listOf(
+                        TerminalFileEntry("config", isDirectory = true),
+                        TerminalFileEntry("config.json", isDirectory = false),
+                        TerminalFileEntry(".private", isDirectory = true),
+                    )
+                })
+            val lines = listOf("curl --config ", "curl --config con", "curl --config=con", "ssh -i con", "adb install con")
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for (line in lines) {
+                    val request = request(line, "file:///project", shell)
+                    val context = TerminalCompletionContext.resolve(request, TerminalCommandSpecs.defaults())
+                    assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind, line)
+
+                    val candidates = source.complete(request, context, 20)
+
+                    assertEquals(listOf("config/", "config.json"), candidates.map { it.replacementText }, line)
+                    assertEquals(listOf("directory", "file"), candidates.map { it.detail }, line)
+                    val startOffset = if (line.endsWith(' ')) line.length else line.length - 3
+                    assertTrue(candidates.all { it.replacementStartOffset == startOffset && it.replacementEndOffset == line.length }, line)
+                }
+            }
+        }
+
+    @Test
+    fun `accepting a navigation directory continues completion inside a file option`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    when (listing.directoryPrefix) {
+                        "" -> listOf(TerminalFileEntry("config", isDirectory = true))
+                        "config/" -> listOf(TerminalFileEntry("client.conf", isDirectory = false))
+                        else -> error("Unexpected directory: ${listing.directoryPrefix}")
+                    }
+                })
+            val line = "curl --config=con"
+            val directory = source.complete(request(line, "file:///project")).single()
+            val nestedLine = line.replaceRange(directory.replacementStartOffset, directory.replacementEndOffset, directory.replacementText)
+            assertEquals("curl --config=config/", nestedLine)
+
+            val nestedRequest = request(nestedLine, "file:///project")
+            val context = TerminalCompletionContext.resolve(nestedRequest, TerminalCommandSpecs.defaults())
+            assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind)
+            val file = source.complete(nestedRequest, context, 20).single()
+            assertEquals("file", file.detail)
+            assertEquals(
+                "curl --config=config/client.conf",
+                nestedLine.replaceRange(file.replacementStartOffset, file.replacementEndOffset, file.replacementText),
+            )
+        }
+
+    @Test
     fun `explicit non-path domains exclude direct and indexed files before host queries`() =
         runBlocking {
             val direct = TerminalCompletionSources.path { error("Unexpected directory query") }

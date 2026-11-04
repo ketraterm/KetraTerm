@@ -326,7 +326,8 @@ both direct and indexed filesystem queries, even when their prefix contains a
 slash. Specs declaring both paths and a value domain permit both sources.
 The engine also rejects incompatible path candidates from native and custom
 sources before deciding whether structured results satisfy the request.
-The expected path kind filters entries; `TerminalHiddenPathPolicy`
+Directory arguments exclude files; file arguments also offer directories for
+traversal while retaining their `FILE` context. `TerminalHiddenPathPolicy`
 controls dot-prefixed entries. Its default hides them for an empty prefix and
 reveals them after a leading dot. Shell quoting preserves an existing quote
 style when safe and uses the request's replacement policy otherwise.

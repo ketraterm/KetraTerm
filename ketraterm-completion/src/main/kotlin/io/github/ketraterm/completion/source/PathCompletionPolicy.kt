@@ -48,14 +48,15 @@ internal fun allowsPathCompletion(context: TerminalCompletionContext): Boolean {
 internal fun TerminalCompletionContext.hasNonPathValueDomain(): Boolean =
     expectedValueDomain != TerminalCompletionValueDomain.NONE && expectedPathKind == TerminalPathArgumentKind.NONE
 
+/** File arguments include navigation directories; directory arguments still exclude files. */
 internal fun TerminalPathArgumentKind.acceptsPathEntry(isDirectory: Boolean): Boolean =
     when (this) {
         TerminalPathArgumentKind.NONE,
+        TerminalPathArgumentKind.FILE,
         TerminalPathArgumentKind.FILE_OR_DIRECTORY,
         -> true
 
         TerminalPathArgumentKind.DIRECTORY -> isDirectory
-        TerminalPathArgumentKind.FILE -> !isDirectory
     }
 
 internal fun TerminalHiddenPathPolicy.acceptsPath(

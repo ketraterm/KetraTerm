@@ -16,6 +16,8 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +26,35 @@ import kotlin.test.assertTrue
 
 /** Tests context-aware completion from host-owned ready fuzzy path matches. */
 class FuzzyPathCompletionSourceTest {
+    @Test
+    fun `file arguments retain indexed navigation directories and their fuzzy matches`() =
+        runBlocking {
+            val path = "settings/config"
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(9, 10, 12, 13, 14, 15))
+            val source =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "project-file",
+                    entriesProvider = { _, _ ->
+                        listOf(
+                            TerminalFuzzyPathEntry(path, isDirectory = true, matchedRanges = ranges),
+                            TerminalFuzzyPathEntry("settings/config.json", isDirectory = false),
+                        )
+                    },
+                )
+            for (line in listOf("curl --config cfg", "curl --config=cfg", "ssh -i cfg", "adb install cfg")) {
+                val request = request(line)
+                val context = TerminalCompletionContext.resolve(request, TerminalCommandSpecs.defaults())
+                assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind, line)
+
+                val candidates = source.complete(request, context, 20)
+
+                assertEquals(listOf("settings/config/", "settings/config.json"), candidates.map { it.replacementText }, line)
+                assertEquals(listOf("project directory", "project file"), candidates.map { it.detail }, line)
+                assertEquals(ranges, candidates.first().matchedRanges, line)
+                assertTrue(candidates.all { it.replacementStartOffset == line.length - 3 && it.replacementEndOffset == line.length }, line)
+            }
+        }
+
     @Test
     fun `host matches survive shell quoting and directory suffixes without rematching`(): Unit =
         runBlocking {

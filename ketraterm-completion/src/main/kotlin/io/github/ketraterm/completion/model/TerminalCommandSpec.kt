@@ -170,7 +170,7 @@ public enum class TerminalPathArgumentKind {
     /** The argument should reference a directory. */
     DIRECTORY,
 
-    /** The argument should reference a regular file. */
+    /** The argument should reference a regular file; completion also offers directories for traversal. */
     FILE,
 }
 
