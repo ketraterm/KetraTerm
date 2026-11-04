@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.testing.shellProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -72,7 +73,7 @@ class MergedCompletionEngineTest {
                         }),
                     ),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, context, _ ->
+                        shellProvider { _, context, _ ->
                             nativeQueries++
                             listOf(
                                 TerminalCompletionCandidate(

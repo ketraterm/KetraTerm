@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
+import io.github.ketraterm.completion.testing.shellProvider
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,7 +57,7 @@ class GitCompletionSourceTest {
                     ),
                     learningStore = learning,
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             queries++
                             emptyList()
                         },

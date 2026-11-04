@@ -40,13 +40,18 @@ public data class TerminalShellCompletionCandidate
  * Replacement bounds are inclusive at the start and exclusive at the end.
  * The producer must validate bounds, Unicode, text sizes, and candidate controls before publication.
  * [candidates] is copied at construction and cannot be mutated.
+ * [externalCommandName] identifies the resolved application after following aliases, or is null
+ * for shell commands, functions, scripts, and unresolved invocations. It is metadata, never code.
  */
-public class TerminalShellCompletionResult(
-    public val commandLine: String,
-    public val cursorOffset: Int,
-    public val replacementStartOffset: Int,
-    public val replacementEndOffset: Int,
-    candidates: List<TerminalShellCompletionCandidate>,
-) {
-    public val candidates: List<TerminalShellCompletionCandidate> = java.util.List.copyOf(candidates)
-}
+public class TerminalShellCompletionResult
+    @JvmOverloads
+    constructor(
+        public val commandLine: String,
+        public val cursorOffset: Int,
+        public val replacementStartOffset: Int,
+        public val replacementEndOffset: Int,
+        candidates: List<TerminalShellCompletionCandidate>,
+        public val externalCommandName: String? = null,
+    ) {
+        public val candidates: List<TerminalShellCompletionCandidate> = java.util.List.copyOf(candidates)
+    }

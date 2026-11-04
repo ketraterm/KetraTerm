@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.engine
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
+import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.*
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -54,7 +55,7 @@ internal class MergedCompletionEngine(
     private val shellSource =
         shellProvider?.let { provider ->
             TerminalCompletionSourceEntry(
-                { request, context, limit -> provider.complete(request, context, limit).orEmpty() },
+                { request, context, limit -> provider.complete(request, context, limit)?.candidates.orEmpty() },
                 TerminalCompletionSourcePrior.NATIVE_SHELL,
             )
         }
@@ -80,13 +81,23 @@ internal class MergedCompletionEngine(
             }
             val commandPosition = resolvedContext.activePosition == TerminalCompletionActivePosition.COMMAND
             val structuredArguments = resolvedContext.hasStructuredArguments()
+            val powerShellOptions =
+                request.shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL &&
+                    (
+                        resolvedContext.activePosition == TerminalCompletionActivePosition.OPTION_NAME ||
+                            resolvedContext.activeOption != null ||
+                            resolvedContext.hasOptionsBeforeCursor
+                    )
             val shellContext =
-                if (shellProvider != null && resolvedContext.hasUnrecognizedOptions) {
+                if (shellProvider != null && (resolvedContext.hasUnrecognizedOptions || powerShellOptions)) {
                     resolvedContext.withoutArgumentConstraints()
                 } else {
                     resolvedContext
                 }
-            val shellCandidates = if (shellProvider != null && !structuredArguments) completeShell(request, shellContext) else null
+            val queryShellFirst = shellProvider != null && (!structuredArguments || powerShellOptions)
+            val shellAnswer = if (queryShellFirst) completeShell(request, shellContext) else null
+            val deferToCatalog = powerShellOptions && shellAnswer != null && resolvedContext.acceptsCatalogArguments(shellAnswer)
+            val shellCandidates = shellAnswer?.takeUnless { deferToCatalog }?.candidates
             val completionContext = if (shellCandidates != null) shellContext else resolvedContext
             val nativeArguments = !commandPosition && shellCandidates != null
             val activeSources = if (nativeArguments) emptyList() else sources
@@ -153,7 +164,7 @@ internal class MergedCompletionEngine(
                 }
             }
 
-            if (shellCandidates != null && shellCandidates.isNotEmpty()) {
+            if (!shellCandidates.isNullOrEmpty()) {
                 rankingState.ingest(
                     CompletionSourceCandidates(
                         sourceIndex = shellSourceIndex,
@@ -167,7 +178,7 @@ internal class MergedCompletionEngine(
             }
 
             // Command authority is resolved before the first publication; argument sources remain progressive.
-            val canFallBackToShell = structuredArguments && shellProvider != null
+            val canFallBackToShell = shellCandidates == null && shellProvider != null && (deferToCatalog || !queryShellFirst)
             if ((!canFallBackToShell || hasStructuredCandidates) &&
                 (rankingState.rankedCandidates().isNotEmpty() || activeSources.isEmpty())
             ) {
@@ -179,7 +190,13 @@ internal class MergedCompletionEngine(
                 if (!canFallBackToShell || hasStructuredCandidates) publish()
             }
             if (canFallBackToShell && !hasStructuredCandidates) {
-                val fallback = completeShell(request, completionContext).orEmpty().filter { changesText(request, it) }
+                val answer = if (queryShellFirst) shellAnswer else completeShell(request, completionContext)
+                val fallback =
+                    answer
+                        ?.candidates
+                        .orEmpty()
+                        .filter { it.kind != TerminalCompletionCandidateKind.PATH || !completionContext.hasNonPathValueDomain() }
+                        .filter { changesText(request, it) }
                 if (fallback.isNotEmpty()) {
                     rankingState.ingest(
                         CompletionSourceCandidates(
@@ -192,6 +209,23 @@ internal class MergedCompletionEngine(
                 publish()
             }
         }
+
+    /** Generic native paths do not replace a compatible application's modeled arguments. */
+    private fun TerminalCompletionContext.acceptsCatalogArguments(answer: TerminalCompletionShellResult): Boolean {
+        val externalName = answer.externalCommandName ?: return false
+        val spec = command ?: return false
+        if (answer.candidates.any { it.kind != TerminalCompletionCandidateKind.PATH }) return false
+        val normalized = normalizeTerminalCommandToken(externalName)
+        val stem =
+            when (normalized.substringAfterLast('.')) {
+                "exe", "com", "cmd", "bat" -> normalized.substringBeforeLast('.')
+                else -> normalized
+            }
+        return sequenceOf(spec.name).plus(spec.aliases).any {
+            val name = normalizeTerminalCommandToken(it)
+            name == normalized || name == stem
+        }
+    }
 
     private fun TerminalCompletionContext.hasStructuredArguments(): Boolean =
         !hasUnrecognizedOptions &&
@@ -276,13 +310,16 @@ internal class MergedCompletionEngine(
     private suspend fun completeShell(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
-    ): List<TerminalCompletionCandidate>? =
+    ): TerminalCompletionShellResult? =
         callShellProvider {
-            val result = shellProvider?.complete(request, context, SOURCE_CANDIDATE_LIMIT)
-            result
-                ?.filter { it.hasValidReplacementRangeFor(request) }
-                ?.filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
-                ?.boundedTo(SOURCE_CANDIDATE_LIMIT)
+            val result = shellProvider?.complete(request, context, SOURCE_CANDIDATE_LIMIT) ?: return@callShellProvider null
+            TerminalCompletionShellResult(
+                result.candidates
+                    .filter { it.hasValidReplacementRangeFor(request) }
+                    .filter { it.kind != TerminalCompletionCandidateKind.PATH || !context.hasNonPathValueDomain() }
+                    .boundedTo(SOURCE_CANDIDATE_LIMIT),
+                result.externalCommandName,
+            )
         }
 
     /** Both shell entry points share diagnostics and preserve request cancellation. */

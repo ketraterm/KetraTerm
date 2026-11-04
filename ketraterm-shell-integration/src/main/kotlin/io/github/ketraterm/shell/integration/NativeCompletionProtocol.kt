@@ -49,7 +49,7 @@ internal class NativeCompletionProtocol(
             inventory.observe(fields)
             return
         }
-        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "1") return
+        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "2") return
         val epoch = fields[3]
         if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return
         if (fields[2] == "Ready" && fields.size == 4) {
@@ -71,7 +71,7 @@ internal class NativeCompletionProtocol(
 
     private fun decode(fields: List<String>): TerminalShellCompletionResult? {
         if (fields[5] != "Ok") return null
-        require(fields.size >= 11)
+        require(fields.size >= 12)
         val line = text(fields[9], 4096)
         val cursor = fields[6].toIntOrNull() ?: return null
         val start = fields[7].toIntOrNull() ?: return null
@@ -79,11 +79,13 @@ internal class NativeCompletionProtocol(
         require(start in 0..cursor && cursor <= end && end <= line.length)
         require(line.boundary(start) && line.boundary(end) && line.boundary(cursor))
         require(line.none { it.isISOControl() })
-        val count = fields[10].toIntOrNull() ?: return null
-        require(count in 0..128 && fields.size == 11 + count * 4)
+        val externalCommandName = text(fields[10], 512).takeIf { it.isNotEmpty() }
+        require(externalCommandName == null || externalCommandName.none { it.isISOControl() })
+        val count = fields[11].toIntOrNull() ?: return null
+        require(count in 0..128 && fields.size == 12 + count * 4)
         val candidates = ArrayList<TerminalShellCompletionCandidate>(count)
         for (index in 0 until count) {
-            val base = 11 + index * 4
+            val base = 12 + index * 4
             val kind =
                 when (fields[base]) {
                     "Command" -> TerminalShellCompletionKind.COMMAND
@@ -96,7 +98,7 @@ internal class NativeCompletionProtocol(
             require(replacement.none { it.isISOControl() })
             candidates += TerminalShellCompletionCandidate(replacement, text(fields[base + 2], 512), text(fields[base + 3], 1024), kind)
         }
-        return TerminalShellCompletionResult(line, cursor, start, end, candidates)
+        return TerminalShellCompletionResult(line, cursor, start, end, candidates, externalCommandName)
     }
 
     private fun text(

@@ -40,12 +40,12 @@ class SessionShellCompletionProviderTest {
             Fixture(StandardTestDispatcher(testScheduler), "git").use { f ->
                 val request = TerminalCompletionRequest("git", 3, shellCapabilities = TerminalShellCapabilities.POSIX)
                 val context = TerminalCompletionContext.resolve(request)
-                assertNull(f.source.complete(request, context, 10))
+                assertNull(f.source.complete(request, context, 10)?.candidates)
                 for (status in TerminalShellCommandInventoryStatus.entries) {
                     f.channel.publishCommands(
                         TerminalShellCommandInventory(emptyList(), status),
                     )
-                    assertEquals(emptyList(), f.source.complete(request, context, 10))
+                    assertEquals(emptyList(), f.source.complete(request, context, 10)?.candidates)
                     assertTrue(f.source.commandAliases().isEmpty())
                 }
             }
@@ -126,10 +126,13 @@ class SessionShellCompletionProviderTest {
                             ),
                             TerminalShellCompletionCandidate("omitted", "omitted", "", TerminalShellCompletionKind.OPTION),
                         ),
+                        externalCommandName = "tool.exe",
                     ),
                 )
                 runCurrent()
-                val candidates = assertNotNull(query.await())
+                val answer = assertNotNull(query.await())
+                val candidates = answer.candidates
+                assertEquals("tool.exe", answer.externalCommandName)
                 assertEquals(listOf("'native value'", "'native path'"), candidates.map { it.replacementText })
                 assertEquals(
                     listOf(TerminalCompletionCandidateKind.ARGUMENT, TerminalCompletionCandidateKind.PATH),
@@ -166,7 +169,7 @@ class SessionShellCompletionProviderTest {
                 fixture.publishCommands(
                     listOf(TerminalShellCompletionCandidate("toolbox", "toolbox", "", TerminalShellCompletionKind.COMMAND)),
                 )
-                val candidates = assertNotNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10))
+                val candidates = assertNotNull(fixture.source.complete(request, TerminalCompletionContext.resolve(request), 10)).candidates
                 runCurrent()
                 assertEquals("shell", candidates.single().source)
                 assertEquals("toolbox", candidates.single().replacementText)
@@ -250,7 +253,7 @@ class SessionShellCompletionProviderTest {
                     ),
                 )
                 runCurrent()
-                assertEquals(listOf("xdir/"), assertNotNull(query.await()).map { it.replacementText })
+                assertEquals(listOf("xdir/"), assertNotNull(query.await()).candidates.map { it.replacementText })
             }
         }
 
@@ -262,10 +265,10 @@ class SessionShellCompletionProviderTest {
                 val context = TerminalCompletionContext.resolve(request)
                 val first = async { fixture.source.complete(request, context, 10) }
                 runCurrent()
-                assertEquals(emptyList(), fixture.source.complete(request, context, 10))
+                assertEquals(emptyList(), fixture.source.complete(request, context, 10)?.candidates)
                 fixture.respond(TerminalShellCompletionResult("tool", 4, 0, 4, emptyList()))
                 runCurrent()
-                assertEquals(emptyList(), first.await())
+                assertEquals(emptyList(), first.await()?.candidates)
             }
         }
 

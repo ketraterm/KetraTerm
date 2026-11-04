@@ -35,10 +35,7 @@ import java.util.*
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 @Tag("native")
@@ -584,7 +581,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     }
                 }
                 session.awaitLine("")
-                val encodingLine = "cat .\\utf8-extended.txt -Encoding u"
+                val encodingLine = "Get-Content .\\utf8-extended.txt -Encoding u"
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(assertNotNull(session.captureCommandEdit()), listOf(TerminalPasteEvent(encodingLine))),
@@ -610,7 +607,35 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     ),
                 )
-                session.awaitLine(encodingLine.dropLast(1) + utf8.replacementText)
+                var currentLine = encodingLine.dropLast(1) + utf8.replacementText
+                session.awaitLine(currentLine)
+                for ((line, expectedText) in listOf(
+                    "Get-Content -Enc u" to "UTF8",
+                    "Get-Content -Encoding:u" to "UTF8",
+                    "Get-ChildItem -H" to "-Hidden",
+                )) {
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            assertNotNull(session.captureCommandEdit()),
+                            listOf(TerminalTextReplacementEvent(0, currentLine.length, line)),
+                        ),
+                    )
+                    session.awaitLine(line)
+                    val edit = assertNotNull(session.captureCommandEdit())
+                    val answer = assertNotNull(session.requestShellCompletions(line, line.length))
+                    assertNull(answer.externalCommandName)
+                    val candidate = answer.candidates.first { it.replacementText.equals(expectedText, ignoreCase = true) }
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            edit,
+                            listOf(TerminalTextReplacementEvent(0, line.length - answer.replacementStartOffset, candidate.replacementText)),
+                        ),
+                    )
+                    currentLine = line.take(answer.replacementStartOffset) + candidate.replacementText
+                    session.awaitLine(currentLine)
+                }
             }
         }
 
@@ -636,7 +661,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         val messages =
             result.stdout
                 .lineSequence()
-                .filter { it.contains("KetraTermCompletion;1;Result;") }
+                .filter { it.contains("KetraTermCompletion;2;Result;") }
                 .toList()
         val application =
             result.stdout
@@ -644,9 +669,11 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 .firstOrNull { it.startsWith("APPLICATION=") }
                 ?.substringAfter('=')
                 ?.split(';')
-        assertEquals(if (application == null) 5 else 7, messages.size, visibleEscapes(result.stdout))
+        assertEquals(if (application == null) 10 else 18, messages.size, visibleEscapes(result.stdout))
 
         fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+
+        fun fields(index: Int) = messages[index].substringAfter("KetraTermCompletion;").trimEnd('\u0007', '\r').split(';')
         assertTrue(messages[0].contains(encoded("Get-KetraNativeWidget")), visibleEscapes(messages[0]))
         assertTrue(messages[1].contains(encoded("alpha")), visibleEscapes(messages[1]))
         assertTrue(messages[2].contains(encoded("beta")), visibleEscapes(messages[2]))
@@ -659,7 +686,22 @@ class TerminalShellIntegrationBootstrapNativeTest {
         if (application != null) {
             assertTrue(messages[5].contains(";Command;${encoded(application[1])};${encoded(application[0])};"), visibleEscapes(messages[5]))
             assertTrue(messages[6].contains(";Command;${encoded(application[0])};${encoded(application[0])};"), visibleEscapes(messages[6]))
+            assertEquals(encoded(application[0]), fields(5)[9], "Application identity")
+            assertEquals("", fields(6)[9], "A shadowing function is not an external application")
+            for (index in 7..10) assertEquals(encoded(application[0]), fields(index)[9], visibleEscapes(messages[index]))
+            assertEquals("", fields(11)[9], "The cursor is outside the nested command")
+            assertEquals("", fields(12)[9], "Dynamic command text is not evaluated")
         }
+        val offset = if (application == null) 5 else 13
+        assertEquals("0", fields(offset)[10], "ls --a must not receive Unix options")
+        assertTrue(messages[offset + 1].contains(encoded("-Hidden")))
+        for (index in offset + 2..offset + 3) {
+            assertTrue(messages[index].contains(encoded("UTF8")))
+            assertEquals("", fields(index)[9])
+        }
+        assertEquals("9", fields(offset + 2)[6])
+        assertEquals("14", fields(offset + 3)[6])
+        assertTrue(messages[offset + 4].contains(";ProviderContainer;"))
         assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
     }
 

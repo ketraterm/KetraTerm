@@ -80,8 +80,11 @@ lives in [completion-host](../ketraterm-completion-host/README.md).
 Pass a `TerminalCompletionShellProvider` as `shellProvider` when the running shell
 can discover executable commands. A successful shell answer supplies the command
 list, enriched with matching catalog descriptions and learning; unknown catalog
-commands are omitted. Modeled arguments prefer specialized sources with native
-fallback; unmodeled arguments use native completion before generic guesses.
+commands are omitted. Return `TerminalCompletionShellResult` with shell-escaped
+edits and the resolved external application name, or null when unavailable.
+PowerShell parameter completion uses live shell semantics; other modeled arguments
+prefer specialized sources with native fallback. See the
+[shell behavior](../docs/features/completion.md#powershell-suggestions) for details.
 `SessionShellCompletionProvider` in `ketraterm-ui-swing-host` supplies this contract
 for installed PowerShell hooks. See the [shell authority contract](docs/completion-architecture.md#internal-implementation).
 

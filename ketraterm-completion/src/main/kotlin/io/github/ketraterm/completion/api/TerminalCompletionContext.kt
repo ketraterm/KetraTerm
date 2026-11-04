@@ -103,6 +103,9 @@ public class TerminalCompletionContext
         public val staticValueCandidates: List<String> = copyOf(staticValueCandidates)
         private val optionsBeforeCursor = copyOf(optionsBeforeCursor)
 
+        /** True when catalog option syntax has already influenced argument interpretation. */
+        internal val hasOptionsBeforeCursor: Boolean get() = optionsBeforeCursor.isNotEmpty()
+
         /** False on shell operators, exhausted modeled arguments, or unsupported refspec expressions. */
         public val isCompletionAllowed: Boolean
             get() = activePosition != TerminalCompletionActivePosition.OPERATOR && gitCompletion?.target != GitCompletionTarget.NONE

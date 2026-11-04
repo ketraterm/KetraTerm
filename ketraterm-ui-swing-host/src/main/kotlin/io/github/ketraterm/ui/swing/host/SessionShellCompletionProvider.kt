@@ -38,58 +38,64 @@ public class SessionShellCompletionProvider(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         limit: Int,
-    ): List<TerminalCompletionCandidate>? {
+    ): TerminalCompletionShellResult? {
         require(limit > 0)
         val syntax = request.shellCapabilities.syntax
         if (syntax == TerminalShellSyntax.POSIX) {
             if (context.activePosition != TerminalCompletionActivePosition.COMMAND || '/' in context.activePrefix) return null
             val inventory = session.shellCommandInventory.value ?: return null
-            return inventory
-                .matchingCommands(context.activePrefix, limit)
-                .map { item ->
-                    TerminalCompletionCandidate(
-                        replacementText = item.replacementText,
-                        replacementStartOffset = context.replacementStartOffset,
-                        replacementEndOffset = context.replacementEndOffset,
-                        displayText = item.displayText,
-                        source = "shell",
-                        kind = TerminalCompletionCandidateKind.COMMAND,
-                    )
-                }
+            val candidates =
+                inventory
+                    .matchingCommands(context.activePrefix, limit)
+                    .map { item ->
+                        TerminalCompletionCandidate(
+                            replacementText = item.replacementText,
+                            replacementStartOffset = context.replacementStartOffset,
+                            replacementEndOffset = context.replacementEndOffset,
+                            displayText = item.displayText,
+                            source = "shell",
+                            kind = TerminalCompletionCandidateKind.COMMAND,
+                        )
+                    }
+            return TerminalCompletionShellResult(candidates)
         }
         if (syntax != TerminalShellSyntax.POWERSHELL) return null
         if (!session.shellCompletionAvailable) return null
-        val result = session.requestShellCompletions(request.commandLine, request.cursorOffset) ?: return emptyList()
-        return result.candidates
-            .asSequence()
-            .filter { item ->
-                item.replacementText.isNotEmpty() &&
-                    item.displayText.isNotEmpty() &&
-                    (context.expectedPathKind != TerminalPathArgumentKind.DIRECTORY || item.kind != TerminalShellCompletionKind.FILE)
-            }.take(limit)
-            .mapIndexed { index, item ->
-                TerminalCompletionCandidate(
-                    replacementText = item.replacementText,
-                    replacementStartOffset = result.replacementStartOffset,
-                    replacementEndOffset = result.replacementEndOffset,
-                    displayText = item.displayText,
-                    detail = item.description,
-                    source = "powershell",
-                    kind =
-                        when (item.kind) {
-                            TerminalShellCompletionKind.COMMAND ->
-                                if (context.activePosition == TerminalCompletionActivePosition.COMMAND) {
-                                    TerminalCompletionCandidateKind.COMMAND
-                                } else {
-                                    TerminalCompletionCandidateKind.ARGUMENT
-                                }
-                            TerminalShellCompletionKind.OPTION -> TerminalCompletionCandidateKind.OPTION
-                            TerminalShellCompletionKind.FILE, TerminalShellCompletionKind.DIRECTORY -> TerminalCompletionCandidateKind.PATH
-                            TerminalShellCompletionKind.ARGUMENT -> TerminalCompletionCandidateKind.ARGUMENT
-                        },
-                    score = result.candidates.size - index,
-                    valueDomain = context.expectedValueDomain,
-                )
-            }.toList()
+        val result =
+            session.requestShellCompletions(request.commandLine, request.cursorOffset) ?: return TerminalCompletionShellResult(emptyList())
+        val candidates =
+            result.candidates
+                .asSequence()
+                .filter { item ->
+                    item.replacementText.isNotEmpty() &&
+                        item.displayText.isNotEmpty() &&
+                        (context.expectedPathKind != TerminalPathArgumentKind.DIRECTORY || item.kind != TerminalShellCompletionKind.FILE)
+                }.take(limit)
+                .mapIndexed { index, item ->
+                    TerminalCompletionCandidate(
+                        replacementText = item.replacementText,
+                        replacementStartOffset = result.replacementStartOffset,
+                        replacementEndOffset = result.replacementEndOffset,
+                        displayText = item.displayText,
+                        detail = item.description,
+                        source = "powershell",
+                        kind =
+                            when (item.kind) {
+                                TerminalShellCompletionKind.COMMAND ->
+                                    if (context.activePosition == TerminalCompletionActivePosition.COMMAND) {
+                                        TerminalCompletionCandidateKind.COMMAND
+                                    } else {
+                                        TerminalCompletionCandidateKind.ARGUMENT
+                                    }
+                                TerminalShellCompletionKind.OPTION -> TerminalCompletionCandidateKind.OPTION
+                                TerminalShellCompletionKind.FILE, TerminalShellCompletionKind.DIRECTORY ->
+                                    TerminalCompletionCandidateKind.PATH
+                                TerminalShellCompletionKind.ARGUMENT -> TerminalCompletionCandidateKind.ARGUMENT
+                            },
+                        score = result.candidates.size - index,
+                        valueDomain = context.expectedValueDomain,
+                    )
+                }.toList()
+        return TerminalCompletionShellResult(candidates, result.externalCommandName)
     }
 }

@@ -72,13 +72,20 @@ the same map to `TerminalCompletionContext.resolve`. Definitions are not evaluat
 and [inventory bounds](../../docs/reference/protocol.md#private-bash-command-inventory).
 
 An optional `shellProvider` answers command positions before initial publication.
-Its returned candidates define the verified command names; an empty list offers none.
+Its answer carries immutable candidates and the resolved external application name;
+empty candidates offer no verified command names.
 The engine enriches verified commands from its catalog and filters
 other command sources against those identities, so speculative catalog entries
 cannot flash before shell discovery finishes. Null means the shell is unsupported
 or unavailable and permits ordinary catalog fallback. Providers own this distinction;
 the session adapter returns empty for busy/stale requests once a native hook is installed.
-Modeled argument positions use progressive catalog and host sources first, with
+PowerShell option positions and arguments following catalog-recognized options query
+native completion first, without catalog argument constraints. The resolved application
+identity permits catalog/host evaluation only for a compatible external application
+whose native answer is empty or contains generic paths. Native parameter/value results,
+functions, cmdlets, scripts, and aliases to other applications retain shell authority.
+A deferred native answer is reused if catalog/host evaluation produces no candidates.
+Other modeled argument positions use progressive catalog and host sources first, with
 native fallback only when they produce no candidates. Retained learning does not
 count as a structured-source answer: when it is the only available result, its
 publication waits for the native fallback to finish, then participates in ranking.

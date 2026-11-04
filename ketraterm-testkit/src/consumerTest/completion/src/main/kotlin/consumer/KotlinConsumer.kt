@@ -49,4 +49,18 @@ fun main() =
         val result = engine.completions(TerminalCompletionRequest("he", 2)).last().single()
         check(result.replacementText == "help" && result.feedbackToken === nativeItem)
         check(result.copy(score = result.score + 1).feedbackToken === nativeItem)
+        val shellEngine =
+            TerminalCompletionEngines.fromSources(
+                emptyList(),
+                shellProvider =
+                    TerminalCompletionShellProvider { _, _, _ ->
+                        TerminalCompletionShellResult(emptyList(), externalCommandName = "git.exe")
+                    },
+            )
+        val options =
+            shellEngine
+                .completions(
+                    TerminalCompletionRequest("git --v", 7, shellCapabilities = TerminalShellCapabilities.POWERSHELL),
+                ).last()
+        check(options.any { it.replacementText == "--version" })
     }

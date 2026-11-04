@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.testing.shellProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.last
@@ -59,7 +60,7 @@ class ShellAwareCompletionEngineTest {
                             ),
                         learningStore = learning,
                         shellProvider =
-                            TerminalCompletionShellProvider { request, context, _ ->
+                            shellProvider { request, context, _ ->
                                 shellQueries++
                                 assertEquals("cat", context.command?.name)
                                 assertNull(context.activePositionalArgument)
@@ -113,7 +114,7 @@ class ShellAwareCompletionEngineTest {
                                 },
                             ),
                         ),
-                    shellProvider = TerminalCompletionShellProvider { _, _, _ -> null },
+                    shellProvider = shellProvider { _, _, _ -> null },
                 )
             val result =
                 engine
@@ -134,7 +135,7 @@ class ShellAwareCompletionEngineTest {
                         sources = emptyList(),
                         commandSpecs = listOf(TerminalCommandSpec("Get-Widget", aliases = listOf("Widget"), description = "Widget tools")),
                         shellProvider =
-                            TerminalCompletionShellProvider { _, _, _ ->
+                            shellProvider { _, _, _ ->
                                 listOf(candidate(name, 1, "shell", TerminalCompletionCandidateKind.COMMAND).copy(detail = "Native help"))
                             },
                     )
@@ -175,7 +176,7 @@ class ShellAwareCompletionEngineTest {
                                 ),
                             commandSpecs = listOf(TerminalCommandSpec(command, description = "$command description")),
                             shellProvider =
-                                TerminalCompletionShellProvider { _, _, _ ->
+                                shellProvider { _, _, _ ->
                                     listOf(candidate(command, prefix.length, "shell", TerminalCompletionCandidateKind.COMMAND))
                                 },
                         )
@@ -214,7 +215,7 @@ class ShellAwareCompletionEngineTest {
                                 }),
                             ),
                         learningStore = learning,
-                        shellProvider = TerminalCompletionShellProvider { _, _, _ -> emptyList() },
+                        shellProvider = shellProvider { _, _, _ -> emptyList() },
                     )
                 for (prefix in listOf("car", "carg", "ca", "c")) {
                     val publications = engine.completions(request(prefix).copy(shellCapabilities = shell)).toList()
@@ -251,7 +252,7 @@ class ShellAwareCompletionEngineTest {
                         learningStore = learning,
                         clockEpochMillis = { 2_000_000_000_000L },
                         shellProvider =
-                            TerminalCompletionShellProvider { _, _, _ ->
+                            shellProvider { _, _, _ ->
                                 error("Native completer must not run for populated cd paths")
                             },
                         sourceFailureHandler = { _, _, failure -> throw AssertionError("Unexpected provider failure", failure) },
@@ -304,7 +305,7 @@ class ShellAwareCompletionEngineTest {
                                         request: TerminalCompletionRequest,
                                         context: TerminalCompletionContext,
                                         limit: Int,
-                                    ): List<TerminalCompletionCandidate>? {
+                                    ): TerminalCompletionShellResult? {
                                         shellQueries++
                                         return null
                                     }
@@ -343,9 +344,11 @@ class ShellAwareCompletionEngineTest {
                                 request: TerminalCompletionRequest,
                                 context: TerminalCompletionContext,
                                 limit: Int,
-                            ): List<TerminalCompletionCandidate> {
+                            ): TerminalCompletionShellResult {
                                 shellQueries++
-                                return listOf(TerminalCompletionCandidate("cargo", 0, 2, "shell", TerminalCompletionCandidateKind.COMMAND))
+                                return TerminalCompletionShellResult(
+                                    listOf(TerminalCompletionCandidate("cargo", 0, 2, "shell", TerminalCompletionCandidateKind.COMMAND)),
+                                )
                             }
                         },
                 )
@@ -374,7 +377,7 @@ class ShellAwareCompletionEngineTest {
                                 request: TerminalCompletionRequest,
                                 context: TerminalCompletionContext,
                                 limit: Int,
-                            ): List<TerminalCompletionCandidate> = error("must not query after fatal failure")
+                            ): TerminalCompletionShellResult = error("must not query after fatal failure")
                         },
                 )
             assertEquals(failure.message, assertFailsWith<AssertionError> { engine.completions(request("ca")).last() }.message)
@@ -432,7 +435,7 @@ class ShellAwareCompletionEngineTest {
                             learningStore = learning,
                             clockEpochMillis = { 20 },
                             shellProvider =
-                                TerminalCompletionShellProvider { request, context, limit ->
+                                shellProvider { request, context, limit ->
                                     nativeQueries++
                                     TerminalCompletionSources.valueDomainCandidates(
                                         request,
@@ -486,7 +489,7 @@ class ShellAwareCompletionEngineTest {
                             }),
                         ),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             listOf(candidate("git", 2, "powershell", TerminalCompletionCandidateKind.COMMAND))
                         },
                 )
@@ -516,7 +519,7 @@ class ShellAwareCompletionEngineTest {
                     sources = emptyList(),
                     commandSpecs = listOf(TerminalCommandSpec("docker"), TerminalCommandSpec("docker-compose")),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             names.mapIndexed { index, name ->
                                 candidate(name, 4, "powershell", TerminalCompletionCandidateKind.COMMAND)
                                     .copy(score = names.size - index)
@@ -544,7 +547,7 @@ class ShellAwareCompletionEngineTest {
                             TerminalCommandSpec("docker", description = "Container platform"),
                             TerminalCommandSpec("docker-compose"),
                         ),
-                    shellProvider = TerminalCompletionShellProvider { _, _, _ -> listOf(native) },
+                    shellProvider = shellProvider { _, _, _ -> listOf(native) },
                 )
             for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
                 val publications = engine.completions(request.copy(shellCapabilities = shell)).toList()
@@ -569,7 +572,7 @@ class ShellAwareCompletionEngineTest {
                     sources = emptyList(),
                     commandSpecs = listOf(TerminalCommandSpec("cargo")),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             entered.complete(Unit)
                             response.await()
                         },
@@ -590,7 +593,7 @@ class ShellAwareCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     sources = emptyList(),
                     commandSpecs = listOf(TerminalCommandSpec("cargo")),
-                    shellProvider = TerminalCompletionShellProvider { _, _, _ -> null },
+                    shellProvider = shellProvider { _, _, _ -> null },
                 )
             assertEquals(
                 "cargo",
@@ -606,7 +609,7 @@ class ShellAwareCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     sources = emptyList(),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             try {
                                 entered.complete(Unit)
                                 awaitCancellation()
@@ -639,7 +642,7 @@ class ShellAwareCompletionEngineTest {
                         ),
                     commandSpecs = emptyList(),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             listOf(candidate("cat", 2, "powershell", TerminalCompletionCandidateKind.COMMAND))
                         },
                 )
@@ -682,7 +685,7 @@ class ShellAwareCompletionEngineTest {
         runTest {
             var queries = 0
             val shell =
-                TerminalCompletionShellProvider { _, _, _ ->
+                shellProvider { _, _, _ ->
                     queries++
                     emptyList()
                 }
@@ -719,7 +722,7 @@ class ShellAwareCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     sources = emptyList(),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             queries++
                             listOf(TerminalCompletionCandidate("xyzdir/", 3, 6, "powershell", TerminalCompletionCandidateKind.PATH))
                         },
@@ -748,7 +751,7 @@ class ShellAwareCompletionEngineTest {
                     learningStore = learning,
                     clockEpochMillis = { 20 },
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             queries++
                             native.await()
                         },
@@ -778,7 +781,7 @@ class ShellAwareCompletionEngineTest {
                     learningStore = learning,
                     clockEpochMillis = { 20 },
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             queries++
                             emptyList()
                         },
@@ -803,7 +806,7 @@ class ShellAwareCompletionEngineTest {
                             ),
                         ),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             listOf(TerminalCompletionCandidate("native", 7, 8, "powershell", TerminalCompletionCandidateKind.ARGUMENT))
                         },
                 )
@@ -832,7 +835,7 @@ class ShellAwareCompletionEngineTest {
                             ),
                         ),
                     shellProvider =
-                        TerminalCompletionShellProvider { _, _, _ ->
+                        shellProvider { _, _, _ ->
                             listOf(candidate("cat", 3, "powershell", TerminalCompletionCandidateKind.COMMAND))
                         },
                 )

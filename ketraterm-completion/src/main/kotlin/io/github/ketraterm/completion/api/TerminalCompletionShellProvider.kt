@@ -22,8 +22,10 @@ package io.github.ketraterm.completion.api
  *
  * At command positions a non-null result defines the verified executable candidates;
  * specifications enrich those candidates instead of advertising unverified commands.
- * Modeled argument positions use catalog/host sources first and query the shell
- * only if they produce no candidates. Unmodeled arguments use the shell first,
+ * PowerShell option names and arguments after options use the live shell first.
+ * A compatible external application without a native argument completer can retain
+ * catalog options. Other modeled arguments use catalog/host sources first and query
+ * the shell only if they produce no candidates. Unmodeled arguments use the shell first,
  * including arguments following an option absent from the catalog.
  */
 @ExperimentalTerminalCompletionApi
@@ -38,14 +40,19 @@ public fun interface TerminalCompletionShellProvider {
 
     /**
      * Returns shell-owned, escaped edits for this exact request. Null permits
-     * ordinary catalog/source fallback. An empty list offers no safe candidates
+     * ordinary catalog/source fallback. An empty answer offers no safe candidates
      * and suppresses unverified fallback at positions owned by the shell.
      * The engine owns invocation, cancellation, and source concurrency. Implementations
      * own bounded host I/O and must preserve caller cancellation.
+     *
+     * @param request exact buffer, cursor, and shell capabilities being completed.
+     * @param context shared parsed context; implementations must not mutate it.
+     * @param limit positive maximum number of candidates to return.
+     * @return current shell answer, or null when native completion is unavailable.
      */
     public suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         limit: Int,
-    ): List<TerminalCompletionCandidate>?
+    ): TerminalCompletionShellResult?
 }

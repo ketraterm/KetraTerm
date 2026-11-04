@@ -204,6 +204,14 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionShellPro
 	public static fun commandAliases (Lio/github/ketraterm/completion/api/TerminalCompletionShellProvider;)Ljava/util/Map;
 }
 
+public final class io/github/ketraterm/completion/api/TerminalCompletionShellResult {
+	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCandidates ()Ljava/util/List;
+	public final fun getExternalCommandName ()Ljava/lang/String;
+}
+
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionSource {
 	public abstract fun complete (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }

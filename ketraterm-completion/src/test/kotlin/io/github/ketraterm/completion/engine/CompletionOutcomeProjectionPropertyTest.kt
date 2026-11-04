@@ -54,7 +54,7 @@ class CompletionOutcomeProjectionPropertyTest {
                                     request: TerminalCompletionRequest,
                                     context: TerminalCompletionContext,
                                     limit: Int,
-                                ): List<TerminalCompletionCandidate>? = null
+                                ): TerminalCompletionShellResult? = null
                             },
                     )
                 val result = engine.complete(request)

@@ -45,11 +45,12 @@ class PowerShellNativeCompletionTest {
                 val query = async { it.session.requestShellCompletions("Get-Chi", 7) }
                 runCurrent()
                 assertEquals("\u001b[24~e", it.connector.writtenBytes.toString(Charsets.UTF_8))
-                val reply = reply("Get-Chi", value = "Get-ChildItem", label = "Get-ChildItem")
+                val reply = reply("Get-Chi", value = "Get-ChildItem", label = "Get-ChildItem", externalCommandName = "git.exe")
                 for (byte in reply.toByteArray()) it.connector.feedFromHost(byteArrayOf(byte))
                 runCurrent()
 
                 val result = assertNotNull(query.await())
+                assertEquals("git.exe", result.externalCommandName)
                 assertEquals(0, result.replacementStartOffset)
                 assertEquals(7, result.replacementEndOffset)
                 assertEquals("Get-ChildItem", result.candidates.single().replacementText)
@@ -81,6 +82,7 @@ class PowerShellNativeCompletionTest {
                 runCurrent()
                 it.feed(reply("Get-Chi", epoch = "b".repeat(32)))
                 it.feed(reply("Get-Chi", id = 2))
+                it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
                 runCurrent()
                 assertFalse(query.isCompleted)
                 it.feed(reply("Get-Chi"))
@@ -146,6 +148,7 @@ class PowerShellNativeCompletionTest {
                 it.feed(reply("Get-Chi", id = 1))
                 assertFalse(next.isCompleted)
                 it.feed(reply("Get-Chi", id = 2))
+                it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
                 runCurrent()
                 assertNotNull(next.await())
             }
@@ -240,6 +243,10 @@ class PowerShellNativeCompletionTest {
             for (bad in listOf(
                 reply("Get-Chi", value = "x".repeat(4097)),
                 reply("Get-Chi", label = "x".repeat(513)),
+                reply("Get-Chi", externalCommandName = "x".repeat(513)),
+                reply("Get-Chi", externalCommandName = "git\n.exe"),
+                reply("Get-Chi", externalCommandName = "git.exe").replace(encoded("git.exe"), "%%%"),
+                reply("Get-Chi", externalCommandName = "git.exe").replace(encoded("git.exe"), "/w=="),
                 reply("Get-Chi").replace(";1;Command;", ";129;Command;"),
                 reply("Get-Chi").replace(";1;Command;", ";0;Command;"),
             )) {
@@ -252,6 +259,7 @@ class PowerShellNativeCompletionTest {
                     val next = async { it.session.requestShellCompletions("Get-Chi", 7) }
                     runCurrent()
                     it.feed(reply("Get-Chi", id = 2))
+                    it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
                     runCurrent()
                     assertNotNull(next.await())
                 }
@@ -286,7 +294,7 @@ class PowerShellNativeCompletionTest {
     companion object {
         private fun encoded(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 
-        private fun ready(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCompletion;1;Ready;$epoch\u0007"
+        private fun ready(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCompletion;2;Ready;$epoch\u0007"
 
         private fun reply(
             line: String,
@@ -296,9 +304,10 @@ class PowerShellNativeCompletionTest {
             label: String = value,
             start: Int = 0,
             end: Int = line.length,
+            externalCommandName: String = "",
         ): String =
-            "\u001b]633;KetraTermCompletion;1;Result;$epoch;$id;Ok;${line.length};$start;$end;${encoded(
+            "\u001b]633;KetraTermCompletion;2;Result;$epoch;$id;Ok;${line.length};$start;$end;${encoded(
                 line,
-            )};1;Command;${encoded(value)};${encoded(label)};\u0007"
+            )};${encoded(externalCommandName)};1;Command;${encoded(value)};${encoded(label)};\u0007"
     }
 }

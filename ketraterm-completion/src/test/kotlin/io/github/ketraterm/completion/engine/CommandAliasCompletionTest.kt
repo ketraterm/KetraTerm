@@ -148,7 +148,7 @@ class CommandAliasCompletionTest {
                         request: TerminalCompletionRequest,
                         context: TerminalCompletionContext,
                         limit: Int,
-                    ): List<TerminalCompletionCandidate>? = null
+                    ): TerminalCompletionShellResult? = null
                 },
         )
 

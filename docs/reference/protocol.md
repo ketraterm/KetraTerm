@@ -417,18 +417,18 @@ and [streaming placement](#streaming-grapheme-placement).
 The same optional producer also accepts the bounded Bash command inventory
 [described below](#private-bash-command-inventory).
 
-The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;1;... BEL`
+The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;2;... BEL`
 (ST is also accepted) from the workspace's PSReadLine hook. All envelope fields
 are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
 The session's default parser forwards unknown OSC bodies synchronously to the
 selected producer. Custom parser factories must forward `observeCustomOsc` and
 use `customOscPayloadLimitBytes` themselves.
 
-| Message body after `KetraTermCompletion;1;` | Meaning |
+| Message body after `KetraTermCompletion;2;` | Meaning |
 | --- | --- |
 | `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
 | `Result;epoch;id;Failed` | Correlated failure. |
-| `Result;epoch;id;Ok;cursor;start;end;line;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line`. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
+| `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
 
 The host admits at most one request per session, sending the semantic `F12,e`
 chord through ordinary ordered input. Host and hook increment their counters for
@@ -441,7 +441,7 @@ Complete custom OSC collection is capped at 256 KiB with this producer installed
 built-in command limits remain unchanged. Replies contain at most 128 candidates,
 a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
 tooltip per candidate. Ranges must contain the cursor and stay within the buffer
-on scalar boundaries. Command and replacement controls are rejected. The hook
+on scalar boundaries. Command, application-name, and replacement controls are rejected. Application names are limited to 512 UTF-16 units. The hook
 bounds its serialized body below the collection limit and preserves `LASTEXITCODE`.
 
 Empty command buffers use bounded `Get-Command` discovery. The hook uses PowerShell's

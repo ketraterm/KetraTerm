@@ -145,7 +145,7 @@ class SwingCompletionPipelineTest {
                             shellProvider =
                                 TerminalCompletionShellProvider { _, _, _ ->
                                     nativeQueries++
-                                    emptyList()
+                                    TerminalCompletionShellResult(emptyList())
                                 },
                         )
                     val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext(shellCapabilities = shell) })
@@ -192,14 +192,16 @@ class SwingCompletionPipelineTest {
                             learningStore = learning,
                             shellProvider =
                                 TerminalCompletionShellProvider { _, context, _ ->
-                                    listOf(
-                                        TerminalCompletionCandidate(
-                                            "cat",
-                                            context.replacementStartOffset,
-                                            context.replacementEndOffset,
-                                            "native",
-                                            TerminalCompletionCandidateKind.COMMAND,
-                                            feedbackToken = token,
+                                    TerminalCompletionShellResult(
+                                        listOf(
+                                            TerminalCompletionCandidate(
+                                                "cat",
+                                                context.replacementStartOffset,
+                                                context.replacementEndOffset,
+                                                "native",
+                                                TerminalCompletionCandidateKind.COMMAND,
+                                                feedbackToken = token,
+                                            ),
                                         ),
                                     )
                                 },

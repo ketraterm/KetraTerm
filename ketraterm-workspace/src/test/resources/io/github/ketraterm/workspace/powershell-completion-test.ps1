@@ -3,9 +3,10 @@ Add-Type @'
 namespace Microsoft.PowerShell {
     public static class PSConsoleReadLine {
         public static string Line;
+        public static int Cursor = -1;
         public static void GetBufferState(ref string line, ref int cursor) {
             line = Line;
-            cursor = Line.Length;
+            cursor = Cursor < 0 ? Line.Length : Cursor;
         }
     }
 }
@@ -25,8 +26,9 @@ Register-ArgumentCompleter -CommandName Get-KetraCustomCompleter -ParameterName 
     [System.Management.Automation.CompletionResult]::new("'native value'", 'native value',
         [System.Management.Automation.CompletionResultType]::ParameterValue, 'native detail')
 }
-function Complete-Test([string] $Line) {
+function Complete-Test([string] $Line, [int] $Cursor = -1) {
     [Microsoft.PowerShell.PSConsoleReadLine]::Line = $Line
+    [Microsoft.PowerShell.PSConsoleReadLine]::Cursor = $Cursor
     & $global:CompletionHandler
     [Console]::WriteLine()
 }
@@ -47,6 +49,23 @@ if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
     Complete-Test $shortName
     Set-Item -LiteralPath ('Function:global:' + $shortName) -Value { }
     Complete-Test $shortName
+    Set-Alias knativeapp $nativePath
+    Complete-Test 'knativeapp -n'
+    Complete-Test ("& '" + $nativePath + "' -n")
+    Complete-Test ('Write-Output x | knativeapp -n')
+    $nested = 'Write-Output $(knativeapp -n)'
+    Complete-Test $nested ($nested.Length - 1)
+    Complete-Test $nested
+    Complete-Test '$unknownCommand -n'
 }
+# Make alias-collision cases independent of platform-specific default aliases.
+Set-Alias ls Get-ChildItem
+Set-Alias cat Get-Content
+Set-Alias mkdir New-Item
+Complete-Test 'ls --a'
+Complete-Test 'ls -H'
+Complete-Test 'cat -Enc u'
+Complete-Test 'cat -Encoding:u'
+Complete-Test 'mkdir -p:'
 [Console]::WriteLine("EXIT=$global:LASTEXITCODE")
 

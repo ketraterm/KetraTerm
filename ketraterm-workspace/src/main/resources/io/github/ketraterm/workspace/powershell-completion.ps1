@@ -3,7 +3,7 @@ function global:__KetraTermCompletionReady {
     if (-not $global:__KetraTermCompletionInstalled) { return }
     $global:__KetraTermCompletionEpoch = [Guid]::NewGuid().ToString('N')
     $global:__KetraTermCompletionSequence = 0L
-    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;1;Ready;' + $global:__KetraTermCompletionEpoch + ([string][char]7))
+    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;2;Ready;' + $global:__KetraTermCompletionEpoch + ([string][char]7))
 }
 
 function global:__KetraTermCompletionEncode([string] $Value) {
@@ -13,15 +13,39 @@ function global:__KetraTermCompletionEncode([string] $Value) {
 function global:__KetraTermComplete {
     $savedExitCode = $global:LASTEXITCODE
     $global:__KetraTermCompletionSequence++
-    $prefix = 'KetraTermCompletion;1;Result;' + $global:__KetraTermCompletionEpoch + ';' + $global:__KetraTermCompletionSequence + ';'
+    $prefix = 'KetraTermCompletion;2;Result;' + $global:__KetraTermCompletionEpoch + ';' + $global:__KetraTermCompletionSequence + ';'
     $body = $prefix + 'Failed'
     try {
         $line = ''
         $cursor = 0
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
         if ($line.Length -le 4096) {
+            $externalCommandName = ''
+            if ($line.Length -gt 0) {
+                $parseTokens = $null
+                $parseErrors = $null
+                $ast = [Management.Automation.Language.Parser]::ParseInput($line, [ref]$parseTokens, [ref]$parseErrors)
+                # Resolve the innermost command containing the cursor, including trailing whitespace.
+                # Command names are inspected as data; dynamic invocations are never evaluated.
+                $activeCommand = $null
+                foreach ($node in $ast.FindAll({ param($node) $node -is [Management.Automation.Language.CommandAst] }, $true)) {
+                    $begin = $node.Extent.StartOffset
+                    $finish = $node.Extent.EndOffset
+                    if ($begin -gt $cursor -or ($finish -lt $cursor -and $line.Substring($finish, $cursor - $finish).Trim().Length -gt 0)) { continue }
+                    if ($null -eq $activeCommand -or $begin -gt $activeCommand.Extent.StartOffset) { $activeCommand = $node }
+                }
+                if ($null -ne $activeCommand) {
+                    $name = $activeCommand.GetCommandName()
+                    if (-not [string]::IsNullOrEmpty($name)) {
+                        $command = $ExecutionContext.InvokeCommand.GetCommand($name, [Management.Automation.CommandTypes]::All)
+                        if ($command -is [Management.Automation.AliasInfo]) { $command = $command.ResolvedCommand }
+                        if ($command -is [Management.Automation.ApplicationInfo]) { $externalCommandName = $command.Name }
+                    }
+                }
+            }
+            $encodedCommandName = global:__KetraTermCompletionEncode $externalCommandName
             # Even a failing completer can acknowledge an unchanged, validated buffer.
-            $body = $prefix + 'Ok;' + $cursor + ';' + $cursor + ';' + $cursor + ';' + (global:__KetraTermCompletionEncode $line) + ';0'
+            $body = $prefix + 'Ok;' + $cursor + ';' + $cursor + ';' + $cursor + ';' + (global:__KetraTermCompletionEncode $line) + ';' + $encodedCommandName + ';0'
             if ($line.Length -eq 0) {
                 # TabExpansion2 rejects empty input. Discover a bounded set of actual commands.
                 $discovered = Microsoft.PowerShell.Core\Get-Command -Name '*' -TotalCount 256 -ErrorAction SilentlyContinue |
@@ -56,7 +80,7 @@ function global:__KetraTermComplete {
                 $end = $start + $result.ReplacementLength
             }
             $header = $prefix + 'Ok;' + $cursor + ';' + $start + ';' +
-                $end + ';' + (global:__KetraTermCompletionEncode $line) + ';'
+                $end + ';' + (global:__KetraTermCompletionEncode $line) + ';' + $encodedCommandName + ';'
             $items = [Collections.Generic.List[string]]::new()
             $size = $header.Length + 3
             foreach ($match in $matches) {

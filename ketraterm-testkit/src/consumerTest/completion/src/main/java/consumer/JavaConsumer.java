@@ -28,6 +28,13 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        TerminalCompletionShellProvider provider = (request, context, limit, continuation) ->
+                new TerminalCompletionShellResult(List.of(), "git.exe");
+        var request = new TerminalCompletionRequest("git --v", 7);
+        var reply = (TerminalCompletionShellResult) provider.complete(request, TerminalCompletionContext.resolve(request), 10, null);
+        if (!"git.exe".equals(reply.getExternalCommandName()) || !reply.getCandidates().isEmpty()) {
+            throw new AssertionError("Shell answer identity was lost");
+        }
         try (var metadata = TerminalCompletionEngines.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-completion.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }
