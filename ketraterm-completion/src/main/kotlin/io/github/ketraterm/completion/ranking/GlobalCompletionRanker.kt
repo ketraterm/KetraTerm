@@ -216,7 +216,7 @@ internal class GlobalCompletionRanker {
             val value = outcome?.activeValue ?: candidate.displayText
             val fullMatch = lexicalMatchRelevance(value, prefix)
             if (candidate.kind != TerminalCompletionCandidateKind.PATH) return fullMatch
-            val windowsSeparators = request.shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL
+            val windowsSeparators = request.shellCapabilities.backslashPathSeparator
             val entryPrefix = pathLeaf(prefix, windowsSeparators, false)
             if (entryPrefix.isEmpty()) return fullMatch
             return maxOf(fullMatch, lexicalMatchRelevance(pathLeaf(value, windowsSeparators, true), entryPrefix))

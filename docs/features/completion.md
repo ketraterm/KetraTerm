@@ -213,7 +213,7 @@ not an exhaustive schema for every version of these tools.
 | Context | Active command segment, preceding arguments, case-sensitive option identity, option values, and end-of-options handling. |
 | Command specifications | Aliases, nested/repeatable subcommands, ordered/variadic arguments, literal values, path kinds, and mutually exclusive option groups. |
 | Shell syntax | POSIX and PowerShell subsets, plus conservative plain parsing; see the [shell matrix](shells.md). |
-| Paths | Directory traversal, including for file-valued arguments, shell-aware escaping, and hidden entries when explicitly requested. |
+| Paths | Directory traversal, including for file-valued arguments, shell-aware escaping, literal POSIX backslashes, Windows separators, and hidden entries when explicitly requested. |
 | Ranking | Merged sources, deterministic ordering, contextual priority, and bounded learning boosts. |
 | Progressive results | Sources can update results asynchronously; obsolete requests are cancelled. |
 | Presentation | Compact matched-text rows, keyboard/pointer navigation, description-only hover tooltips, full row context for accessibility, and custom UI support. |

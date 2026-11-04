@@ -76,15 +76,76 @@ class IntellijCompletionSourceRequestTest {
             assertTrue(candidates.any { it.replacementText == "src/main.kt" })
         }
 
+    @Test
+    fun `POSIX path adapters preserve literal backslashes through lookup and insertion`() =
+        runBlocking {
+            for (createSource in listOf(::intellijProjectFileCompletionSource, ::intellijGitStatusPathCompletionSource)) {
+                var requestedPrefix: String? = null
+                val source =
+                    createSource { _, prefix ->
+                        requestedPrefix = prefix
+                        listOf(TerminalFuzzyPathEntry("src/foo\\bar.kt", isDirectory = false))
+                    }
+                val request = request("git add 'foo\\b")
+
+                val candidate = engine(source).complete(request).single()
+
+                assertEquals("foo\\b", requestedPrefix)
+                assertEquals("src/foo\\bar.kt", candidate.displayText)
+                assertEquals(
+                    "git add 'src/foo\\bar.kt'",
+                    request.commandLine.replaceRange(
+                        candidate.replacementStartOffset,
+                        candidate.replacementEndOffset,
+                        candidate.replacementText,
+                    ),
+                )
+            }
+        }
+
+    @Test
+    fun `Windows path adapters normalize lookup and retain the requested insertion separator`() =
+        runBlocking {
+            for (capabilities in listOf(
+                TerminalShellCapabilities.POWERSHELL,
+                TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+            )) {
+                for (createSource in listOf(::intellijProjectFileCompletionSource, ::intellijGitStatusPathCompletionSource)) {
+                    var requestedPrefix: String? = null
+                    val source =
+                        createSource { _, prefix ->
+                            requestedPrefix = prefix
+                            listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false))
+                        }
+                    val request = request("git add 'src\\Ch", capabilities)
+
+                    val candidate = engine(source).complete(request).single()
+
+                    assertEquals("src/Ch", requestedPrefix)
+                    assertEquals(
+                        "git add 'src\\Changed.kt'",
+                        request.commandLine.replaceRange(
+                            candidate.replacementStartOffset,
+                            candidate.replacementEndOffset,
+                            candidate.replacementText,
+                        ),
+                    )
+                }
+            }
+        }
+
     private fun engine(source: TerminalCompletionSource): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(listOf(TerminalCompletionSourceEntry(source, priority = 1)))
 
-    private fun request(commandLine: String): TerminalCompletionRequest =
+    private fun request(
+        commandLine: String,
+        capabilities: TerminalShellCapabilities = TerminalShellCapabilities.POSIX,
+    ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
             workingDirectoryUri = WORKING_DIRECTORY,
-            shellCapabilities = TerminalShellCapabilities.POSIX,
+            shellCapabilities = capabilities,
         )
 
     private companion object {

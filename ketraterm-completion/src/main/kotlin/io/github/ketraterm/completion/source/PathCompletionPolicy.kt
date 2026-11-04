@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
@@ -24,25 +25,33 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 /** Shared allocation-free path eligibility policy for direct and indexed sources. */
 internal fun isPathLike(prefix: String): Boolean =
     prefix.startsWith('/') ||
-        prefix.startsWith('\\') ||
         prefix.startsWith('.') ||
         prefix.startsWith('~') ||
         prefix.indexOf('/') >= 0 ||
-        prefix.indexOf('\\') >= 0 ||
         (prefix.length >= 2 && prefix[1] == ':')
 
-internal fun allowsPathCompletion(context: TerminalCompletionContext): Boolean {
+/** Chooses insertion spelling without treating literal filename backslashes as separators. */
+internal fun TerminalShellCapabilities.pathSeparator(prefix: String): Char =
+    if (backslashPathSeparator && prefix.contains('\\')) '\\' else '/'
+
+/** Canonical provider paths use `/`; a remaining backslash must be representable literally. */
+internal fun TerminalShellCapabilities.canRepresentPath(path: String): Boolean = !backslashPathSeparator || !path.contains('\\')
+
+internal fun allowsPathCompletion(
+    context: TerminalCompletionContext,
+    normalizedPrefix: String,
+): Boolean {
     val activePosition = context.activePosition
     if (activePosition == TerminalCompletionActivePosition.OPERATOR ||
         activePosition == TerminalCompletionActivePosition.OPTION_NAME
     ) {
         return false
     }
-    if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(context.activePrefix)
+    if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(normalizedPrefix)
     if (context.expectedPathKind != TerminalPathArgumentKind.NONE) return true
     // A slash in a branch name does not turn that value into a filesystem path.
     if (context.hasNonPathValueDomain()) return false
-    return isPathLike(context.activePrefix)
+    return isPathLike(normalizedPrefix)
 }
 
 internal fun TerminalCompletionContext.hasNonPathValueDomain(): Boolean =
@@ -71,23 +80,14 @@ internal fun TerminalHiddenPathPolicy.acceptsPath(
         }
 
 private fun String.startsWithActiveDot(): Boolean {
-    val slash = lastIndexOf('/')
-    val backslash = lastIndexOf('\\')
-    val activeStart = maxOf(slash, backslash) + 1
+    val activeStart = lastIndexOf('/') + 1
     return activeStart < length && this[activeStart] == '.'
 }
 
 private fun String.hasHiddenSegment(): Boolean {
     var segmentStart = 0
     while (segmentStart < length) {
-        val forwardSeparator = indexOf('/', segmentStart)
-        val backwardSeparator = indexOf('\\', segmentStart)
-        val segmentEnd =
-            when {
-                forwardSeparator < 0 -> if (backwardSeparator < 0) length else backwardSeparator
-                backwardSeparator < 0 -> forwardSeparator
-                else -> minOf(forwardSeparator, backwardSeparator)
-            }
+        val segmentEnd = indexOf('/', segmentStart).let { if (it < 0) length else it }
         val segmentLength = segmentEnd - segmentStart
         val isNavigationSegment =
             segmentLength == 1 ||

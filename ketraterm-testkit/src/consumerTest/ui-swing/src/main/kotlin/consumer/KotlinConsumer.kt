@@ -128,8 +128,10 @@ fun main() =
                 "spec",
                 "SUBCOMMAND",
                 argumentHint = "<branch>",
+                backslashPathSeparator = false,
             )
         check(hinted.copy().argumentHint == "<branch>" && hinted.replacementText == "switch")
+        check(!hinted.copy().backslashPathSeparator)
         check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)

@@ -59,6 +59,10 @@ presentation data; insertion uses `replacementText` and its replacement range.
 Select shell capabilities from authoritative host metadata. Use `POSIX` or
 `POWERSHELL` for their supported lexical and quoting contracts, and the default
 `PLAIN` for other shells. The engine does not infer a dialect from a profile id.
+Path separators are captured separately from quoting: set
+`backslashPathSeparator = true` on POSIX capabilities for environments such as
+Git Bash that accept Windows paths. Native POSIX capabilities preserve literal
+backslashes in filenames.
 
 ## Customize the engine
 

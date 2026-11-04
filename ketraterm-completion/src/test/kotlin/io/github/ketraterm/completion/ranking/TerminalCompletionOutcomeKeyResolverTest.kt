@@ -26,6 +26,36 @@ import kotlin.test.assertNotNull
 
 class TerminalCompletionOutcomeKeyResolverTest {
     @Test
+    fun `path outcomes follow explicit separators independently of shell quoting`() {
+        for (base in dialects) {
+            for (backslashSeparator in listOf(false, true)) {
+                val capabilities = base.copy(backslashPathSeparator = backslashSeparator)
+                val request = request("cat 'foo", capabilities)
+                val context = TerminalCompletionContext.resolve(request)
+                val literal = assertNotNull(resolver.resolve(request, candidate("'foo\\bar'", context), context))
+                val nested = assertNotNull(resolver.resolve(request, candidate("'foo/bar'", context), context))
+
+                assertEquals(backslashSeparator, literal.groupKey == nested.groupKey)
+                assertEquals(if (backslashSeparator) "foo/bar" else "foo\\bar", literal.activeValue)
+
+                val ranking = GlobalCompletionRanker().createRequestState(request, context, 10, 0)
+                ranking.ingest(
+                    CompletionSourceCandidates(
+                        0,
+                        0,
+                        candidates =
+                            listOf(
+                                candidate("'foo\\bar'", context),
+                                candidate("'foo/bar'", context),
+                            ),
+                    ),
+                )
+                assertEquals(if (backslashSeparator) 1 else 2, ranking.rankedCandidates().size)
+            }
+        }
+    }
+
+    @Test
     fun `literal and differently quoted expansions keep distinct outcomes and decoded matching text`() {
         for (capabilities in dialects) {
             val request = request("echo $", capabilities)

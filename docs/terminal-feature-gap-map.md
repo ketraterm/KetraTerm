@@ -28,7 +28,6 @@ Known correctness gaps in the [experimental completion system](features/completi
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(session/ui)` | Reconcile PowerShell combining text with screen-derived command snapshots. It can appear to have trailing spaces absent from the editor buffer. Distinguish that display padding without stripping genuine whitespace or editable suffixes. |
-| `TODO(completion/host/profile)` | Preserve literal POSIX backslashes throughout path listing and candidate projection. For example, `cat 'foo\b` currently searches `foo/` but can insert a literal backslash path. Align separator interpretation, entry-name validation, and displayed/inserted paths with the filesystem and shell. |
 
 Maintainability, scalability, and deferred capability work:
 

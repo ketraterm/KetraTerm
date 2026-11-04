@@ -26,6 +26,31 @@ import kotlin.test.assertTrue
 
 class CompletionMergeRankingTest {
     @Test
+    fun `path leaf ranking respects literal backslashes independently of quoting`() {
+        val line = "cat 'main"
+        for (base in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+            for (backslashSeparator in listOf(false, true)) {
+                val request =
+                    TerminalCompletionRequest(
+                        line,
+                        line.length,
+                        shellCapabilities = base.copy(backslashPathSeparator = backslashSeparator),
+                    )
+                val state = GlobalCompletionRanker().createRequestState(request, TerminalCompletionContext.resolve(request), 10, 0)
+                val candidates =
+                    listOf("'feature\\main'", "'main-other'").map {
+                        TerminalCompletionCandidate(it, 4, line.length, "paths", TerminalCompletionCandidateKind.PATH)
+                    }
+                state.ingest(CompletionSourceCandidates(0, 0, candidates = candidates))
+                assertEquals(
+                    if (backslashSeparator) "'feature\\main'" else "'main-other'",
+                    state.rankedCandidates().first().replacementText,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `equally matching live domain values precede history even at the end of a source batch`() {
         val request = TerminalCompletionRequest("git switch ma", 13)
         val state = GlobalCompletionRanker().createRequestState(request, TerminalCompletionContext.resolve(request), 256, 0)

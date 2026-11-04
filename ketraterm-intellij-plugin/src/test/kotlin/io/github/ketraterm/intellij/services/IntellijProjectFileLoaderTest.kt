@@ -18,17 +18,28 @@ package io.github.ketraterm.intellij.services
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.testFramework.IndexingTestUtil
+import com.intellij.testFramework.JUnit38AssumeSupportRunner
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import org.junit.Assume.assumeTrue
+import org.junit.runner.RunWith
+import java.nio.file.FileSystems
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.invariantSeparatorsPathString
 
 /** IntelliJ fixture tests for project-file completion through Go to File. */
+@RunWith(JUnit38AssumeSupportRunner::class)
 class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
     fun testUnqualifiedQueryMatchesNamesInsteadOfAncestorDirectories() {
         myFixture.addFileToProject("app-server/plugins/Plugin.kt", "")
@@ -92,6 +103,42 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
             entries.map { it.path },
         )
         assertTrue(entries.single().isDirectory)
+    }
+
+    fun testLiteralBackslashesSurviveGoToFileSearchAndExcludeBroadenedMatches() {
+        assumeTrue("Literal backslash filenames require a POSIX filesystem", FileSystems.getDefault().separator == "/")
+        val directory = Files.createTempDirectory("ketraterm-literal-paths")
+        try {
+            for (path in listOf(
+                "foo\\bar.kt",
+                "foobar.kt",
+                "foo/bar.kt",
+                "dir\\name/Main.kt",
+                "dir-other-name/Main.kt",
+                "dir/name/Main.kt",
+            )) {
+                val target = directory.resolve(path)
+                Files.createDirectories(target.parent)
+                Files.writeString(target, "")
+            }
+            val root = requireNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(directory))
+            root.refresh(false, true)
+            PsiTestUtil.addContentRoot(module, root)
+            try {
+                IndexingTestUtil.waitUntilIndexesAreReady(project)
+                val loader = IntellijProjectFileLoader(project)
+                val uri = directory.toUri().toString()
+
+                assertEquals(listOf("foo\\bar.kt"), runBlocking { loader.load(uri, "foo\\b") }.map { it.path })
+                assertEquals(listOf("dir\\name/Main.kt"), runBlocking { loader.load(uri, "dir\\name/Ma") }.map { it.path })
+                val absolutePrefix = directory.resolve("foo\\b").invariantSeparatorsPathString
+                assertEquals(listOf("foo\\bar.kt"), runBlocking { loader.load(uri, absolutePrefix) }.map { it.path })
+            } finally {
+                PsiTestUtil.removeContentEntry(module, root)
+            }
+        } finally {
+            assertTrue(FileUtil.delete(directory.toFile()))
+        }
     }
 
     /** Verifies that a pending write cancels and transparently restarts the IntelliJ read action. */

@@ -18,11 +18,12 @@ package io.github.ketraterm.intellij.services
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.workspace.TerminalProfileKind
 
-/** Maps authoritative IntelliJ terminal profiles to implemented lexical policy. */
+/** Maps authoritative IntelliJ terminal profiles to shell syntax and path-separator policy. */
 internal fun TerminalProfileKind.intellijCompletionShellCapabilities(): TerminalShellCapabilities =
     when (this) {
         TerminalProfileKind.POWERSHELL -> TerminalShellCapabilities.POWERSHELL
-        TerminalProfileKind.GIT_BASH,
+        TerminalProfileKind.GIT_BASH -> TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true)
+        TerminalProfileKind.COMMAND_PROMPT -> TerminalShellCapabilities.PLAIN.copy(backslashPathSeparator = true)
         TerminalProfileKind.UBUNTU,
         TerminalProfileKind.BASH,
         TerminalProfileKind.ZSH,
@@ -30,7 +31,6 @@ internal fun TerminalProfileKind.intellijCompletionShellCapabilities(): Terminal
         TerminalProfileKind.UNIX_SHELL,
         -> TerminalShellCapabilities.POSIX
 
-        TerminalProfileKind.COMMAND_PROMPT,
         TerminalProfileKind.FISH,
         TerminalProfileKind.NUSHELL,
         TerminalProfileKind.DEFAULT,

@@ -24,6 +24,66 @@ import kotlin.test.*
 
 class PathCompletionSourceTest {
     @Test
+    fun `POSIX quoting preserves literal backslashes through listing matching and insertion`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("", listing.directoryPrefix)
+                    assertEquals("foo\\b", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("foo\\bar", false))
+                })
+            for ((line, replacement) in listOf(
+                "cat 'foo\\b" to "'foo\\bar'",
+                "cat \"foo\\b" to "\"foo\\\\bar\"",
+                "cat foo\\\\b" to "foo\\\\bar",
+            )) {
+                val candidate = source.complete(request(line, "file:///project")).single()
+                assertEquals(replacement, candidate.replacementText, line)
+                assertEquals("foo\\bar", candidate.displayText, line)
+                assertEquals(0, candidate.matchedRanges.startOffset(0), line)
+                assertEquals(5, candidate.matchedRanges.endOffset(0), line)
+            }
+        }
+
+    @Test
+    fun `POSIX directory and trailing filename backslashes remain literal`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("foo\\dir/", listing.directoryPrefix)
+                    assertEquals("ba", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("bar\\", false))
+                })
+            val candidate = source.complete(request("cat 'foo\\dir/ba", "file:///project")).single()
+            assertEquals("'foo\\dir/bar\\'", candidate.replacementText)
+            assertEquals("bar\\", candidate.displayText)
+        }
+
+    @Test
+    fun `literal POSIX backslashes do not introduce hidden components or activate unknown argument paths`() =
+        runBlocking {
+            val source = PathCompletionSource({ listOf(TerminalFileEntry("foo\\.hidden", false)) })
+            assertEquals("foo\\.hidden", source.complete(request("cat 'foo\\", "file:///project")).single().displayText)
+            val unexpected = PathCompletionSource({ error("A literal backslash does not prove a path argument") })
+            assertTrue(unexpected.complete(request("unknown 'foo\\b", "file:///project")).isEmpty())
+        }
+
+    @Test
+    fun `Windows separators work independently of POSIX shell quoting`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("src/", listing.directoryPrefix)
+                    assertEquals("m", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("main", true), TerminalFileEntry("m\\literal", false))
+                })
+            val capabilities = TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true)
+            val candidate = source.complete(request("cat 'src\\m", "file:///C:/project", capabilities)).single()
+            assertEquals("'src\\main\\'", candidate.replacementText)
+            assertEquals("main\\", candidate.displayText)
+        }
+
+    @Test
     fun `file arguments include navigation directories without changing their expected path kind`() =
         runBlocking {
             val source =

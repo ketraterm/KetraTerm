@@ -210,6 +210,44 @@ class SwingCompletionSuggestionProviderTest {
         }
 
     @Test
+    fun `path presentation carries the captured separator policy without rewriting labels or matches`() =
+        runBlocking {
+            val path = "dir/foo\\bar"
+            val offsets = intArrayOf(4, 7)
+            for (capabilities in listOf(
+                TerminalShellCapabilities.POSIX,
+                TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+                TerminalShellCapabilities.POWERSHELL,
+            )) {
+                val provider =
+                    SwingCompletionSuggestionProvider(
+                        engine = {
+                            flowOf(
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        path,
+                                        4,
+                                        7,
+                                        "path",
+                                        TerminalCompletionCandidateKind.PATH,
+                                        matchedRanges = TerminalCompletionMatchRanges.fromPackedOffsets(path, offsets),
+                                    ),
+                                ),
+                            )
+                        },
+                        contextProvider = { SwingCompletionContext(shellCapabilities = capabilities) },
+                    )
+
+                val suggestion = provider.suggestions(request("cat foo", 7)).last().single()
+
+                assertEquals(capabilities.backslashPathSeparator, suggestion.backslashPathSeparator)
+                assertEquals(path, suggestion.displayText)
+                assertEquals(path, suggestion.replacementText)
+                assertContentEquals(offsets, suggestion.matchedRanges.copyPackedOffsets())
+            }
+        }
+
+    @Test
     fun `maps provider identifiers once into bounded renderer-neutral labels`() =
         runBlocking {
             val sources =

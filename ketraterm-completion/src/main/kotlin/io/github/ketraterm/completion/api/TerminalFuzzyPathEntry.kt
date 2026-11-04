@@ -20,8 +20,8 @@ package io.github.ketraterm.completion.api
  *
  * [path] is a shell-facing lexical path relative to the request's current
  * directory, or an absolute path when a host cannot safely relativize it. It
- * always uses forward slashes; the shared source adapts the replacement to the
- * active shell token's separator and quoting style.
+ * always uses forward slashes as separators; backslashes are literal filename
+ * characters. The shared source adapts separators and quoting to the captured shell capabilities.
  *
  * @property path non-empty lexical path without a trailing separator.
  * @property isDirectory whether this entry represents a directory.
@@ -44,7 +44,6 @@ public data class TerminalFuzzyPathEntry
         init {
             require(path.isNotBlank()) { "path must not be blank" }
             require(!path.endsWith('/')) { "path must not end with '/', was $path" }
-            require(!path.endsWith('\\')) { "path must not end with '\\', was $path" }
             require(detail.isNullOrBlank() || !detail.contains('\n')) { "detail must be a single line" }
             matchedRanges.requireValidFor(path)
         }

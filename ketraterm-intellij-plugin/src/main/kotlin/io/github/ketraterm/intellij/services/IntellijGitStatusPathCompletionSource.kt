@@ -89,7 +89,8 @@ internal class IntellijGitStatusPathLoader(
      * Renamed paths use their post-rename path when available; deleted paths use their prior path.
      *
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
-     * @param prefix decoded active path prefix supplied by the completion context.
+     * @param prefix decoded active path prefix with separators normalized to `/`;
+     * literal filename backslashes remain unchanged.
      * @return query-matched paths within the independent visit budget, or an
      * empty list for unusable project, URI, or repository state.
      */
@@ -99,8 +100,7 @@ internal class IntellijGitStatusPathLoader(
     ): List<TerminalFuzzyPathEntry> {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        val normalizedPrefix = prefix.replace('\\', '/')
-        val pathMatcher = IntellijCompletionPathMatcher(normalizedPrefix)
+        val pathMatcher = IntellijCompletionPathMatcher(prefix)
         val changedFileDetail = KetraTermBundle.message("completion.detail.changedFile")
         val untrackedFileDetail = KetraTermBundle.message("completion.detail.untrackedFile")
         return readPort.read(workingDirectoryUri) { model ->
@@ -119,7 +119,7 @@ internal class IntellijGitStatusPathLoader(
             ) {
                 if (!path.startsWith(model.repositoryRoot)) return
                 val relativePath = relativePath(model.workingDirectory, path) ?: return
-                val score = gitStatusFuzzyScore(relativePath, normalizedPrefix) ?: return
+                val score = gitStatusFuzzyScore(relativePath, prefix) ?: return
                 if (retainedPaths.add(relativePath)) {
                     retained +=
                         ScoredGitStatusPath(
@@ -169,7 +169,9 @@ internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?, Str
     TerminalCompletionSources.fuzzyPath(
         messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-git-status-path",
-        entriesProvider = { request, context -> loader(request.workingDirectoryUri, context.activePrefix) },
+        entriesProvider = { request, context ->
+            loader(request.workingDirectoryUri, request.shellCapabilities.normalizePathSeparators(context.activePrefix))
+        },
         requiresNonEmptyPrefix = false,
         allowedCommandNames = setOf("add", "restore", "rm", "diff"),
     )

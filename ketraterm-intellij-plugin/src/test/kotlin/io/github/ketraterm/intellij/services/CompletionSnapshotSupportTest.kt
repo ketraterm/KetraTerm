@@ -16,7 +16,9 @@
 package io.github.ketraterm.intellij.services
 
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.nio.file.FileSystems
 import java.nio.file.Path
 
 /** Pure tests for lexical IntelliJ completion-path support. */
@@ -27,5 +29,14 @@ class CompletionSnapshotSupportTest {
 
         assertEquals("../shared/File.kt", toRelativeCompletionPath(base, base.resolve("../shared/File.kt")))
         assertEquals("", toRelativeCompletionPath(base, base))
+    }
+
+    @Test
+    fun `POSIX relative completion paths preserve backslashes inside names`() {
+        assumeTrue("Backslashes are filename characters only on POSIX filesystems", FileSystems.getDefault().separator == "/")
+        val base = Path.of("project").toAbsolutePath()
+
+        assertEquals("foo\\bar/child\\name", toRelativeCompletionPath(base, base.resolve("foo\\bar/child\\name")))
+        assertEquals("../foo\\bar", toRelativeCompletionPath(base, base.resolve("../foo\\bar")))
     }
 }

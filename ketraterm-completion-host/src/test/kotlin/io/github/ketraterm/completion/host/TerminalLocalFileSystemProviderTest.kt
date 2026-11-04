@@ -51,6 +51,45 @@ class TerminalLocalFileSystemProviderTest {
         }
 
     @Test
+    fun `literal backslashes in entry prefixes reach the scanner unchanged`() =
+        runTest {
+            val directory = Path.of("completion-directory").toAbsolutePath().normalize()
+            val entry = TerminalFileEntry("foo\\bar", isDirectory = false)
+            val scans = mutableListOf<Pair<Path, String>>()
+            val provider =
+                TerminalLocalFileSystemProvider(
+                    scanner =
+                        TerminalDirectoryScanner { scannedDirectory, prefix ->
+                            scans += scannedDirectory to prefix
+                            listOf(entry)
+                        },
+                )
+
+            val entries = provider.listDirectory(TerminalDirectoryListingRequest(directory.toUri().toString(), "nested/", "foo\\b"))
+
+            assertEquals(listOf(entry), entries)
+            assertEquals(listOf(directory.resolve("nested") to "foo\\b"), scans)
+        }
+
+    @Test
+    fun `canonical directory prefixes retain native filesystem meaning`() {
+        val directory = Path.of("completion-directory").toAbsolutePath().normalize()
+        val windows = directory.fileSystem.separator == "\\"
+        val resolver = TerminalCompletionPathResolver()
+        val cases =
+            listOf(
+                "foo\\bar/" to if (windows) null else directory.resolve("foo\\bar"),
+                "C:/workspace/" to if (windows) Path.of("C:/workspace") else null,
+                "//server/share/" to if (windows) Path.of("//server/share") else null,
+            )
+
+        for ((prefix, expected) in cases) {
+            val request = TerminalDirectoryListingRequest(directory.toUri().toString(), prefix, "")
+            assertEquals(expected, resolver.resolve(request), prefix)
+        }
+    }
+
+    @Test
     fun `unsupported working-directory URI is a normal empty result`() =
         runTest {
             var scans = 0

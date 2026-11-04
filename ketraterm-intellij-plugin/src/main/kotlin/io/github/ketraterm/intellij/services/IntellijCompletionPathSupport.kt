@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.util.io.FileUtil
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
 /** Uses the project fallback only when the shell supplied no working-directory metadata. */
 internal fun resolveIntellijCompletionWorkingDirectory(
@@ -57,11 +57,14 @@ internal fun <T> findContainingCompletionRoot(
     return selected
 }
 
-/** Returns a shell-facing forward-slash path relative to [base], or [target] when relativization is unavailable. */
+/**
+ * Returns a forward-slash path relative to [base], or [target] when relativization is unavailable.
+ * Only filesystem separators are converted; literal backslashes in POSIX names are preserved.
+ */
 internal fun toRelativeCompletionPath(
     base: Path,
     target: Path,
 ): String {
     val relative = runCatching { base.relativize(target) }.getOrElse { target }
-    return FileUtil.toSystemIndependentName(relative.toString()).removeSuffix("/")
+    return relative.invariantSeparatorsPathString.removeSuffix("/")
 }

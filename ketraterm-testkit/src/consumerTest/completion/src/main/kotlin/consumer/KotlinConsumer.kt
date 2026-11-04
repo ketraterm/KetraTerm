@@ -24,6 +24,11 @@ import kotlinx.coroutines.runBlocking
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        val posixPaths = TerminalShellCapabilities.POSIX
+        val windowsPaths = posixPaths.copy(backslashPathSeparator = true)
+        check(!posixPaths.backslashPathSeparator && windowsPaths.backslashPathSeparator)
+        check(posixPaths.normalizePathSeparators("foo\\bar") == "foo\\bar")
+        check(windowsPaths.normalizePathSeparators("foo\\bar") == "foo/bar")
         check(
             JavaConsumer
                 .stream()

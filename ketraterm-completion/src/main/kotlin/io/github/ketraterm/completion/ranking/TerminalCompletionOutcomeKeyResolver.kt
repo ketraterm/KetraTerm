@@ -56,7 +56,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
                 attachedOptionValue = context.attachedOptionValue != null && activeIndex == originalActiveIndex,
-                shellSyntax = request.shellCapabilities.syntax,
+                shellCapabilities = request.shellCapabilities,
             )
         val groupKey =
             if (projectedContext.canReplay) {
@@ -80,7 +80,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         pathTokenIndex: Int,
         pathAware: Boolean,
         attachedOptionValue: Boolean,
-        shellSyntax: TerminalShellSyntax,
+        shellCapabilities: TerminalShellCapabilities,
     ): List<TerminalCommandLineTokenIdentity>? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
@@ -90,7 +90,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
             val token = tokens[index]
             resultTokens +=
                 if (index == normalizedPathIndex && token.rawText == null) {
-                    TerminalCommandLineTokenIdentity(normalizePathToken(token.text, shellSyntax, attachedOptionValue))
+                    TerminalCommandLineTokenIdentity(normalizePathToken(token.text, shellCapabilities, attachedOptionValue))
                 } else {
                     token.identity
                 }
@@ -101,16 +101,16 @@ internal class TerminalCompletionOutcomeKeyResolver {
 
     private fun normalizePathToken(
         token: String,
-        shellSyntax: TerminalShellSyntax,
+        shellCapabilities: TerminalShellCapabilities,
         attachedOptionValue: Boolean,
     ): String {
         // An equals sign in a positional filename is literal, not an option/value boundary.
         val separatorIndex = if (attachedOptionValue) token.indexOf('=') else -1
-        val windowsSeparators = shellSyntax == TerminalShellSyntax.POWERSHELL
+        val windowsSeparators = shellCapabilities.backslashPathSeparator
 
         fun path(value: String): String {
-            var normalized = if (windowsSeparators) value.replace('\\', '/') else value
-            if (windowsSeparators) {
+            var normalized = shellCapabilities.normalizePathSeparators(value)
+            if (windowsSeparators && shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL) {
                 while (normalized.length > 2 && normalized.startsWith("./")) normalized = normalized.substring(2)
             }
             return stripRedundantTrailingSeparators(normalized, windowsSeparators)
@@ -127,7 +127,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         windowsSeparators: Boolean,
     ): String {
         var end = value.length
-        // PowerShell backslashes are normalized above; remaining backslashes are literal filename characters.
+        // Path separators are normalized above; remaining backslashes are literal filename characters.
         while (end > 1 && value[end - 1] == '/' && !isRoot(value, end, windowsSeparators)) end--
         return if (end == value.length) value else value.substring(0, end)
     }

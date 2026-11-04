@@ -38,6 +38,37 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @ParameterizedTest
+    @ValueSource(strings = ["foo\\bar.txt", "dir\\name/foo\\bar.txt", "parent/foo\\"])
+    fun `POSIX path presentation preserves literal backslashes in names and parents`(path: String) =
+        onEdt {
+            val nameStart = path.lastIndexOf('/') + 1
+            val name = path.substring(nameStart)
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    backslashPathSeparator = false,
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(path, intArrayOf(nameStart, nameStart + 3)),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(800, 40)
+                val row = view.renderedLabel(candidate)
+                val text = row.text.replace(Regex("<[^>]+>"), "").replace("&nbsp;", " ")
+                val parent = path.substringBeforeLast('/', "")
+
+                assertEquals(name + if (parent.isEmpty()) "" else "  $parent", text)
+                assertTrue(row.text.contains(">foo</b>"))
+                assertEquals(if (parent.isEmpty()) null else "<html>$path</html>", row.toolTipText)
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertEquals(path, candidate.replacementText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
     @CsvSource("/file.txt, /", "C:\\file.txt, C:\\", "../file.txt, ..")
     fun `root and navigation context survives name first presentation`(
         path: String,

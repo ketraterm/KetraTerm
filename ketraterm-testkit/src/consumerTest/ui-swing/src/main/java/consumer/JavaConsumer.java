@@ -276,7 +276,8 @@ draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && acti
                 var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND", "status", "",
                     io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole.COMMAND,
                     io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionMatchRanges.EMPTY,
-                    "Native", null, null, "[path]");
+                    "Native", null, null, "[path]", false);
+                if (candidate.getBackslashPathSeparator()) throw new AssertionError("Literal backslash presentation was lost");
                 if (!"git status".equals(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKt.commandTextAfterReplacement(
                     candidate, new SwingShellSuggestionRequest("git st", 6)))) {
                     throw new AssertionError("Argument hint entered command text");

@@ -36,12 +36,16 @@ public class TerminalCompletionPathResolver
         /**
          * Resolves [request] into a normalized absolute local directory.
          *
+         * Backslashes in canonical prefixes are literal filename characters;
+         * filesystems that interpret them as separators cannot represent these requests.
+         *
          * @param request lexical directory request produced by the completion engine.
          * @return local path, or `null` for malformed, remote, or unsupported input.
          */
         public fun resolve(request: TerminalDirectoryListingRequest): Path? {
             val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
             val prefix = request.directoryPrefix
+            if (workingDirectory.fileSystem.separator == "\\" && prefix.contains('\\')) return null
             return try {
                 val resolved =
                     when {

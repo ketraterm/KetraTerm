@@ -27,6 +27,47 @@ import kotlin.test.assertTrue
 /** Tests context-aware completion from host-owned ready fuzzy path matches. */
 class FuzzyPathCompletionSourceTest {
     @Test
+    fun `POSIX indexed filenames retain literal backslashes hidden-name semantics and match ranges`() =
+        runBlocking {
+            val path = "src\\literal/target\\.txt\\"
+            val start = path.indexOf("target")
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(start, start + 7))
+            val source =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry(path, false, matchedRanges = ranges))
+                })
+            val candidate = source.complete(request("cat 'target\\")).single()
+            assertEquals("'$path'", candidate.replacementText)
+            assertEquals(path, candidate.displayText)
+            assertEquals(ranges, candidate.matchedRanges)
+        }
+
+    @Test
+    fun `indexed directory suffix follows separator capability independently of quoting`() =
+        runBlocking {
+            val source =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry("src/target\\dir", true))
+                })
+            val literal = source.complete(request("cd 'target\\")).single()
+            assertEquals("'src/target\\dir/'", literal.replacementText)
+            assertEquals("src/target\\dir/", literal.displayText)
+
+            val windowsSource =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry("src/target", true), TerminalFuzzyPathEntry("src/target\\literal", true))
+                })
+            for (capabilities in listOf(
+                TerminalShellCapabilities.POWERSHELL,
+                TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+            )) {
+                val candidate = windowsSource.complete(request("cd 'src\\ta", capabilities)).single()
+                assertEquals("'src\\target\\'", candidate.replacementText)
+                assertEquals("src/target/", candidate.displayText)
+            }
+        }
+
+    @Test
     fun `file arguments retain indexed navigation directories and their fuzzy matches`() =
         runBlocking {
             val path = "settings/config"

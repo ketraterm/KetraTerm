@@ -85,6 +85,36 @@ class GradleTaskCompletionSourceTest {
         }
 
     @Test
+    fun `project directory separators follow capabilities without collapsing literal backslashes`() =
+        runBlocking {
+            val source =
+                TerminalCompletionSources.gradleTask(
+                    sourceId = "gradle-task",
+                    tasksProvider = { _, _ ->
+                        listOf(
+                            TerminalGradleTask(":literal:runLiteral", projectDirectory = "foo\\bar"),
+                            TerminalGradleTask(":nested:runNested", projectDirectory = "foo/bar"),
+                        )
+                    },
+                )
+            val capabilities =
+                listOf(
+                    TerminalShellCapabilities.POSIX,
+                    TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+                    TerminalShellCapabilities.POWERSHELL.copy(backslashPathSeparator = false),
+                    TerminalShellCapabilities.POWERSHELL,
+                )
+            for (shell in capabilities) {
+                for ((selector, literalTask) in listOf("foo\\bar" to "runLiteral", "foo/bar" to "runNested")) {
+                    val request = request("gradle -p '$selector' ru").copy(shellCapabilities = shell)
+                    val expected = if (shell.backslashPathSeparator) listOf("runLiteral", "runNested") else listOf(literalTask)
+
+                    assertEquals(expected, source.complete(request).map { it.replacementText }, "$shell: $selector")
+                }
+            }
+        }
+
+    @Test
     fun `qualified task paths remain rooted in the build after project directory options`() =
         runBlocking {
             assertEquals(

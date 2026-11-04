@@ -36,6 +36,7 @@ import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
 /**
  * Queries IntelliJ's Go to File engine for bounded fuzzy paths.
@@ -56,7 +57,8 @@ internal class IntellijProjectFileLoader(
      * Returns IntelliJ-ranked project paths matching [prefix].
      *
      * @param workingDirectoryUri local `file` URI used to relativize project entries.
-     * @param prefix decoded active terminal path token.
+     * @param prefix decoded active terminal path token with separators normalized to `/`;
+     * literal filename backslashes remain unchanged.
      * @return ready project paths within this loader's independent query and
      * visit budgets, or an empty list for disposed projects, unsupported
      * working-directory URIs, and directories outside this project's content roots.
@@ -68,8 +70,7 @@ internal class IntellijProjectFileLoader(
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
-        val normalizedPrefix = prefix.replace('\\', '/')
-        if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
+        if (prefix.substringAfterLast('/').isEmpty()) return emptyList()
         val workingDirectory =
             resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) {
                 project.guessProjectDir()?.toNioPath()
@@ -85,7 +86,11 @@ internal class IntellijProjectFileLoader(
                     listOfNotNull(project.basePath?.let { Path.of(it) })
                 }
             if (findContainingCompletionRoot(workingDirectory, roots) { it } == null) return@readAction emptyList()
-            val pathMatcher = IntellijCompletionPathMatcher(normalizedPrefix)
+            val pathMatcher = IntellijCompletionPathMatcher(prefix)
+            // Go to File treats every backslash as a directory separator. Broaden
+            // only its query, then require the original literal name and path.
+            val searchPrefix = prefix.replace('\\', '*')
+            val broadenedQuery = searchPrefix != prefix
             val model = GotoFileModel(project)
             try {
                 val itemProvider = model.getItemProvider(null)
@@ -96,7 +101,7 @@ internal class IntellijProjectFileLoader(
                 val paths = HashSet<String>(initialCapacity)
                 var visited = 0
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
-                val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
+                val parameters = FindSymbolParameters.wrap(searchPrefix, GlobalSearchScope.projectScope(project))
                 itemProvider.filterElementsWithWeights(
                     viewModel,
                     parameters,
@@ -110,6 +115,10 @@ internal class IntellijProjectFileLoader(
                         if (!pathMatcher.matchesName(file.name)) return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
+                        if (broadenedQuery) {
+                            val qualifiedPath = if (prefix.startsWith('/')) filePath.invariantSeparatorsPathString else path
+                            if (!pathMatcher.matchesPath(qualifiedPath)) return@Processor true
+                        }
                         if (paths.add(path)) {
                             results.add(
                                 TerminalFuzzyPathEntry(
@@ -166,6 +175,6 @@ internal fun intellijProjectFileCompletionSource(loader: suspend (String?, Strin
         messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-project-file",
         entriesProvider = { request, context ->
-            loader(request.workingDirectoryUri, context.activePrefix)
+            loader(request.workingDirectoryUri, request.shellCapabilities.normalizePathSeparators(context.activePrefix))
         },
     )

@@ -72,6 +72,9 @@ public enum class TerminalShellSyntax {
  *
  * @property syntax lexical rules used to resolve the cursor's command segment.
  * @property quoting replacement escaping policy used by candidate sources.
+ * @property backslashPathSeparator whether a decoded backslash separates path components.
+ * Defaults to true for PowerShell and false otherwise. Hosts must set it for
+ * their shell environment: Git Bash accepts Windows separators despite POSIX quoting.
  */
 @ExperimentalTerminalCompletionApi
 public data class TerminalShellCapabilities
@@ -79,7 +82,18 @@ public data class TerminalShellCapabilities
     constructor(
         val syntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
         val quoting: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.CONSERVATIVE,
+        val backslashPathSeparator: Boolean = syntax == TerminalShellSyntax.POWERSHELL,
     ) {
+        /**
+         * Converts decoded path separators to the host-provider convention of `/`.
+         * Literal backslashes are preserved when [backslashPathSeparator] is false.
+         * This performs no expansion, filesystem access, or shell unescaping.
+         *
+         * @param path decoded path text, after shell tokenization.
+         * @return path with canonical separators and unchanged filename characters.
+         */
+        public fun normalizePathSeparators(path: String): String = if (backslashPathSeparator) path.replace('\\', '/') else path
+
         public companion object {
             /** Conservative capabilities for unknown or unsupported shells. */
             @JvmField

@@ -60,7 +60,9 @@ See the [request contract](../ketraterm-completion/README.md#request-completions
 `TerminalDirectoryListingRequest` into a normalized absolute local `Path`.
 It accepts relative and absolute paths, `~/` using the configured home directory,
 and Windows drive or UNC syntax when Windows support is enabled. Requests use
-forward slashes; shell parsing and quoting stay in the completion engine.
+forward slashes as separators. Remaining backslashes are literal filename
+characters: POSIX filesystems preserve them; Windows resolution rejects them.
+Shell parsing and quoting stay in the completion engine.
 
 `TerminalLocalFileUriResolver` accepts `file:` working-directory URIs with an
 empty authority or `localhost`. Unsupported schemes, remote authorities, and

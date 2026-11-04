@@ -119,6 +119,7 @@ public class SwingCompletionSuggestionProvider
                 displayText = displayText,
                 detail = detail,
                 argumentHint = argumentHint,
+                backslashPathSeparator = requestContext.shellCapabilities.backslashPathSeparator,
                 accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
                 interactionContext = requestContext,
                 feedbackToken = feedbackToken,

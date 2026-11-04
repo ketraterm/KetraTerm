@@ -286,6 +286,8 @@ Nested `PATH` rows show the name first and parent context in `secondaryForegroun
 (`selectionForeground` on selection). Long paths shorten to the available width;
 hover and accessibility retain the full path, and acceptance inserts the original
 replacement. Visible match fragments keep their supplied highlights.
+Custom providers set `backslashPathSeparator = false` when `PATH` labels contain
+literal POSIX backslashes. The standard completion adapter supplies this policy.
 
 During ordinary typing, old rows remain briefly to avoid flicker. A slow refresh
 clears them after 200 ms while collection continues; stale rows cannot be accepted.

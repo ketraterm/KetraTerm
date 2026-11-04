@@ -96,9 +96,10 @@ Unmodeled arguments query
 the shell before publishing and use its successful answer instead of generic file
 or replay guesses. No candidates are published while a native query could
 invalidate their captured editing context.
-PowerShell path outcomes normalize slash direction, leading `./`, quoting, and
-trailing directory separators; insertion keeps the chosen source's original edit.
-POSIX and plain-syntax backslashes remain literal filename characters. An `=`
+Path outcomes normalize separators according to `backslashPathSeparator`, quoting,
+and trailing directory separators. PowerShell additionally normalizes leading `./`
+when Windows separators are enabled; insertion keeps the chosen source's original edit.
+Backslashes remain literal filename characters when that capability is disabled. An `=`
 introduces a separately normalized path only for a resolved attached option value;
 an `=` within an ordinary filename remains part of that path.
 
@@ -400,7 +401,12 @@ restrictions narrow a provider's validity. Fuzzy paths require typed path text
 by default; a context-specific provider can permit an empty prefix.
 
 Direct path requests preserve a lexical directory prefix and the authoritative
-working-directory URI. Hosts interpret home, drive, UNC, and authority semantics
+working-directory URI. Provider paths use `/` separators and preserve literal
+backslashes. `TerminalShellCapabilities.backslashPathSeparator` distinguishes
+Windows separators from filename characters independently of shell quoting;
+`normalizePathSeparators` applies that convention to decoded input. Direct and
+indexed sources, ranking, and the Swing adapter share this captured capability.
+Hosts interpret home, drive, UNC, and authority semantics
 and reject locations they cannot safely map. The completion engine does not
 probe filesystems or turn remote authorities into local paths.
 

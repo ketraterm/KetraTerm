@@ -43,7 +43,7 @@ public data class TerminalFileEntry(
  *
  * @property workingDirectoryUri absolute host-reported working-directory URI.
  * @property directoryPrefix typed path portion ending at the final separator;
- * forward slashes are used as a transport-neutral separator. An empty value
+ * only forward slashes are separators; backslashes are literal filename characters. An empty value
  * addresses the working directory and `~/` addresses the host user's home.
  * @property entryNamePrefix typed base-name prefix after the final separator.
  * @throws IllegalArgumentException if the URI is blank, the directory prefix is
@@ -61,7 +61,6 @@ public data class TerminalDirectoryListingRequest(
             "directoryPrefix must be empty or end with '/', was $directoryPrefix"
         }
         require(!entryNamePrefix.contains('/')) { "entryNamePrefix must not contain '/'" }
-        require(!entryNamePrefix.contains('\\')) { "entryNamePrefix must not contain '\\'" }
     }
 }
 

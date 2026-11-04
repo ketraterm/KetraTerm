@@ -28,6 +28,13 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var posixPaths = new TerminalShellCapabilities(TerminalShellSyntax.POSIX, TerminalShellQuotingPolicy.POSIX, false);
+        var windowsPaths = new TerminalShellCapabilities(TerminalShellSyntax.POSIX, TerminalShellQuotingPolicy.POSIX, true);
+        if (posixPaths.getBackslashPathSeparator() || !windowsPaths.getBackslashPathSeparator()
+                || !"foo\\bar".equals(posixPaths.normalizePathSeparators("foo\\bar"))
+                || !"foo/bar".equals(windowsPaths.normalizePathSeparators("foo\\bar"))) {
+            throw new AssertionError("Path separator policy was lost");
+        }
         var option = new io.github.ketraterm.completion.model.TerminalOptionSpec(
                 List.of("-m"), "", true, io.github.ketraterm.completion.model.TerminalPathArgumentKind.NONE,
                 List.of(), io.github.ketraterm.completion.model.TerminalCompletionValueDomain.NONE,

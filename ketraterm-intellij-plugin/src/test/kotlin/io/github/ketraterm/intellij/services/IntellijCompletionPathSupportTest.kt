@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Path
 
@@ -68,7 +67,7 @@ class IntellijCompletionPathSupportTest {
                 }
             },
         )
-        org.junit.Assert.assertTrue(ranges.startOffset(0) >= path.lastIndexOf('/') + 1)
+        assertTrue(ranges.startOffset(0) >= path.lastIndexOf('/') + 1)
     }
 
     @Test
@@ -84,6 +83,51 @@ class IntellijCompletionPathSupportTest {
             }.replace("/", "").lowercase(),
         )
         assertEquals(0, IntellijCompletionPathMatcher("").ranges(path).rangeCount)
+    }
+
+    @Test
+    fun `literal backslashes stay in the filename query and highlighted ranges`() {
+        val path = "src/foo\\bar.kt"
+        val matcher = IntellijCompletionPathMatcher("foo\\b")
+
+        assertTrue(matcher.matchesName("foo\\bar.kt"))
+        assertFalse(matcher.matchesName("bar.kt"))
+        assertFalse(matcher.matchesName("foobar.kt"))
+        assertFalse(matcher.matchesName("foo/bar.kt"))
+        assertTrue(matcher.matchesPath(path))
+        assertFalse(matcher.matchesPath("src/foobar.kt"))
+        assertFalse(matcher.matchesPath("src/foo/bar.kt"))
+        val ranges = matcher.ranges(path)
+        assertEquals(
+            "foo\\b",
+            buildString {
+                for (index in 0 until ranges.rangeCount) {
+                    append(path.substring(ranges.startOffset(index), ranges.endOffset(index)))
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `qualified literal backslashes reject wildcard broadened parent matches`() {
+        val matcher = IntellijCompletionPathMatcher("foo\\bar/ma")
+
+        assertTrue(matcher.matchesName("main.kt"))
+        assertTrue(matcher.matchesPath("src/foo\\bar/main.kt"))
+        assertFalse(matcher.matchesPath("src/foobar/main.kt"))
+        assertFalse(matcher.matchesPath("src/foo/bar/main.kt"))
+        assertFalse(matcher.matchesPath("src/foo-other-bar/main.kt"))
+    }
+
+    @Test
+    fun `absolute literal queries match absolute paths instead of relative display paths`() {
+        val matcher = IntellijCompletionPathMatcher("/tmp/project/foo\\b")
+
+        assertTrue(matcher.matchesName("foo\\bar.kt"))
+        assertTrue(matcher.matchesPath("/tmp/project/foo\\bar.kt"))
+        assertFalse(matcher.matchesPath("foo\\bar.kt"))
+        assertFalse(matcher.matchesPath("/tmp/project/foobar.kt"))
+        assertFalse(matcher.matchesPath("/tmp/project/foo/bar.kt"))
     }
 
     @Test

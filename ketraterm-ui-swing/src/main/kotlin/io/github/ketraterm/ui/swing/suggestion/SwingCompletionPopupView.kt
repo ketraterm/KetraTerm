@@ -320,8 +320,9 @@ private class CompletionRenderer(
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
         val hint = displayText(suggestion.argumentHint, 512)
-        val nameEnd = primary.trimEnd('/', '\\').length
-        val nameStart = primary.lastIndexOfAny(charArrayOf('/', '\\'), nameEnd - 1) + 1
+        val separators = if (suggestion.backslashPathSeparator) charArrayOf('/', '\\') else charArrayOf('/')
+        val nameEnd = primary.trimEnd(*separators).length
+        val nameStart = primary.lastIndexOfAny(separators, nameEnd - 1) + 1
         val pathNameStart = nameStart.takeIf { suggestion.kind == "PATH" && it > 0 && nameEnd > it }
         val role = roles[suggestion.accentRole.ordinal]
         val accessibleDescription =
