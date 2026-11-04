@@ -48,13 +48,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
         val activeIndex = projectedContext.activeTokenIndex
         // Whole-line history may append arguments; match the user's original word,
         // not the last word inserted by that candidate or an alias-generated word.
-        val originalActiveIndex =
-            TerminalCommandLineTokenizer
-                .parse(
-                    request.commandLine,
-                    request.cursorOffset,
-                    request.shellCapabilities.syntax,
-                ).activeTokenIndex
+        val originalActiveIndex = context.originalActiveTokenIndex
         if (projectedContext.canReplay && tokens.firstCommandTokenIndex() >= tokens.size) return null
         val tokenIdentities =
             outcomeKey(

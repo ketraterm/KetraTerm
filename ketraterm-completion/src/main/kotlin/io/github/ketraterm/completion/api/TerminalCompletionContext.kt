@@ -97,6 +97,8 @@ public class TerminalCompletionContext
         internal val gitCompletion: GitCompletionContext? = null,
         /** The command is known, but unknown option arity prevents catalog argument ownership. */
         internal val hasUnrecognizedOptions: Boolean = false,
+        /** Active token index in the user's input, before aliases add semantic tokens. */
+        internal val originalActiveTokenIndex: Int = commandLineContext.activeTokenIndex,
     ) {
         public val commandPath: List<TerminalCommandSpec> = copyOf(commandPath)
         public val usedOptionExclusiveGroupIds: Set<String> = copySetOf(usedOptionExclusiveGroupIds)
@@ -156,6 +158,7 @@ public class TerminalCompletionContext
                 optionsBeforeCursor = optionsBeforeCursor,
                 precedingPositionalArguments = precedingPositionalArguments,
                 hasUnrecognizedOptions = hasUnrecognizedOptions,
+                originalActiveTokenIndex = originalActiveTokenIndex,
             )
 
         /**

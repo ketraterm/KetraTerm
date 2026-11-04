@@ -171,6 +171,7 @@ internal object TerminalCompletionContextResolver {
             precedingPositionalArguments = analysis.positionalArguments,
             gitCompletion = gitCompletion,
             hasUnrecognizedOptions = analysis.hasUnrecognizedOptions,
+            originalActiveTokenIndex = lineContext.activeTokenIndex,
         )
     }
 

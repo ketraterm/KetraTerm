@@ -106,6 +106,65 @@ class TerminalCompletionOutcomeKeyResolverTest {
     }
 
     @Test
+    fun `fixed argument aliases rank the original word when whole line candidates append arguments`() {
+        val request = request("gs ma", TerminalShellCapabilities.POSIX)
+        val resolvedContext = TerminalCompletionContext.resolve(request, commandAliases = mapOf("gs" to "git switch"))
+        for (context in listOf(resolvedContext, resolvedContext.withoutArgumentConstraints())) {
+            val candidates =
+                listOf(
+                    candidate("gs feature-main main", context).copy(
+                        replacementStartOffset = 0,
+                        displayText = "main",
+                        score = Int.MAX_VALUE,
+                    ),
+                    candidate("gs main unrelated", context).copy(
+                        replacementStartOffset = 0,
+                        displayText = "unrelated",
+                    ),
+                )
+            val outcomes = candidates.map { assertNotNull(resolver.resolve(request, it, context)) }
+
+            assertEquals(listOf("feature-main", "main"), outcomes.map { it.activeValue })
+
+            val ranking = GlobalCompletionRanker().createRequestState(request, context, 10, 0)
+            ranking.ingest(CompletionSourceCandidates(0, 0, candidates = candidates))
+            assertEquals(
+                listOf("gs main unrelated", "gs feature-main main"),
+                ranking.rankedCandidates().map { it.replacementText },
+            )
+        }
+    }
+
+    @Test
+    fun `fixed argument aliases preserve attached path roots and normalize each edited value`() {
+        val specs =
+            listOf(
+                TerminalCommandSpec(
+                    "tool",
+                    options =
+                        listOf(
+                            TerminalOptionSpec(listOf("--verbose")),
+                            TerminalOptionSpec(
+                                listOf("--path"),
+                                requiresValue = true,
+                                valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                            ),
+                        ),
+                ),
+            )
+        val request = request("t --path=/", TerminalShellCapabilities.POSIX)
+        val context = TerminalCompletionContext.resolve(request, specs, mapOf("t" to "tool --verbose"))
+        for ((replacement, expectedValue) in listOf("/" to "/", "/tmp/" to "/tmp")) {
+            val candidate = candidate(replacement, context).copy(kind = TerminalCompletionCandidateKind.PATH)
+            val outcome = assertNotNull(resolver.resolve(request, candidate, context))
+
+            assertEquals(listOf("t", "--path=$expectedValue"), outcome.groupKey.map { it.text })
+            assertEquals(expectedValue, outcome.activeValue)
+            assertEquals("t --path=$replacement", outcome.exactCommandLine)
+        }
+    }
+
+    @Test
     fun `unsupported command chains retain host candidates with exact full line identity`() {
         for (capabilities in dialects) {
             val request = request("", capabilities)

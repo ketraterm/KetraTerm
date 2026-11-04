@@ -88,6 +88,7 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionContext 
 	public final fun getSubcommandCandidateSource ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
 	public final fun getUsedOptionExclusiveGroupIds ()Ljava/util/Set;
 	public final fun isCompletionAllowed ()Z
+	public final fun precedingOptionValues (Lio/github/ketraterm/completion/model/TerminalOptionSpec;)Ljava/util/List;
 	public final fun precedingOptionValues (Ljava/lang/String;)Ljava/util/List;
 	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
