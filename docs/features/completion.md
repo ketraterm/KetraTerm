@@ -53,6 +53,7 @@ active keymap. Shell-native Tab completion remains a separate facility.
 Command and option rows show argument placeholders when command specifications
 provide metadata, for example `switch <branch>` and `-m <message>`. Named optional
 arguments use `[name]`. Repeated arguments use the same compact placeholder.
+Subcommand option overrides supply their own descriptions and hints.
 Git's `checkout` distinguishes
 its optional reference/file argument from subsequent pathspecs; `add` and
 `cherry-pick` describe pathspecs and commits. Hints are never inserted, matched,

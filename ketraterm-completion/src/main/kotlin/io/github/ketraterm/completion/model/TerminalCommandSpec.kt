@@ -29,7 +29,9 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * @property description short human-readable description.
  * @property aliases additional tokens that resolve to this command.
  * @property subcommands nested subcommands available after this command.
- * @property options options available at this command level.
+ * @property options options declared at this command level. For each exact option
+ * name, the deepest command's first declaration wins during parsing and completion;
+ * unshadowed aliases of inherited options remain available.
  * @property positionalArguments ordered positional argument declarations. When
  * nonempty, they take precedence over the scalar positional metadata.
  * @property positionalArgumentPathKind file-system path kind accepted by bare

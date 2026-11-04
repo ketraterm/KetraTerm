@@ -109,28 +109,32 @@ internal class SpecCompletionSource(
     }
 
     private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
-        val options = context.commandPath.flatMap { it.options }
+        val names =
+            context.commandPath
+                .asSequence()
+                .flatMap { it.options }
+                .flatMap { it.names }
+                .distinct()
 
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
-        for (option in options) {
+        for (name in names) {
+            if (name == prefix) continue
+            val match = CompletionMatcher.match(name, prefix) ?: continue
+            val option = findOptionSpec(context.commandPath, name) ?: continue
             if (option.exclusiveGroupIds.any(context.usedOptionExclusiveGroupIds::contains)) continue
-            for (name in option.names) {
-                if (name == prefix) continue
-                val match = CompletionMatcher.match(name, prefix) ?: continue
-                candidates +=
-                    candidate(
-                        replacementText = name,
-                        displayText = name,
-                        detail = option.description,
-                        argumentHint = option.argumentHint(),
-                        kind = TerminalCompletionCandidateKind.OPTION,
-                        context = context.commandLineContext,
-                        score = match.sourceScore(OPTION_BASE_SCORE, prefix, orderIndex++),
-                        matchedRanges = match.matchedRanges,
-                    )
-            }
+            candidates +=
+                candidate(
+                    replacementText = name,
+                    displayText = name,
+                    detail = option.description,
+                    argumentHint = option.argumentHint(),
+                    kind = TerminalCompletionCandidateKind.OPTION,
+                    context = context.commandLineContext,
+                    score = match.sourceScore(OPTION_BASE_SCORE, prefix, orderIndex++),
+                    matchedRanges = match.matchedRanges,
+                )
         }
         return candidates
     }
