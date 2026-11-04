@@ -24,6 +24,39 @@ class IntellijCompletionPathSupportTest {
     private val projectDirectory = Path.of("completion-project").toAbsolutePath().normalize()
 
     @Test
+    fun `containing roots respect path components rather than sibling name prefixes`() {
+        val sibling = projectDirectory.resolveSibling("completion-project-other")
+
+        assertNull(findContainingCompletionRoot(sibling.resolve("src"), listOf(projectDirectory)) { it })
+        assertEquals(projectDirectory, findContainingCompletionRoot(projectDirectory, listOf(projectDirectory)) { it })
+    }
+
+    @Test
+    fun `containing roots select the deepest match and preserve the first equal match`() {
+        val nested = projectDirectory.resolve("nested")
+        val roots =
+            listOf(
+                "unavailable" to null,
+                "outer" to projectDirectory,
+                "nested-first" to nested,
+                "nested-second" to nested,
+            )
+
+        val selected = findContainingCompletionRoot(nested.resolve("src/main"), roots) { it.second }
+
+        assertEquals("nested-first", selected?.first)
+    }
+
+    @Test
+    fun `containing roots normalize relative paths and parent segments`() {
+        val root = Path.of("completion-project", "nested", "..")
+        val directory = Path.of("completion-project", ".", "src", "..", "test")
+
+        assertEquals(root, findContainingCompletionRoot(directory, listOf(root)) { it })
+        assertNull(findContainingCompletionRoot(Path.of("completion-project", "..", "other"), listOf(root)) { it })
+    }
+
+    @Test
     fun `filename matches do not highlight unrelated ancestor letters`() {
         val path = "gradle/build/generated/settings.gradle.kts"
         val ranges = IntellijCompletionPathMatcher("sgk").ranges(path)

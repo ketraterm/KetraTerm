@@ -19,6 +19,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.ModuleData
+import com.intellij.openapi.externalSystem.model.project.ProjectData
 import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.progress.ProgressManager
@@ -26,11 +27,11 @@ import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jetbrains.plugins.gradle.util.GradleConstants
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 
 /** Minimal imported Gradle task data required by completion projection. */
@@ -42,6 +43,8 @@ internal data class GradleTaskReadModel(
 
 /** Lazy external-system node view consumed inside the owning IntelliJ read action. */
 internal interface GradleModelNode {
+    /** Imported build or module directory; task and grouping nodes return null. */
+    val projectDirectory: Path?
     val moduleId: String?
     val task: GradleTaskReadModel?
     val children: Iterable<GradleModelNode>
@@ -79,6 +82,17 @@ private class IntellijGradleModelReadPort(
 private class IntellijGradleModelNode(
     private val node: DataNode<*>,
 ) : GradleModelNode {
+    override val projectDirectory: Path?
+        get() {
+            val path =
+                when (node.key) {
+                    ProjectKeys.PROJECT -> (node.data as? ProjectData)?.linkedExternalProjectPath
+                    ProjectKeys.MODULE -> (node.data as? ModuleData)?.linkedExternalProjectPath
+                    else -> null
+                } ?: return null
+            return localGradleProjectDirectory(path)
+        }
+
     override val moduleId: String?
         get() = if (node.key == ProjectKeys.MODULE) (node.data as? ModuleData)?.id else null
 
@@ -115,36 +129,76 @@ internal class IntellijGradleTaskLoader(
     /**
      * Loads the imported Gradle tasks visible to a terminal working directory.
      *
-     * @param workingDirectoryUri local `file` URI used to relativize `-p` project directories.
+     * @param workingDirectoryUri authoritative local terminal directory.
+     * @param projectDirectory completed `-p`/`--project-dir` value, or null to use the terminal directory.
      * @return a visit-bounded deterministic task snapshot, or an empty list when the
-     * project is disposed, the directory is unavailable, or no Gradle model is imported.
+     * project is disposed, the directory is unavailable, or no imported build contains it.
      */
-    suspend fun load(workingDirectoryUri: String?): List<TerminalGradleTask> {
+    suspend fun load(
+        workingDirectoryUri: String?,
+        projectDirectory: String? = null,
+    ): List<TerminalGradleTask> {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
+        val workingDirectory = resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) { null } ?: return emptyList()
+        val startDirectory =
+            try {
+                projectDirectory?.let { workingDirectory.resolve(it).normalize() } ?: workingDirectory
+            } catch (_: InvalidPathException) {
+                return emptyList()
+            }
         return readPort.read { modelRoots ->
-            val retained = ArrayList<TerminalGradleTask>(INITIAL_TASK_CAPACITY)
-            var visitedTasks = 0
             val checkpoint = {
                 cancellationContext.ensureActive()
                 ProgressManager.checkCanceled()
             }
-            val roots = modelRoots.asSequence().map { root -> PendingGradleNode(root, inheritedModuleId = null) }.asIterable()
-            visitBoundedDepthFirst(
-                roots = roots,
-                maxVisited = MAX_VISITED_MODEL_NODES,
-                cancellationCheckpoint = checkpoint,
-                children = PendingGradleNode::children,
-            ) { pendingNode ->
-                val task = pendingNode.node.task
-                if (task != null) {
-                    visitedTasks++
-                    val moduleId = pendingNode.moduleId
-                    val entry = if (moduleId == null) null else task.toCompletionTask(workingDirectory, moduleId)
-                    if (entry != null) retained += entry
+            val roots = ArrayList<GradleModelNode>()
+            BoundedVisitBudget(MAX_VISITED_MODEL_NODES, checkpoint).visit(modelRoots) { root ->
+                roots += root
+                true
+            }
+            if (roots.size == MAX_VISITED_MODEL_NODES) return@read emptyList()
+            val selectedRoot =
+                findContainingCompletionRoot(startDirectory, roots) { root ->
+                    checkpoint()
+                    root.projectDirectory
+                } ?: return@read emptyList()
+            val projectDirectories = HashSet<Path>()
+            val retained = ArrayList<TerminalGradleTask>(INITIAL_TASK_CAPACITY)
+            var visitedTasks = 0
+            val visitedNodes =
+                visitBoundedDepthFirst(
+                    roots = listOf(PendingGradleNode(selectedRoot, inheritedModuleId = null)),
+                    maxVisited = MAX_VISITED_MODEL_NODES,
+                    cancellationCheckpoint = checkpoint,
+                    children = PendingGradleNode::children,
+                ) { pendingNode ->
+                    pendingNode.node.projectDirectory?.let { projectDirectories.add(it.toAbsolutePath().normalize()) }
+                    val task = pendingNode.node.task
+                    if (task != null) {
+                        visitedTasks++
+                        val moduleId = pendingNode.moduleId
+                        val entry = if (moduleId == null) null else task.toCompletionTask(workingDirectory, moduleId)
+                        if (entry != null) retained += entry
+                    }
+                    visitedTasks < MAX_VISITED_TASKS
                 }
-                visitedTasks < MAX_VISITED_TASKS
+            val selectedProject =
+                findContainingCompletionRoot(startDirectory, projectDirectories) { it }
+                    ?: return@read emptyList()
+            val selectedProjectPath = relativeProjectDirectory(workingDirectory, selectedProject)
+            // A truncated model may hide a deeper project. An exact directory match remains authoritative.
+            val projectKnown =
+                selectedProject == startDirectory ||
+                    (visitedNodes < MAX_VISITED_MODEL_NODES && visitedTasks < MAX_VISITED_TASKS)
+            if (projectKnown) {
+                // Preserve the selector's spelling so the shared source can compare it without filesystem access.
+                for (index in retained.indices) {
+                    val task = retained[index]
+                    if (task.projectDirectory == selectedProjectPath) {
+                        retained[index] = task.copy(projectDirectory = projectDirectory?.ifBlank { "." } ?: ".")
+                    }
+                }
             }
             retained.sortWith(TASK_ORDER)
             retained
@@ -155,8 +209,8 @@ internal class IntellijGradleTaskLoader(
         workingDirectory: Path,
         moduleId: String,
     ): TerminalGradleTask? {
-        val taskPath = fullyQualifiedTaskPath(moduleId, name) ?: return null
-        val linkedProjectDirectory = runCatching { Path.of(linkedProjectPath) }.getOrNull() ?: return null
+        val taskPath = IntellijGradleTaskPath.fullyQualified(moduleId, name) ?: return null
+        val linkedProjectDirectory = localGradleProjectDirectory(linkedProjectPath) ?: return null
         val projectDirectory = relativeProjectDirectory(workingDirectory, linkedProjectDirectory)
         return TerminalGradleTask(
             path = taskPath,
@@ -169,11 +223,6 @@ internal class IntellijGradleTaskLoader(
         workingDirectory: Path,
         projectDirectory: Path,
     ): String = toRelativeCompletionPath(workingDirectory, projectDirectory).ifBlank { "." }
-
-    private fun fullyQualifiedTaskPath(
-        moduleId: String,
-        taskName: String,
-    ): String? = IntellijGradleTaskPath.fullyQualified(moduleId, taskName)
 
     private companion object {
         private const val MAX_VISITED_MODEL_NODES = 16_384
@@ -198,6 +247,13 @@ internal class IntellijGradleTaskLoader(
                 .asIterable()
     }
 }
+
+private fun localGradleProjectDirectory(path: String): Path? =
+    try {
+        Path.of(path).toAbsolutePath().normalize()
+    } catch (_: InvalidPathException) {
+        null
+    }
 
 /** Converts public External System module and task data into a Gradle invocation path. */
 internal object IntellijGradleTaskPath {
@@ -225,9 +281,11 @@ internal object IntellijGradleTaskPath {
 }
 
 /** Creates imported-Gradle-task completion without exposing IntelliJ model APIs to the shared engine. */
-internal fun intellijGradleTaskCompletionSource(loader: suspend (String?) -> List<TerminalGradleTask>) =
+internal fun intellijGradleTaskCompletionSource(loader: suspend (String?, String?) -> List<TerminalGradleTask>) =
     TerminalCompletionSources.gradleTask(
         messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-gradle-task",
-        tasksProvider = { request, _ -> loader(request.workingDirectoryUri) },
+        tasksProvider = { request, context ->
+            loader(request.workingDirectoryUri, context.precedingOptionValues("--project-dir").lastOrNull())
+        },
     )

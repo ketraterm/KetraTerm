@@ -78,7 +78,7 @@ This table describes the sources available when completion is enabled.
 | Git remote names | Bounded `git remote` query of local configuration. | Configured remotes from the selected IDE repository. |
 | Recent Git commits | No dynamic source. | Up to 50 commits for supported commit arguments. |
 | Git changed paths | Ordinary path completion. | IDE change-list paths for supported Git commands. |
-| Gradle tasks | Built-in lifecycle tasks. | Also tasks from the imported Gradle model. |
+| Gradle tasks | Built-in lifecycle tasks. | Also tasks from the deepest imported build root containing the terminal directory or completed `-p`/`--project-dir` target. |
 | Learned commands and tokens | In-memory learning when enabled. | In-memory learning when enabled. |
 
 ### Working directory and remote shells

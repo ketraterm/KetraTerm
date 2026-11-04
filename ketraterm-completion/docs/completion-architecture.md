@@ -363,6 +363,15 @@ resolved context, not the engine's output limit. They require an independent
 visit, input, result, or time budget. A Gradle loader reads its available model;
 completion must not start Gradle to discover tasks.
 
+Gradle loaders select the build from the request directory and the last completed
+`--project-dir`/`-p` value in the resolved context. For its current project, the
+loader supplies that selector spelling in `TerminalGradleTask.projectDirectory`,
+or `.` without an override. Short names use that project; leading-colon task
+paths remain relative to the selected build. IntelliJ selects the deepest
+containing imported build root before traversing tasks, using the same directory
+containment helper as fuzzy project paths. It omits ambiguous short names when
+model bounds prevent determining the current project.
+
 The Git source shares the value-domain matcher and shell replacement encoder.
 Standalone and IntelliJ loaders supply repository data without duplicating command
 policy. A plain composite refspec replaces only the active component; quoted or

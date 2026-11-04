@@ -214,7 +214,7 @@ class IntellijCompletionLoaderBoundsTest {
         runBlocking {
             val projectDirectory = temporaryFolder.newFolder("gradle-loader").toPath()
             val tasks = CountingGradleTaskNodes(projectDirectory.toString())
-            val root = TestGradleModelNode(moduleId = "root", children = tasks)
+            val root = TestGradleModelNode(projectDirectory = projectDirectory, moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
 
             val entries = loader.load(projectDirectory.toUri().toString())
@@ -235,7 +235,7 @@ class IntellijCompletionLoaderBoundsTest {
                         if (count == 4) loading.cancel(CancellationException("obsolete Gradle completion"))
                     },
                 )
-            val root = TestGradleModelNode(moduleId = "root", children = tasks)
+            val root = TestGradleModelNode(projectDirectory = projectDirectory, moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
             loading = async(start = CoroutineStart.LAZY) { loader.load(projectDirectory.toUri().toString()) }
 
@@ -312,6 +312,7 @@ class IntellijCompletionLoaderBoundsTest {
     }
 
     private data class TestGradleModelNode(
+        override val projectDirectory: java.nio.file.Path? = null,
         override val moduleId: String? = null,
         override val task: GradleTaskReadModel? = null,
         override val children: Iterable<GradleModelNode> = emptyList(),

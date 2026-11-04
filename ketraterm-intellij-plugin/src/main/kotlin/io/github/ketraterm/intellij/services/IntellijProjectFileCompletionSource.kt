@@ -80,14 +80,11 @@ internal class IntellijProjectFileLoader(
             ProgressManager.checkCanceled()
             if (project.isDisposed) return@readAction emptyList()
             val rootManager = ProjectRootManager.getInstance(project)
-            val roots = rootManager.contentRoots.mapNotNull { it.toNioPathOrNull()?.toAbsolutePath()?.normalize() }
-            val belongsToProject =
-                if (roots.isNotEmpty()) {
-                    roots.any(workingDirectory::startsWith)
-                } else {
-                    project.basePath?.let { workingDirectory.startsWith(Path.of(it).toAbsolutePath().normalize()) } == true
+            val roots =
+                rootManager.contentRoots.mapNotNull { it.toNioPathOrNull() }.ifEmpty {
+                    listOfNotNull(project.basePath?.let { Path.of(it) })
                 }
-            if (!belongsToProject) return@readAction emptyList()
+            if (findContainingCompletionRoot(workingDirectory, roots) { it } == null) return@readAction emptyList()
             val pathMatcher = IntellijCompletionPathMatcher(normalizedPrefix)
             val model = GotoFileModel(project)
             try {

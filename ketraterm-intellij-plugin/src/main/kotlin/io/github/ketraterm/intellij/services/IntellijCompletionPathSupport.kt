@@ -30,6 +30,33 @@ internal fun resolveIntellijCompletionWorkingDirectory(
         TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
     }
 
+/**
+ * Selects the deepest containing root after absolute, lexical path normalization.
+ * Equal-depth matches retain their iteration order; no filesystem access is performed.
+ *
+ * @param directory terminal directory whose owning root is needed.
+ * @param roots candidate roots in preference order.
+ * @param rootDirectory local directory of a root, or `null` when unavailable.
+ * @return the most specific containing root, or `null` when no root contains [directory].
+ */
+internal fun <T> findContainingCompletionRoot(
+    directory: Path,
+    roots: Iterable<T>,
+    rootDirectory: (T) -> Path?,
+): T? {
+    val normalizedDirectory = directory.toAbsolutePath().normalize()
+    var selected: T? = null
+    var selectedDepth = -1
+    for (root in roots) {
+        val path = rootDirectory(root)?.toAbsolutePath()?.normalize() ?: continue
+        if (path.nameCount > selectedDepth && normalizedDirectory.startsWith(path)) {
+            selected = root
+            selectedDepth = path.nameCount
+        }
+    }
+    return selected
+}
+
 /** Returns a shell-facing forward-slash path relative to [base], or [target] when relativization is unavailable. */
 internal fun toRelativeCompletionPath(
     base: Path,

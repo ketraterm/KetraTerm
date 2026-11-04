@@ -46,7 +46,7 @@ class IntellijCompletionSourceRequestTest {
         runBlocking {
             var requestedDirectory: String? = null
             val source =
-                intellijGradleTaskCompletionSource { workingDirectoryUri ->
+                intellijGradleTaskCompletionSource { workingDirectoryUri, _ ->
                     requestedDirectory = workingDirectoryUri
                     listOf(TerminalGradleTask(":test", projectDirectory = "."))
                 }

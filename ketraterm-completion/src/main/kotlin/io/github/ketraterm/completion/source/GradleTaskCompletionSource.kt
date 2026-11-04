@@ -104,34 +104,17 @@ internal class GradleTaskCompletionSource(
         projectDirectory: String?,
     ): String? =
         when {
+            prefix.startsWith(':') -> task.path
             projectDirectory != null ->
                 task.takeIf { normalizeProjectDirectory(it.projectDirectory) == projectDirectory }?.shortName
 
-            prefix.startsWith(':') -> task.path
+            task.projectDirectory != null -> task.takeIf { normalizeProjectDirectory(it.projectDirectory) == "." }?.shortName
             task.isRootProjectTask -> task.shortName
             else -> null
         }
 
-    private fun projectDirectoryBeforeActiveToken(context: TerminalCompletionContext): String? {
-        var selectedDirectory: String? = null
-        val tokens = context.commandLineContext.tokens
-        var index = context.commandTokenIndex + 1
-        while (index < context.commandLineContext.activeTokenIndex) {
-            val token = tokens[index].text
-            when {
-                token in GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES -> {
-                    val value = tokens.getOrNull(++index)?.text ?: return selectedDirectory
-                    selectedDirectory = normalizeProjectDirectory(value)
-                }
-
-                token.startsWith("${GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_LONG}=") -> {
-                    selectedDirectory = normalizeProjectDirectory(token.substringAfter('='))
-                }
-            }
-            index++
-        }
-        return selectedDirectory
-    }
+    private fun projectDirectoryBeforeActiveToken(context: TerminalCompletionContext): String? =
+        normalizeProjectDirectory(context.precedingOptionValues(GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_LONG).lastOrNull())
 
     private fun normalizeProjectDirectory(value: String?): String? {
         var normalized = value?.replace('\\', '/') ?: return null
