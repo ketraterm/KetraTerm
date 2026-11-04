@@ -241,6 +241,9 @@ history and observed-token suggestions. Hosts may independently disable replay
 retention while keeping ranking evidence.
 Completed arguments keep their case-sensitive identity, so learning for `ssh -L`
 does not leak into `ssh -l`. Matching the word being typed ignores case.
+Learned replay preserves supported shell expressions and keeps them distinct from
+literal arguments. Commands with substitutions or other syntax that cannot be
+replayed safely are omitted; see the [learning contract](../../ketraterm-completion/docs/completion-architecture.md#learning-and-privacy).
 
 Persistence is opt-in. Approved replay may contain plaintext command data;
 filtering cannot identify every secret. See the [storage and privacy contract](../reference/storage.md)

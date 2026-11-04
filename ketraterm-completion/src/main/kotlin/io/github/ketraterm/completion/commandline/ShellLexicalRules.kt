@@ -19,6 +19,66 @@ import io.github.ketraterm.completion.api.TerminalShellSyntax
 
 /** Lexical rules for shell syntaxes supported by the shared completion engine. */
 internal object ShellLexicalRules {
+    /** Whether decoding this source character preserves its shell meaning during learned replay. */
+    enum class ReplayCharacter {
+        LITERAL,
+        EXPRESSION,
+        UNSUPPORTED,
+    }
+
+    /**
+     * Classifies replay-sensitive syntax without evaluating expansions or extending token boundaries.
+     * Substitutions and grouping need a richer grammar than this tokenizer and cannot be projected safely.
+     */
+    fun replayCharacter(
+        commandLine: String,
+        index: Int,
+        quote: Char,
+        syntax: TerminalShellSyntax,
+    ): ReplayCharacter {
+        val ch = commandLine[index]
+        val next = commandLine.getOrNull(index + 1)
+        if (syntax == TerminalShellSyntax.PLAIN && ch in "\$`~*?[]{}()<>|;&") return ReplayCharacter.UNSUPPORTED
+        if (quote == SINGLE_QUOTE) return ReplayCharacter.LITERAL
+        if (isEscapePair(commandLine, index, quote, syntax)) {
+            return if (syntax == TerminalShellSyntax.POWERSHELL && next != null && next in "0abefnrtuv") {
+                ReplayCharacter.EXPRESSION
+            } else {
+                ReplayCharacter.LITERAL
+            }
+        }
+        if (ch == '\\' && syntax != TerminalShellSyntax.POWERSHELL && index == commandLine.lastIndex) {
+            return ReplayCharacter.UNSUPPORTED
+        }
+        if (ch == '$') {
+            return if (next == '(' || next == '{' || next == SINGLE_QUOTE || next == DOUBLE_QUOTE) {
+                ReplayCharacter.UNSUPPORTED
+            } else {
+                ReplayCharacter.EXPRESSION
+            }
+        }
+        if (ch == BACKTICK) return ReplayCharacter.UNSUPPORTED
+        if (syntax == TerminalShellSyntax.POSIX && ch == '!') return ReplayCharacter.UNSUPPORTED
+        if (quote == DOUBLE_QUOTE) return ReplayCharacter.LITERAL
+        if (syntax == TerminalShellSyntax.POWERSHELL && ch in "[],") return ReplayCharacter.UNSUPPORTED
+        if (ch in "(){}<>|;&") return ReplayCharacter.UNSUPPORTED
+        val atWordStart = index == 0 || commandLine[index - 1].isWhitespace()
+        if (syntax == TerminalShellSyntax.POSIX) {
+            if (ch in "*?[") return ReplayCharacter.EXPRESSION
+            if (ch == '~' && (atWordStart || commandLine[index - 1] == '=' || commandLine[index - 1] == ':')) {
+                return ReplayCharacter.EXPRESSION
+            }
+        }
+        if (ch == '#' && atWordStart) return ReplayCharacter.UNSUPPORTED
+        if (syntax == TerminalShellSyntax.POWERSHELL &&
+            ch == '@' &&
+            (atWordStart || next == '(' || next == '{' || next == SINGLE_QUOTE || next == DOUBLE_QUOTE)
+        ) {
+            return ReplayCharacter.UNSUPPORTED
+        }
+        return ReplayCharacter.LITERAL
+    }
+
     fun operatorLength(
         commandLine: String,
         index: Int,

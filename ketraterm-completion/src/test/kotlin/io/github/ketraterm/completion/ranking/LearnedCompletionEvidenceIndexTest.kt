@@ -99,7 +99,7 @@ class LearnedCompletionEvidenceIndexTest {
         assertEquals(
             0,
             index.adjustment(
-                ResolvedCompletionOutcome(groupKey = listOf("git", "status"), exactCommandLine = "git status", activeValue = "status"),
+                ResolvedCompletionOutcome(groupKey = emptyList(), exactCommandLine = "git status", activeValue = "status"),
                 CompletionLearningContextKey.of(null, null),
                 NOW,
             ),

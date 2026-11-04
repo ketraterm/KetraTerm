@@ -17,11 +17,21 @@ package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 
+/** Literal identities ignore equivalent quoting; expressions retain their exact shell spelling. */
+internal data class TerminalCommandLineTokenIdentity(
+    val text: String,
+    val rawText: String? = null,
+)
+
 internal data class TerminalCommandLineToken(
     val text: String,
     val startOffset: Int,
     val endOffset: Int,
-)
+    val rawText: String? = null,
+    val canReplay: Boolean = true,
+) {
+    val identity: TerminalCommandLineTokenIdentity get() = TerminalCommandLineTokenIdentity(text, rawText)
+}
 
 internal data class TerminalCommandLineContext(
     val tokens: List<TerminalCommandLineToken>,
@@ -34,6 +44,8 @@ internal data class TerminalCommandLineContext(
     val cursorRegion: TerminalCommandLineCursorRegion,
     val precededByOperator: Boolean,
     val cursorOffset: Int,
+    /** False when the complete input contains syntax that learned replay cannot safely project. */
+    val canReplay: Boolean = true,
 )
 
 internal val TerminalCommandLineContext.commandStartOffset: Int
@@ -41,8 +53,6 @@ internal val TerminalCommandLineContext.commandStartOffset: Int
 
 internal val TerminalCommandLineContext.commandEndOffset: Int
     get() = tokens.lastOrNull()?.endOffset ?: cursorOffset
-
-internal fun TerminalCommandLineContext.commandPrefix(commandLine: String): String = commandLine.substring(commandStartOffset, cursorOffset)
 
 internal enum class TerminalCommandLineCursorRegion {
     SEGMENT,
@@ -66,6 +76,7 @@ internal object TerminalCommandLineTokenizer {
             segmentEnd = bounds.end,
             precededByOperator = bounds.precededByOperator,
             shellSyntax = shellSyntax,
+            canReplay = bounds.canReplay,
         )
     }
 
@@ -74,6 +85,7 @@ internal object TerminalCommandLineTokenizer {
         val end: Int,
         val precededByOperator: Boolean,
         val cursorInOperator: Boolean = false,
+        val canReplay: Boolean = true,
     )
 
     private fun locateSegmentBounds(
@@ -86,11 +98,18 @@ internal object TerminalCommandLineTokenizer {
         var segmentStart = 0
         var segmentEnd = commandLine.length
         var precededByOperator = false
+        var canReplay = true
 
         while (index < commandLine.length) {
+            if (ShellLexicalRules.replayCharacter(commandLine, index, quote, shellSyntax) ==
+                ShellLexicalRules.ReplayCharacter.UNSUPPORTED
+            ) {
+                canReplay = false
+            }
             if (quote == NO_QUOTE) {
                 val operatorLength = ShellLexicalRules.operatorLength(commandLine, index, shellSyntax)
                 if (operatorLength > 0) {
+                    canReplay = false
                     val operatorEnd = index + operatorLength
                     when {
                         cursorOffset <= index -> {
@@ -103,6 +122,7 @@ internal object TerminalCommandLineTokenizer {
                                 end = operatorEnd,
                                 precededByOperator = precededByOperator,
                                 cursorInOperator = true,
+                                canReplay = false,
                             )
                         else -> {
                             segmentStart = operatorEnd
@@ -123,6 +143,7 @@ internal object TerminalCommandLineTokenizer {
             start = segmentStart,
             end = segmentEnd,
             precededByOperator = precededByOperator,
+            canReplay = canReplay && quote == NO_QUOTE,
         )
     }
 
@@ -161,6 +182,7 @@ internal object TerminalCommandLineTokenizer {
         segmentEnd: Int,
         precededByOperator: Boolean,
         shellSyntax: TerminalShellSyntax,
+        canReplay: Boolean,
     ): TerminalCommandLineContext {
         val (tokenList, activePrefix) = collectSegmentTokens(commandLine, cursorOffset, segmentStart, segmentEnd, shellSyntax)
         return resolveCursorTokenContext(
@@ -170,6 +192,7 @@ internal object TerminalCommandLineTokenizer {
             segmentStart = segmentStart,
             segmentEnd = segmentEnd,
             precededByOperator = precededByOperator,
+            canReplay = canReplay && tokenList.all { it.canReplay },
         )
     }
 
@@ -191,6 +214,8 @@ internal object TerminalCommandLineTokenizer {
         var tokenStart = NO_OFFSET
         var quote = NO_QUOTE
         var activePrefix: String? = null
+        var tokenNeedsRawText = false
+        var tokenCanReplay = true
 
         while (index < segmentEnd) {
             if (tokenStart != NO_OFFSET && cursorOffset == index) {
@@ -199,9 +224,11 @@ internal object TerminalCommandLineTokenizer {
 
             val ch = commandLine[index]
             if (quote == NO_QUOTE && ch.isShellWhitespace()) {
-                tokens = addToken(tokens, tokenBuilder, tokenStart, index)
+                tokens = addToken(tokens, tokenBuilder, tokenStart, index, commandLine, tokenNeedsRawText, tokenCanReplay)
                 tokenStart = NO_OFFSET
                 tokenBuilder = null
+                tokenNeedsRawText = false
+                tokenCanReplay = true
                 index++
                 continue
             }
@@ -209,6 +236,15 @@ internal object TerminalCommandLineTokenizer {
             if (tokenStart == NO_OFFSET) {
                 tokenStart = index
                 tokenBuilder = StringBuilder()
+            }
+
+            when (ShellLexicalRules.replayCharacter(commandLine, index, quote, shellSyntax)) {
+                ShellLexicalRules.ReplayCharacter.LITERAL -> Unit
+                ShellLexicalRules.ReplayCharacter.EXPRESSION -> tokenNeedsRawText = true
+                ShellLexicalRules.ReplayCharacter.UNSUPPORTED -> {
+                    tokenNeedsRawText = true
+                    tokenCanReplay = false
+                }
             }
 
             when {
@@ -238,7 +274,16 @@ internal object TerminalCommandLineTokenizer {
         }
 
         if (tokenStart != NO_OFFSET && cursorOffset == segmentEnd) activePrefix = tokenBuilder!!.toString()
-        tokens = addToken(tokens, tokenBuilder, tokenStart, segmentEnd)
+        tokens =
+            addToken(
+                tokens,
+                tokenBuilder,
+                tokenStart,
+                segmentEnd,
+                commandLine,
+                tokenNeedsRawText || quote != NO_QUOTE,
+                tokenCanReplay && quote == NO_QUOTE,
+            )
 
         return ParsedSegmentTokens(tokens ?: emptyList(), activePrefix)
     }
@@ -250,6 +295,7 @@ internal object TerminalCommandLineTokenizer {
         segmentStart: Int,
         segmentEnd: Int,
         precededByOperator: Boolean,
+        canReplay: Boolean,
     ): TerminalCommandLineContext {
         var tokenIndex = 0
         while (tokenIndex < tokenList.size) {
@@ -266,6 +312,7 @@ internal object TerminalCommandLineTokenizer {
                     cursorRegion = TerminalCommandLineCursorRegion.SEGMENT,
                     precededByOperator = precededByOperator,
                     cursorOffset = cursorOffset,
+                    canReplay = canReplay,
                 )
             }
             if (cursorOffset < token.startOffset) break
@@ -283,6 +330,7 @@ internal object TerminalCommandLineTokenizer {
             cursorRegion = TerminalCommandLineCursorRegion.SEGMENT,
             precededByOperator = precededByOperator,
             cursorOffset = cursorOffset,
+            canReplay = canReplay,
         )
     }
 
@@ -303,6 +351,7 @@ internal object TerminalCommandLineTokenizer {
             cursorRegion = TerminalCommandLineCursorRegion.OPERATOR,
             precededByOperator = precededByOperator,
             cursorOffset = cursorOffset,
+            canReplay = false,
         )
 
     private fun addToken(
@@ -310,10 +359,20 @@ internal object TerminalCommandLineTokenizer {
         builder: StringBuilder?,
         startOffset: Int,
         endOffset: Int,
+        commandLine: String,
+        needsRawText: Boolean,
+        canReplay: Boolean,
     ): MutableList<TerminalCommandLineToken>? {
         if (startOffset == NO_OFFSET) return tokens
         val result = tokens ?: ArrayList(INITIAL_TOKEN_CAPACITY)
-        result += TerminalCommandLineToken(builder!!.toString(), startOffset, endOffset)
+        result +=
+            TerminalCommandLineToken(
+                builder!!.toString(),
+                startOffset,
+                endOffset,
+                rawText = if (needsRawText) commandLine.substring(startOffset, endOffset) else null,
+                canReplay = canReplay,
+            )
         return result
     }
 

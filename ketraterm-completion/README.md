@@ -118,6 +118,9 @@ feedback. The store performs no I/O; persistence consumes its immutable
 `snapshot()` and hydrates through `mergeSnapshot()` once per distinct aggregate
 event set.
 
+Replay preserves supported shell-expression spelling. Commands whose syntax
+cannot be replayed safely are omitted; the rules are described in the learning contract below.
+
 The optional `replayFilter` constructor argument adds a host restriction to the
 built-in plaintext policy. `TerminalCompletionLearningStore(replayFilter = { false })`
 retains opaque ranking evidence while disabling plaintext replay. The filter

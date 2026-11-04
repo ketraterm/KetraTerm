@@ -264,10 +264,21 @@ normalizes a trailing slash; it does not resolve filesystem aliases. Opaque
 ranking evidence may fall back from exact context to directory-only,
 profile-only, and global evidence.
 
-Replay and observed-token indexes compare completed decoded tokens exactly,
-including case and whitespace inside quoted arguments. Only active-token
-matching ignores case. The history index owns context matching; candidate
-projection uses its matched rows without repeating those checks.
+Replay and observed-token indexes compare completed literal tokens by decoded
+text, including case and quoted whitespace. Expression-bearing tokens retain
+their original shell spelling, so `$HOME`, `"$HOME"`, and `'$HOME'` have distinct
+identities. Only active-token matching ignores case. The history index owns
+context matching; candidate projection uses its matched rows without repeating
+those checks.
+
+History replay preserves raw spelling for simple POSIX/PowerShell variables,
+mixed quoted fragments, POSIX tilde/glob patterns, and PowerShell special escapes.
+Observed-token inference uses only proven literals. Rows containing substitutions,
+braced expressions, PowerShell arrays/indexing, control syntax, or unfinished quoting are omitted from replay;
+the conservative plain dialect also omits expression-bearing rows. No expression
+is evaluated. Attached-value edits require identical raw option prefixes so
+projection cannot slice through different quoting or escapes. These rules apply
+when rebuilding derived indexes; stored command text and ranking evidence remain unchanged.
 
 Suggestion feedback never creates replay rows. Explicit dismissal supplies
 negative evidence; passive closure and rejected editing attempts should not be

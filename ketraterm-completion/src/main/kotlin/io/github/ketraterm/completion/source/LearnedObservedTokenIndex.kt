@@ -16,17 +16,14 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.TERMINAL_COMMAND_OPTION_TERMINATOR
-import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
-import io.github.ketraterm.completion.commandline.isTerminalOptionToken
-import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.stats.saturatedCounterSum
 
-/** Immutable transitions keyed by exact host context and completed decoded tokens from successful commands. */
+/** Literal-token transitions keyed by exact host context and completed token semantics. */
 internal class LearnedObservedTokenIndex private constructor(
     private val buckets: Map<ObservedBucketKey, List<Entry>>,
 ) {
@@ -51,16 +48,16 @@ internal class LearnedObservedTokenIndex private constructor(
         }
     }
 
-    private fun TerminalCompletionContext.observedContext(): List<String>? {
+    private fun TerminalCompletionContext.observedContext(): List<TerminalCommandLineTokenIdentity>? {
         if (command != null) return null
         val line = commandLineContext
         val commandIndex = commandTokenIndex
         if (commandIndex >= line.tokens.size || line.activeTokenIndex <= commandIndex) return null
-        val context = ArrayList<String>(line.activeTokenIndex - commandIndex)
+        val context = ArrayList<TerminalCommandLineTokenIdentity>(line.activeTokenIndex - commandIndex)
         for (index in commandIndex until line.activeTokenIndex) {
-            val token = line.tokens[index].text
-            if (token.isBlank()) return null
-            context += token
+            val token = line.tokens[index]
+            if (token.text.isBlank()) return null
+            context += token.identity
         }
         return context
     }
@@ -140,29 +137,32 @@ internal class LearnedObservedTokenIndex private constructor(
             val tokens = row.lineContext.tokens
             var tokenIndex = tokens.firstCommandTokenIndex()
             if (tokenIndex >= tokens.size) return
-            val executable = tokens[tokenIndex].text
-            if (executable.isBlank()) return
+            val executable = tokens[tokenIndex]
+            if (executable.text.isBlank() || executable.rawText != null) return
 
             val learningContext = CompletionLearningContextKey.of(row.stats.profileId, row.stats.workingDirectoryUri)
-            val context = ArrayList<String>()
-            context += executable
+            val context = ArrayList<TerminalCommandLineTokenIdentity>()
+            context += executable.identity
             tokenIndex++
             var observedFirstArgument = false
             var encounteredOption = false
             while (tokenIndex < tokens.size) {
-                val token = tokens[tokenIndex].text
+                val tokenInfo = tokens[tokenIndex]
+                val token = tokenInfo.text
                 val normalizedToken = normalizeTerminalCommandToken(token)
                 when {
                     normalizedToken.isBlank() -> Unit
                     normalizedToken in COMMAND_OPERATORS || normalizedToken == TERMINAL_COMMAND_OPTION_TERMINATOR -> return
                     normalizedToken.isTerminalOptionToken() -> {
-                        token.observedOptionToken()?.let { retain(context, it, learningContext, row.stats, aggregates) }
-                        context += token
+                        if (tokenInfo.rawText == null) {
+                            token.observedOptionToken()?.let { retain(context, it, learningContext, row.stats, aggregates) }
+                        }
+                        context += tokenInfo.identity
                         encounteredOption = true
                     }
                     !observedFirstArgument && !encounteredOption -> {
-                        retain(context, token, learningContext, row.stats, aggregates)
-                        context += token
+                        if (tokenInfo.rawText == null) retain(context, token, learningContext, row.stats, aggregates)
+                        context += tokenInfo.identity
                         observedFirstArgument = true
                     }
                     else -> return
@@ -172,7 +172,7 @@ internal class LearnedObservedTokenIndex private constructor(
         }
 
         private fun retain(
-            context: List<String>,
+            context: List<TerminalCommandLineTokenIdentity>,
             token: String,
             learningContext: CompletionLearningContextKey,
             stats: TerminalCompletionRankingStats,
@@ -218,7 +218,7 @@ internal class LearnedObservedTokenIndex private constructor(
 
     private data class ObservedBucketKey(
         val learningContext: CompletionLearningContextKey,
-        val observedContext: List<String>,
+        val observedContext: List<TerminalCommandLineTokenIdentity>,
     )
 
     private data class TransitionKey(

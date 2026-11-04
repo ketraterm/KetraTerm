@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenIdentity
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
@@ -54,22 +55,29 @@ internal class TerminalCompletionOutcomeKeyResolver {
                     request.cursorOffset,
                     request.shellCapabilities.syntax,
                 ).activeTokenIndex
-        if (tokens.firstCommandTokenIndex() >= tokens.size) return null
-        val outcomeKey =
+        if (projectedContext.canReplay && tokens.firstCommandTokenIndex() >= tokens.size) return null
+        val tokenIdentities =
             outcomeKey(
                 tokens = tokens,
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
                 attachedOptionValue = context.attachedOptionValue != null && activeIndex == originalActiveIndex,
                 shellSyntax = request.shellCapabilities.syntax,
-            ) ?: return null
+            )
+        val groupKey =
+            if (projectedContext.canReplay) {
+                tokenIdentities ?: return null
+            } else {
+                // Complex shell syntax remains a valid host result, but only exact text proves equivalence.
+                listOf(TerminalCommandLineTokenIdentity(commandLine, rawText = commandLine))
+            }
         return ResolvedCompletionOutcome(
-            groupKey = outcomeKey,
+            groupKey = groupKey,
             exactCommandLine = commandLine,
             activeValue =
-                outcomeKey.getOrNull(originalActiveIndex)?.let { value ->
+                tokenIdentities?.getOrNull(originalActiveIndex)?.text?.let { value ->
                     if (context.attachedOptionValue == null) value else value.substringAfter('=')
-                },
+                } ?: candidate.displayText,
         )
     }
 
@@ -79,14 +87,19 @@ internal class TerminalCompletionOutcomeKeyResolver {
         pathAware: Boolean,
         attachedOptionValue: Boolean,
         shellSyntax: TerminalShellSyntax,
-    ): List<String>? {
+    ): List<TerminalCommandLineTokenIdentity>? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
-        val resultTokens = ArrayList<String>(tokens.size)
+        val resultTokens = ArrayList<TerminalCommandLineTokenIdentity>(tokens.size)
         var index = 0
         while (index < tokens.size) {
-            val tokenText = tokens[index].text
-            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText, shellSyntax, attachedOptionValue) else tokenText
+            val token = tokens[index]
+            resultTokens +=
+                if (index == normalizedPathIndex && token.rawText == null) {
+                    TerminalCommandLineTokenIdentity(normalizePathToken(token.text, shellSyntax, attachedOptionValue))
+                } else {
+                    token.identity
+                }
             index++
         }
         return resultTokens
@@ -142,7 +155,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
 }
 
 internal data class ResolvedCompletionOutcome(
-    val groupKey: List<String>,
+    val groupKey: List<TerminalCommandLineTokenIdentity>,
     val exactCommandLine: String,
     val activeValue: String?,
 )

@@ -36,7 +36,11 @@ internal fun projectLearnedCommandCandidate(
     val activeIndex = requestLine.activeTokenIndex
     val learnedToken = learnedLine.tokens.getOrNull(activeIndex) ?: return null
 
-    val replacementStartInLearned = replacementStartInLearnedCommand(requestLine, completionContext, learnedToken.startOffset)
+    val requestTokenStart = requestLine.tokens.getOrNull(activeIndex)?.startOffset ?: requestLine.cursorOffset
+    val prefixLength = (completionContext.replacementStartOffset - requestTokenStart).coerceAtLeast(0)
+    // A value-only edit must preserve the same raw option prefix, including quoting and escapes.
+    if (!learnedCommand.regionMatches(learnedToken.startOffset, request.commandLine, requestTokenStart, prefixLength)) return null
+    val replacementStartInLearned = learnedToken.startOffset + prefixLength
     if (replacementStartInLearned !in learnedToken.startOffset..learnedLine.commandEndOffset) return null
     val preserveFollowingText = requestLine.hasFollowingCommandText(request.commandLine)
     val learnedReplacementEnd = if (preserveFollowingText) learnedToken.endOffset else learnedLine.commandEndOffset
@@ -88,16 +92,6 @@ private fun literalPrefixRanges(
 private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {
     val activeToken = tokens.getOrNull(activeTokenIndex) ?: return false
     return activeToken.endOffset < commandEndOffset && commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
-}
-
-private fun replacementStartInLearnedCommand(
-    requestLine: TerminalCommandLineContext,
-    completionContext: TerminalCompletionContext,
-    learnedTokenStart: Int,
-): Int {
-    val requestTokenStart = requestLine.tokens.getOrNull(requestLine.activeTokenIndex)?.startOffset ?: requestLine.cursorOffset
-    val offsetWithinToken = (completionContext.replacementStartOffset - requestTokenStart).coerceAtLeast(0)
-    return learnedTokenStart + offsetWithinToken
 }
 
 private fun semanticKind(context: TerminalCompletionContext): TerminalCompletionCandidateKind? =
