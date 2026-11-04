@@ -41,6 +41,7 @@ Custom hosts can supply their own context and editing authority.
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+Automatic refreshes cannot replace an active Ctrl+Space request.
 After Escape, automatic suggestions remain dismissed across cursor movement and
 focus changes until the command text changes. Completion candidates that leave the
 command text unchanged are omitted; explicit completion remains available.

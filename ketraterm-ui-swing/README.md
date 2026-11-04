@@ -235,6 +235,7 @@ to `SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY` to show automatic popups
 for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
+Automatic refreshes cannot replace an active explicit request.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for
 parameter-only automatic requests. The shared completion adapter forwards it

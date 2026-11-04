@@ -26,6 +26,26 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
     @Test
+    fun `explicit request before initial observation suppresses the same automatic request`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            fixture.scheduler.onExplicitRequest()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+
+            fixture.active = snapshot("git st")
+            fixture.revisions.value = 1
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git st")), fixture.requests)
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `invalidation before the initial revision suppresses the unchanged initial snapshot`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)

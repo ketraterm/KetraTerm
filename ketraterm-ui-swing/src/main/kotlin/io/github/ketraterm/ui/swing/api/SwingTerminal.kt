@@ -2152,9 +2152,11 @@ public class SwingTerminal
          *
          * Call on the EDT. The returned interaction is independent of popup mounting: hosts can
          * publish their own results or use [requestShellSuggestions] with any Swing/IntelliJ UI.
-         * A new request supersedes the previous interaction. Input, session rebinding, disposal,
-         * and ineligible viewport/settings close it. Null means the request or editing target is
-         * unavailable. Source completion does not invalidate a displayed final publication.
+         * A new request supersedes the previous interaction, except automatic requests cannot
+         * replace a valid explicit interaction. Input, session rebinding, disposal, and ineligible
+         * viewport/settings close it. Null means an explicit interaction takes priority or the
+         * request or editing target is unavailable. Source completion does not invalidate a
+         * displayed final publication.
          * By default editing is captured from the bound session; an unbound view is display-only.
          * Supply [editTarget] for a host editor, or [SwingShellSuggestionEditTarget.NONE] for display-only results.
          */
@@ -2175,6 +2177,10 @@ public class SwingTerminal
                     request
                 }
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return null
+            if (automatic && !activeSuggestionIsAutomatic) {
+                val revision = suggestionRevision
+                if (activeSuggestionInteraction?.validateContext() == true || suggestionRevision != revision) return null
+            }
             val bound = session
             val observed =
                 bound?.activeShellCommandLine()?.takeIf {
@@ -2259,6 +2265,7 @@ public class SwingTerminal
                     }
                 },
             )
+            if (!automatic) suggestionScheduler?.onExplicitRequest()
             if (bound != null && observed != null) {
                 scope.launch {
                     combine(bound.activeShellCommandLineRevision, bound.state) { _, _ -> }

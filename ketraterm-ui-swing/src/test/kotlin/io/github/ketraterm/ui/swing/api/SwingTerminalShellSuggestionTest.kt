@@ -77,6 +77,9 @@ class SwingTerminalShellSuggestionTest {
                 settings = settings.copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.ALWAYS }
                 terminal.reloadSettings()
                 assertTrue(explicit.isActive)
+                assertNull(terminal.beginShellSuggestionInteraction(request(), SwingShellSuggestionTrigger.AUTOMATIC))
+                assertTrue(explicit.isActive)
+                explicit.close()
                 assertTrue(capture(SwingShellSuggestionTrigger.AUTOMATIC).request.includeCommandNames)
             } finally {
                 terminal.dispose()

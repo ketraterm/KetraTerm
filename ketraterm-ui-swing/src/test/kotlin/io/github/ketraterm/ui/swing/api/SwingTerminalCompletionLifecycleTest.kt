@@ -40,6 +40,101 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCompletionLifecycleTest {
     @Test
+    fun `explicit command suggestions survive pending automatic refresh and settings changes until input changes`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "gi")
+            val view = RecordingView()
+            var settings = settings().copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY }
+            val terminal = terminal(testScheduler, view) { settings }
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                runCurrent()
+                focus(terminal, true)
+                advanceTimeBy(50.milliseconds)
+
+                val explicit = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                assertTrue(explicit.request.includeCommandNames)
+                val command = SwingShellSuggestion("git", 0, 2, "git", "COMMAND")
+                terminal.presentShellSuggestions(explicit)
+                explicit.publish(listOf(command))
+
+                advanceTimeBy(25.milliseconds)
+                runCurrent()
+                assertTrue(explicit.isActive)
+                assertEquals(listOf(command), view.snapshot.visibleSuggestions)
+                assertTrue(target.interactions.isEmpty())
+
+                settings = settings.copy { it.shellSuggestionsEnabled = false }
+                terminal.reloadSettings()
+                settings = settings.copy { it.shellSuggestionsEnabled = true }
+                terminal.reloadSettings()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertTrue(explicit.isActive)
+                assertTrue(target.interactions.isEmpty())
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git ", 4, 4, 0)
+                runCurrent()
+                assertFalse(explicit.isActive)
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val automatic = target.interactions.single()
+                assertEquals("git ", automatic.request.commandText)
+                assertFalse(automatic.request.includeCommandNames)
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `explicit empty results retire a pending automatic refresh`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "gi")
+            val terminal = terminal(testScheduler)
+            val requests = ArrayList<SwingShellSuggestionRequest>()
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flowOf(emptyList<SwingShellSuggestion>()).flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        requests += request
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
+                }
+            try {
+                terminal.setShellSuggestionProvider(provider)
+                terminal.bind(fixture.session)
+                runCurrent()
+                focus(terminal, true)
+                advanceTimeBy(50.milliseconds)
+
+                val explicit = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(explicit, provider)
+                runCurrent()
+                assertTrue(explicit.isClosed)
+
+                advanceTimeBy(25.milliseconds)
+                runCurrent()
+                assertEquals(listOf("gi"), requests.map { it.commandText })
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git", 3, 3, 0)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf("gi", "git"), requests.map { it.commandText })
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `releasing backspace after refreshed suggestions still permits acceptance`() =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "git st")

@@ -137,6 +137,16 @@ internal class SwingShellSuggestionScheduler(
         scheduleRefresh()
     }
 
+    /** Retires queued automatic work for the command already requested explicitly, even if its results are empty. */
+    fun onExplicitRequest() {
+        checkEdt()
+        val revision = lifecycleRevision
+        val snapshot = activeCommandLine?.invoke()
+        if (lifecycleRevision != revision) return
+        refreshes.value = null
+        lastRequest = snapshot
+    }
+
     fun onFocusGained() {
         checkEdt()
         scheduleRefresh()
