@@ -27,7 +27,7 @@ Known correctness gaps in the [experimental completion system](features/completi
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(session/ui)` | Reconcile shell-editor text with screen-derived command snapshots. PowerShell combining text can appear to have trailing spaces absent from the buffer; native inline history predictions can appear after the cursor and suppress completion popups. Distinguish those decorations without stripping genuine whitespace or editable suffixes. |
+| `TODO(session/ui)` | Reconcile PowerShell combining text with screen-derived command snapshots. It can appear to have trailing spaces absent from the editor buffer. Distinguish that display padding without stripping genuine whitespace or editable suffixes. |
 | `TODO(completion/host/profile)` | Preserve literal POSIX backslashes throughout path listing and candidate projection. For example, `cat 'foo\b` currently searches `foo/` but can insert a literal backslash path. Align separator interpretation, entry-name validation, and displayed/inserted paths with the filesystem and shell. |
 | `TODO(host/profile)` | Exclude disabled Bash builtins from both command discovery and its refresh signature. `compgen -A builtin` still publishes `times` after `enable -n times`; use enabled-builtin discovery and cover disable/re-enable transitions. |
 

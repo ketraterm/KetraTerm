@@ -75,8 +75,12 @@ without removing their command metadata; a missing capture stays unavailable.
 The view chooses fonts and presentation, while the producer retains only terminal
 render data. Custom producers can pass the same snapshot to `recordCommandStart`.
 
-`session.activeShellCommandLine()` returns an immutable snapshot only when the
-prompt context is available and the cursor is at the visible command end. Use
+`session.activeShellCommandLine()` returns an immutable snapshot when the prompt
+context is available and the cursor is at the visible command end. With the native
+PowerShell bridge, a visible suffix instead produces a provisional prefix marked
+`requiresShellConfirmation`; follow the session's
+[conditional-edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+before using it for suggestions. Use
 `session.activeShellCommandLineRevision` to observe edits; session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use

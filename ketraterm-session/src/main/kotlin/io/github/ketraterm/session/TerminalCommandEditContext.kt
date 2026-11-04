@@ -27,7 +27,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the command, cursor, producer revision, and render generation remain unchanged.
  * No writer or frame lease is retained. Acceptance still does not confirm remote execution.
  *
- * @property commandLine authoritative snapshot used to calculate editor actions.
+ * @property commandLine snapshot used to calculate editor actions. A snapshot
+ * requiring shell confirmation cannot admit edits until the native editor has
+ * confirmed its exact text and cursor through [TerminalSession.requestShellCompletions].
  * @property prefixResetKeys detached key sequence that clears only the editor's text before its cursor,
  * captured with [commandLine]; empty when that capability is unavailable.
  */

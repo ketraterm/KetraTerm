@@ -117,7 +117,7 @@ public class TerminalShellCompletionChannel internal constructor(
             result.commandLine == snapshot.commandText &&
             result.cursorOffset == snapshot.cursorOffset
         ) {
-            receipt = Receipt(expected, inputRevision, outputRevision)
+            receipt = Receipt(expected, inputRevision, outputRevision, result)
         } else {
             current.response = null
         }
@@ -130,12 +130,22 @@ public class TerminalShellCompletionChannel internal constructor(
         outputRevision: Long,
     ): Boolean {
         val completed = receipt ?: return false
-        return expected.inputRevision == completed.before.inputRevision &&
-            expected.outputRevision == completed.before.outputRevision &&
+        val capturedBeforeQuery =
+            expected.inputRevision == completed.before.inputRevision && expected.outputRevision == completed.before.outputRevision
+        val capturedAfterQuery = expected.inputRevision == completed.inputRevision && expected.outputRevision == completed.outputRevision
+        return (capturedBeforeQuery || capturedAfterQuery) &&
             expected.shellRevision == completed.before.shellRevision &&
+            expected.prefixResetKeys == completed.before.prefixResetKeys &&
             expected.commandLine == completed.before.commandLine &&
             completed.inputRevision == inputRevision &&
             completed.outputRevision == outputRevision
+    }
+
+    /** Reuses confirmation only while the freshly captured editor context still owns its exact receipt. */
+    internal fun confirmedResult(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
+        if (!expected.commandLine.requiresShellConfirmation) return null
+        val completed = receipt ?: return null
+        return completed.result.takeIf { permits(expected, expected.inputRevision, expected.outputRevision) }
     }
 
     internal fun close(): Pending? =
@@ -168,5 +178,6 @@ public class TerminalShellCompletionChannel internal constructor(
         val before: TerminalCommandEditContext,
         val inputRevision: Long,
         val outputRevision: Long,
+        val result: TerminalShellCompletionResult,
     )
 }

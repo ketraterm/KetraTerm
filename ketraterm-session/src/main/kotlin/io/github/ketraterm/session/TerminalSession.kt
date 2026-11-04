@@ -622,12 +622,14 @@ public class TerminalSession private constructor(
 
     /**
      * Returns the active shell command-line snapshot, or `null` after closure
-     * or when no trustworthy editing context is available.
+     * or when the selected producer cannot capture an editing context.
      *
      * The selected integration is authoritative, including `null`. A host
      * snapshot is read directly; a protocol producer may reconstruct bounded
      * text from the grid. Hosts must keep UTF-16 offsets and live-grid anchors
      * current after corresponding output and geometry changes.
+     * Check [TerminalShellCommandLineSnapshot.requiresShellConfirmation] before
+     * using provisional text for suggestions or edits.
      *
      * @return active command-line snapshot, or `null` when unavailable.
      */
@@ -646,6 +648,8 @@ public class TerminalSession private constructor(
      * Capture at request time, before asynchronous suggestion work. The host must
      * publish unavailable editing state while its own pending input makes the
      * model untrustworthy; queue idleness is not acknowledgement by a remote shell.
+     * A snapshot marked [TerminalShellCommandLineSnapshot.requiresShellConfirmation]
+     * can be captured for a native query, but cannot admit edits until that query confirms it.
      *
      * @throws IllegalArgumentException if the producer's prefix-reset sequence contains more than four keys.
      */
@@ -692,6 +696,8 @@ public class TerminalSession private constructor(
      * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
      * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
      * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
+     * Provisional snapshots reuse that verified result while their exact context remains current,
+     * so confirmation and candidate collection do not invoke the native completer twice.
      */
     public suspend fun requestShellCompletions(
         commandLine: String,
@@ -700,6 +706,7 @@ public class TerminalSession private constructor(
         currentCoroutineContext().ensureActive()
         val expected = captureCommandEdit() ?: return null
         if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
+        var confirmedResult: TerminalShellCompletionResult? = null
         val query =
             try {
                 synchronized(mutationLock) {
@@ -714,6 +721,8 @@ public class TerminalSession private constructor(
                             ) {
                                 return@synchronized null
                             }
+                            confirmedResult = runtime.shellCompletion.confirmedResult(expected)
+                            if (confirmedResult != null) return@synchronized null
                             var generation = 0L
                             renderReader.readRenderFrame { generation = it.frameGeneration }
                             val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
@@ -726,7 +735,7 @@ public class TerminalSession private constructor(
             } catch (failure: OutboundCapacityException) {
                 failWrite(failure)
                 return null
-            } ?: return null
+            } ?: return confirmedResult
         outboundWriter.signalPending()
         return try {
             withTimeoutOrNull(2_000.milliseconds) { query.deferred.await() }
@@ -763,7 +772,10 @@ public class TerminalSession private constructor(
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
                             expected.owner !== editContextOwner ||
                                 (
-                                    (expected.inputRevision != inputRevision || expected.outputRevision != outputRevision) &&
+                                    (
+                                        expected.commandLine.requiresShellConfirmation ||
+                                            expected.inputRevision != inputRevision || expected.outputRevision != outputRevision
+                                    ) &&
                                         !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
                                 ) ||
                                 expected.shellRevision != revision ||

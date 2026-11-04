@@ -30,10 +30,15 @@ internal class NativeCompletionProtocol(
 ) {
     private val inventory = ShellCommandInventoryProtocol(channel)
 
+    /** Whether this prompt has a hook that can confirm the exact editable buffer. */
+    var canConfirmCommandLine: Boolean = false
+        private set
+
     var commandLinePrefixResetKeys: List<TerminalKeyEvent> = emptyList()
         private set
 
     fun promptStarted() {
+        canConfirmCommandLine = false
         commandLinePrefixResetKeys = emptyList()
     }
 
@@ -64,6 +69,7 @@ internal class NativeCompletionProtocol(
         if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return
         if (fields[2] == "Ready" && (fields.size == 4 || fields.size == 5 && fields[4] == "PrefixReset")) {
             channel.ready(epoch, listOf(TerminalKeyEvent(key = TerminalKey.F12), TerminalKeyEvent(codepoint = 'e'.code)))
+            canConfirmCommandLine = true
             commandLinePrefixResetKeys =
                 if (fields.size == 5) {
                     listOf(TerminalKeyEvent(key = TerminalKey.F12), TerminalKeyEvent(codepoint = 'r'.code))

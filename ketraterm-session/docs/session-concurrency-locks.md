@@ -89,7 +89,7 @@ per-key markers; bulk bytes themselves do not enter those counters.
 Capture `captureCommandEdit()` before requesting or calculating asynchronous
 suggestions. It returns null unless the session is running, the writer is idle,
 no output batch is in progress (including a graphics decode yield),
-an authoritative editing snapshot is available, and the selected producer supports
+an editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 `submitInput(expected, events)` using that same context.
 
@@ -114,6 +114,15 @@ that permission. Changed-away-and-back rendered text cannot renew an old context
 Results complete outside session locks. Cancellation retains the pending wire
 slot until a reply/new prompt, and closure cancels the waiter.
 
+A screen-derived snapshot with `requiresShellConfirmation` contains only the
+prompt-to-cursor prefix: visible text after the cursor may be a shell prediction
+or a real editable suffix. Query the native completer before publishing suggestions.
+Only an exact buffer and cursor match confirms the prefix; real suffixes, including
+whitespace, fail confirmation. Conditional admission rejects unconfirmed contexts.
+The session reuses the confirmed native result for an unchanged provisional
+snapshot, avoiding a second query during candidate collection. Confirmation also
+permits a fresh capture of that same context and expires under the checks above.
+
 Rejection returns `STALE_CONTEXT`, `UNSUPPORTED_CONTEXT`, `CANCELLED`, or the
 usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
 use the ordinary bounded compound queue. Callers still own editor semantics:
@@ -136,8 +145,9 @@ An idle writer does not acknowledge remote processing. `expected.cancel()` rejec
 future checks, but cancellation racing admission can lose and cannot retract
 accepted bytes. Response-dependent callers must stop waiting on session closure.
 
-The default session-backed Swing suggestion path captures before provider work
-and validates replacement boundaries before conditional admission. When a prefix
+The default session-backed Swing suggestion path captures before provider work,
+confirms provisional snapshots before collecting results, and validates
+replacement boundaries before conditional admission. When a prefix
 reset is available and the snapshot ends at the cursor, it sends that sequence
 and pastes the edited prefix as one compound input. The resulting prefix must be
 single-line and control-free; unsafe replay is rejected without sending input.
@@ -348,7 +358,7 @@ cancelling host flows.
 
 ### Terminal command-line concurrency scope
 
-`activeShellCommandLine` reads the selected authoritative snapshot; host snapshots
+`activeShellCommandLine` reads the selected producer's snapshot; host snapshots
 need no terminal mutation lock, while protocol producers may use serialized grid
 reads. Null is authoritative. Host text bounds and remote acknowledgement remain
 host responsibilities. Every versioned host assignment advances its guarded

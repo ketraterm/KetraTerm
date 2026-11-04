@@ -149,8 +149,9 @@ Acceptance uses the shell's replacement text and range. The PowerShell bridge
 restores the edited command prefix through PSReadLine's exact replacement API,
 preserving text after the cursor. Slow native completers
 can time out. Cancelling a request cannot stop a completer already running inside
-PowerShell. Suggestions also require an unambiguous editable command line with
-the cursor at its end. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)
+PowerShell. Suggestions use the confirmed editor buffer even when inline history
+predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
+real editable suffix text. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)
 for request limits and validation.
 
 ### Bash and zsh suggestions

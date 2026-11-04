@@ -2159,6 +2159,10 @@ public class SwingTerminal
          * displayed final publication.
          * By default editing is captured from the bound session; an unbound view is display-only.
          * Supply [editTarget] for a host editor, or [SwingShellSuggestionEditTarget.NONE] for display-only results.
+         * Hosts publishing results directly must first confirm a session snapshot marked
+         * [TerminalShellCommandLineSnapshot.requiresShellConfirmation] through
+         * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
+         * before collecting a provider; conditional session admission also rejects unconfirmed edits.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -2285,7 +2289,11 @@ public class SwingTerminal
             return interaction.takeIf { activeSuggestionInteraction === it && it.isActive }
         }
 
-        /** Captures the bound session's authoritative command line on the EDT, without mounting a popup. */
+        /**
+         * Captures the bound session's command line on the EDT, without mounting a popup.
+         * Provisional snapshots still require native confirmation before direct publication;
+         * [requestShellSuggestions] handles confirmation for provider-backed interactions.
+         */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
         public fun beginActiveShellSuggestionInteraction(
@@ -2336,6 +2344,7 @@ public class SwingTerminal
          * This does not mount UI. Its request-specific observer is captured before collection.
          * Closing the interaction cancels collection; final visible results survive stream completion.
          * Each interaction accepts one provider collection. Combine independent sources in the provider.
+         * Provisional session input is confirmed by the shell before collecting provider results.
          */
         @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
@@ -2345,6 +2354,12 @@ public class SwingTerminal
             check(SwingUtilities.isEventDispatchThread()) { "suggestion source capture must run on the EDT" }
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
             val scope = suggestionScope ?: return
+            val bound = session
+            val snapshot = bound?.activeShellCommandLine()
+            val requiresConfirmation =
+                snapshot?.requiresShellConfirmation == true &&
+                    snapshot.commandText == interaction.request.commandText &&
+                    snapshot.cursorOffset == interaction.request.cursorOffset
             interaction.beginSource()
             val source =
                 try {
@@ -2364,6 +2379,19 @@ public class SwingTerminal
             val publications = source.suggestions.flowOn(Dispatchers.Default).conflate()
             scope.launch {
                 try {
+                    if (requiresConfirmation &&
+                        bound.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset) == null
+                    ) {
+                        if (activeSuggestionInteraction === interaction) {
+                            cancelAndHideShellSuggestionsOnEdt(
+                                "Shell could not confirm suggestion input",
+                                SwingShellSuggestionCloseReason.INVALIDATED,
+                            )
+                        }
+                        return@launch
+                    }
+                    ensureActive()
+                    if (activeSuggestionInteraction !== interaction || !interaction.validateContext()) return@launch
                     publications.collect { suggestions ->
                         this@launch.ensureActive()
                         if (activeSuggestionInteraction === interaction && interaction.isActive) {

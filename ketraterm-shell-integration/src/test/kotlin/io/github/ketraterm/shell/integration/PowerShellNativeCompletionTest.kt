@@ -38,6 +38,75 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
     @Test
+    fun `visible prediction requires exact native confirmation before editing`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.feed("ldItem\u001b[6D")
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals("Get-Chi", expected.commandLine.commandText)
+                assertTrue(expected.commandLine.requiresShellConfirmation)
+                val edit = listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))
+                assertEquals(TerminalInputAdmission.STALE_CONTEXT, fixture.session.submitInput(expected, edit))
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi"))
+                runCurrent()
+                assertNotNull(query.await())
+                assertEquals(TerminalInputAdmission.ACCEPTED, fixture.session.submitInput(expected, edit))
+            }
+        }
+
+    @Test
+    fun `actual editable suffix cannot confirm a screen prefix`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.feed(" tail\u001b[5D")
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals("Get-Chi", expected.commandLine.commandText)
+                assertTrue(expected.commandLine.requiresShellConfirmation)
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi tail", cursor = 7, end = 7))
+                runCurrent()
+                assertNull(query.await())
+                assertEquals(
+                    TerminalInputAdmission.STALE_CONTEXT,
+                    fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "wrong"))),
+                )
+                assertEquals("\u001b[24~e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @Test
+    fun `native confirmation preserves typed spaces before prediction`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.feed("  argument\u001b[8D")
+                val snapshot = assertNotNull(fixture.session.activeShellCommandLine())
+                assertEquals("Get-Chi  ", snapshot.commandText)
+                assertEquals(9, snapshot.cursorOffset)
+                val query = async { fixture.session.requestShellCompletions(snapshot.commandText, snapshot.cursorOffset) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi  "))
+                runCurrent()
+                assertEquals("Get-Chi  ", assertNotNull(query.await()).commandLine)
+            }
+        }
+
+    @Test
+    fun `visible suffix remains unavailable without a prompt native hook`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
+                fixture.feed("ldItem\u001b[6D")
+                assertNull(fixture.session.activeShellCommandLine())
+                fixture.feed(ready())
+                assertTrue(assertNotNull(fixture.session.activeShellCommandLine()).requiresShellConfirmation)
+                fixture.feed("\r\n\u001b]133;A\u0007$ \u001b]133;B\u0007word\u001b[2D")
+                assertNull(fixture.session.activeShellCommandLine())
+            }
+        }
+
+    @Test
     fun `validated PowerShell hook announces prefix reset only for its prompt`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
@@ -353,9 +422,10 @@ class PowerShellNativeCompletionTest {
             label: String = value,
             start: Int = 0,
             end: Int = line.length,
+            cursor: Int = line.length,
             externalCommandName: String = "",
         ): String =
-            "\u001b]633;KetraTermCompletion;2;Result;$epoch;$id;Ok;${line.length};$start;$end;${encoded(
+            "\u001b]633;KetraTermCompletion;2;Result;$epoch;$id;Ok;$cursor;$start;$end;${encoded(
                 line,
             )};${encoded(externalCommandName)};1;Command;${encoded(value)};${encoded(label)};\u0007"
     }

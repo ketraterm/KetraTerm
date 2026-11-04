@@ -546,22 +546,9 @@ class TerminalShellIntegrationBootstrapNativeTest {
             val executable = installedExecutable(executableName)
             assumeTrue(executable != null, "$executableName is not installed")
             val helper = directory.resolve("prefix-reset-test.ps1")
-            checkNotNull(
-                TerminalShellIntegrationBootstrapNativeTest::class.java.getResourceAsStream("powershell-prefix-reset-test.ps1"),
-            ).use { source ->
-                Files.copy(source, helper)
-            }
+            Files.writeString(helper, powerShellEditorTestScript("powershell-prefix-reset-test.ps1"))
             val snapshots = Channel<String>(Channel.UNLIMITED)
-            val listener =
-                object : TerminalWorkspaceListener {
-                    override fun titleChanged(
-                        tab: TerminalWorkspaceTab,
-                        title: String,
-                    ) {
-                        if (title.startsWith("ketra-")) snapshots.trySend(title).getOrThrow()
-                    }
-                }
-            TerminalWorkspace(listener).use { workspace ->
+            TerminalWorkspace(powerShellEditorListener(snapshots)).use { workspace ->
                 val session =
                     workspace
                         .openTab(
@@ -586,26 +573,13 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 assertEquals("ketra-ready", withTimeout(15.seconds) { snapshots.receive() })
                 session.awaitLine("")
 
-                suspend fun assertBuffer(
-                    line: String,
-                    cursor: Int,
-                ) {
-                    val snapshot = withTimeout(15.seconds) { snapshots.receive() }
-                    val fields = snapshot.split(';')
-                    assertEquals(5, fields.size, snapshot)
-                    assertEquals("ketra-buffer", fields[0])
-                    assertEquals(cursor.toString(), fields[2], snapshot)
-                    assertEquals("77", fields[3], "Prefix replacement must preserve LASTEXITCODE")
-                    assertEquals(line, String(Base64.getDecoder().decode(fields[4]), Charsets.UTF_8))
-                }
-
                 val suffix = " tail \uD83D\uDE80"
                 for (prefix in listOf("echo e\u0301", "echo \uD83D\uDE80", "echo \uD83D\uDC69\u200D\uD83D\uDCBB", "")) {
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.codepoint('s'.code))),
                     )
-                    assertBuffer(prefix + suffix, prefix.length)
+                    snapshots.assertPowerShellBuffer(prefix + suffix, prefix.length, exitCode = 77)
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(
@@ -617,7 +591,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             ),
                         ),
                     )
-                    assertBuffer(suffix, 0)
+                    snapshots.assertPowerShellBuffer(suffix, 0, exitCode = 77)
                     val replacement = "echo accepted"
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
@@ -629,11 +603,157 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             ),
                         ),
                     )
-                    assertBuffer(replacement + suffix, replacement.length)
+                    snapshots.assertPowerShellBuffer(replacement + suffix, replacement.length, exitCode = 77)
                 }
             }
             snapshots.close()
         }
+
+    @ParameterizedTest(name = "PowerShell inline prediction [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completion distinguishes inline predictions from editable suffixes and spaces`(
+        executableName: String,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            Files.writeString(directory.resolve("prediction-test.ps1"), powerShellEditorTestScript("powershell-prediction-test.ps1"))
+            val snapshots = Channel<String>(Channel.UNLIMITED)
+            try {
+                TerminalWorkspace(powerShellEditorListener(snapshots)).use { workspace ->
+                    val session =
+                        workspace
+                            .openTab(
+                                TerminalProfile(
+                                    "powershell",
+                                    "PowerShell",
+                                    listOf(requireNotNull(executable), "-NoLogo", "-NoProfile"),
+                                    workingDirectory = directory,
+                                ),
+                                TerminalWorkspaceOpenOptions().copy { it.columns = 240 },
+                            ).session
+                    session.awaitLine("")
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            listOf(
+                                TerminalPasteEvent(". ([ScriptBlock]::Create([IO.File]::ReadAllText('prediction-test.ps1')))"),
+                                TerminalKeyEvent.key(TerminalKey.ENTER),
+                            ),
+                        ),
+                    )
+                    val readiness = withTimeout(15.seconds) { snapshots.receive() }
+                    assumeTrue(readiness != "ketra-prediction-unavailable", "$executableName PSReadLine does not support predictions")
+                    assertEquals("ketra-prediction-ready", readiness)
+                    session.awaitLine("")
+
+                    val prefix = "Get-Chi"
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(prefix.map { TerminalKeyEvent.codepoint(it.code) }),
+                    )
+                    withTimeout(15.seconds) {
+                        session.renderGeneration.first {
+                            var predicted = false
+                            session.readRenderFrame { frame ->
+                                val codeWords = IntArray(frame.columns)
+                                frame.copyTextLine(frame.cursor.row, codeWords, flags = IntArray(frame.columns))
+                                val suffix =
+                                    buildString {
+                                        for (column in frame.cursor.column until frame.columns) append(codeWords[column].toChar())
+                                    }
+                                predicted = suffix.startsWith("ldItem -Name ketra-native-prediction")
+                            }
+                            predicted
+                        }
+                    }
+                    session.awaitLine(prefix, "painted inline prediction")
+                    assertTrue(assertNotNull(session.activeShellCommandLine()).requiresShellConfirmation)
+                    val edit = assertNotNull(session.captureCommandEdit())
+                    val queryStarted =
+                        kotlin.time.TimeSource.Monotonic
+                            .markNow()
+                    val response = session.requestShellCompletions(prefix, prefix.length)
+                    val result =
+                        assertNotNull(
+                            response,
+                            "Native confirmation failed after ${queryStarted.elapsedNow()}; current ${session.activeShellCommandLine()}",
+                        )
+                    assertEquals(prefix, result.commandLine)
+                    assertEquals(prefix.length, result.cursorOffset)
+                    val candidate = result.candidates.single { it.replacementText == "Get-ChildItem" }
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            edit,
+                            listOf(
+                                TerminalKeyEvent.key(TerminalKey.F12),
+                                TerminalKeyEvent.codepoint('r'.code),
+                                TerminalTextReplacementEvent(0, 0, candidate.replacementText),
+                                TerminalKeyEvent.key(TerminalKey.F12),
+                                TerminalKeyEvent.codepoint('t'.code),
+                            ),
+                        ),
+                    )
+                    snapshots.assertPowerShellBuffer("Get-ChildItem", "Get-ChildItem".length)
+
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.codepoint('s'.code))),
+                    )
+                    snapshots.assertPowerShellBuffer("Get-Chi tail", prefix.length)
+                    session.awaitLine(prefix, "genuine editable suffix")
+                    assertTrue(assertNotNull(session.activeShellCommandLine()).requiresShellConfirmation)
+                    assertNull(
+                        session.requestShellCompletions(prefix, prefix.length),
+                        "A real suffix must not be mistaken for a prediction",
+                    )
+
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.codepoint('w'.code))),
+                    )
+                    val spaced = "$prefix  "
+                    snapshots.assertPowerShellBuffer(spaced, spaced.length)
+                    session.awaitLine(spaced, "genuine trailing spaces")
+                    val spacedResult = assertNotNull(session.requestShellCompletions(spaced, spaced.length))
+                    assertEquals(spaced, spacedResult.commandLine)
+                    assertEquals(spaced.length, spacedResult.cursorOffset)
+                }
+            } finally {
+                snapshots.close()
+            }
+        }
+
+    private fun powerShellEditorTestScript(scenario: String): String =
+        listOf("powershell-editor-test.ps1", scenario).joinToString("\n") { name ->
+            checkNotNull(javaClass.getResourceAsStream(name)).use { it.readBytes().toString(Charsets.UTF_8) }
+        }
+
+    private fun powerShellEditorListener(snapshots: Channel<String>): TerminalWorkspaceListener =
+        object : TerminalWorkspaceListener {
+            override fun titleChanged(
+                tab: TerminalWorkspaceTab,
+                title: String,
+            ) {
+                if (title.startsWith("ketra-")) snapshots.trySend(title).getOrThrow()
+            }
+        }
+
+    private suspend fun Channel<String>.assertPowerShellBuffer(
+        line: String,
+        cursor: Int,
+        exitCode: Int? = null,
+    ) {
+        val snapshot = withTimeout(15.seconds) { receive() }
+        val fields = snapshot.split(';')
+        assertEquals(5, fields.size, snapshot)
+        assertEquals("ketra-buffer", fields[0])
+        assertEquals(cursor.toString(), fields[2], snapshot)
+        if (exitCode != null) assertEquals(exitCode.toString(), fields[3], "Prefix replacement must preserve LASTEXITCODE")
+        assertEquals(line, String(Base64.getDecoder().decode(fields[4]), Charsets.UTF_8))
+    }
 
     @ParameterizedTest(name = "PowerShell completion round trip [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])

@@ -33,6 +33,61 @@ import org.junit.jupiter.api.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCommandLineObservationTest {
     @Test
+    fun `prediction visibility changes confirmation state without changing typed text`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                fixture.feed("\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007\u001b]133;B\u0007git s")
+                runCurrent()
+                val initial = kotlin.test.assertNotNull(fixture.session.activeShellCommandLine())
+                assertFalse(initial.requiresShellConfirmation)
+                val beforePrediction = fixture.session.activeShellCommandLineRevision.value
+
+                fixture.feed("tatus\u001b[5D")
+                runCurrent()
+                val predicted = kotlin.test.assertNotNull(fixture.session.activeShellCommandLine())
+                assertEquals(initial.copy(requiresShellConfirmation = true), predicted)
+                val withPrediction = fixture.session.activeShellCommandLineRevision.value
+                assertTrue(withPrediction > beforePrediction)
+
+                fixture.feed("witch\u001b[5D")
+                runCurrent()
+                assertEquals(predicted, fixture.session.activeShellCommandLine())
+                assertEquals(withPrediction, fixture.session.activeShellCommandLineRevision.value)
+
+                fixture.feed("\u001b[K")
+                runCurrent()
+                assertEquals(initial, fixture.session.activeShellCommandLine())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > withPrediction)
+            }
+        }
+
+    @Test
+    fun `prediction after wrapped cursor preserves prefix and revision availability`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                fixture.feed(
+                    "\u001b]133;A\u0007P> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(
+                        32,
+                    )}\u0007\u001b]133;B\u0007" + "x".repeat(27) +
+                        "ghost\u001b[5D",
+                )
+                runCurrent()
+                val snapshot = kotlin.test.assertNotNull(fixture.session.activeShellCommandLine())
+                assertEquals("x".repeat(27), snapshot.commandText)
+                assertEquals(0, snapshot.cursorColumn)
+                assertTrue(snapshot.requiresShellConfirmation)
+                val previous = fixture.session.activeShellCommandLineRevision.value
+                assertTrue(previous >= 0)
+                fixture.feed("\u001b[K")
+                runCurrent()
+                assertEquals(snapshot.copy(requiresShellConfirmation = false), fixture.session.activeShellCommandLine())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > previous)
+            }
+        }
+
+    @Test
     fun `unobserved renders never scan command history even when the revision property is read`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->

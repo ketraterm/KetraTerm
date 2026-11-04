@@ -19,30 +19,41 @@ package io.github.ketraterm.session
  * Immutable snapshot of the shell command line currently known to the session.
  *
  * The optional OSC integration extracts bounded text from prompt markers
- * and synchronized render frames, only when the cursor is at the visible end.
+ * and synchronized render frames. When visible text after the cursor could be
+ * a shell prediction, it may expose the prompt-to-cursor prefix with
+ * [requiresShellConfirmation]. Consumers must confirm that prefix against the
+ * native editor before publishing suggestions or submitting edits.
  * A host-owned shell editor can instead supply its complete logical command
  * text and an offset anywhere in that text through [TerminalShellIntegrationFactory.host].
  * Hosts own their source's text limits and publish updates when text, cursor,
  * anchor, or availability changes. Snapshots are consumed outside paint loops.
  *
- * @property commandText complete known command-line text, without the prompt.
+ * @property commandText command-line text without the prompt; a provisional
+ * prefix when [requiresShellConfirmation] is true.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
  * @property cursorColumn zero-based live terminal-grid cursor column to use as a
  * popup anchor.
  * @property cursorRow zero-based live terminal-grid cursor row to use as a popup
  * anchor.
+ * @property requiresShellConfirmation whether the text needs an exact native
+ * editor-buffer match through [TerminalSession.requestShellCompletions]. Until
+ * that succeeds, conditional edit admission rejects this snapshot. Confirmation
+ * expires on subsequent input, output, resize, or producer changes.
  */
-public data class TerminalShellCommandLineSnapshot(
-    val commandText: String,
-    val cursorOffset: Int,
-    val cursorColumn: Int,
-    val cursorRow: Int,
-) {
-    init {
-        require(cursorOffset in 0..commandText.length) {
-            "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+public data class TerminalShellCommandLineSnapshot
+    @JvmOverloads
+    constructor(
+        val commandText: String,
+        val cursorOffset: Int,
+        val cursorColumn: Int,
+        val cursorRow: Int,
+        val requiresShellConfirmation: Boolean = false,
+    ) {
+        init {
+            require(cursorOffset in 0..commandText.length) {
+                "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+            }
+            require(cursorColumn >= 0) { "cursorColumn must be >= 0, was $cursorColumn" }
+            require(cursorRow >= 0) { "cursorRow must be >= 0, was $cursorRow" }
         }
-        require(cursorColumn >= 0) { "cursorColumn must be >= 0, was $cursorColumn" }
-        require(cursorRow >= 0) { "cursorRow must be >= 0, was $cursorRow" }
     }
-}

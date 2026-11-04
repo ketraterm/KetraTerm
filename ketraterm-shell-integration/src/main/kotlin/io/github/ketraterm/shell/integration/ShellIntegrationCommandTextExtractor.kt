@@ -30,6 +30,7 @@ internal const val TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX = 2
 
 internal enum class TerminalShellCommandFingerprintStatus {
     COMPLETE,
+    REQUIRES_SHELL_CONFIRMATION,
     MISSING_START_LINE,
     INVALID,
 }
@@ -138,6 +139,7 @@ internal class ShellIntegrationCommandTextExtractor(
      * @param cursorColumn zero-based cursor column in [frame].
      * @param destination reusable primitive output with at least
      * [TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS] elements.
+     * @param allowVisibleSuffix whether a native hook can verify that text after the cursor is decoration.
      * @return fingerprint status; [TerminalShellCommandFingerprintStatus.MISSING_START_LINE]
      * allows the caller to retry with bounded scrollback rows.
      */
@@ -148,6 +150,7 @@ internal class ShellIntegrationCommandTextExtractor(
         cursorRow: Int,
         cursorColumn: Int,
         destination: LongArray,
+        allowVisibleSuffix: Boolean = false,
     ): TerminalShellCommandFingerprintStatus =
         fingerprintSource(
             frame = frame,
@@ -157,6 +160,7 @@ internal class ShellIntegrationCommandTextExtractor(
             cursorRow = cursorRow,
             cursorColumn = cursorColumn,
             destination = destination,
+            allowVisibleSuffix = allowVisibleSuffix,
         )
 
     /** Allocation-free fingerprint overload for an immutable published render cache. */
@@ -167,6 +171,7 @@ internal class ShellIntegrationCommandTextExtractor(
         cursorRow: Int,
         cursorColumn: Int,
         destination: LongArray,
+        allowVisibleSuffix: Boolean = false,
     ): TerminalShellCommandFingerprintStatus =
         fingerprintSource(
             frame = null,
@@ -176,6 +181,7 @@ internal class ShellIntegrationCommandTextExtractor(
             cursorRow = cursorRow,
             cursorColumn = cursorColumn,
             destination = destination,
+            allowVisibleSuffix = allowVisibleSuffix,
         )
 
     private fun fingerprintSource(
@@ -186,6 +192,7 @@ internal class ShellIntegrationCommandTextExtractor(
         cursorRow: Int,
         cursorColumn: Int,
         destination: LongArray,
+        allowVisibleSuffix: Boolean,
     ): TerminalShellCommandFingerprintStatus {
         require(destination.size >= TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS) {
             "destination must contain at least $TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS longs"
@@ -205,11 +212,12 @@ internal class ShellIntegrationCommandTextExtractor(
             return TerminalShellCommandFingerprintStatus.INVALID
         }
 
+        var requiresShellConfirmation = false
         if (cursorAtNextLineStart) {
             copyFingerprintLine(frame, cache, cursorRow, columns)
-            if (!validClusterData || lastTextColumnExclusive(columns) > 0) {
-                return TerminalShellCommandFingerprintStatus.INVALID
-            }
+            if (!validClusterData) return TerminalShellCommandFingerprintStatus.INVALID
+            requiresShellConfirmation = lastTextColumnExclusive(columns) > 0
+            if (requiresShellConfirmation && !allowVisibleSuffix) return TerminalShellCommandFingerprintStatus.INVALID
         }
 
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_A_INDEX] = FINGERPRINT_HASH_A_SEED
@@ -221,9 +229,8 @@ internal class ShellIntegrationCommandTextExtractor(
             copyFingerprintLine(frame, cache, row, columns)
             if (!validClusterData) return TerminalShellCommandFingerprintStatus.INVALID
             if (!cursorAtNextLineStart && row == cursorRow) {
-                if (cursorColumn.coerceIn(0, columns) < lastTextColumnExclusive(columns)) {
-                    return TerminalShellCommandFingerprintStatus.INVALID
-                }
+                requiresShellConfirmation = cursorColumn.coerceIn(0, columns) < lastTextColumnExclusive(columns)
+                if (requiresShellConfirmation && !allowVisibleSuffix) return TerminalShellCommandFingerprintStatus.INVALID
             }
 
             val wrapped = frame?.lineWrapped(row) ?: cache!!.lineWrapped[row]
@@ -277,7 +284,11 @@ internal class ShellIntegrationCommandTextExtractor(
             }
             row++
         }
-        return TerminalShellCommandFingerprintStatus.COMPLETE
+        return if (requiresShellConfirmation) {
+            TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION
+        } else {
+            TerminalShellCommandFingerprintStatus.COMPLETE
+        }
     }
 
     private fun findFingerprintLine(

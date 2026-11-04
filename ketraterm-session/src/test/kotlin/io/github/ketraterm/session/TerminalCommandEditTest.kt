@@ -35,6 +35,22 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCommandEditTest {
+    @Test
+    fun `provisional command text cannot admit an edit without native confirmation`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot().copy(requiresShellConfirmation = true))
+            session(connector, model).use { session ->
+                session.start(10, 3)
+                val expected = checkNotNull(session.captureCommandEdit())
+
+                assertNull(session.requestShellCompletions("git s", 5))
+                assertEquals(STALE_CONTEXT, session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
+                runCurrent()
+                assertArrayEquals(byteArrayOf(), connector.writtenBytes)
+            }
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `key release invalidates a fresh edit only when sent to the shell`(reportReleases: Boolean) =
