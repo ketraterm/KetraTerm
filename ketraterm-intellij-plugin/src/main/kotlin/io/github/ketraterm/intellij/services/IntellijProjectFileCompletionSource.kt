@@ -41,8 +41,8 @@ import java.nio.file.Path
  * Queries IntelliJ's Go to File engine for bounded fuzzy paths.
  *
  * IntelliJ owns project discovery, fuzzy matching, path qualification, and result
- * ordering. This adapter only converts PSI items into shell-facing paths relative
- * to the terminal working directory. Shared completion still owns hidden-file
+ * ordering. This adapter requires a matching target name and converts PSI items
+ * into shell-facing paths relative to the terminal working directory. Shared completion still owns hidden-file
  * policy, replacement ranges, and shell quoting.
  *
  * @property project project whose Go to File provider is queried.
@@ -110,6 +110,7 @@ internal class IntellijProjectFileLoader(
                         if (visited == MAX_VISITED_ENTRIES) return@Processor false
                         visited++
                         val file = (descriptor.item as? PsiFileSystemItem)?.virtualFile ?: return@Processor true
+                        if (!pathMatcher.matchesName(file.name)) return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
                         if (paths.add(path)) {

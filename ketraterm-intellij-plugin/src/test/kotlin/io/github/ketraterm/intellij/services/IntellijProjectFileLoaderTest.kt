@@ -30,6 +30,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** IntelliJ fixture tests for project-file completion through Go to File. */
 class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
+    fun testUnqualifiedQueryMatchesNamesInsteadOfAncestorDirectories() {
+        myFixture.addFileToProject("app-server/plugins/Plugin.kt", "")
+        myFixture.addFileToProject("application/Main.kt", "")
+        myFixture.addFileToProject("rendering/apps/player/Player.kt", "")
+        myFixture.addFileToProject("gradle/wrapper/gradle-wrapper.properties", "")
+
+        val paths = load("app").map { it.path }
+
+        assertContainsElements(paths, "app-server", "application", "rendering/apps", "gradle/wrapper")
+        assertFalse(paths.toString(), paths.contains("rendering/apps/player"))
+        assertFalse(paths.toString(), paths.contains("app-server/plugins"))
+        assertFalse(paths.toString(), paths.contains("application/Main.kt"))
+        assertContainsElements(load("player").map { it.path }, "rendering/apps/player")
+        assertContainsElements(load("apps/pl").map { it.path }, "rendering/apps/player")
+    }
+
     fun testTerminalOutsideTheIndexedProjectDoesNotSearchItsFiles() {
         myFixture.addFileToProject("settings.gradle.kts", "")
         var resolutions = 0

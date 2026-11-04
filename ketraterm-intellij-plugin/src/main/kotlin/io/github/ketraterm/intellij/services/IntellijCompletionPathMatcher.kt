@@ -19,7 +19,7 @@ import com.intellij.psi.codeStyle.NameUtil
 import com.intellij.util.text.matching.MatchingMode
 import io.github.ketraterm.completion.api.TerminalCompletionMatchRanges
 
-/** Prepares one query's IDE matchers; annotation never filters or reranks host-selected paths. */
+/** Prepares one query's IDE matchers for target-name eligibility and display-relative annotation. */
 internal class IntellijCompletionPathMatcher(
     prefix: String,
 ) {
@@ -30,6 +30,9 @@ internal class IntellijCompletionPathMatcher(
         prefix.substringBeforeLast('/', "").takeIf(String::isNotEmpty)?.let {
             NameUtil.buildMatcher("*$it", MatchingMode.IGNORE_CASE)
         }
+
+    /** Whether the query's final component matches the target name, independently of its ancestors. */
+    fun matchesName(name: String): Boolean = empty || nameMatcher.match(name) != null
 
     /** Returns display-relative UTF-16 fragments, preferring the basename over unrelated ancestors. */
     fun ranges(path: String): TerminalCompletionMatchRanges {

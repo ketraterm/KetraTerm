@@ -42,6 +42,8 @@ The popup follows IDE colors and your configured terminal font.
 Project-indexed file suggestions apply while the terminal is inside this project's
 content roots. After changing to another project, filesystem and shell completion
 follow the terminal's current directory without searching the original project's index.
+Queries match file or directory names; use a path such as `apps/pl` to qualify a
+name by its parent directories.
 
 The **Project** settings page accepts a single startup command. The command is
 submitted once after shell readiness, including in restored tabs; typing before
