@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.commandEndOffset
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
-/** Projects a learned full command into the request's active completion range. */
+/** Projects a row already matched by [LearnedHistoryCandidateIndex] into the request's active completion range. */
 internal fun projectLearnedCommandCandidate(
     request: TerminalCompletionRequest,
     requestLine: TerminalCommandLineContext,
@@ -35,8 +35,6 @@ internal fun projectLearnedCommandCandidate(
 ): TerminalCompletionCandidate? {
     val activeIndex = requestLine.activeTokenIndex
     val learnedToken = learnedLine.tokens.getOrNull(activeIndex) ?: return null
-    if (!matchingPrefixTokens(requestLine, learnedLine, activeIndex)) return null
-    if (!learnedToken.text.startsWith(requestLine.activePrefix, ignoreCase = true)) return null
 
     val replacementStartInLearned = replacementStartInLearnedCommand(requestLine, completionContext, learnedToken.startOffset)
     if (replacementStartInLearned !in learnedToken.startOffset..learnedLine.commandEndOffset) return null
@@ -90,18 +88,6 @@ private fun literalPrefixRanges(
 private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {
     val activeToken = tokens.getOrNull(activeTokenIndex) ?: return false
     return activeToken.endOffset < commandEndOffset && commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
-}
-
-private fun matchingPrefixTokens(
-    requestLine: TerminalCommandLineContext,
-    learnedLine: TerminalCommandLineContext,
-    activeIndex: Int,
-): Boolean {
-    if (activeIndex > learnedLine.tokens.size || activeIndex > requestLine.tokens.size) return false
-    for (index in 0 until activeIndex) {
-        if (!requestLine.tokens[index].text.equals(learnedLine.tokens[index].text, ignoreCase = true)) return false
-    }
-    return true
 }
 
 private fun replacementStartInLearnedCommand(

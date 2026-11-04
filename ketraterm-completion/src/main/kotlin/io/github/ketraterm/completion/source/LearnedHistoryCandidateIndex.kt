@@ -26,12 +26,12 @@ import java.util.*
 internal class LearnedHistoryCandidateIndex private constructor(
     private val buckets: Map<HistoryBucketKey, List<IndexedLearnedCommand>>,
 ) {
-    /** Returns rows whose exact host context, prior tokens, and active-token prefix match the request. */
+    /** Matches host context and completed decoded tokens exactly, then the active prefix ignoring case. */
     fun matching(
         requestLine: TerminalCommandLineContext,
         requestContext: CompletionLearningContextKey,
     ): List<IndexedLearnedCommand> {
-        val priorTokens = requestLine.tokens.subList(0, requestLine.activeTokenIndex).map { it.text.lowercase(Locale.ROOT) }
+        val priorTokens = requestLine.tokens.subList(0, requestLine.activeTokenIndex).map { it.text }
         val key = HistoryBucketKey(requestContext, priorTokens)
         val bucket = buckets[key] ?: return emptyList()
         val prefix = requestLine.activePrefix.lowercase(Locale.ROOT)
@@ -66,10 +66,10 @@ internal class LearnedHistoryCandidateIndex private constructor(
                 if (!stats.hasSuccessfulExecution()) continue
                 val line = parsedRow.lineContext
                 val learningContext = CompletionLearningContextKey.of(stats.profileId, stats.workingDirectoryUri)
-                val normalizedTokens = line.tokens.map { it.text.lowercase(Locale.ROOT) }
+                val tokens = line.tokens.map { it.text }
                 val indexedTokenCount = minOf(line.tokens.size, MAX_INDEXED_TOKEN_POSITIONS)
                 for (activeIndex in 0 until indexedTokenCount) {
-                    val key = HistoryBucketKey(learningContext, normalizedTokens.subList(0, activeIndex))
+                    val key = HistoryBucketKey(learningContext, tokens.subList(0, activeIndex))
                     mutableBuckets
                         .getOrPut(key, ::ArrayList)
                         .add(
@@ -77,7 +77,7 @@ internal class LearnedHistoryCandidateIndex private constructor(
                                 stats = stats,
                                 replay = parsedRow.replay,
                                 lineContext = line,
-                                normalizedActiveToken = normalizedTokens[activeIndex],
+                                normalizedActiveToken = tokens[activeIndex].lowercase(Locale.ROOT),
                                 snapshotRank = snapshotRank,
                             ),
                         )

@@ -261,6 +261,11 @@ normalizes a trailing slash; it does not resolve filesystem aliases. Opaque
 ranking evidence may fall back from exact context to directory-only,
 profile-only, and global evidence.
 
+Replay and observed-token indexes compare completed decoded tokens exactly,
+including case and whitespace inside quoted arguments. Only active-token
+matching ignores case. The history index owns context matching; candidate
+projection uses its matched rows without repeating those checks.
+
 Suggestion feedback never creates replay rows. Explicit dismissal supplies
 negative evidence; passive closure and rejected editing attempts should not be
 recorded as dismissal. Successful command executions are the authority for

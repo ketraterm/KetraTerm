@@ -29,6 +29,30 @@ import kotlin.test.assertTrue
 
 class LearnedObservedTokenIndexTest {
     @Test
+    fun `observed options preserve completed argument and option case`() {
+        val index =
+            index(
+                positive("abc Foo --upper"),
+                positive("abc foo --lower"),
+                positive("abc 'Foo ' --spaced"),
+                positive("abc -L --forward"),
+                positive("abc -l --login"),
+            )
+        val cases =
+            mapOf(
+                "abc Foo --" to "--upper",
+                "abc foo --" to "--lower",
+                "abc -L --" to "--forward",
+                "abc -l --" to "--login",
+                "abc Foo --U" to "--upper",
+                "abc \"Foo \" --" to "--spaced",
+            )
+        for ((typed, expected) in cases) {
+            assertEquals(listOf(expected), candidates(index, typed).map { it.replacementText }, typed)
+        }
+    }
+
+    @Test
     fun `derives first arguments and options without retaining later values`() {
         val index =
             index(

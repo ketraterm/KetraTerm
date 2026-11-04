@@ -237,6 +237,8 @@ Learning adjusts matching candidates using executions, acceptance, and explicit
 dismissal. Successful commands admitted by the replay policy can also supply
 history and observed-token suggestions. Hosts may independently disable replay
 retention while keeping ranking evidence.
+Completed arguments keep their case-sensitive identity, so learning for `ssh -L`
+does not leak into `ssh -l`. Matching the word being typed ignores case.
 
 Persistence is opt-in. Approved replay may contain plaintext command data;
 filtering cannot identify every secret. See the [storage and privacy contract](../reference/storage.md)

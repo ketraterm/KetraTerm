@@ -26,7 +26,7 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.stats.saturatedCounterSum
 
-/** Immutable exact-host-context observed-token transitions derived from successful command rows. */
+/** Immutable transitions keyed by exact host context and completed decoded tokens from successful commands. */
 internal class LearnedObservedTokenIndex private constructor(
     private val buckets: Map<ObservedBucketKey, List<Entry>>,
 ) {
@@ -56,12 +56,9 @@ internal class LearnedObservedTokenIndex private constructor(
         val line = commandLineContext
         val commandIndex = commandTokenIndex
         if (commandIndex >= line.tokens.size || line.activeTokenIndex <= commandIndex) return null
-        val executable = normalizeTerminalCommandToken(line.tokens[commandIndex].text)
-        if (executable.isBlank()) return null
-
         val context = ArrayList<String>(line.activeTokenIndex - commandIndex)
         for (index in commandIndex until line.activeTokenIndex) {
-            val token = normalizeTerminalCommandToken(line.tokens[index].text)
+            val token = line.tokens[index].text
             if (token.isBlank()) return null
             context += token
         }
@@ -143,7 +140,7 @@ internal class LearnedObservedTokenIndex private constructor(
             val tokens = row.lineContext.tokens
             var tokenIndex = tokens.firstCommandTokenIndex()
             if (tokenIndex >= tokens.size) return
-            val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
+            val executable = tokens[tokenIndex].text
             if (executable.isBlank()) return
 
             val learningContext = CompletionLearningContextKey.of(row.stats.profileId, row.stats.workingDirectoryUri)
@@ -160,12 +157,12 @@ internal class LearnedObservedTokenIndex private constructor(
                     normalizedToken in COMMAND_OPERATORS || normalizedToken == TERMINAL_COMMAND_OPTION_TERMINATOR -> return
                     normalizedToken.isTerminalOptionToken() -> {
                         token.observedOptionToken()?.let { retain(context, it, learningContext, row.stats, aggregates) }
-                        context += normalizedToken
+                        context += token
                         encounteredOption = true
                     }
                     !observedFirstArgument && !encounteredOption -> {
                         retain(context, token, learningContext, row.stats, aggregates)
-                        context += normalizedToken
+                        context += token
                         observedFirstArgument = true
                     }
                     else -> return

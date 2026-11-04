@@ -31,6 +31,54 @@ import kotlin.test.assertTrue
 
 class LearnedHistoryCompletionEngineTest {
     @Test
+    fun `learned ssh values cannot cross case-distinct completed options`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            store.recordCommandResult("ssh -L 8080:localhost:80 server", true, null, null, 10)
+            store.recordCommandResult("ssh -l alice server", true, null, null, 20)
+            val engine = engine(store)
+            val cases =
+                mapOf(
+                    "ssh -L " to "8080:localhost:80 server",
+                    "ssh -l " to "alice server",
+                    "ssh -l AL" to "alice server",
+                )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL, TerminalShellCapabilities.PLAIN)) {
+                for ((typed, expected) in cases) {
+                    val candidates = engine.complete(request(typed, shellCapabilities = shell)).filter { it.source == "learned" }
+                    assertEquals(listOf(expected), candidates.map { it.replacementText }, "$shell: $typed")
+                    val candidate = candidates.single()
+                    assertEquals(
+                        typed.take(7) + expected,
+                        typed.replaceRange(candidate.replacementStartOffset, candidate.replacementEndOffset, candidate.replacementText),
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun `completed argument identity ignores quote style but preserves decoded case and whitespace`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            store.recordCommandResult("tool 'Repo Path' --upper", true, null, null, 10)
+            store.recordCommandResult("tool 'repo path' --lower", true, null, null, 20)
+            store.recordCommandResult("tool 'Repo Path ' --spaced", true, null, null, 30)
+            val engine = engine(store, commandSpecs = listOf(TerminalCommandSpec("tool")))
+            val cases =
+                mapOf(
+                    "tool \"Repo Path\" --" to "--upper",
+                    "tool \"repo path\" --" to "--lower",
+                    "tool \"Repo Path \" --" to "--spaced",
+                )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for ((typed, expected) in cases) {
+                    val candidates = engine.complete(request(typed, shellCapabilities = shell)).filter { it.source == "learned" }
+                    assertEquals(listOf(expected), candidates.map { it.replacementText }, "$shell: $typed")
+                }
+            }
+        }
+
+    @Test
     fun `saved commands publish display-relative prefix matches including quoted paths`() =
         runBlocking {
             val cases =
@@ -84,7 +132,7 @@ class LearnedHistoryCompletionEngineTest {
         }
 
     @Test
-    fun `learned history matches case-insensitively while preserving exact command case`() =
+    fun `learned history active prefixes match case-insensitively while preserving recorded case`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
             learningStore.recordCommandResult("cat Foo", true, null, null, 10)
