@@ -189,9 +189,10 @@ not an exhaustive schema for every version of these tools.
 | --- | --- |
 | Files and navigation | `cd`, `pushd`, `ls`, `cat`, `mkdir`, `rm`, `cp`, `mv` |
 | Version control | `git`, `gh` |
-| Build and languages | `gradle` / `gradlew`, `cargo`, `go`, `kotlin`, `kotlinc` |
+| Build and languages | `gradle` / `gradlew`, `mvn` / `mvnw`, `dotnet`, `cargo`, `go`, `kotlin`, `kotlinc`, `python` / `python3` |
 | Package managers | `npm`, `pnpm`, `yarn`, `bun`, `pip` |
 | Containers and cloud | `docker`, `docker-compose`, `kubectl`, `aws` |
+| Network clients | `curl`, `ssh` |
 | Developer tools | `code`, `adb`, `ketra` |
 
 ## Matching and interaction

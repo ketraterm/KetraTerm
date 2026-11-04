@@ -69,6 +69,10 @@ catalog; custom `TerminalCommandSpec`, `TerminalOptionSpec`, and
 arguments. Keep custom catalogs and their nested collections unchanged while
 the engine is in use. The engine evaluates its catalog automatically.
 
+See the [bundled command catalog](../docs/features/completion.md#built-in-command-catalog)
+for the included tools. Specs cover selected common forms rather than every
+option supported by every installed version.
+
 Register host sources with `TerminalCompletionSourceEntry`. Source factories in
 `TerminalCompletionSources` cover direct paths, fuzzy paths, Gradle tasks, and
 dynamic value domains. A custom `TerminalCompletionSource` receives the request,

@@ -55,6 +55,11 @@ public object TerminalCommandSpecs {
                 ToolchainCommandSpecs.kotlinc(),
                 ToolchainCommandSpecs.adb(),
                 ToolchainCommandSpecs.ketra(),
+                NetworkCommandSpecs.curl(),
+                NetworkCommandSpecs.ssh(),
+                MavenCommandSpecs.maven(),
+                DotnetCommandSpecs.dotnet(),
+                ToolchainCommandSpecs.python(),
             ),
         )
 

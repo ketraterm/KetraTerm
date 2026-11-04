@@ -584,6 +584,7 @@ class MergedCompletionEngineTest {
                         entry(source(candidate("status", source = "spec", score = 900)), priority = 0),
                         entry(source(candidate("switch", source = "learned", score = 1)), priority = 100),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -601,6 +602,7 @@ class MergedCompletionEngineTest {
                         entry(source(candidate("status", detail = "static", source = "spec", score = 900)), priority = 0),
                         entry(source(candidate("status", detail = "recent", source = "learned", score = 1)), priority = 100),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -644,6 +646,7 @@ class MergedCompletionEngineTest {
                         ),
                         entry(source(candidate("bravo", score = 20)), priority = 0),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -785,6 +788,7 @@ class MergedCompletionEngineTest {
             val engine =
                 TerminalCompletionEngines.fromSources(
                     listOf(entry({ _, _, _ -> candidates }, priority = 0)),
+                    commandSpecs = emptyList(),
                 )
 
             val actual = engine.complete(request())
@@ -815,6 +819,7 @@ class MergedCompletionEngineTest {
                             priority = 0,
                         ),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())

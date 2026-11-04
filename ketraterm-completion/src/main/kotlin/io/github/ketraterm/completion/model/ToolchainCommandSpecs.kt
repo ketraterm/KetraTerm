@@ -234,4 +234,72 @@ internal object ToolchainCommandSpecs {
                     ),
                 ),
         )
+
+    fun python(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "python",
+            description = commandSpecText("spec.python.description"),
+            aliases = listOf("python3"),
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.python.argument.script.name"),
+                        isOptional = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalArgumentSpec(commandSpecText("spec.python.argument.args.name"), isOptional = true, isVariadic = true),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(
+                        names = listOf("--help", "-h"),
+                        description = commandSpecText("spec.python.option.--help.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--version", "-V"),
+                        description = commandSpecText("spec.python.option.--version.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-m"),
+                        description = commandSpecText("spec.python.option.-m.description"),
+                        requiresValue = true,
+                        valueName = commandSpecText("spec.python.option.-m.valueName"),
+                        valueCandidates = listOf("venv", "http.server", "unittest", "compileall"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-c"),
+                        description = commandSpecText("spec.python.option.-c.description"),
+                        requiresValue = true,
+                        valueName = commandSpecText("spec.python.option.-c.valueName"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-i"),
+                        description = commandSpecText("spec.python.option.-i.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-u"),
+                        description = commandSpecText("spec.python.option.-u.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-B"),
+                        description = commandSpecText("spec.python.option.-B.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-I"),
+                        description = commandSpecText("spec.python.option.-I.description"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-W"),
+                        description = commandSpecText("spec.python.option.-W.description"),
+                        requiresValue = true,
+                        valueName = commandSpecText("spec.python.option.-W.valueName"),
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("-X"),
+                        description = commandSpecText("spec.python.option.-X.description"),
+                        requiresValue = true,
+                        valueName = commandSpecText("spec.python.option.-X.valueName"),
+                    ),
+                ),
+        )
 }
