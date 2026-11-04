@@ -46,7 +46,7 @@ __ketraterm_publish_commands() {
     for name in "${keywords[@]}"; do seen["$name"]=1; done
     # Bash 5.3's array output preserves names containing whitespace without
     # spawning another shell or resolving every executable through PATH again.
-    builtin compgen -V available -A alias -A function -A builtin
+    builtin compgen -V available -A alias -A function -A enabled
     for name in "${available[@]}"; do locals["$name"]=1; done
     if [[ $inventory_kind == Path ]]; then
         builtin mapfile -d '' -t available < <(__ketraterm_collect_path_commands)
@@ -142,7 +142,7 @@ __ketraterm_completion_ready() {
         builtin printf -v path_signature '%s:%q' "$path_signature" "$PWD"
     fi
     signature=$(
-        declare -p BASH_ALIASES; builtin compgen -A function -A builtin
+        declare -p BASH_ALIASES; builtin compgen -A function -A enabled
     )
     if [[ $signature != "${__ketraterm_completion_signature-}" ]]; then
         __ketraterm_completion_signature=$signature

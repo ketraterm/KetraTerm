@@ -447,6 +447,40 @@ class TerminalShellIntegrationBootstrapNativeTest {
     }
 
     @Test
+    fun `Bash prompt inventory refreshes when builtins are disabled and reenabled`(): Unit =
+        runBlocking {
+            val bash = installedExecutable("bash", "bash.exe")
+            assumeTrue(bash != null, "Bash is not installed")
+            assumeBashCommandInventory(bash!!)
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile("bash", "Bash", listOf(bash, "--noprofile", "--norc", "-i")),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
+                session.awaitLine("")
+                withTimeout(15.seconds) {
+                    session.shellCommandInventory.first { it?.commands?.any { command -> command.displayText == "times" } == true }
+                }
+                for ((action, marker) in listOf(
+                    "-n times" to "ketra_builtin_disabled",
+                    "times" to "ketra_builtin_reenabled",
+                )) {
+                    val script =
+                        "before=\"${'$'}__ketraterm_completion_epoch\"; builtin enable $action; " +
+                            "__ketraterm_completion_ready; " +
+                            "[[ ${'$'}before != ${'$'}__ketraterm_completion_epoch ]] && $marker() { :; }"
+                    session.submitInput(listOf(TerminalPasteEvent(script), TerminalKeyEvent.key(TerminalKey.ENTER)))
+                    withTimeout(15.seconds) {
+                        session.shellCommandInventory.first { it?.commands?.any { command -> command.displayText == marker } == true }
+                        session.activeShellCommandLineRevision.first { session.activeShellCommandLine()?.commandText == "" }
+                    }
+                }
+            }
+        }
+
+    @Test
     fun `Bash inventory survives deletion and guarded acceptance through real Readline`(
         @TempDir tempDir: Path,
     ): Unit =

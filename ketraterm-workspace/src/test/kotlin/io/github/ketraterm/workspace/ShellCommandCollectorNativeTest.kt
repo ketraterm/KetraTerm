@@ -240,6 +240,35 @@ class ShellCommandCollectorNativeTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = ["bash", "wsl-bash"])
+    fun `disabled Bash builtins leave local inventory while same named executables remain available`(shell: String) {
+        val publisher = checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(UTF_8) }
+        val output =
+            runCollector(
+                shell,
+                publisher + "\n" +
+                    """
+                    command mkdir bin
+                    printf '#!/bin/sh\n' > bin/times
+                    command chmod +x bin/times
+                    PATH="${'$'}PWD/bin"
+                    builtin enable times
+                    __ketraterm_publish_commands test 1 Local
+                    builtin enable -n times
+                    __ketraterm_publish_commands test 2 Local
+                    __ketraterm_publish_commands test 3 Path
+                    builtin enable times
+                    __ketraterm_publish_commands test 4 Local
+                    """.trimIndent(),
+            )
+        val names = inventoryCommandNames(output)
+        assertEquals(4, names.size)
+        assertEquals(listOf(true, false, true, true), names.map { "times" in it })
+        assertEquals(setOf("times"), names[2])
+        assertTrue(listOf(names[0], names[1], names[3]).all { "printf" in it })
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["zsh", "wsl-zsh"])
     fun `zsh retains explicit hashes and refreshes PATH without changing caller options`(shell: String) {
         val publisher = checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(UTF_8) }
@@ -265,12 +294,16 @@ class ShellCommandCollectorNativeTest {
                     [[ -o HASH_LIST_ALL ]] || exit 31
                     """.trimIndent(),
             )
-        val snapshots = output.split(Regex("\u001b]633;KetraTermCommands;3;Begin;test;[12]\u0007")).drop(1)
-        assertEquals(2, snapshots.size)
-        val names =
-            snapshots.map { snapshot ->
-                assertTrue(snapshot.contains("KetraTermCommands;3;End;test;"))
-                Regex(";Chunk;test;[12];[0-9]+;([^\u0007]+)")
+        assertEquals(listOf(setOf("first-command", "explicit"), setOf("second-command")), inventoryCommandNames(output))
+    }
+
+    private fun inventoryCommandNames(output: String): List<Set<String>> =
+        output
+            .split(Regex("\u001b]633;KetraTerm(?:Shell)?Commands;3;Begin;test;[0-9]+\u0007"))
+            .drop(1)
+            .map { snapshot ->
+                assertTrue(Regex("KetraTerm(?:Shell)?Commands;3;End;test;").containsMatchIn(snapshot))
+                Regex(";Chunk;test;[0-9]+;[0-9]+;([^\u0007]+)")
                     .findAll(snapshot)
                     .flatMap { chunk ->
                         Base64
@@ -283,8 +316,6 @@ class ShellCommandCollectorNativeTest {
                             .map { it[0] }
                     }.toSet()
             }
-        assertEquals(listOf(setOf("first-command", "explicit"), setOf("second-command")), names)
-    }
 
     private fun runCollector(
         shell: String,

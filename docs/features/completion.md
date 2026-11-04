@@ -71,7 +71,7 @@ This table describes the sources available when completion is enabled.
 | --- | --- | --- |
 | Built-in command specifications | Yes | Yes |
 | Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
-| Bash command inventory | Commands, alias definitions, functions, and builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
+| Bash command inventory | Commands, alias definitions, functions, and enabled builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
 | zsh command inventory | Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires `zsh/parameter` and `base64`; verified with zsh 5.9. Literal aliases inform argument semantics. | Same inventory and command authority. |
 | Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
 | Project-wide files | No project index. | IDE fuzzy filename lookup with match highlighting, while the terminal is inside the project's content roots. |
@@ -162,8 +162,8 @@ are available first, while executable discovery runs in the background without
 redrawing the prompt. Available commands remain usable while discovery continues;
 new executable files may take a later refresh to appear.
 
-Shell-local names take precedence over matching executable names. Alias and
-function changes are picked up at the next prompt. PATH changes invalidate the
+Shell-local names take precedence over matching executable names. Alias, function,
+and builtin enablement changes are picked up at the next prompt. PATH changes invalidate the
 previous executable inventory; directory changes do so when PATH contains empty
 or relative entries. An unchanged PATH can be re-scanned after 60 seconds, with
 refresh starting at a later prompt. Failed refreshes retain the last complete
