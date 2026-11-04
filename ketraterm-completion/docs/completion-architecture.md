@@ -106,8 +106,10 @@ Command specifications format display-only `argumentHint` metadata separately fr
 candidate labels, matched ranges, and insertion text. Positional declarations retain
 names and optionality for display, while repetition remains part of argument
 resolution rather than an ellipsis in the hint. Option `valueName` labels required
-values. Scalar path/domain metadata supplies a type label when no ordered declaration
-exists. Fusion retains hint metadata from the strongest equivalent hint-bearing
+values. Scalar path/domain metadata controls source routing and cannot establish
+operand count or requiredness, so it does not produce command hints. Opaque domain
+identifiers never become display labels; unnamed values use a path type or `value`.
+Fusion retains hint metadata from the strongest equivalent hint-bearing
 candidate without changing the chosen edit or ranking. Verified native command rows
 can receive catalog hints alongside descriptions; native parameter results are not
 given potentially incompatible catalog option hints.

@@ -68,7 +68,10 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "restore",
                         description = commandSpecText("spec.git.restore.description"),
-                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("pathspec", isVariadic = true, pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(
@@ -83,6 +86,7 @@ internal object GitCommandSpecs {
                                     listOf("--source", "-s"),
                                     commandSpecText("spec.git.restore.option.--source.description"),
                                     requiresValue = true,
+                                    valueName = "tree-ish",
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                             ),
@@ -90,7 +94,10 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "rm",
                         description = commandSpecText("spec.git.rm.description"),
-                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("pathspec", isVariadic = true, pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("--cached"), commandSpecText("spec.git.rm.option.--cached.description")),
@@ -200,7 +207,15 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "branch",
                         description = commandSpecText("spec.git.branch.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "branch",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("-a", "--all"), commandSpecText("spec.git.branch.option.-a.description")),
@@ -209,12 +224,14 @@ internal object GitCommandSpecs {
                                     listOf("-d", "--delete"),
                                     commandSpecText("spec.git.branch.option.-d.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-D"),
                                     commandSpecText("spec.git.branch.option.-D.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                                 TerminalOptionSpec(listOf("-m", "--move"), commandSpecText("spec.git.branch.option.-m.description")),
@@ -282,7 +299,15 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "merge",
                         description = commandSpecText("spec.git.merge.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "commit",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(
@@ -298,7 +323,11 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "rebase",
                         description = commandSpecText("spec.git.rebase.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("upstream", isOptional = true, valueDomain = TerminalCompletionValueDomain.GIT_BRANCH),
+                                TerminalArgumentSpec("branch", isOptional = true, valueDomain = TerminalCompletionValueDomain.GIT_BRANCH),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(
@@ -309,6 +338,7 @@ internal object GitCommandSpecs {
                                     listOf("--onto"),
                                     commandSpecText("spec.git.rebase.option.--onto.description"),
                                     requiresValue = true,
+                                    valueName = "newbase",
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                                 TerminalOptionSpec(
@@ -326,8 +356,16 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "reset",
                         description = commandSpecText("spec.git.reset.description"),
-                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "commit or path",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
                         positionalArgumentAfterDoubleDash = TerminalArgumentSpec(pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY),
                         options =
                             listOf(
@@ -363,7 +401,15 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "show",
                         description = commandSpecText("spec.git.show.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "object",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                                ),
+                            ),
                     ),
                     TerminalCommandSpec(
                         name = "diff",
@@ -450,7 +496,10 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "revert",
                         description = commandSpecText("spec.git.revert.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("commit", isVariadic = true, valueDomain = TerminalCompletionValueDomain.GIT_COMMIT),
+                            ),
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("--continue"), commandSpecText("spec.git.revert.option.--continue.description")),

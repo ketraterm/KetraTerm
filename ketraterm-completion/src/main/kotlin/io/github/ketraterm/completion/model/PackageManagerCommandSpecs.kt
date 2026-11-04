@@ -29,7 +29,7 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.npm.run.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.NPM_SCRIPT,
+                        positionalArguments = scriptArguments(isOptional = true),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.npm.test.description"), aliases = listOf("t")),
                     TerminalCommandSpec("start", commandSpecText("spec.npm.start.description")),
@@ -60,7 +60,7 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.pnpm.run.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.NPM_SCRIPT,
+                        positionalArguments = scriptArguments(isOptional = true),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.pnpm.test.description"), aliases = listOf("t")),
                     TerminalCommandSpec("build", commandSpecText("spec.pnpm.build.description")),
@@ -115,7 +115,7 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.yarn.run.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.NPM_SCRIPT,
+                        positionalArguments = scriptArguments(isOptional = false),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.yarn.test.description")),
                     TerminalCommandSpec("build", commandSpecText("spec.yarn.build.description")),
@@ -144,7 +144,7 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.bun.run.description"),
-                        positionalArgumentValueDomain = TerminalCompletionValueDomain.NPM_SCRIPT,
+                        positionalArguments = scriptArguments(isOptional = true),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.bun.test.description")),
                     TerminalCommandSpec("install", commandSpecText("spec.bun.install.description"), aliases = listOf("i")),
@@ -301,5 +301,11 @@ internal object PackageManagerCommandSpecs {
                     TerminalOptionSpec(listOf("--help"), commandSpecText("spec.gh.option.--help.description")),
                     TerminalOptionSpec(listOf("--version"), commandSpecText("spec.gh.option.--version.description")),
                 ),
+        )
+
+    private fun scriptArguments(isOptional: Boolean): List<TerminalArgumentSpec> =
+        listOf(
+            TerminalArgumentSpec("script", isOptional = isOptional, valueDomain = TerminalCompletionValueDomain.NPM_SCRIPT),
+            TerminalArgumentSpec("args", isOptional = true, isVariadic = true),
         )
 }

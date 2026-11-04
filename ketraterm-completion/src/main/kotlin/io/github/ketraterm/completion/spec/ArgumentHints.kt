@@ -16,36 +16,26 @@
 package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
-/** Formats only declared argument semantics; never parses descriptions or edits a command line. */
-internal fun TerminalCommandSpec.argumentHint(): String {
-    if (positionalArguments.isNotEmpty()) {
-        return positionalArguments.joinToString(" ") { argument ->
-            val name = argument.name.ifBlank { argumentLabel(argument.pathKind, argument.valueDomain).ifEmpty { "value" } }
-            if (argument.isOptional) "[$name]" else "<$name>"
-        }
+/** Formats declared operands only; scalar routing metadata does not specify arity or requiredness. */
+internal fun TerminalCommandSpec.argumentHint(): String =
+    positionalArguments.joinToString(" ") { argument ->
+        val name = argument.name.ifBlank { argumentLabel(argument.pathKind).ifEmpty { "value" } }
+        if (argument.isOptional) "[$name]" else "<$name>"
     }
-    val name = argumentLabel(positionalArgumentPathKind, positionalArgumentValueDomain)
-    return if (name.isEmpty()) "" else "<$name>"
-}
 
 internal fun TerminalOptionSpec.argumentHint(): String {
     if (!requiresValue) return ""
-    val name = valueName.ifBlank { argumentLabel(valuePathKind, valueDomain).ifEmpty { "value" } }
+    val name = valueName.ifBlank { argumentLabel(valuePathKind).ifEmpty { "value" } }
     return "<$name>"
 }
 
-private fun argumentLabel(
-    pathKind: TerminalPathArgumentKind,
-    domain: TerminalCompletionValueDomain,
-): String =
-    when {
-        domain != TerminalCompletionValueDomain.NONE -> domain.id.substringAfterLast('.')
-        pathKind == TerminalPathArgumentKind.DIRECTORY -> "directory"
-        pathKind == TerminalPathArgumentKind.FILE -> "file"
-        pathKind == TerminalPathArgumentKind.FILE_OR_DIRECTORY -> "path"
-        else -> ""
+private fun argumentLabel(pathKind: TerminalPathArgumentKind): String =
+    when (pathKind) {
+        TerminalPathArgumentKind.DIRECTORY -> "directory"
+        TerminalPathArgumentKind.FILE -> "file"
+        TerminalPathArgumentKind.FILE_OR_DIRECTORY -> "path"
+        TerminalPathArgumentKind.NONE -> ""
     }

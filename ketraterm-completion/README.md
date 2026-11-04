@@ -90,7 +90,10 @@ for installed PowerShell hooks. See the [shell authority contract](docs/completi
 
 Candidates carry optional display-only `argumentHint` text. Command specifications
 supply positional names, optional arguments, and option `valueName` labels;
-these hints do not affect edits or ranking.
+these hints do not affect edits or ranking. Declare `positionalArguments` to show
+command operands: scalar path/domain routing metadata alone does not establish
+their number or whether they are required. Hints summarize the declared form;
+they are not a complete synopsis of every option-dependent mode.
 
 Custom engines can resolve and share context with
 `TerminalCompletionContext.resolve(request, commandSpecs)`. See the

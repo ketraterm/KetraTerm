@@ -33,7 +33,8 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * @property positionalArguments ordered positional argument declarations. When
  * nonempty, they take precedence over the scalar positional metadata.
  * @property positionalArgumentPathKind file-system path kind accepted by bare
- * positional arguments after this command or subcommand.
+ * positional arguments after this command or subcommand. This routing field does
+ * not imply operand count or requiredness; declare [positionalArguments] for hints.
  * @property positionalArgumentValueDomain dynamic host-owned value domain
  * accepted by bare positional arguments after this command or subcommand.
  * @property positionalArgumentHiddenPathPolicy hidden-entry policy used when
@@ -123,8 +124,9 @@ public data class TerminalArgumentSpec
  * @property valueHiddenPathPolicy hidden-entry policy used when
  * [valuePathKind] accepts a path.
  * @property valueName display name for the required value, such as `message` for `-m`.
- * Empty uses the value's domain/path kind or the generic `value` label. Ignored for flags;
- * it never changes parsing, quoting, or inserted text.
+ * Empty uses the value's path kind or the generic `value` label; domain identifiers
+ * are not display labels. Ignored for flags; it never changes parsing, quoting,
+ * or inserted text.
  * @property exclusiveGroupIds identifiers of mutually exclusive option groups.
  * Options that share any identifier cannot be suggested together once one has
  * already been entered before the completion cursor.

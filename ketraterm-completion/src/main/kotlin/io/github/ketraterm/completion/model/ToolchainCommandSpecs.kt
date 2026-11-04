@@ -43,12 +43,14 @@ internal object ToolchainCommandSpecs {
                         names = listOf("--profile"),
                         description = commandSpecText("spec.aws.option.--profile.description"),
                         requiresValue = true,
+                        valueName = "profile",
                         valueDomain = TerminalCompletionValueDomain.AWS_PROFILE,
                     ),
                     TerminalOptionSpec(
                         names = listOf("--region"),
                         description = commandSpecText("spec.aws.option.--region.description"),
                         requiresValue = true,
+                        valueName = "region",
                         valueDomain = TerminalCompletionValueDomain.AWS_REGION,
                     ),
                     TerminalOptionSpec(
@@ -166,7 +168,7 @@ internal object ToolchainCommandSpecs {
                     TerminalCommandSpec(
                         "install",
                         commandSpecText("spec.adb.install.description"),
-                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE,
+                        positionalArguments = listOf(TerminalArgumentSpec("apk", pathKind = TerminalPathArgumentKind.FILE)),
                     ),
                     TerminalCommandSpec("uninstall", commandSpecText("spec.adb.uninstall.description")),
                     TerminalCommandSpec("shell", commandSpecText("spec.adb.shell.description")),

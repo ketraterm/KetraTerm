@@ -161,14 +161,16 @@ public object TerminalCommandSpecs {
             name = "cd",
             description = commandSpecText("spec.cd.description"),
             aliases = listOf("chdir", "sl", "set-location"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(TerminalArgumentSpec("directory", isOptional = true, pathKind = TerminalPathArgumentKind.DIRECTORY)),
         )
 
     private fun pushd(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "pushd",
             description = commandSpecText("spec.pushd.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(TerminalArgumentSpec("directory", isOptional = true, pathKind = TerminalPathArgumentKind.DIRECTORY)),
         )
 
     private fun ls(): TerminalCommandSpec =
@@ -176,7 +178,15 @@ public object TerminalCommandSpecs {
             name = "ls",
             description = commandSpecText("spec.ls.description"),
             aliases = listOf("dir"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        "path",
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-l"), commandSpecText("spec.ls.option.-l.description")),
@@ -192,7 +202,15 @@ public object TerminalCommandSpecs {
             name = "cat",
             description = commandSpecText("spec.cat.description"),
             aliases = listOf("type"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        "file",
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-n", "--number"), commandSpecText("spec.cat.option.-n.description")),
@@ -203,7 +221,8 @@ public object TerminalCommandSpecs {
         TerminalCommandSpec(
             name = "mkdir",
             description = commandSpecText("spec.mkdir.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(TerminalArgumentSpec("directory", isVariadic = true, pathKind = TerminalPathArgumentKind.DIRECTORY)),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-p", "--parents"), commandSpecText("spec.mkdir.option.-p.description")),
@@ -215,7 +234,8 @@ public object TerminalCommandSpecs {
             name = "rm",
             description = commandSpecText("spec.rm.description"),
             aliases = listOf("del", "erase"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(TerminalArgumentSpec("path", isVariadic = true, pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY)),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-r", "-R", "--recursive"), commandSpecText("spec.rm.option.-r.description")),
@@ -255,7 +275,15 @@ public object TerminalCommandSpecs {
         TerminalCommandSpec(
             name = "code",
             description = commandSpecText("spec.code.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        "path",
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-r", "--reuse-window"), commandSpecText("spec.code.option.-r.description")),

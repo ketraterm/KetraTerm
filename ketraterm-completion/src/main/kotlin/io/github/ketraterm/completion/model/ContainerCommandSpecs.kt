@@ -26,19 +26,84 @@ internal object ContainerCommandSpecs {
             subcommands =
                 listOf(
                     TerminalCommandSpec("ps", commandSpecText("spec.docker.ps.description")),
-                    TerminalCommandSpec("run", commandSpecText("spec.docker.run.description")),
-                    TerminalCommandSpec("exec", commandSpecText("spec.docker.exec.description")),
-                    TerminalCommandSpec("build", commandSpecText("spec.docker.build.description")),
-                    TerminalCommandSpec("images", commandSpecText("spec.docker.images.description")),
-                    TerminalCommandSpec("pull", commandSpecText("spec.docker.pull.description")),
-                    TerminalCommandSpec("push", commandSpecText("spec.docker.push.description")),
-                    TerminalCommandSpec("stop", commandSpecText("spec.docker.stop.description")),
-                    TerminalCommandSpec("start", commandSpecText("spec.docker.start.description")),
-                    TerminalCommandSpec("restart", commandSpecText("spec.docker.restart.description")),
-                    TerminalCommandSpec("rm", commandSpecText("spec.docker.rm.description")),
-                    TerminalCommandSpec("rmi", commandSpecText("spec.docker.rmi.description")),
-                    TerminalCommandSpec("logs", commandSpecText("spec.docker.logs.description")),
-                    TerminalCommandSpec("inspect", commandSpecText("spec.docker.inspect.description")),
+                    TerminalCommandSpec(
+                        "run",
+                        commandSpecText("spec.docker.run.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("image"),
+                                TerminalArgumentSpec("command", isOptional = true),
+                                TerminalArgumentSpec("args", isOptional = true, isVariadic = true),
+                            ),
+                    ),
+                    TerminalCommandSpec(
+                        "exec",
+                        commandSpecText("spec.docker.exec.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("container"),
+                                TerminalArgumentSpec("command"),
+                                TerminalArgumentSpec("args", isOptional = true, isVariadic = true),
+                            ),
+                    ),
+                    TerminalCommandSpec(
+                        "build",
+                        commandSpecText("spec.docker.build.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("context", pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY),
+                            ),
+                    ),
+                    TerminalCommandSpec(
+                        "images",
+                        commandSpecText("spec.docker.images.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("repository", isOptional = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "pull",
+                        commandSpecText("spec.docker.pull.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("image")),
+                    ),
+                    TerminalCommandSpec(
+                        "push",
+                        commandSpecText("spec.docker.push.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("image")),
+                    ),
+                    TerminalCommandSpec(
+                        "stop",
+                        commandSpecText("spec.docker.stop.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("container", isVariadic = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "start",
+                        commandSpecText("spec.docker.start.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("container", isVariadic = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "restart",
+                        commandSpecText("spec.docker.restart.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("container", isVariadic = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "rm",
+                        commandSpecText("spec.docker.rm.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("container", isVariadic = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "rmi",
+                        commandSpecText("spec.docker.rmi.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("image", isVariadic = true)),
+                    ),
+                    TerminalCommandSpec(
+                        "logs",
+                        commandSpecText("spec.docker.logs.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("container")),
+                    ),
+                    TerminalCommandSpec(
+                        "inspect",
+                        commandSpecText("spec.docker.inspect.description"),
+                        positionalArguments = listOf(TerminalArgumentSpec("object", isVariadic = true)),
+                    ),
                     TerminalCommandSpec("network", commandSpecText("spec.docker.network.description")),
                     TerminalCommandSpec("volume", commandSpecText("spec.docker.volume.description")),
                     TerminalCommandSpec("system", commandSpecText("spec.docker.system.description")),
@@ -68,6 +133,7 @@ internal object ContainerCommandSpecs {
                         names = listOf("--context"),
                         description = commandSpecText("spec.docker.option.--context.description"),
                         requiresValue = true,
+                        valueName = "context",
                         valueDomain = TerminalCompletionValueDomain.DOCKER_CONTEXT,
                     ),
                 ),
@@ -303,12 +369,14 @@ internal object ContainerCommandSpecs {
                         names = listOf("--namespace", "-n"),
                         description = commandSpecText("spec.kubectl.option.--namespace.description"),
                         requiresValue = true,
+                        valueName = "namespace",
                         valueDomain = TerminalCompletionValueDomain.KUBERNETES_NAMESPACE,
                     ),
                     TerminalOptionSpec(
                         names = listOf("--context"),
                         description = commandSpecText("spec.kubectl.option.--context.description"),
                         requiresValue = true,
+                        valueName = "context",
                         valueDomain = TerminalCompletionValueDomain.KUBERNETES_CONTEXT,
                     ),
                 ),

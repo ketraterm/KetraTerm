@@ -35,7 +35,9 @@ class TerminalCompletionContextResolutionTest {
         assertEquals(TerminalPathArgumentKind.FILE_OR_DIRECTORY, context.expectedPathKind)
         assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain)
         assertNull(context.activeOption)
-        assertNull(context.activePositionalArgument)
+        val fallbackArgument = assertNotNull(context.activePositionalArgument)
+        assertEquals("file", fallbackArgument.name)
+        assertSame(context.currentCommand?.positionalArguments?.single(), fallbackArgument)
         assertEquals(listOf("file.txt"), context.precedingPositionalArguments)
         assertTrue(context.hasUnrecognizedOptions)
     }
