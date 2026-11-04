@@ -328,7 +328,7 @@ class SettingsDialogDesktopTest {
         withDialog { settings, dialog, closed ->
             onEdt {
                 val checkboxes = components(dialog).filterIsInstance<JCheckBox>().associateBy { it.text }
-                val smart = checkboxes.getValue("Enable smart suggestions")
+                val smart = checkboxes.getValue("Enable suggestions (experimental)")
                 val automatic = checkboxes.getValue("Show shell suggestions automatically")
                 val enter = checkboxes.getValue("Accept selected suggestion with Enter")
                 val persistence = checkboxes.getValue("Persist suggestion learning")
