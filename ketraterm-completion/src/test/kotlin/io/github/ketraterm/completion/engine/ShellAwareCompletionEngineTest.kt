@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.last
@@ -29,6 +30,101 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
+    @Test
+    fun `unrecognized options use authoritative argument values without filesystem or history guesses`() =
+        runTest {
+            for (capabilities in listOf(TerminalShellCapabilities.POWERSHELL, TerminalShellCapabilities.POSIX)) {
+                var fileQueries = 0
+                var shellQueries = 0
+                val learning =
+                    TerminalCompletionLearningStore().apply {
+                        recordCommandResult("cat utf8-extended.txt -Encoding unwanted-history", true, null, null, 10)
+                    }
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        sources =
+                            listOf(
+                                TerminalCompletionSourceEntry({ _, context, _ ->
+                                    fileQueries++
+                                    listOf(
+                                        TerminalCompletionCandidate(
+                                            "unrelated.txt",
+                                            context.replacementStartOffset,
+                                            context.replacementEndOffset,
+                                            "path",
+                                            TerminalCompletionCandidateKind.PATH,
+                                        ),
+                                    )
+                                }),
+                            ),
+                        learningStore = learning,
+                        shellProvider =
+                            TerminalCompletionShellProvider { request, context, _ ->
+                                shellQueries++
+                                assertEquals("cat", context.command?.name)
+                                assertNull(context.activePositionalArgument)
+                                assertNull(context.activeOption)
+                                assertEquals(TerminalPathArgumentKind.NONE, context.expectedPathKind)
+                                assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain)
+                                listOf("Unicode", "UTF8").filter { it.startsWith(context.activePrefix, ignoreCase = true) }.map {
+                                    TerminalCompletionCandidate(
+                                        it,
+                                        context.replacementStartOffset,
+                                        request.cursorOffset,
+                                        "shell",
+                                        TerminalCompletionCandidateKind.ARGUMENT,
+                                    )
+                                }
+                            },
+                    )
+                val prefixes =
+                    listOf(
+                        "" to listOf("Unicode", "UTF8"),
+                        "u" to listOf("Unicode", "UTF8"),
+                        "ut" to listOf("UTF8"),
+                        "z" to emptyList(),
+                    )
+                for ((prefix, expected) in prefixes) {
+                    val line = "cat utf8-extended.txt -Encoding $prefix"
+                    val candidates = engine.completions(request(line).copy(shellCapabilities = capabilities)).last()
+                    assertEquals(expected.toSet(), candidates.map { it.replacementText }.toSet())
+                    assertTrue(candidates.all { it.source == "shell" })
+                    assertTrue(
+                        candidates.all {
+                            it.replacementStartOffset == line.length - prefix.length && it.replacementEndOffset == line.length
+                        },
+                    )
+                }
+                assertEquals(4, shellQueries)
+                assertEquals(0, fileQueries)
+            }
+        }
+
+    @Test
+    fun `unrecognized options retain explicit path fallback when native completion is unavailable`() =
+        runTest {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry(
+                                TerminalCompletionSources.path {
+                                    listOf(TerminalFileEntry("utf8.txt", isDirectory = false))
+                                },
+                            ),
+                        ),
+                    shellProvider = TerminalCompletionShellProvider { _, _, _ -> null },
+                )
+            val result =
+                engine
+                    .completions(
+                        request("cat file.txt -Encoding ./u").copy(workingDirectoryUri = "file:///completion-test"),
+                    ).last()
+                    .single()
+            assertEquals("./utf8.txt", result.replacementText)
+            assertEquals("path", result.source)
+        }
+
     @Test
     fun `PowerShell catalog enrichment respects command case without rewriting shell edits`() =
         runTest {

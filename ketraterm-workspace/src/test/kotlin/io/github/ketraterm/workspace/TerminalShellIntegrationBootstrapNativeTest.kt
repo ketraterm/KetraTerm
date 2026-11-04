@@ -19,6 +19,7 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCompletionKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -583,6 +584,33 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     }
                 }
                 session.awaitLine("")
+                val encodingLine = "cat .\\utf8-extended.txt -Encoding u"
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(assertNotNull(session.captureCommandEdit()), listOf(TerminalPasteEvent(encodingLine))),
+                )
+                session.awaitLine(encodingLine)
+                val encodingEdit = assertNotNull(session.captureCommandEdit())
+                val encodings = assertNotNull(session.requestShellCompletions(encodingLine, encodingLine.length))
+                assertTrue(encodings.candidates.any { it.replacementText.equals("Unicode", ignoreCase = true) })
+                val utf8 = encodings.candidates.first { it.replacementText.equals("UTF8", ignoreCase = true) }
+                assertTrue(encodings.candidates.all { it.kind == TerminalShellCompletionKind.ARGUMENT })
+                assertEquals(encodingLine.length - 1, encodings.replacementStartOffset)
+                assertEquals(encodingLine.length, encodings.replacementEndOffset)
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(
+                        encodingEdit,
+                        listOf(
+                            TerminalTextReplacementEvent(
+                                deleteAfterCursorCount = encodings.replacementEndOffset - encodings.cursorOffset,
+                                deleteBeforeCursorCount = encodings.cursorOffset - encodings.replacementStartOffset,
+                                replacementText = utf8.replacementText,
+                            ),
+                        ),
+                    ),
+                )
+                session.awaitLine(encodingLine.dropLast(1) + utf8.replacementText)
             }
         }
 

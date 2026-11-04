@@ -82,6 +82,9 @@ Modeled argument positions use progressive catalog and host sources first, with
 native fallback only when they produce no candidates. Retained learning does not
 count as a structured-source answer: when it is the only available result, its
 publication waits for the native fallback to finish, then participates in ranking.
+An unrecognized option makes argument ownership uncertain. Native queries and their
+answers use a context without inferred argument constraints; the original catalog
+context remains available when the shell returns null and local fallback is needed.
 Unmodeled arguments query
 the shell before publishing and use its successful answer instead of generic file
 or replay guesses. No candidates are published while a native query could

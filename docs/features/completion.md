@@ -115,7 +115,8 @@ by the shell. Bare names and executable extensions merge when they resolve to
 the same file; shadowing aliases and functions remain distinct.
 
 Modeled arguments prefer the catalog and host sources, with native fallback
-when they have no results. Unknown functions and arguments use native completers
+when they have no results. Arguments after an option absent from the catalog are
+unmodeled. Unknown functions and arguments use native completers
 before generic path suggestions. Directory arguments exclude files; typed values
 such as Git branches exclude unrelated path suggestions. Relevant live values
 precede history-only results, while learning can still influence their order.

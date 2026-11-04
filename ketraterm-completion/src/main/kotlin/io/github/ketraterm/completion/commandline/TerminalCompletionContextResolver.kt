@@ -169,6 +169,7 @@ internal object TerminalCompletionContextResolver {
             optionsBeforeCursor = analysis.options,
             precedingPositionalArguments = analysis.positionalArguments,
             gitCompletion = gitCompletion,
+            hasUnrecognizedOptions = analysis.hasUnrecognizedOptions,
         )
     }
 

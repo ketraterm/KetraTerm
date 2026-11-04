@@ -73,14 +73,21 @@ internal class MergedCompletionEngine(
             }
 
             val aliases = callShellProvider { shellProvider?.commandAliases() }.orEmpty()
-            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs, aliases)
-            if (!completionContext.isCompletionAllowed) {
+            val resolvedContext = TerminalCompletionContext.resolve(request, commandSpecs, aliases)
+            if (!resolvedContext.isCompletionAllowed) {
                 send(emptyList())
                 return@channelFlow
             }
-            val commandPosition = completionContext.activePosition == TerminalCompletionActivePosition.COMMAND
-            val structuredArguments = completionContext.hasStructuredArguments()
-            val shellCandidates = if (shellProvider != null && !structuredArguments) completeShell(request, completionContext) else null
+            val commandPosition = resolvedContext.activePosition == TerminalCompletionActivePosition.COMMAND
+            val structuredArguments = resolvedContext.hasStructuredArguments()
+            val shellContext =
+                if (shellProvider != null && resolvedContext.hasUnrecognizedOptions) {
+                    resolvedContext.withoutArgumentConstraints()
+                } else {
+                    resolvedContext
+                }
+            val shellCandidates = if (shellProvider != null && !structuredArguments) completeShell(request, shellContext) else null
+            val completionContext = if (shellCandidates != null) shellContext else resolvedContext
             val nativeArguments = !commandPosition && shellCandidates != null
             val activeSources = if (nativeArguments) emptyList() else sources
             val includeHistory =
@@ -187,7 +194,8 @@ internal class MergedCompletionEngine(
         }
 
     private fun TerminalCompletionContext.hasStructuredArguments(): Boolean =
-        activePosition != TerminalCompletionActivePosition.COMMAND &&
+        !hasUnrecognizedOptions &&
+            activePosition != TerminalCompletionActivePosition.COMMAND &&
             (
                 subcommandCandidateSource != null ||
                     activeOption != null ||

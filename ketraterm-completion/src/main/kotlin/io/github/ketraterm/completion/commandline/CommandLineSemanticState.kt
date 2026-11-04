@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.spec.findNextCommandSpec
 import io.github.ketraterm.completion.spec.findOptionSpec
 
-/** Semantic state produced by one pass over tokens following a known command. */
+/** One semantic pass retaining catalog fallback data and whether unknown option arity limits its authority. */
 internal class CommandLineSemanticState(
     val commandPath: List<TerminalCommandSpec>,
     val usedOptionExclusiveGroupIds: Set<String>,
@@ -28,6 +28,7 @@ internal class CommandLineSemanticState(
     val pendingOptionValue: TerminalOptionSpec?,
     val options: List<ResolvedOption>,
     val positionalArguments: List<String>,
+    val hasUnrecognizedOptions: Boolean,
 )
 
 /** One completed option occurrence; null distinguishes a flag from an empty value. */
@@ -50,6 +51,7 @@ internal fun analyzeCommandTokens(
     var optionsTerminated = false
     var options: ArrayList<ResolvedOption>? = null
     var positionalArguments: ArrayList<String>? = null
+    var hasUnrecognizedOptions = false
     commandPath += rootSpec
 
     var tokenIndex = startIndex
@@ -74,7 +76,9 @@ internal fun analyzeCommandTokens(
 
                 !optionsTerminated && normalized.isTerminalOptionToken() -> {
                     val option = findOptionSpec(commandPath, token)
-                    if (option != null) {
+                    if (option == null) {
+                        hasUnrecognizedOptions = true
+                    } else {
                         if (option.exclusiveGroupIds.isNotEmpty()) {
                             if (usedExclusiveGroupIds == null) {
                                 usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
@@ -123,6 +127,7 @@ internal fun analyzeCommandTokens(
         pendingOptionValue = pendingOptionValue,
         options = options ?: emptyList(),
         positionalArguments = positionalArguments ?: emptyList(),
+        hasUnrecognizedOptions = hasUnrecognizedOptions,
     )
 }
 

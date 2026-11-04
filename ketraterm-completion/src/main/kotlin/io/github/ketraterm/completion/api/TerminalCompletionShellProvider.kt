@@ -23,7 +23,8 @@ package io.github.ketraterm.completion.api
  * At command positions a non-null result defines the verified executable candidates;
  * specifications enrich those candidates instead of advertising unverified commands.
  * Modeled argument positions use catalog/host sources first and query the shell
- * only if they produce no candidates. Unmodeled arguments use the shell first.
+ * only if they produce no candidates. Unmodeled arguments use the shell first,
+ * including arguments following an option absent from the catalog.
  */
 @ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionShellProvider {

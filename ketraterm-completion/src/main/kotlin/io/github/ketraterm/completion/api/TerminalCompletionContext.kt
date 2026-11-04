@@ -95,6 +95,8 @@ public class TerminalCompletionContext
         optionsBeforeCursor: List<ResolvedOption> = emptyList(),
         precedingPositionalArguments: List<String> = emptyList(),
         internal val gitCompletion: GitCompletionContext? = null,
+        /** The command is known, but unknown option arity prevents catalog argument ownership. */
+        internal val hasUnrecognizedOptions: Boolean = false,
     ) {
         public val commandPath: List<TerminalCommandSpec> = copyOf(commandPath)
         public val usedOptionExclusiveGroupIds: Set<String> = copySetOf(usedOptionExclusiveGroupIds)
@@ -130,6 +132,28 @@ public class TerminalCompletionContext
          * the same segment, active-word exclusion, and lifetime as [precedingArguments].
          */
         public val precedingPositionalArguments: List<String> = copyOf(precedingPositionalArguments)
+
+        /** Preserves parsed words and command identity while leaving native argument semantics unconstrained. */
+        internal fun withoutArgumentConstraints(): TerminalCompletionContext =
+            TerminalCompletionContext(
+                commandLineContext = commandLineContext,
+                commandTokenIndex = commandTokenIndex,
+                command = command,
+                commandPath = commandPath,
+                activePosition =
+                    if (activePosition == TerminalCompletionActivePosition.OPTION_NAME) {
+                        activePosition
+                    } else {
+                        TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
+                    },
+                usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
+                optionsTerminated = optionsTerminated,
+                activeTokenQuote = activeTokenQuote,
+                attachedOptionValue = attachedOptionValue,
+                optionsBeforeCursor = optionsBeforeCursor,
+                precedingPositionalArguments = precedingPositionalArguments,
+                hasUnrecognizedOptions = hasUnrecognizedOptions,
+            )
 
         /**
          * Returns every completed value for a known option in input order, including
