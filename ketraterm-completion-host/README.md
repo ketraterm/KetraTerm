@@ -45,7 +45,7 @@ URI, the path source returns no candidates.
 
 Hosts can pass a request and its resolved context through
 `TerminalCompletionSourceEnvironment.resolve(request, context, fallbackDirectory)`
-before evaluating local sources. It applies completed Git `-C` values in order
+before evaluating local sources. It applies completed root Git `-C` values in order
 and rejects explicit remote or malformed directory metadata. The optional fallback
 is used for relative overrides only when directory metadata is absent. Keep the
 original request for editing and learning; pass the returned request only to the

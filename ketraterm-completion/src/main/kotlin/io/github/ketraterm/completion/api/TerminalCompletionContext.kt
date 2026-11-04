@@ -175,9 +175,26 @@ public class TerminalCompletionContext
          */
         public fun precedingOptionValues(optionName: String): List<String> {
             val name = optionName.trim()
+            return precedingOptionValues { name in it.names }
+        }
+
+        /**
+         * Returns completed values owned by the exact [option] declaration.
+         *
+         * Use an option instance from this context's [commandPath] to distinguish
+         * parent and child options that share a name. Matching uses reference identity;
+         * a structurally equal copy is a different declaration. Value ordering,
+         * cursor boundaries, and immutability follow [precedingOptionValues].
+         *
+         * @param option catalog declaration whose resolved occurrences are selected.
+         * @return decoded values for this declaration, or an empty list when none precede the cursor.
+         */
+        public fun precedingOptionValues(option: TerminalOptionSpec): List<String> = precedingOptionValues { it === option }
+
+        private inline fun precedingOptionValues(matches: (TerminalOptionSpec) -> Boolean): List<String> {
             var result: ArrayList<String>? = null
             for (entry in optionsBeforeCursor) {
-                if (name in entry.option.names && entry.value != null) {
+                if (matches(entry.option) && entry.value != null) {
                     val values = result ?: ArrayList<String>().also { result = it }
                     values += entry.value
                 }

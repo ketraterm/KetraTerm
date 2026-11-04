@@ -163,6 +163,9 @@ empty strings, and no variable, glob, or command expansion occurs.
   `--name=value` forms share decoded value semantics. Unknown options, valueless
   flags, pending values, and the active word are excluded. The caller chooses
   first, last, or all values; no last-value-wins policy is imposed.
+- `precedingOptionValues(option)` selects only occurrences of that exact catalog
+  declaration from `commandPath`. Use it when parent and child options share a
+  spelling but have different meanings, such as Git's root and `switch` `-C` options.
 
 `TerminalCompletionRequest.includeCommandNames` defaults to `true`. Hosts can set it
 to `false` for parameter-only completion: the engine resolves the context once and

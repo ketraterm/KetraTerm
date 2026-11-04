@@ -28,6 +28,7 @@ Known correctness gaps in the [experimental completion system](features/completi
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(session/ui)` | Reconcile shell-editor text with screen-derived command snapshots. PowerShell combining text can appear to have trailing spaces absent from the buffer; native inline history predictions can appear after the cursor and suppress completion popups. Distinguish those decorations without stripping genuine whitespace or editable suffixes. |
+| `TODO(completion)` | Preserve shell-expression semantics in learned suggestions. Replay can turn `echo "$HOME"` into a literal argument and merge it with `echo '$HOME'`. Preserve the distinction between expressions and literal values, or omit projections that cannot retain their meaning. |
 | `TODO(completion/host/profile)` | Preserve literal POSIX backslashes throughout path listing and candidate projection. For example, `cat 'foo\b` currently searches `foo/` but can insert a literal backslash path. Align separator interpretation, entry-name validation, and displayed/inserted paths with the filesystem and shell. |
 | `TODO(host/profile)` | Exclude disabled Bash builtins from both command discovery and its refresh signature. `compgen -A builtin` still publishes `times` after `enable -n times`; use enabled-builtin discovery and cover disable/re-enable transitions. |
 
@@ -36,7 +37,6 @@ Maintainability, scalability, and deferred capability work:
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(completion)` | Reuse the original request's parsed context during outcome-key resolution. `TerminalCompletionOutcomeKeyResolver` currently reparses unchanged input for every candidate; candidate-specific edited input still needs its own analysis. |
-| `TODO(completion)` | Remove duplicated command-spec lookup in `TerminalCompletionContextResolver` by reusing `findCommandSpec`. |
 | `TODO(host/profile)` | Bound raw PATH enumeration before materializing directory contents in `path-commands.sh`. Existing command-count and text limits apply after executable filtering, so directories with many non-executable entries can consume unbounded temporary worker memory and scan time. Preserve explicit incomplete-inventory handling. |
 | `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 

@@ -88,8 +88,9 @@ Filesystem and Git sources need a locally resolvable working directory. WSL and
 remote shell metadata do not provide access to the guest's files. Explicit remote
 or malformed directory metadata is never replaced with unrelated local data.
 
-For Git commands, completed `-C` arguments select the directory for all applicable
-sources. Relative values build on the preceding directory; an empty value leaves
+For Git commands, completed root `-C` options select the directory for all applicable
+sources; `switch -C` names a branch and does not change that directory.
+Relative values build on the preceding directory; an empty value leaves
 it unchanged. IntelliJ uses the project directory only when shell directory
 metadata is absent.
 

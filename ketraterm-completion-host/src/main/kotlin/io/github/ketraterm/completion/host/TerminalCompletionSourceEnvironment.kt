@@ -25,7 +25,7 @@ import java.nio.file.Path
 @ExperimentalTerminalCompletionApi
 public object TerminalCompletionSourceEnvironment {
     /**
-     * Resolves completed Git `-C` values in input order for local source evaluation.
+     * Resolves completed root Git `-C` values in input order for local source evaluation.
      * Relative values build on the preceding directory; empty values leave it unchanged.
      * Only options before the active token in [context] participate.
      *
@@ -49,8 +49,9 @@ public object TerminalCompletionSourceEnvironment {
         val suppliedDirectory = request.workingDirectoryUri
         val localDirectory = TerminalLocalFileUriResolver.resolve(suppliedDirectory)
         if (suppliedDirectory != null && localDirectory == null) return null
-        if (context.command?.name != "git") return request
-        val directoryChanges = context.precedingOptionValues("-C")
+        val command = context.command?.takeIf { it.name == "git" } ?: return request
+        val directoryOption = command.options.firstOrNull { "-C" in it.names } ?: return request
+        val directoryChanges = context.precedingOptionValues(directoryOption)
         if (directoryChanges.isEmpty()) return request
 
         var directory = localDirectory ?: fallbackDirectory?.toAbsolutePath()?.normalize()

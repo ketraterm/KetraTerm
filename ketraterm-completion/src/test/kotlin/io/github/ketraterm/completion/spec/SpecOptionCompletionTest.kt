@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalArgumentSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalOptionSpec
@@ -173,6 +174,27 @@ class SpecOptionCompletionTest {
             assertEquals(listOf("--verbose", "--details"), candidates.map { it.replacementText })
             assertEquals(listOf("first definition", "second definition"), candidates.map { it.detail })
             assertEquals(listOf("", "<level>"), candidates.map { it.argumentHint })
+        }
+
+    @Test
+    fun `duplicate static values do not consume the source limit or merge distinct casing`() =
+        runTest {
+            val values = listOf("alpha", "alpha", "Alpha", "beta")
+            val specs =
+                listOf(
+                    TerminalCommandSpec(
+                        "tool",
+                        options = listOf(TerminalOptionSpec(listOf("--value"), requiresValue = true, valueCandidates = values)),
+                        positionalArguments = listOf(TerminalArgumentSpec("value", valueCandidates = values)),
+                    ),
+                )
+            for (line in listOf("tool ", "tool --value ", "tool --value=")) {
+                assertEquals(
+                    listOf("alpha", "Alpha", "beta"),
+                    complete(specs, line, limit = 3).map { it.replacementText },
+                    line,
+                )
+            }
         }
 
     private suspend fun complete(

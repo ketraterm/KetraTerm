@@ -27,7 +27,9 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  *
  * @property name canonical command or subcommand token.
  * @property description short human-readable description.
- * @property aliases additional tokens that resolve to this command.
+ * @property aliases additional tokens that resolve to this command. Command names
+ * and aliases match case-insensitively; the first matching declaration at the same
+ * level supplies parsing semantics and completion metadata.
  * @property subcommands nested subcommands available after this command.
  * @property options options declared at this command level. For each exact option
  * name, the deepest command's first declaration wins during parsing and completion;

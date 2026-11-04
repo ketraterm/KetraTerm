@@ -44,6 +44,27 @@ class TerminalCompletionSourceEnvironmentTest {
     }
 
     @Test
+    fun `Git branch creation options cannot override the source directory`() {
+        val dialects = listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL, TerminalShellCapabilities.PLAIN)
+        for (capabilities in dialects) {
+            for (branchOption in listOf("-C topic", "--force-create topic", "--force-create=topic")) {
+                val line = "git -C other switch $branchOption fe"
+                val request = request(line).copy(shellCapabilities = capabilities)
+                assertEquals(projectDirectory.resolve("other"), resolvedPath(request), line)
+
+                val withoutDirectoryChange = request("git switch $branchOption fe").copy(shellCapabilities = capabilities)
+                assertSame(withoutDirectoryChange, resolve(withoutDirectoryChange), branchOption)
+            }
+        }
+    }
+
+    @Test
+    fun `Git branch creation does not require local directory metadata`() {
+        val request = request("git switch -C topic fe", directory = null)
+        assertSame(request, resolve(request, project = null))
+    }
+
+    @Test
     fun `relative Git directory changes use the captured project only for absent metadata`() {
         val line = "git -C child switch fe"
         assertEquals(projectDirectory.resolve("child"), resolvedPath(request(line, directory = null)))

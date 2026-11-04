@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.spec.findCommandSpec
 
 internal data class AttachedOptionValue(
     val option: TerminalOptionSpec,
@@ -71,7 +72,7 @@ internal object TerminalCompletionContextResolver {
         val commandToken = semanticLine?.tokens?.getOrNull(commandTokenIndex)
         val root =
             commandToken
-                ?.let { findSpec(commandSpecs, normalizeTerminalCommandToken(it.text)) }
+                ?.let { findCommandSpec(commandSpecs, normalizeTerminalCommandToken(it.text)) }
         if (root == null) {
             return TerminalCompletionContext(
                 commandLineContext = lineContext,
@@ -255,15 +256,6 @@ internal object TerminalCompletionContextResolver {
             quote = if (quote == SINGLE_QUOTE || quote == DOUBLE_QUOTE) quote else NO_QUOTE,
         )
     }
-
-    private fun findSpec(
-        specs: List<TerminalCommandSpec>,
-        normalizedToken: String,
-    ): TerminalCommandSpec? =
-        specs.firstOrNull { spec ->
-            normalizeTerminalCommandToken(spec.name) == normalizedToken ||
-                spec.aliases.any { normalizeTerminalCommandToken(it) == normalizedToken }
-        }
 
     private fun activeTokenQuote(
         commandLine: String,

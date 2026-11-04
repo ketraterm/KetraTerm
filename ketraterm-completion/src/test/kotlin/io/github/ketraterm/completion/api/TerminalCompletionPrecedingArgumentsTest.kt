@@ -158,6 +158,26 @@ class TerminalCompletionPrecedingArgumentsTest {
     }
 
     @Test
+    fun `option declaration lookup separates shadowed occurrences with equal metadata`() {
+        val rootOption = TerminalOptionSpec(listOf("--context", "-c"), requiresValue = true)
+        val childOption = rootOption.copy()
+        val child = TerminalCommandSpec("get", options = listOf(childOption))
+        val catalog = listOf(TerminalCommandSpec("tool", options = listOf(rootOption), subcommands = listOf(child)))
+        val context = resolve("tool -c root --context='' get --context=child -c next active", catalog = catalog)
+
+        assertEquals(listOf("root", "", "child", "next"), context.precedingOptionValues("--context"))
+        val rootValues = context.precedingOptionValues(rootOption)
+        assertEquals(listOf("root", ""), rootValues)
+        assertEquals(listOf("child", "next"), context.precedingOptionValues(childOption))
+        assertEquals(emptyList(), context.precedingOptionValues(rootOption.copy()))
+        assertFailsWith<UnsupportedOperationException> { (rootValues as MutableList<String>).clear() }
+
+        val pending = resolve("tool -c root get --context=active", catalog = catalog)
+        assertEquals(listOf("root"), pending.precedingOptionValues(rootOption))
+        assertEquals(emptyList(), pending.precedingOptionValues(childOption))
+    }
+
+    @Test
     fun `option terminator ends ownership once and preserves later dash words`() {
         val context = resolve("tool --context prod -- --context ignored -- '' next ")
 
