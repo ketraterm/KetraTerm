@@ -23,13 +23,7 @@ promise stable APIs or behavior.
 
 ## Completion and suggestions
 
-Known correctness gaps in the [experimental completion system](features/completion.md#stability-experimental):
-
-| Owner | Remaining work |
-| --- | --- |
-| `TODO(session/ui)` | Reconcile PowerShell combining text with screen-derived command snapshots. It can appear to have trailing spaces absent from the editor buffer. Distinguish that display padding without stripping genuine whitespace or editable suffixes. |
-
-Maintainability, scalability, and deferred capability work:
+Remaining known gaps in the [experimental completion system](features/completion.md#stability-experimental):
 
 | Owner | Remaining work |
 | --- | --- |

@@ -9,7 +9,7 @@ a terminal or use the Swing/IntelliJ suggestion UI.
 Completion and suggestions are **experimental**, including their engine, sources,
 learning, persistence, and UI APIs. Suggestions may be incomplete, rank poorly,
 or behave unexpectedly in edge cases. APIs may change before stabilization.
-Known issues and remaining work are tracked in the [gap map](../terminal-feature-gap-map.md#completion-and-suggestions).
+Remaining work is tracked in the [gap map](../terminal-feature-gap-map.md#completion-and-suggestions).
 
 Kotlin callers can opt in to `ExperimentalTerminalCompletionApi` for the engine
 and `ExperimentalShellSuggestionsApi` for Swing suggestions. Both use
@@ -153,6 +153,10 @@ PowerShell. Suggestions use the confirmed editor buffer even when inline history
 predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
 real editable suffix text. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)
 for request limits and validation.
+
+On Windows, combining accents (for example, `e` followed by U+0301) can make native
+suggestions unavailable in PowerShell 5.1 and 7. PSReadLine may position the cursor
+beyond the rendered text, causing KetraTerm's exact editor-buffer validation to fail.
 
 ### Bash and zsh suggestions
 
