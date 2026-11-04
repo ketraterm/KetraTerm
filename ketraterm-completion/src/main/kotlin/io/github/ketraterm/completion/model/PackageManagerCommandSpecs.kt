@@ -29,7 +29,12 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.npm.run.description"),
-                        positionalArguments = scriptArguments(isOptional = true),
+                        positionalArguments =
+                            scriptArguments(
+                                scriptName = commandSpecText("spec.npm.run.argument.script.name"),
+                                argsName = commandSpecText("spec.npm.run.argument.args.name"),
+                                isOptional = true,
+                            ),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.npm.test.description"), aliases = listOf("t")),
                     TerminalCommandSpec("start", commandSpecText("spec.npm.start.description")),
@@ -60,7 +65,12 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.pnpm.run.description"),
-                        positionalArguments = scriptArguments(isOptional = true),
+                        positionalArguments =
+                            scriptArguments(
+                                scriptName = commandSpecText("spec.pnpm.run.argument.script.name"),
+                                argsName = commandSpecText("spec.pnpm.run.argument.args.name"),
+                                isOptional = true,
+                            ),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.pnpm.test.description"), aliases = listOf("t")),
                     TerminalCommandSpec("build", commandSpecText("spec.pnpm.build.description")),
@@ -90,7 +100,7 @@ internal object PackageManagerCommandSpecs {
                         listOf("--filter"),
                         commandSpecText("spec.pnpm.option.--filter.description"),
                         requiresValue = true,
-                        valueName = "selector",
+                        valueName = commandSpecText("spec.pnpm.option.--filter.valueName"),
                     ),
                     TerminalOptionSpec(listOf("--save-dev", "-D"), commandSpecText("spec.pnpm.option.--save-dev.description")),
                     TerminalOptionSpec(listOf("--save-peer"), commandSpecText("spec.pnpm.option.--save-peer.description")),
@@ -115,7 +125,12 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.yarn.run.description"),
-                        positionalArguments = scriptArguments(isOptional = false),
+                        positionalArguments =
+                            scriptArguments(
+                                scriptName = commandSpecText("spec.yarn.run.argument.script.name"),
+                                argsName = commandSpecText("spec.yarn.run.argument.args.name"),
+                                isOptional = false,
+                            ),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.yarn.test.description")),
                     TerminalCommandSpec("build", commandSpecText("spec.yarn.build.description")),
@@ -144,7 +159,12 @@ internal object PackageManagerCommandSpecs {
                     TerminalCommandSpec(
                         name = "run",
                         description = commandSpecText("spec.bun.run.description"),
-                        positionalArguments = scriptArguments(isOptional = true),
+                        positionalArguments =
+                            scriptArguments(
+                                scriptName = commandSpecText("spec.bun.run.argument.script.name"),
+                                argsName = commandSpecText("spec.bun.run.argument.args.name"),
+                                isOptional = true,
+                            ),
                     ),
                     TerminalCommandSpec("test", commandSpecText("spec.bun.test.description")),
                     TerminalCommandSpec("install", commandSpecText("spec.bun.install.description"), aliases = listOf("i")),
@@ -208,7 +228,7 @@ internal object PackageManagerCommandSpecs {
                         listOf("--features"),
                         commandSpecText("spec.cargo.option.--features.description"),
                         requiresValue = true,
-                        valueName = "features",
+                        valueName = commandSpecText("spec.cargo.option.--features.valueName"),
                     ),
                     TerminalOptionSpec(listOf("--all-features"), commandSpecText("spec.cargo.option.--all-features.description")),
                     TerminalOptionSpec(
@@ -225,7 +245,7 @@ internal object PackageManagerCommandSpecs {
                         listOf("-p", "--package"),
                         commandSpecText("spec.cargo.option.-p.description"),
                         requiresValue = true,
-                        valueName = "package",
+                        valueName = commandSpecText("spec.cargo.option.-p.valueName"),
                     ),
                 ),
         )
@@ -303,9 +323,13 @@ internal object PackageManagerCommandSpecs {
                 ),
         )
 
-    private fun scriptArguments(isOptional: Boolean): List<TerminalArgumentSpec> =
+    private fun scriptArguments(
+        scriptName: String,
+        argsName: String,
+        isOptional: Boolean,
+    ): List<TerminalArgumentSpec> =
         listOf(
-            TerminalArgumentSpec("script", isOptional = isOptional, valueDomain = TerminalCompletionValueDomain.NPM_SCRIPT),
-            TerminalArgumentSpec("args", isOptional = true, isVariadic = true),
+            TerminalArgumentSpec(scriptName, isOptional = isOptional, valueDomain = TerminalCompletionValueDomain.NPM_SCRIPT),
+            TerminalArgumentSpec(argsName, isOptional = true, isVariadic = true),
         )
 }
