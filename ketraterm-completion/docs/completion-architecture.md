@@ -164,6 +164,12 @@ empty strings, and no variable, glob, or command expansion occurs.
   flags, pending values, and the active word are excluded. The caller chooses
   first, last, or all values; no last-value-wins policy is imposed.
 
+`TerminalCompletionRequest.includeCommandNames` defaults to `true`. Hosts can set it
+to `false` for parameter-only completion: the engine resolves the context once and
+returns an empty snapshot at an executable name before source or native-completion
+work. Subcommands, options, and arguments remain eligible. Custom engines must
+honor the same request contract.
+
 ### Evaluation and failure behavior
 
 Collection starts a cold structured coroutine flow. The engine evaluates specs

@@ -46,6 +46,7 @@ fun main() =
                 )
             }
         val engine = TerminalCompletionEngines.fromSources(listOf(TerminalCompletionSourceEntry(source)))
+        check(engine.completions(TerminalCompletionRequest("he", 2, includeCommandNames = false)).last().isEmpty())
         val result = engine.completions(TerminalCompletionRequest("he", 2)).last().single()
         check(result.replacementText == "help" && result.feedbackToken === nativeItem)
         check(result.copy(score = result.score + 1).feedbackToken === nativeItem)

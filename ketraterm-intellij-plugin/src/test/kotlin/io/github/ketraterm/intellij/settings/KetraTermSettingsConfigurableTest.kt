@@ -28,6 +28,7 @@ import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfile
 import kotlinx.coroutines.CompletableDeferred
 import java.awt.Color
@@ -39,6 +40,63 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testAutomaticPopupModePersistsAndFollowsEnablement() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.replaceState(
+                original.copy(
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = true,
+                    shellSuggestionAutomaticMode = "parameters_only",
+                ),
+            )
+            val component = configurable.createComponent()
+
+            fun button(key: String) =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message(key)
+                }
+            val always = button("settings.ketraterm.shellSuggestions.always")
+            val parameters = button("settings.ketraterm.shellSuggestions.parameters")
+            val automatic = button("settings.ketraterm.shellSuggestions")
+            val master = button("settings.ketraterm.smartSuggestions")
+            assertTrue(parameters.isSelected)
+            assertFalse(configurable.isModified)
+            always.doClick()
+            assertTrue(configurable.isModified)
+            configurable.apply()
+            assertEquals("always", settings.state.shellSuggestionAutomaticMode)
+            parameters.doClick()
+            configurable.reset()
+            assertTrue(always.isSelected)
+            assertFalse(parameters.isSelected)
+            assertFalse(configurable.isModified)
+            parameters.doClick()
+            configurable.apply()
+            assertEquals("parameters_only", settings.state.shellSuggestionAutomaticMode)
+            assertEquals(
+                SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY,
+                settings.current().shellSuggestionAutomaticMode,
+            )
+            automatic.doClick()
+            assertFalse(always.isEnabled)
+            assertFalse(parameters.isEnabled)
+            automatic.doClick()
+            assertTrue(parameters.isEnabled)
+            assertTrue(parameters.isSelected)
+            master.doClick()
+            assertFalse(parameters.isEnabled)
+            configurable.reset()
+            assertTrue(parameters.isEnabled)
+            assertTrue(parameters.isSelected)
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testLearningResetConfirmsAndWaitsForSavedDataWhenSuggestionsAreDisabled() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

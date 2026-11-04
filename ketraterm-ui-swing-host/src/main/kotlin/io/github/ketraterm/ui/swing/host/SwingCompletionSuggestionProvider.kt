@@ -96,6 +96,7 @@ public class SwingCompletionSuggestionProvider
                         workingDirectoryUri = requestContext.workingDirectoryUri,
                         profileId = requestContext.profileId,
                         shellCapabilities = requestContext.shellCapabilities,
+                        includeCommandNames = request.includeCommandNames,
                     )
                 } catch (_: IllegalArgumentException) {
                     return flowOf(emptyList())

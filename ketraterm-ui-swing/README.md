@@ -230,9 +230,15 @@ The host retains ownership of engines, sources, persistence, and their resources
 
 The terminal coordinates automatic focus, eligibility, debounce, and session
 observation. `smartSuggestionsEnabled` gates all suggestions;
-`shellSuggestionsEnabled` gates automatic popups. An explicit
+`shellSuggestionsEnabled` gates automatic popups. Set `shellSuggestionAutomaticMode`
+to `SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY` to show automatic popups
+for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
-remains available when automatic popups are disabled. Use
+remains available when automatic popups are disabled or limited to parameters.
+Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
+using their shell-aware command context; the terminal sets it to `false` for
+parameter-only automatic requests. The shared completion adapter forwards it
+to the engine. Use
 `refreshShellSuggestions()` on the EDT when external context such as the working
 directory changes. It immediately cancels pending work and closes existing
 suggestions, including explicit requests. Automatic suggestions then refresh

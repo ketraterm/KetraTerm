@@ -116,6 +116,9 @@ public data class TerminalShellCapabilities
  * @property workingDirectoryUri optional current working directory URI.
  * @property profileId optional host profile id used by host-owned ranking data.
  * @property shellCapabilities resolved shell lexical and replacement policy.
+ * @property includeCommandNames whether executable-name positions are eligible. When false,
+ * engines return an empty snapshot at a command name, including after a shell operator.
+ * Subcommands, options, and positional arguments remain eligible.
  * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
  * or splits a UTF-16 surrogate pair.
  */
@@ -128,6 +131,7 @@ public data class TerminalCompletionRequest
         val workingDirectoryUri: String? = null,
         val profileId: String? = null,
         val shellCapabilities: TerminalShellCapabilities = PLAIN,
+        val includeCommandNames: Boolean = true,
     ) {
         init {
             require(cursorOffset in 0..commandLine.length) {

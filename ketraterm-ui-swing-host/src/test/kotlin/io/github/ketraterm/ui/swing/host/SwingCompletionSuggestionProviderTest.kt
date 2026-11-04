@@ -32,6 +32,20 @@ import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
     @Test
+    fun `command name eligibility reaches custom completion engines`() =
+        runBlocking {
+            val flags = ArrayList<Boolean>()
+            val provider =
+                SwingCompletionSuggestionProvider(engine = { request ->
+                    flags += request.includeCommandNames
+                    flowOf(emptyList())
+                })
+            provider.suggestions(SwingShellSuggestionRequest("git", 3, includeCommandNames = false)).last()
+            provider.suggestions(SwingShellSuggestionRequest("git", 3)).last()
+            assertEquals(listOf(false, true), flags)
+        }
+
+    @Test
     fun `opening captures context and feedback before deferred engine work`() =
         runBlocking {
             val initial = SwingCompletionContext(profileId = "bash", workingDirectoryUri = "file:///first")

@@ -35,6 +35,8 @@ public final class JavaConsumer {
         if (!"message".equals(option.getValueName())) throw new AssertionError("Missing option value name");
         TerminalCompletionShellProvider provider = (request, context, limit, continuation) ->
                 new TerminalCompletionShellResult(List.of(), "git.exe");
+        var parametersOnly = new TerminalCompletionRequest("git", 3, null, null, TerminalShellCapabilities.PLAIN, false);
+        if (parametersOnly.getIncludeCommandNames()) throw new AssertionError("Command-name restriction was lost");
         var request = new TerminalCompletionRequest("git --v", 7);
         var reply = (TerminalCompletionShellResult) provider.complete(request, TerminalCompletionContext.resolve(request), 10, null);
         if (!"git.exe".equals(reply.getExternalCommandName()) || !reply.getCandidates().isEmpty()) {

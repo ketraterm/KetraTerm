@@ -51,6 +51,39 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalShellSuggestionTest {
+    @Test
+    fun `automatic scope follows settings reload while explicit capture stays unrestricted`() {
+        var settings = SwingSettings.create { it.smartSuggestionsEnabled = true }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                fun capture(trigger: SwingShellSuggestionTrigger) =
+                    requireNotNull(
+                        terminal.beginShellSuggestionInteraction(
+                            request(),
+                            trigger,
+                            editTarget = SwingShellSuggestionEditTarget.NONE,
+                        ),
+                    )
+                val initial = capture(SwingShellSuggestionTrigger.AUTOMATIC)
+                assertTrue(initial.request.includeCommandNames)
+                settings = settings.copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY }
+                terminal.reloadSettings()
+                assertFalse(initial.isActive)
+                val parameters = capture(SwingShellSuggestionTrigger.AUTOMATIC)
+                assertFalse(parameters.request.includeCommandNames)
+                val explicit = capture(SwingShellSuggestionTrigger.EXPLICIT)
+                assertTrue(explicit.request.includeCommandNames)
+                settings = settings.copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.ALWAYS }
+                terminal.reloadSettings()
+                assertTrue(explicit.isActive)
+                assertTrue(capture(SwingShellSuggestionTrigger.AUTOMATIC).request.includeCommandNames)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
     private val mutationDispatcher = StandardTestDispatcher()
 
     @Test

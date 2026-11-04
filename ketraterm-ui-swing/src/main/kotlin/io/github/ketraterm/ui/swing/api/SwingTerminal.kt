@@ -1617,6 +1617,14 @@ public class SwingTerminal
                     preferredSize = preferredGridSize(next.columns, next.rows)
                     revalidate()
                 }
+                if (next.shellSuggestionAutomaticMode != previous.shellSuggestionAutomaticMode) {
+                    if (activeSuggestionInteraction == null || activeSuggestionIsAutomatic ||
+                        shellSuggestionController?.isRefreshing == true
+                    ) {
+                        cancelAndHideShellSuggestionsOnEdt("Automatic suggestion mode changed")
+                        suggestionScheduler?.refresh()
+                    }
+                }
                 updateAutomaticSuggestionEligibilityOnEdt()
                 reconcileSuggestionSchedulerOnEdt()
                 if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
@@ -2160,11 +2168,17 @@ public class SwingTerminal
         ): SwingShellSuggestionInteraction? {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion capture must run on the EDT" }
             val automatic = trigger == SwingShellSuggestionTrigger.AUTOMATIC
+            val effectiveRequest =
+                if (automatic && settings.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY) {
+                    request.copy(includeCommandNames = false)
+                } else {
+                    request
+                }
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return null
             val bound = session
             val observed =
                 bound?.activeShellCommandLine()?.takeIf {
-                    it.commandText == request.commandText && it.cursorOffset == request.cursorOffset
+                    it.commandText == effectiveRequest.commandText && it.cursorOffset == effectiveRequest.cursorOffset
                 }
             val revision = suggestionRevision + 1
             cancelAndHideShellSuggestionsOnEdt(
@@ -2175,8 +2189,8 @@ public class SwingTerminal
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
             val captured =
                 when {
-                    editTarget != null -> editTarget.capture(request)
-                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, request)
+                    editTarget != null -> editTarget.capture(effectiveRequest)
+                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest)
                     else -> SwingShellSuggestionHandler.NONE
                 } ?: run {
                     if (suggestionRevision == revision) shellSuggestionController?.hide()
@@ -2202,7 +2216,7 @@ public class SwingTerminal
 
                     override fun close() = captured.close()
                 }
-            val interaction = SwingShellSuggestionInteraction(request, handler, feedbackHandler)
+            val interaction = SwingShellSuggestionInteraction(effectiveRequest, handler, feedbackHandler)
             if (bound != null && observed != null) {
                 interaction.contextIsCurrent = { !bound.isClosed && bound.activeShellCommandLine() == observed }
             }

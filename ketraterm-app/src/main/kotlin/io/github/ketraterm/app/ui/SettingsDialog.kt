@@ -26,6 +26,7 @@ import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
@@ -252,6 +253,24 @@ internal class SettingsDialog(
         JCheckBox(appMessages.text("settings.smartSuggestions"), settings.config.smartSuggestionsEnabled)
     private val shellSuggestionsCheckbox =
         JCheckBox(appMessages.text("settings.shellSuggestions"), settings.config.shellSuggestionsEnabled)
+    private val automaticSuggestionsAlways =
+        JRadioButton(appMessages.text("settings.shellSuggestions.always")).apply {
+            isSelected = settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.ALWAYS
+            isOpaque = false
+        }
+    private val automaticSuggestionsParameters =
+        JRadioButton(appMessages.text("settings.shellSuggestions.parameters")).apply {
+            isSelected = settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+            isOpaque = false
+        }
+
+    init {
+        ButtonGroup().apply {
+            add(automaticSuggestionsAlways)
+            add(automaticSuggestionsParameters)
+        }
+    }
+
     private val acceptSelectedSuggestionWithEnterCheckbox =
         JCheckBox(appMessages.text("settings.acceptSuggestionWithEnter"), settings.config.acceptSelectedSuggestionWithEnter)
     private val persistentSuggestionLearningCheckbox =
@@ -361,6 +380,11 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(smartSuggestionsCheckbox, updateApplyState)
         registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(automaticSuggestionsAlways, updateApplyState)
+        registerChangeListener(automaticSuggestionsParameters, updateApplyState)
+        smartSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
+        shellSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
+        updateAutomaticSuggestionModes()
         registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
         registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
@@ -617,15 +641,29 @@ internal class SettingsDialog(
             shellSuggestionsCheckbox,
             appMessages.text("settings.shellSuggestions.description"),
         )
+        suggestionsSection.add(
+            JPanel().apply {
+                layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                isOpaque = false
+                add(automaticSuggestionsAlways)
+                add(automaticSuggestionsParameters)
+            },
+            GridBagConstraints().apply {
+                gridy = 4
+                gridwidth = 2
+                anchor = GridBagConstraints.WEST
+                insets = Insets(0, 24, 8, 0)
+            },
+        )
         addCheckboxRow(
             suggestionsSection,
-            4,
+            6,
             acceptSelectedSuggestionWithEnterCheckbox,
             appMessages.text("settings.acceptSuggestionWithEnter.description"),
         )
         addCheckboxRow(
             suggestionsSection,
-            6,
+            8,
             persistentSuggestionLearningCheckbox,
             appMessages.text("settings.persistSuggestionLearning.description"),
         )
@@ -637,7 +675,7 @@ internal class SettingsDialog(
                 add(learningResetStatus)
             },
             GridBagConstraints().apply {
-                gridy = 8
+                gridy = 10
                 gridwidth = 2
                 anchor = GridBagConstraints.WEST
                 insets = Insets(4, 0, 12, 0)
@@ -887,6 +925,8 @@ internal class SettingsDialog(
         shellRequestWindowManipulationCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
         shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
+        automaticSuggestionsAlways.isSelected = true
+        updateAutomaticSuggestionModes()
         acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
         persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = KetraTermConfig.DEFAULT_SCROLL_ON_OUTPUT
@@ -1065,6 +1105,12 @@ internal class SettingsDialog(
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
             smartSuggestionsEnabled = smartSuggestionsCheckbox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
+            shellSuggestionAutomaticMode =
+                if (automaticSuggestionsParameters.isSelected) {
+                    SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+                } else {
+                    SwingShellSuggestionAutomaticMode.ALWAYS
+                },
             acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
             persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
             clipboardWrite = clipboardWriteCombo.selectedItem as TerminalClipboardPermission,
@@ -1083,6 +1129,12 @@ internal class SettingsDialog(
         )
     }
 
+    private fun updateAutomaticSuggestionModes() {
+        val enabled = smartSuggestionsCheckbox.isSelected && shellSuggestionsCheckbox.isSelected
+        automaticSuggestionsAlways.isEnabled = enabled
+        automaticSuggestionsParameters.isEnabled = enabled
+    }
+
     private fun registerChangeListener(
         comp: Component,
         callback: () -> Unit,
@@ -1099,7 +1151,7 @@ internal class SettingsDialog(
                     },
                 )
             is JComboBox<*> -> comp.addActionListener { callback() }
-            is JCheckBox -> comp.addActionListener { callback() }
+            is AbstractButton -> comp.addActionListener { callback() }
             is JSpinner -> comp.addChangeListener { callback() }
         }
     }

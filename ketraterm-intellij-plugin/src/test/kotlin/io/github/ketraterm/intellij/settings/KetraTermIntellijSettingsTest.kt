@@ -28,6 +28,7 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
@@ -37,6 +38,20 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `automatic popup mode defaults for old XML normalizes invalid values and survives restart`() {
+        val service = KetraTermIntellijSettings()
+        service.loadState(Element("State").deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals("always", service.state.shellSuggestionAutomaticMode)
+        service.loadState(service.state.copy(shellSuggestionAutomaticMode = "invalid"))
+        assertEquals("always", service.state.shellSuggestionAutomaticMode)
+        service.replaceState(service.state.copy(themeId = "nord", shellSuggestionAutomaticMode = " PARAMETERS_ONLY "))
+        val restored = KetraTermIntellijSettings()
+        restored.loadState(requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals("parameters_only", restored.state.shellSuggestionAutomaticMode)
+        assertEquals(SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY, restored.current().shellSuggestionAutomaticMode)
+    }
+
     @Test
     fun `sticky headers default on for old XML and survive restart and Swing conversion`() {
         val service = KetraTermIntellijSettings()

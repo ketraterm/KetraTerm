@@ -30,6 +30,7 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import kotlinx.collections.immutable.persistentListOf
 import java.awt.Font
@@ -209,6 +210,7 @@ class KetraTermIntellijSettings :
      * @property addProjectJdkToPath whether new terminals use the project JDK for `JAVA_HOME` and prepend its `bin` to `PATH`.
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property smartSuggestionsEnabled master switch for completion resources and requests.
+     * @property shellSuggestionAutomaticMode persisted automatic popup scope (`always` or `parameters_only`).
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
      * may appear automatically. Explicit requests require only [smartSuggestionsEnabled].
      * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
@@ -269,6 +271,8 @@ class KetraTermIntellijSettings :
         @JvmField val smartSuggestionsEnabled: Boolean = DEFAULT_SMART_SUGGESTIONS_ENABLED,
         @OptionTag
         @JvmField val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @OptionTag
+        @JvmField val shellSuggestionAutomaticMode: String = "always",
         @OptionTag
         @JvmField val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @OptionTag
@@ -373,6 +377,12 @@ internal object KetraTermIntellijSettingsNormalizer {
     fun normalize(state: KetraTermIntellijSettings.State): KetraTermIntellijSettings.State =
         state.copy(
             themeId = KetraTermIntellijSettings.normalizeThemeId(state.themeId),
+            shellSuggestionAutomaticMode =
+                SwingShellSuggestionAutomaticMode.entries
+                    .firstOrNull {
+                        it.name.equals(state.shellSuggestionAutomaticMode.trim(), ignoreCase = true)
+                    }?.name
+                    ?.lowercase(Locale.ROOT) ?: "always",
             fontFamily = normalizeFontFamily(state.fontFamily),
             fallbackFontFamily = normalizeFontFamily(state.fallbackFontFamily),
             fontSize =
@@ -531,6 +541,10 @@ internal object KetraTermIntellijSettingsMapper {
             draft.lineHeight = state.lineHeight
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled
+            draft.shellSuggestionAutomaticMode =
+                SwingShellSuggestionAutomaticMode.entries.first {
+                    it.name.equals(state.shellSuggestionAutomaticMode, ignoreCase = true)
+                }
             draft.acceptSelectedSuggestionWithEnter = state.acceptSelectedSuggestionWithEnter
             draft.shellSuggestionStyle =
                 SwingShellSuggestionStyle(

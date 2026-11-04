@@ -167,6 +167,12 @@ public final class JavaConsumer {
             || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
             || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
             throw new AssertionError("Java color policies did not survive copying");
+        var parameterSettings = copiedSettings.copy(draft -> draft.setShellSuggestionAutomaticMode(
+                io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY));
+        if (parameterSettings.getShellSuggestionAutomaticMode()
+                != io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+                || new io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest("git", 3, false).getIncludeCommandNames())
+            throw new AssertionError("Java automatic completion mode was lost");
         if (new SwingSettings().getMinimumContrastRatio() != 3.0)
             throw new AssertionError("Java default contrast policy changed");
         var paletteSelection = copiedSettings.copy(draft -> draft.resetSelectionStyle());

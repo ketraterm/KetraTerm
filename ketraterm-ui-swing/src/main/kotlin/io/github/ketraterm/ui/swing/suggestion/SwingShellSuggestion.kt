@@ -266,18 +266,24 @@ public data class SwingShellSuggestionState(
  *
  * @property commandText visible command-line text known to the provider.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
+ * @property includeCommandNames whether executable-name positions are eligible. Providers
+ * must return no candidates at a command name when false, using their shell-aware context.
+ * Subcommands, options, and positional arguments remain eligible.
  */
 @ExperimentalShellSuggestionsApi
-public data class SwingShellSuggestionRequest(
-    val commandText: String,
-    val cursorOffset: Int,
-) {
-    init {
-        require(cursorOffset in 0..commandText.length) {
-            "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+public data class SwingShellSuggestionRequest
+    @JvmOverloads
+    constructor(
+        val commandText: String,
+        val cursorOffset: Int,
+        val includeCommandNames: Boolean = true,
+    ) {
+        init {
+            require(cursorOffset in 0..commandText.length) {
+                "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+            }
         }
     }
-}
 
 /** Determines whether a provider request follows automatic observation or an explicit user action. */
 @ExperimentalShellSuggestionsApi
@@ -352,7 +358,8 @@ public fun interface SwingShellSuggestionProvider {
      *
      * The reusable Swing terminal invokes this on [kotlinx.coroutines.Dispatchers.Default],
      * outside the Swing Event Dispatch Thread. Implementations must cooperate
-     * with cancellation when a newer request replaces the current one.
+     * with cancellation when a newer request replaces the current one, and honor
+     * [SwingShellSuggestionRequest.includeCommandNames] before querying their sources.
      *
      * @param request command-line context.
      * @return cold stream of ordered suggestion snapshots, best first.

@@ -650,6 +650,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
+	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -715,6 +716,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
+	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -774,6 +776,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationPromptDotHoverColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotHoverHaloColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
+	public final fun setShellSuggestionAutomaticMode (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;)V
 	public final fun setShellSuggestionStyle (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V
@@ -995,6 +998,14 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionA
 	public static fun values ()[Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 }
 
+public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode : java/lang/Enum {
+	public static final field ALWAYS Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static final field PARAMETERS_ONLY Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+}
+
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason : java/lang/Enum {
 	public static final field ACCEPTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;
 	public static final field CANCELLED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;
@@ -1181,13 +1192,17 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionR
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest {
 	public fun <init> (Ljava/lang/String;I)V
+	public fun <init> (Ljava/lang/String;IZ)V
+	public synthetic fun <init> (Ljava/lang/String;IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()I
-	public final fun copy (Ljava/lang/String;I)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
-	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/lang/String;IILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;IZ)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/lang/String;IZILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommandText ()Ljava/lang/String;
 	public final fun getCursorOffset ()I
+	public final fun getIncludeCommandNames ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

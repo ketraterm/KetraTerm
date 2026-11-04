@@ -36,6 +36,8 @@ public fun interface TerminalCompletionEngine {
      * Each emission contains the globally reranked union of every source that
      * has completed so far. Implementations must not mutate terminal state or
      * perform UI work. Cancelling collection must cancel all source work.
+     * Implementations must honor [TerminalCompletionRequest.includeCommandNames] using the
+     * resolved command position before querying sources.
      *
      * @param request command-line completion context.
      * @return cold stream of ordered completion snapshots.

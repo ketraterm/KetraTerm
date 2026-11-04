@@ -23,6 +23,7 @@ import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -46,6 +47,38 @@ import kotlin.test.assertTrue
 
 @Tag("desktop")
 class SettingsDialogDesktopTest {
+    @Test
+    fun `automatic popup modes preserve disabled selection and persist through the settings dialog`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val buttons = components(dialog).filterIsInstance<AbstractButton>().associateBy { it.text }
+                val always = buttons.getValue("Always")
+                val parameters = buttons.getValue("Only for parameters")
+                val automatic = buttons.getValue("Show shell suggestions automatically")
+                assertTrue(always.isSelected)
+                assertFalse(parameters.isEnabled)
+                automatic.doClick()
+                parameters.doClick()
+                assertTrue(parameters.isSelected)
+                assertFalse(always.isSelected)
+                assertTrue(button(dialog, "Apply").isEnabled)
+                automatic.doClick()
+                assertFalse(parameters.isEnabled)
+                assertFalse(always.isEnabled)
+                automatic.doClick()
+                assertTrue(parameters.isEnabled)
+                assertTrue(parameters.isSelected)
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertEquals(
+                SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY,
+                settings.config.shellSuggestionAutomaticMode,
+            )
+            assertEquals(settings.config.shellSuggestionAutomaticMode, settings.current().shellSuggestionAutomaticMode)
+        }
+    }
+
     @Test
     fun `command alert controls reset and persist independently of completion`() {
         withDialog { settings, dialog, closed ->

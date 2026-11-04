@@ -19,6 +19,7 @@ import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 import org.junit.jupiter.api.io.TempDir
@@ -29,6 +30,22 @@ import java.util.*
 import kotlin.test.*
 
 class KetraTermConfigTest {
+    @Test
+    fun `automatic suggestion mode defaults safely and survives configuration persistence`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("config.toml")
+        val manager = KetraTermConfigManager(path)
+        for (raw in listOf("", "shell_suggestion_automatic_mode = \"invalid\"")) {
+            Files.writeString(path, "[behavior]\n$raw\n")
+            assertEquals(SwingShellSuggestionAutomaticMode.ALWAYS, manager.load().shellSuggestionAutomaticMode)
+        }
+        val mode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+        manager.save(manager.load().copy(shellSuggestionAutomaticMode = mode))
+        assertEquals(mode, manager.load().shellSuggestionAutomaticMode)
+        assertEquals(mode, KetraTermSettings(manager).current().shellSuggestionAutomaticMode)
+    }
+
     @Test
     fun `sticky headers default on and survive config restart`(
         @TempDir directory: Path,

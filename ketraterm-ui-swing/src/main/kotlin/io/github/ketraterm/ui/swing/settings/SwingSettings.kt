@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.api.SwingHyperlinkActivation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import java.awt.Font
@@ -108,6 +109,7 @@ import java.util.*
  * @property cursorShape default cursor shape configured for the session.
  * @property lineHeight finite positive vertical line height scaling factor.
  * @property smartSuggestionsEnabled master switch for all shell suggestion requests and presentation.
+ * @property shellSuggestionAutomaticMode automatic popup scope; explicit requests ignore this setting.
  * @property shellSuggestionsEnabled whether hosts may request shell suggestion
  * popups automatically. Explicit requests require only [smartSuggestionsEnabled].
  * @property acceptSelectedSuggestionWithEnter whether an unmodified Enter key
@@ -308,6 +310,10 @@ public class SwingSettings private constructor(
 
     @ExperimentalShellSuggestionsApi
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
+
+    /** Scope of automatic completion requests; explicit requests remain unrestricted. */
+    @ExperimentalShellSuggestionsApi
+    public val shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode = builder.shellSuggestionAutomaticMode
 
     @ExperimentalShellSuggestionsApi
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
@@ -540,6 +546,11 @@ public class SwingSettings private constructor(
         @ExperimentalShellSuggestionsApi
         public var shellSuggestionsEnabled: Boolean = source?.shellSuggestionsEnabled ?: true
 
+        /** Draft value for [SwingSettings.shellSuggestionAutomaticMode]. */
+        @ExperimentalShellSuggestionsApi
+        public var shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode =
+            source?.shellSuggestionAutomaticMode ?: SwingShellSuggestionAutomaticMode.ALWAYS
+
         /** Draft value for [SwingSettings.acceptSelectedSuggestionWithEnter]; validated when [build] is called. */
         @ExperimentalShellSuggestionsApi
         public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
@@ -616,6 +627,7 @@ public class SwingSettings private constructor(
             middleClickPasteSource == other.middleClickPasteSource &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
+            shellSuggestionAutomaticMode == other.shellSuggestionAutomaticMode &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
             shellSuggestionStyle == other.shellSuggestionStyle &&
             scrollOnOutput == other.scrollOnOutput &&
@@ -676,6 +688,7 @@ public class SwingSettings private constructor(
         result = 31 * result + middleClickPasteSource.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
+        result = 31 * result + shellSuggestionAutomaticMode.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
         result = 31 * result + shellSuggestionStyle.hashCode()
         result = 31 * result + scrollOnOutput.hashCode()

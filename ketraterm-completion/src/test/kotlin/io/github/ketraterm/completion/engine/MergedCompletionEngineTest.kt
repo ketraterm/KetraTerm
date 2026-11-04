@@ -29,6 +29,78 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class MergedCompletionEngineTest {
     @Test
+    fun `parameter only requests reject command positions before source or native completion`() =
+        runTest {
+            var queries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, _, _ ->
+                                queries++
+                                emptyList()
+                            }),
+                        ),
+                    shellProvider =
+                        shellProvider { _, _, _ ->
+                            queries++
+                            emptyList()
+                        },
+                )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for (line in listOf("", "gi", "git | ca", "git && ca")) {
+                    val request = TerminalCompletionRequest(line, line.length, shellCapabilities = shell, includeCommandNames = false)
+                    assertEquals(listOf(emptyList()), engine.completions(request).toList(), line)
+                }
+            }
+            assertEquals(0, queries)
+        }
+
+    @Test
+    fun `parameter only requests keep subcommands options and arguments while defaults keep commands`() =
+        runTest {
+            var queries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, context, _ ->
+                                queries++
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        "candidate",
+                                        context.replacementStartOffset,
+                                        context.replacementEndOffset,
+                                        "custom",
+                                        TerminalCompletionCandidateKind.ARGUMENT,
+                                    ),
+                                )
+                            }),
+                        ),
+                )
+            for (line in listOf("git ", "git sw", "git --v", "cat fi")) {
+                val request = TerminalCompletionRequest(line, line.length, includeCommandNames = false)
+                assertTrue(
+                    engine
+                        .completions(request)
+                        .toList()
+                        .last()
+                        .isNotEmpty(),
+                    line,
+                )
+            }
+            assertEquals(4, queries)
+            assertTrue(
+                engine
+                    .completions(TerminalCompletionRequest("gi", 2))
+                    .toList()
+                    .last()
+                    .isNotEmpty(),
+            )
+            assertEquals(5, queries)
+        }
+
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun `late empty source does not clear or republish useful results`() =
         runTest {

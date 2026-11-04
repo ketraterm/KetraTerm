@@ -21,7 +21,9 @@ the same stability contract.
 
 Completion and automatic suggestions are **enabled by default in both products**.
 Settings expose the master switch, automatic popups, Enter acceptance, and optional
-learning persistence. Standalone users can also set `smart_suggestions_enabled`
+learning persistence. Automatic popups can appear **Always** (the default) or
+**Only for parameters**. Parameter-only mode includes subcommands, options, and
+arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Explicit saved preferences remain effective.
 Library hosts enable and configure their own provider and presentation.

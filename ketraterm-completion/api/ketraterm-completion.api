@@ -180,17 +180,20 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionRequest 
 	public fun <init> (Ljava/lang/String;ILjava/lang/String;)V
 	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)V
-	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;Z)V
+	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()I
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
-	public final fun copy (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
-	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public final fun component6 ()Z
+	public final fun copy (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;Z)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ZILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommandLine ()Ljava/lang/String;
 	public final fun getCursorOffset ()I
+	public final fun getIncludeCommandNames ()Z
 	public final fun getProfileId ()Ljava/lang/String;
 	public final fun getShellCapabilities ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
 	public final fun getWorkingDirectoryUri ()Ljava/lang/String;

@@ -46,7 +46,9 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
@@ -147,6 +149,13 @@ fun main() =
         check(promptColors.shellIntegrationPromptDividerHoverColor == 0xFF4B6EAF.toInt())
         check(promptColors.copy { it.shellIntegrationPromptDividerColor = null }.shellIntegrationPromptDividerColor == null)
         check(promptColors.copy { it.shellIntegrationPromptDotHoverHaloColor = 0 }.shellIntegrationPromptDotHoverHaloColor == 0)
+        val parameterSettings =
+            interactionSettings.copy {
+                it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+            }
+        check(parameterSettings != interactionSettings)
+        check(parameterSettings.toBuilder().build().shellSuggestionAutomaticMode == parameterSettings.shellSuggestionAutomaticMode)
+        check(!SwingShellSuggestionRequest("git", 3, includeCommandNames = false).includeCommandNames)
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)
         val arrowSettings = interactionSettings.copy { it.alternateScreenWheelToArrowEnabled = true }

@@ -76,7 +76,9 @@ internal class MergedCompletionEngine(
 
             val aliases = callShellProvider { shellProvider?.commandAliases() }.orEmpty()
             val resolvedContext = TerminalCompletionContext.resolve(request, commandSpecs, aliases)
-            if (!resolvedContext.isCompletionAllowed) {
+            if (!resolvedContext.isCompletionAllowed ||
+                (!request.includeCommandNames && resolvedContext.activePosition == TerminalCompletionActivePosition.COMMAND)
+            ) {
                 send(emptyList())
                 return@channelFlow
             }
