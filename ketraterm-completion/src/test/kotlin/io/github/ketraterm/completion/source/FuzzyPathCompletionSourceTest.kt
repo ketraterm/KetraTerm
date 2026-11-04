@@ -19,10 +19,33 @@ import io.github.ketraterm.completion.api.*
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** Tests context-aware completion from host-owned ready fuzzy path matches. */
 class FuzzyPathCompletionSourceTest {
+    @Test
+    fun `host matches survive shell quoting and directory suffixes without rematching`(): Unit =
+        runBlocking {
+            val path = "notes/My Folder"
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(6, 8, 9, 10))
+            val source =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "project-file",
+                    entriesProvider =
+                        { _, _ ->
+                            listOf(TerminalFuzzyPathEntry(path, true, matchedRanges = ranges))
+                        },
+                )
+
+            val candidate = source.complete(request("cd MyF")).single()
+
+            assertEquals("notes/My\\ Folder/", candidate.replacementText)
+            assertEquals("notes/My Folder/", candidate.displayText)
+            assertEquals(ranges, candidate.matchedRanges)
+            assertFailsWith<IllegalArgumentException> { TerminalFuzzyPathEntry("short", false, matchedRanges = ranges) }
+        }
+
     private val entriesByPrefix =
         mapOf(
             "FzT" to

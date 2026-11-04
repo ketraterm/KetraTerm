@@ -36,7 +36,7 @@ import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
  * @property selectionMatchBackground selected fragment background; defaults to [selectionBackground]
  * at construction. These are independent values afterwards, including when using [copy].
  * @property border popup outline; zero alpha omits it.
- * @property secondaryForeground overflow counter foreground.
+ * @property secondaryForeground overflow counter and ordinary path-parent foreground.
  * @property argumentHintForeground ordinary argument-placeholder foreground; defaults to [secondaryForeground] at construction.
  * @property selectionArgumentHintForeground selected argument-placeholder foreground; defaults to [argumentHintForeground].
  * These are concrete independent values after construction, including when using [copy].

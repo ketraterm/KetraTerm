@@ -17,15 +17,85 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.KeyEvent
 import javax.swing.JPanel
+import kotlin.time.Duration.Companion.milliseconds
 
 class SwingShellSuggestionControllerTest {
     private val source = JPanel()
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `slow refresh expires old rows without disconnecting the new publication`() =
+        onEdt {
+            val scope = TestScope()
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), presentationScope = scope)
+            val old = SwingShellSuggestionInteraction(request("old"))
+            val next = SwingShellSuggestionInteraction(request("new"))
+            try {
+                old.publish(suggestions(2))
+                controller.present(old)
+                controller.retainPresentation()
+                old.close()
+                controller.present(next)
+                scope.advanceTimeBy(150.milliseconds)
+                assertTrue(controller.state().visible)
+                // Another keystroke must not extend the lifetime of obsolete rows.
+                controller.retainPresentation()
+                controller.present(next)
+                scope.advanceTimeBy(50.milliseconds)
+                scope.runCurrent()
+                assertFalse(controller.state().visible)
+                assertTrue(next.isActive)
+
+                next.publish(suggestions(3))
+                assertTrue(controller.state().visible)
+                assertEquals(3, controller.state().count)
+            } finally {
+                controller.close()
+                old.close()
+                next.close()
+                scope.cancel()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `fresh publication cancels expiry of retained presentation`() =
+        onEdt {
+            val scope = TestScope()
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), presentationScope = scope)
+            val old = SwingShellSuggestionInteraction(request("old"))
+            val next = SwingShellSuggestionInteraction(request("new"))
+            try {
+                old.publish(suggestions(2))
+                controller.present(old)
+                controller.retainPresentation()
+                old.close()
+                controller.present(next)
+                scope.advanceTimeBy(75.milliseconds)
+                next.publish(suggestions(3))
+                scope.advanceTimeBy(500.milliseconds)
+                scope.runCurrent()
+                assertTrue(controller.state().visible)
+                assertEquals(3, controller.state().count)
+                assertFalse(controller.isRefreshing)
+            } finally {
+                controller.close()
+                old.close()
+                next.close()
+                scope.cancel()
+            }
+        }
 
     @Test
     fun `reentrant replacement owns the popup state and publication`() =
@@ -197,7 +267,8 @@ class SwingShellSuggestionControllerTest {
                         if (snapshot.selectedIndex >= 0) interaction.close(SwingShellSuggestionCloseReason.INVALIDATED)
                     }
                 }
-            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { view })
+            val scope = TestScope()
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { view }, presentationScope = scope)
             controller.present(interaction)
             val event = keyPressed(keyCode)
 
@@ -207,6 +278,7 @@ class SwingShellSuggestionControllerTest {
             assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, interaction.closeReason)
             assertFalse(controller.state().visible)
             controller.close()
+            scope.cancel()
         }
 
     @Test
@@ -920,7 +992,8 @@ class SwingShellSuggestionControllerTest {
         private val host: RecordingSuggestionHost,
         viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
     ) {
-        private val presenter = SwingShellSuggestionController(host, viewFactory)
+        private val presentationScope = TestScope()
+        private val presenter = SwingShellSuggestionController(host, viewFactory, presentationScope)
         private var current: SwingShellSuggestionInteraction? = null
 
         val popup get() = presenter.popup
@@ -956,7 +1029,13 @@ class SwingShellSuggestionControllerTest {
 
         fun hide(): Boolean = presenter.hide()
 
-        fun close() = presenter.close()
+        fun close() {
+            try {
+                presenter.close()
+            } finally {
+                presentationScope.cancel()
+            }
+        }
     }
 
     private class RecordingSuggestionHost(

@@ -100,6 +100,7 @@ internal class IntellijGitStatusPathLoader(
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         val normalizedPrefix = prefix.replace('\\', '/')
+        val pathMatcher = IntellijCompletionPathMatcher(normalizedPrefix)
         val changedFileDetail = KetraTermBundle.message("completion.detail.changedFile")
         val untrackedFileDetail = KetraTermBundle.message("completion.detail.untrackedFile")
         return readPort.read(workingDirectoryUri) { model ->
@@ -122,7 +123,13 @@ internal class IntellijGitStatusPathLoader(
                 if (retainedPaths.add(relativePath)) {
                     retained +=
                         ScoredGitStatusPath(
-                            entry = TerminalFuzzyPathEntry(relativePath, isDirectory = isDirectory, detail = detail),
+                            entry =
+                                TerminalFuzzyPathEntry(
+                                    relativePath,
+                                    isDirectory = isDirectory,
+                                    detail = detail,
+                                    matchedRanges = pathMatcher.ranges(relativePath),
+                                ),
                             score = score,
                         )
                 }

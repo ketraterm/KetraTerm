@@ -156,7 +156,7 @@ class SwingCompletionPipelineTest {
                         val oldPublication = publication(old)
                         val line = "git switch feature/lox --quiet"
                         val current = onEdt { begin(terminal, provider, line, line.indexOf('x'), accepted) }
-                        val results = publication(current)
+                        val results = publication(current) { snapshot -> snapshot.suggestions.any { it.source == "git" } }
                         onEdt {
                             assertEquals(SwingShellSuggestionAcceptanceResult.STALE_CONTEXT, old.tryAccept(oldPublication, 0))
                             assertEquals("git", results.suggestions.first().source)
@@ -263,11 +263,14 @@ class SwingCompletionPipelineTest {
         return interaction
     }
 
-    private suspend fun publication(interaction: SwingShellSuggestionInteraction): SwingShellSuggestionSnapshot {
+    private suspend fun publication(
+        interaction: SwingShellSuggestionInteraction,
+        readyWhen: (SwingShellSuggestionSnapshot) -> Boolean = { it.suggestions.isNotEmpty() },
+    ): SwingShellSuggestionSnapshot {
         val ready = CompletableDeferred<SwingShellSuggestionSnapshot>()
         val listener =
             SwingShellSuggestionInteractionListener {
-                if (it.snapshot.suggestions.isNotEmpty()) ready.complete(it.snapshot)
+                if (readyWhen(it.snapshot)) ready.complete(it.snapshot)
             }
         onEdt {
             interaction.addChangeListener(listener)

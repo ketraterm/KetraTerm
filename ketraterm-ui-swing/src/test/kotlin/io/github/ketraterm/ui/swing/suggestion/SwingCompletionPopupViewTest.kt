@@ -37,6 +37,145 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
+    @ParameterizedTest
+    @CsvSource("/file.txt, /", "C:\\file.txt, C:\\", "../file.txt, ..")
+    fun `root and navigation context survives name first presentation`(
+        path: String,
+        parent: String,
+    ) = onEdt {
+        val candidate = suggestion(path).copy(kind = "PATH")
+        val view = createView(RecordingListener())
+        try {
+            view.update(snapshot(listOf(candidate), -1, 1, 0))
+            val row = view.renderedLabel(candidate)
+            assertTrue(row.text.startsWith("<html>file.txt"))
+            assertTrue(row.text.endsWith("$parent</span></html>"))
+            assertEquals(path, row.accessibleContext.accessibleName)
+        } finally {
+            view.close()
+        }
+    }
+
+    @Test
+    fun `path shortening preserves deep matching graphemes and escapes full path tooltips`() =
+        onEdt {
+            val parent = "module/" + "unmatched/".repeat(12) + "target\uD83D\uDE80e\u0301/" + "unmatched/".repeat(12)
+            val path = parent + "leaf<&>.txt"
+            val start = path.indexOf("target")
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                            path,
+                            intArrayOf(start, start + "target\uD83D\uDE80e\u0301".length),
+                        ),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(350, 40)
+                val row = view.renderedLabel(candidate)
+                assertTrue(row.text.startsWith("<html>leaf&lt;&amp;&gt;.txt"))
+                assertTrue(row.text.contains(">target\uD83D\uDE80e\u0301</b>"))
+                assertTrue(row.text.contains('\u2026'))
+                assertTrue(row.toolTipText.contains("leaf&lt;&amp;&gt;.txt"))
+                assertEquals(path, row.accessibleContext.accessibleName)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `nested paths show highlighted names first with muted parent context and full paths on hover`() =
+        onEdt {
+            val path = "module/rendering/runs/gaps-build.log"
+            val nameStart = path.indexOf("gaps-")
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    accentRole = SwingShellSuggestionAccentRole.PATH,
+                    replacementText = "'module/rendering/runs/gaps-build.log'",
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                            path,
+                            intArrayOf(nameStart, nameStart + 1, nameStart + 5, nameStart + 6),
+                        ),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.applyStyle(
+                    SwingShellSuggestionStyle(secondaryForeground = 0xFF123456.toInt(), selectionForeground = 0xFF654321.toInt()),
+                )
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(450, 40)
+                val row = view.renderedLabel(candidate)
+                assertTrue(row.text.startsWith("<html><b "))
+                assertTrue(row.text.indexOf("uild.log") < row.text.indexOf("module"))
+                assertTrue(row.text.contains("color:#123456"))
+                assertTrue(row.text.contains(">g</b>aps-<b "))
+                assertEquals("<html>$path</html>", row.toolTipText)
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertEquals("'module/rendering/runs/gaps-build.log'", candidate.replacementText)
+
+                val selected = view.renderedLabel(candidate, selected = true)
+                assertTrue(selected.text.contains("color:#654321"))
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `deep paths shorten parent context to width and recompute for font and size changes`() =
+        onEdt {
+            val path = "module/" + "deep-directory/".repeat(30) + "leaf.txt"
+            val candidate = suggestion(path).copy(kind = "PATH", accentRole = SwingShellSuggestionAccentRole.PATH)
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+
+                fun label(width: Int): String {
+                    view.list.setSize(width, 40)
+                    val label = view.renderedLabel(candidate)
+                    return label.text
+                }
+                val narrow = label(260)
+                assertTrue(narrow.startsWith("<html>leaf.txt"))
+                assertTrue(narrow.contains('\u2026'))
+                assertFalse(narrow.contains("deep-directory/deep-directory/deep-directory"))
+                val wide = label(480)
+                assertTrue(wide.length > narrow.length)
+                view.font = view.list.font.deriveFont(26f)
+                val enlarged = label(480)
+                assertTrue(enlarged.length < wide.length)
+                assertEquals(path, candidate.displayText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `directory paths retain trailing separators and distinguish equal names by parents`() =
+        onEdt {
+            val candidates =
+                listOf("client/src/main/", "server/src/main/").map {
+                    suggestion(it).copy(kind = "PATH", accentRole = SwingShellSuggestionAccentRole.PATH)
+                }
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(candidates, -1, 2, 0))
+                val labels =
+                    candidates.mapIndexed { index, candidate ->
+                        (view.renderedLabel(candidate, index)).text
+                    }
+                assertTrue(labels.all { it.startsWith("<html>main/") })
+                assertTrue(labels[0].contains("client/src"))
+                assertTrue(labels[1].contains("server/src"))
+            } finally {
+                view.close()
+            }
+        }
+
     @Test
     fun `font changes scale rows icons and popup bounds without replacing the publication`() =
         onEdt {
@@ -874,6 +1013,12 @@ class SwingCompletionPopupViewTest {
             detail = detail,
             sourceDisplayText = sourceDisplayText,
         )
+
+    private fun SwingCompletionPopupView.renderedLabel(
+        candidate: SwingShellSuggestion,
+        index: Int = 0,
+        selected: Boolean = false,
+    ): javax.swing.JLabel = list.cellRenderer.getListCellRendererComponent(list, candidate, index, selected, false) as javax.swing.JLabel
 
     private fun imageContainsNonTransparentPixel(image: BufferedImage): Boolean {
         var y = 0

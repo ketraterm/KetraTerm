@@ -30,6 +30,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** IntelliJ fixture tests for project-file completion through Go to File. */
 class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
+    fun testTerminalOutsideTheIndexedProjectDoesNotSearchItsFiles() {
+        myFixture.addFileToProject("settings.gradle.kts", "")
+        var resolutions = 0
+        val loader =
+            IntellijProjectFileLoader(project) { file ->
+                resolutions++
+                Path.of(requireNotNull(project.basePath)).resolve(file.name)
+            }
+        val otherProject = Path.of(requireNotNull(project.basePath)).resolveSibling("another-terminal-project")
+
+        val entries = runBlocking { loader.load(otherProject.toUri().toString(), "sgk") }
+
+        assertEmpty(entries)
+        assertEquals(0, resolutions)
+    }
+
     /** Verifies that a non-contiguous query uses IntelliJ's project-file search. */
     fun testNonContiguousQueryFindsProjectFile() {
         myFixture.addFileToProject("settings.gradle.kts", "")
@@ -37,6 +53,15 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
         val entries = load("sgk")
 
         assertTrue(entries.toString(), entries.any { it.path == "settings.gradle.kts" })
+        val match = entries.single { it.path == "settings.gradle.kts" }
+        assertEquals(
+            "sgk",
+            buildString {
+                for (index in 0 until match.matchedRanges.rangeCount) {
+                    append(match.path.substring(match.matchedRanges.startOffset(index), match.matchedRanges.endOffset(index)))
+                }
+            },
+        )
     }
 
     /** Verifies that IntelliJ applies an explicit fuzzy directory qualifier. */

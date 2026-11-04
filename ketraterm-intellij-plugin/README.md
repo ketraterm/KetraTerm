@@ -39,6 +39,9 @@ focus, and their text omits the command line.
 Completion is enabled by default and configurable in KetraTerm settings; see
 [completion availability](../docs/features/completion.md#availability).
 The popup follows IDE colors and your configured terminal font.
+Project-indexed file suggestions apply while the terminal is inside this project's
+content roots. After changing to another project, filesystem and shell completion
+follow the terminal's current directory without searching the original project's index.
 
 The **Project** settings page accepts a single startup command. The command is
 submitted once after shell readiness, including in restored tabs; typing before

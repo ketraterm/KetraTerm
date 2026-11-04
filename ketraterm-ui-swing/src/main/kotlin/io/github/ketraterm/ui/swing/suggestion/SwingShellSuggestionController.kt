@@ -17,12 +17,19 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.*
 import java.awt.event.KeyEvent
+import kotlin.time.Duration.Companion.milliseconds
 
-/** Embedded presentation adapter; the request interaction owns candidates, selection, admission, and feedback. */
+/**
+ * Embedded presentation adapter; the request interaction owns candidates, selection, admission, and feedback.
+ *
+ * @param presentationScope component-owned EDT scope for the bounded refresh grace period.
+ */
 internal class SwingShellSuggestionController(
     private val host: SwingShellSuggestionHost,
     viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
+    private val presentationScope: CoroutineScope,
 ) {
     private var interaction: SwingShellSuggestionInteraction? = null
     private var viewportStartIndex = 0
@@ -30,6 +37,7 @@ internal class SwingShellSuggestionController(
     private var anchorRow = 0
     private var presentationRevision = 0L
     private var visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var retentionJob: Job? = null
     var isRefreshing: Boolean = false
         private set
     private val changeListener =
@@ -95,6 +103,17 @@ internal class SwingShellSuggestionController(
         interaction?.removeChangeListener(changeListener)
         interaction = null
         isRefreshing = true
+        if (retentionJob == null) {
+            retentionJob =
+                presentationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    delay(RETAINED_PRESENTATION_GRACE)
+                    retentionJob = null
+                    if (isRefreshing) {
+                        presentationRevision++
+                        clearPresentation()
+                    }
+                }
+        }
     }
 
     fun present(
@@ -118,13 +137,20 @@ internal class SwingShellSuggestionController(
     }
 
     fun hide(): Boolean {
+        retentionJob?.cancel()
+        retentionJob = null
+        isRefreshing = false
         if (interaction == null && !view.component.isVisible && visualSnapshot.visibleSuggestions.isEmpty()) return false
         presentationRevision++
         interaction?.removeChangeListener(changeListener)
         interaction = null
-        isRefreshing = false
         viewportStartIndex = 0
         val changed = view.component.isVisible || visualSnapshot.visibleSuggestions.isNotEmpty()
+        clearPresentation()
+        return changed
+    }
+
+    private fun clearPresentation() {
         visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
         cleanupSwingResources(
             { view.component.isVisible = false },
@@ -132,7 +158,6 @@ internal class SwingShellSuggestionController(
             host::revalidate,
             host::repaint,
         )
-        return changed
     }
 
     fun close() = cleanupSwingResources({ hide() }, view::close)
@@ -264,6 +289,8 @@ internal class SwingShellSuggestionController(
         if (isRefreshing && !active.hasPublication) return
         if (isRefreshing) {
             isRefreshing = false
+            retentionJob?.cancel()
+            retentionJob = null
             val previous = visualSnapshot.publication
             val outcome = previous?.selectedSuggestion?.commandTextAfterReplacement(previous.owner.request)
             if (outcome != null) {
@@ -281,8 +308,7 @@ internal class SwingShellSuggestionController(
         val maximum = view.maximumVisibleSuggestions
         require(maximum > 0) { "maximumVisibleSuggestions must be positive" }
         if (items.isEmpty()) {
-            visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
-            cleanupSwingResources({ view.component.isVisible = false }, { view.update(visualSnapshot) }, host::revalidate, host::repaint)
+            clearPresentation()
             return
         }
         val selected = current.selectedIndex
@@ -303,6 +329,10 @@ internal class SwingShellSuggestionController(
         host.revalidate()
         if (presentationRevision != revision) return
         host.repaint()
+    }
+
+    private companion object {
+        val RETAINED_PRESENTATION_GRACE = 200.milliseconds
     }
 }
 

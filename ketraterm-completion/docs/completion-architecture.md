@@ -173,6 +173,10 @@ without waiting for slower sources. Each emission replaces the preceding
 snapshot; unchanged rankings are not emitted again. Normal completion leaves
 the final result available to the caller.
 
+Ready learned arguments can publish while a native fallback or a host query is
+pending. They do not suppress fallback when no structured source has a result;
+shell-authoritative contexts still resolve their native answer first.
+
 Every source receives an output limit of 256. The engine also bounds each source
 result and returns at most 256 globally ranked candidates per snapshot. These
 are safety limits independent of the number of rows a UI presents. Source
@@ -338,7 +342,10 @@ compiled from replay and are not a separate persisted learning family.
 | `git` | Host-bounded `TerminalGitCompletionSnapshot` of local/tracking branches, tags, remotes, and the current branch. | Mode-dependent reference selection, component matching, refspec edits, and limit. |
 | `valueDomain` | Complete host-bounded values for the declared domain. | Matching, quoting, replacement, and limit. |
 
-Fuzzy providers own fuzzy matching; Gradle and value-domain providers leave
+Fuzzy providers own fuzzy matching and can supply `TerminalFuzzyPathEntry.matchedRanges`
+relative to the unquoted path. The source preserves these ranges without matching
+again, including when replacement text needs shell quoting or a directory suffix.
+Gradle and value-domain providers leave
 matching to the shared source. These loaders receive the immutable request and
 resolved context, not the engine's output limit. They require an independent
 visit, input, result, or time budget. A Gradle loader reads its available model;

@@ -279,10 +279,11 @@ private class CompletionRenderer(
         super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus)
         val suggestion = value as? SwingShellSuggestion ?: return this
         val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
-        val matchBackground = if (isSelected) style.selectionMatchBackground else style.matchBackground
-        val matchColor = if (isSelected) style.selectionMatchForeground else style.matchForeground
-        val hintColor = if (isSelected) style.selectionArgumentHintForeground else style.argumentHintForeground
-        text = row.html(matchColor, matchBackground, hintColor, isSelected)
+        val metrics = getFontMetrics(font.deriveFont(Font.BOLD))
+        val availableWidth =
+            (list?.width?.takeIf { it > 0 } ?: (480f * font.size2D / COMPLETION_DESIGN_FONT_SIZE).roundToInt()) -
+                rowBorder.getBorderInsets(this).let { it.left + it.right } - icons[suggestion.accentRole.ordinal].iconWidth - iconTextGap
+        text = row.html(style, isSelected, availableWidth.coerceAtLeast(1), metrics)
         selected = isSelected
         isOpaque = false
         icon = icons[suggestion.accentRole.ordinal]
@@ -319,21 +320,9 @@ private class CompletionRenderer(
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
         val hint = displayText(suggestion.argumentHint, 512)
-        val html =
-            buildString {
-                append("<html>")
-                var offset = 0
-                for (range in 0 until matches.rangeCount) {
-                    val start = matches.startOffset(range)
-                    val end = matches.endOffset(range)
-                    append(escapeHtml(primary.substring(offset, start)))
-                    append("<b>").append(escapeHtml(primary.substring(start, end))).append("</b>")
-                    offset = end
-                }
-                append(escapeHtml(primary.substring(offset)))
-                if (hint.isNotEmpty()) append("&nbsp;&nbsp;<span>").append(escapeHtml(hint)).append("</span>")
-                append("</html>")
-            }
+        val nameEnd = primary.trimEnd('/', '\\').length
+        val nameStart = primary.lastIndexOfAny(charArrayOf('/', '\\'), nameEnd - 1) + 1
+        val pathNameStart = nameStart.takeIf { suggestion.kind == "PATH" && it > 0 && nameEnd > it }
         val role = roles[suggestion.accentRole.ordinal]
         val accessibleDescription =
             if (detail.isEmpty()) {
@@ -342,8 +331,18 @@ private class CompletionRenderer(
                 messages.message("completion.row.description", detail, source, role)
             }
         return CompletionRow(
-            html = html,
-            tooltip = detail.takeIf { it.isNotEmpty() }?.let { "<html>" + escapeHtml(it) + "</html>" },
+            primary = primary,
+            matches = matches,
+            hint = hint,
+            pathNameStart = pathNameStart,
+            tooltip =
+                when {
+                    pathNameStart != null ->
+                        "<html>" + escapeHtml(primary) +
+                            (if (detail.isEmpty()) "" else "<br>" + escapeHtml(detail)) + "</html>"
+                    detail.isNotEmpty() -> "<html>" + escapeHtml(detail) + "</html>"
+                    else -> null
+                },
             accessibleName = (primary + if (hint.isEmpty()) "" else " $hint").ifEmpty { fallbackAccessibleName },
             accessibleDescription = accessibleDescription,
         )
@@ -445,41 +444,80 @@ private class CompletionIcon(
 }
 
 private class CompletionRow(
-    private val html: String,
+    private val primary: String,
+    private val matches: SwingShellSuggestionMatchRanges,
+    private val hint: String,
+    private val pathNameStart: Int?,
     val tooltip: String?,
     val accessibleName: String,
     val accessibleDescription: String,
 ) {
-    private val hasMatches = "<b>" in html
-    private val hasHint = "<span>" in html
     private val matchColors = IntArray(2)
     private val hintColors = IntArray(2)
+    private val parentColors = IntArray(2)
     private val matchBackgrounds = IntArray(2)
     private val coloredHtml = arrayOfNulls<String>(2)
+    private var layoutWidth = -1
+    private var layoutFont: Font? = null
+    private var labelHtml = ""
 
     /**
      * Colors prepared match spans without reprocessing provider text or matching again.
      * Selected and ordinary markup have separate cache entries; theme changes replace them.
      *
-     * @param matchColor opaque ARGB foreground for matched fragments.
-     * @param matchBackground opaque ARGB fragment fill.
-     * @param hintColor opaque ARGB foreground for display-only argument placeholders.
+     * @param style immutable popup palette.
      * @param selected whether this markup is for the selected row.
+     * @param width available label width after the icon and row insets.
+     * @param metrics conservative bold metrics used to fit highlighted path text.
      * @return escaped label markup, retaining the ordinary foreground outside matched spans.
      */
     fun html(
-        matchColor: Int,
-        matchBackground: Int,
-        hintColor: Int,
+        style: SwingShellSuggestionStyle,
         selected: Boolean,
+        width: Int,
+        metrics: FontMetrics,
     ): String {
-        if (!hasMatches && !hasHint) return html
+        val matchColor = if (selected) style.selectionMatchForeground else style.matchForeground
+        val matchBackground = if (selected) style.selectionMatchBackground else style.matchBackground
+        val hintColor = if (selected) style.selectionArgumentHintForeground else style.argumentHintForeground
+        val parentColor = if (selected) style.selectionForeground else style.secondaryForeground
+        if (labelHtml.isEmpty() || (pathNameStart != null && (layoutWidth != width || layoutFont != metrics.font))) {
+            labelHtml =
+                buildString {
+                    append("<html>")
+                    if (pathNameStart == null) {
+                        appendMatched(primary, matches, 0, primary.length)
+                    } else {
+                        val parentEnd =
+                            when (pathNameStart) {
+                                1 -> 1
+                                3 -> if (primary[1] == ':') 3 else 2
+                                else -> pathNameStart - 1
+                            }
+                        val gap = metrics.stringWidth("  ")
+                        val parentReserve = minOf(metrics.stringWidth(primary.substring(0, parentEnd)), width / 4)
+                        val nameWidth = appendElided(primary, matches, pathNameStart, primary.length, width - parentReserve - gap, metrics)
+                        val parentWidth = width - nameWidth - gap
+                        if (parentWidth >= metrics.stringWidth("\u2026")) {
+                            append("&nbsp;&nbsp;<span class=\"parent\">")
+                            appendElided(primary, matches, 0, parentEnd, parentWidth, metrics)
+                            append("</span>")
+                        }
+                    }
+                    if (hint.isNotEmpty()) append("&nbsp;&nbsp;<span>").append(escapeHtml(hint)).append("</span>")
+                    append("</html>")
+                }
+            layoutWidth = width
+            layoutFont = metrics.font
+            coloredHtml.fill(null)
+        }
         val index = if (selected) 1 else 0
         val cached = coloredHtml[index]
         if (cached != null &&
             matchColors[index] == matchColor &&
             matchBackgrounds[index] == matchBackground &&
-            hintColors[index] == hintColor
+            hintColors[index] == hintColor &&
+            parentColors[index] == parentColor
         ) {
             return cached
         }
@@ -489,15 +527,97 @@ private class CompletionRow(
                 append(";background-color:").append(matchBackground.toHtmlColor())
             }
         val colored =
-            html
+            labelHtml
                 .replace("<b>", "<b style=\"$css\">")
                 .replace("<span>", "<span style=\"color:${hintColor.toHtmlColor()}\">")
+                .replace("<span class=\"parent\">", "<span style=\"color:${parentColor.toHtmlColor()}\">")
         hintColors[index] = hintColor
+        parentColors[index] = parentColor
         matchColors[index] = matchColor
         matchBackgrounds[index] = matchBackground
         coloredHtml[index] = colored
         return colored
     }
+}
+
+/** Emits slices of the original label, so moving or shortening paths never changes match offsets. */
+private fun StringBuilder.appendMatched(
+    text: String,
+    matches: SwingShellSuggestionMatchRanges,
+    start: Int,
+    end: Int,
+) {
+    var offset = start
+    for (range in 0 until matches.rangeCount) {
+        val from = maxOf(start, matches.startOffset(range))
+        val until = minOf(end, matches.endOffset(range))
+        if (from >= until) continue
+        append(escapeHtml(text.substring(offset, from)))
+        append("<b>").append(escapeHtml(text.substring(from, until))).append("</b>")
+        offset = until
+    }
+    append(escapeHtml(text.substring(offset, end)))
+}
+
+/** Fits path text at grapheme boundaries, preserving matched islands whenever they fit. */
+private fun StringBuilder.appendElided(
+    text: String,
+    matches: SwingShellSuggestionMatchRanges,
+    start: Int,
+    end: Int,
+    width: Int,
+    metrics: FontMetrics,
+): Int {
+    val fullWidth = metrics.stringWidth(text.substring(start, end))
+    if (fullWidth <= width) {
+        appendMatched(text, matches, start, end)
+        return fullWidth
+    }
+    val boundaries = ArrayList<Int>()
+    boundaries.add(start)
+    val matcher = GRAPHEME.matcher(text).region(start, end)
+    while (matcher.find()) boundaries.add(matcher.end())
+    val count = boundaries.lastIndex
+    val ellipsisWidth = metrics.stringWidth("\u2026")
+    var range = 0
+    val matchedClusters =
+        BooleanArray(count) { cluster ->
+            while (range < matches.rangeCount && matches.endOffset(range) <= boundaries[cluster]) range++
+            range < matches.rangeCount && matches.startOffset(range) < boundaries[cluster + 1]
+        }
+    var preserveMatches = true
+
+    fun visible(
+        cluster: Int,
+        kept: Int,
+    ): Boolean = cluster < (kept + 1) / 2 || cluster >= count - kept / 2 || (preserveMatches && matchedClusters[cluster])
+
+    fun measured(kept: Int): Int {
+        var result = 0
+        var cluster = 0
+        while (cluster < count) {
+            val from = cluster
+            val shown = visible(cluster, kept)
+            while (cluster < count && visible(cluster, kept) == shown) cluster++
+            result += if (shown) metrics.stringWidth(text.substring(boundaries[from], boundaries[cluster])) else ellipsisWidth
+        }
+        return result
+    }
+    if (measured(0) > width) preserveMatches = false
+    var low = 0
+    var high = count
+    while (low < high) {
+        val middle = (low + high + 1) / 2
+        if (measured(middle) <= width) low = middle else high = middle - 1
+    }
+    var cluster = 0
+    while (cluster < count) {
+        val from = cluster
+        val shown = visible(cluster, low)
+        while (cluster < count && visible(cluster, low) == shown) cluster++
+        if (shown) appendMatched(text, matches, boundaries[from], boundaries[cluster]) else append('\u2026')
+    }
+    return measured(low)
 }
 
 private fun Int.toHtmlColor(): String = "#" + (this and 0xFFFFFF).toString(16).padStart(6, '0')

@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.toNioPathOrNull
@@ -57,8 +58,8 @@ internal class IntellijProjectFileLoader(
      * @param workingDirectoryUri local `file` URI used to relativize project entries.
      * @param prefix decoded active terminal path token.
      * @return ready project paths within this loader's independent query and
-     * visit budgets, or an empty list for disposed projects and unsupported
-     * working-directory URIs.
+     * visit budgets, or an empty list for disposed projects, unsupported
+     * working-directory URIs, and directories outside this project's content roots.
      */
     suspend fun load(
         workingDirectoryUri: String?,
@@ -78,6 +79,16 @@ internal class IntellijProjectFileLoader(
         return readAction {
             ProgressManager.checkCanceled()
             if (project.isDisposed) return@readAction emptyList()
+            val rootManager = ProjectRootManager.getInstance(project)
+            val roots = rootManager.contentRoots.mapNotNull { it.toNioPathOrNull()?.toAbsolutePath()?.normalize() }
+            val belongsToProject =
+                if (roots.isNotEmpty()) {
+                    roots.any(workingDirectory::startsWith)
+                } else {
+                    project.basePath?.let { workingDirectory.startsWith(Path.of(it).toAbsolutePath().normalize()) } == true
+                }
+            if (!belongsToProject) return@readAction emptyList()
+            val pathMatcher = IntellijCompletionPathMatcher(normalizedPrefix)
             val model = GotoFileModel(project)
             try {
                 val itemProvider = model.getItemProvider(null)
@@ -102,7 +113,13 @@ internal class IntellijProjectFileLoader(
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
                         if (paths.add(path)) {
-                            results.add(TerminalFuzzyPathEntry(path, file.isDirectory))
+                            results.add(
+                                TerminalFuzzyPathEntry(
+                                    path,
+                                    file.isDirectory,
+                                    matchedRanges = pathMatcher.ranges(path),
+                                ),
+                            )
                         }
                         results.size < MAX_QUERY_RESULTS
                     },

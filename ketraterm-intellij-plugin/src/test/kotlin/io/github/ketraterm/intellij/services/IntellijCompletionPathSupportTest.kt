@@ -24,6 +24,36 @@ class IntellijCompletionPathSupportTest {
     private val projectDirectory = Path.of("completion-project").toAbsolutePath().normalize()
 
     @Test
+    fun `filename matches do not highlight unrelated ancestor letters`() {
+        val path = "gradle/build/generated/settings.gradle.kts"
+        val ranges = IntellijCompletionPathMatcher("sgk").ranges(path)
+        assertEquals(
+            "sgk",
+            buildString {
+                for (index in 0 until ranges.rangeCount) {
+                    append(path.substring(ranges.startOffset(index), ranges.endOffset(index)))
+                }
+            },
+        )
+        org.junit.Assert.assertTrue(ranges.startOffset(0) >= path.lastIndexOf('/') + 1)
+    }
+
+    @Test
+    fun `directory qualifiers and non ASCII names retain original offsets`() {
+        val path = "src/main/\uD83D\uDE80Settings.gradle.kts"
+        val ranges = IntellijCompletionPathMatcher("src/main/sgk").ranges(path)
+        assertEquals(
+            "srcmainsgk",
+            buildString {
+                for (index in 0 until ranges.rangeCount) {
+                    append(path.substring(ranges.startOffset(index), ranges.endOffset(index)))
+                }
+            }.replace("/", "").lowercase(),
+        )
+        assertEquals(0, IntellijCompletionPathMatcher("").ranges(path).rangeCount)
+    }
+
+    @Test
     fun `only absent directory metadata admits the project fallback`() {
         var fallbacks = 0
 

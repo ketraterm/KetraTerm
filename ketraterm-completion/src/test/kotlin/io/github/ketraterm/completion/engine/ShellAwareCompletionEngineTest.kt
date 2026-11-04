@@ -739,15 +739,16 @@ class ShellAwareCompletionEngineTest {
         }
 
     @Test
-    fun `learned arguments cannot suppress native fallback or publish before its edit completes`() =
+    fun `ready learned arguments publish while native fallback is pending without suppressing it`() =
         runTest {
             val learning = TerminalCompletionLearningStore()
             learning.recordCommandResult("git switch feature-old", true, null, null, 10)
+            val host = CompletableDeferred<List<TerminalCompletionCandidate>>()
             val native = CompletableDeferred<List<TerminalCompletionCandidate>>()
             var queries = 0
             val engine =
                 MergedCompletionEngine(
-                    sources = listOf(TerminalCompletionSourceEntry({ _, _, _ -> emptyList() })),
+                    sources = listOf(TerminalCompletionSourceEntry({ _, _, _ -> host.await() })),
                     learningStore = learning,
                     clockEpochMillis = { 20 },
                     shellProvider =
@@ -759,8 +760,12 @@ class ShellAwareCompletionEngineTest {
             val results = ArrayList<List<TerminalCompletionCandidate>>()
             val job = launch { engine.completions(request("git switch fe")).toList(results) }
             runCurrent()
+            assertEquals(0, queries)
+            assertTrue(results.single().any { it.replacementText == "feature-old" })
+            host.complete(emptyList())
+            runCurrent()
             assertEquals(1, queries)
-            assertTrue(results.isEmpty())
+            assertTrue(results.single().any { it.replacementText == "feature-old" })
             native.complete(
                 listOf(TerminalCompletionCandidate("feature-current", 11, 13, "powershell", TerminalCompletionCandidateKind.ARGUMENT)),
             )

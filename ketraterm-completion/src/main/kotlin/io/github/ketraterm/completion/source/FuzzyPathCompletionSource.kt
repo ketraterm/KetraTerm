@@ -57,7 +57,7 @@ internal class FuzzyPathCompletionSource(
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
-        for ((path, isDirectory, detail) in entriesProvider(request, context)) {
+        for ((path, isDirectory, detail, matchedRanges) in entriesProvider(request, context)) {
             if (!context.expectedPathKind.acceptsPathEntry(isDirectory)) continue
             if (!context.expectedHiddenPathPolicy.acceptsPath(path, prefix)) continue
             val rawPath = if (pathSeparator == '\\') path.replace('/', '\\') else path
@@ -83,6 +83,7 @@ internal class FuzzyPathCompletionSource(
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.PATH,
                     score = candidateScore,
+                    matchedRanges = matchedRanges,
                 ),
             )
         }

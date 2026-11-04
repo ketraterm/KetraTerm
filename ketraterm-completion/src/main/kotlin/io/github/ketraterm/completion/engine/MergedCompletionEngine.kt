@@ -180,9 +180,7 @@ internal class MergedCompletionEngine(
 
             // Command authority is resolved before the first publication; argument sources remain progressive.
             val canFallBackToShell = shellCandidates == null && shellProvider != null && (deferToCatalog || !queryShellFirst)
-            if ((!canFallBackToShell || hasStructuredCandidates) &&
-                (rankingState.rankedCandidates().isNotEmpty() || activeSources.isEmpty())
-            ) {
+            if (rankingState.rankedCandidates().isNotEmpty() || (activeSources.isEmpty() && !canFallBackToShell)) {
                 publish()
             }
             collectSources(activeSources, request, completionContext, ::available) { completed ->

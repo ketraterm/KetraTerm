@@ -25,23 +25,30 @@ package io.github.ketraterm.completion.api
  *
  * @property path non-empty lexical path without a trailing separator.
  * @property isDirectory whether this entry represents a directory.
- * @property detail optional host-owned concise description shown beside the path.
+ * @property detail optional host-owned concise path description.
+ * @property matchedRanges host-computed UTF-16 match ranges relative to [path],
+ * before shell quoting and the optional directory separator are added. Empty
+ * means that the host did not supply highlighting; it does not reject the path.
  * @throws IllegalArgumentException if [path] is blank or separator-terminated,
- * or [detail] contains a line break.
+ * [detail] contains a line break, or [matchedRanges] is invalid for [path].
  */
 @ExperimentalTerminalCompletionApi
-public data class TerminalFuzzyPathEntry(
-    val path: String,
-    val isDirectory: Boolean,
-    val detail: String? = null,
-) {
-    init {
-        require(path.isNotBlank()) { "path must not be blank" }
-        require(!path.endsWith('/')) { "path must not end with '/', was $path" }
-        require(!path.endsWith('\\')) { "path must not end with '\\', was $path" }
-        require(detail.isNullOrBlank() || !detail.contains('\n')) { "detail must be a single line" }
+public data class TerminalFuzzyPathEntry
+    @JvmOverloads
+    constructor(
+        val path: String,
+        val isDirectory: Boolean,
+        val detail: String? = null,
+        val matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+    ) {
+        init {
+            require(path.isNotBlank()) { "path must not be blank" }
+            require(!path.endsWith('/')) { "path must not end with '/', was $path" }
+            require(!path.endsWith('\\')) { "path must not end with '\\', was $path" }
+            require(detail.isNullOrBlank() || !detail.contains('\n')) { "detail must be a single line" }
+            matchedRanges.requireValidFor(path)
+        }
     }
-}
 
 /**
  * Supplies host-bounded fuzzy matches for one immutable completion request and

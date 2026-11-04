@@ -2706,6 +2706,7 @@ public class SwingTerminal
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
                 hostServices.shellSuggestionViewFactory,
+                CoroutineScope(componentScope.coroutineContext + (suggestionDispatcher ?: uiCoroutineDispatcher)),
             ).also {
                 shellSuggestionController = it
                 it.popup.isVisible = false

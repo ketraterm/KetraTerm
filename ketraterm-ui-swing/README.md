@@ -275,6 +275,14 @@ Custom views retain control of their own styling. Providers supply label-relativ
 fragments without repeating the match. Providers can supply display-only `argumentHint`
 text beside the label; hints never become part of the accepted command.
 
+Nested `PATH` rows show the name first and parent context in `secondaryForeground`
+(`selectionForeground` on selection). Long paths shorten to the available width;
+hover and accessibility retain the full path, and acceptance inserts the original
+replacement. Visible match fragments keep their supplied highlights.
+
+During ordinary typing, old rows remain briefly to avoid flicker. A slow refresh
+clears them after 200 ms while collection continues; stale rows cannot be accepted.
+
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 `AUTOMATIC`; pass `EXPLICIT` for an explicit command. The host must replace or hide
