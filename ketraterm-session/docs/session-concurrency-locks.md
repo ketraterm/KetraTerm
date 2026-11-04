@@ -119,6 +119,12 @@ usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
 use the ordinary bounded compound queue. Callers still own editor semantics:
 UTF-16 text offsets do not determine the shell's deletion units.
 
+A producer may supply `commandLinePrefixResetKeys`: up to four semantic key events
+that clear text before the cursor without executing it or changing the suffix.
+The default is empty. Capture detaches these keys as `expected.prefixResetKeys`;
+admission rejects the edit if the producer's sequence has changed. Hosts can pass
+the sequence to the versioned `TerminalShellIntegrationFactory.host` overload.
+
 Host-owned projections should use `TerminalShellCommandLineState`. Its assignments
 and session checks share a guard. The StateFlow-only host factory remains readable
 but cannot provide conditional contexts. A custom producer may implement
@@ -131,8 +137,13 @@ future checks, but cancellation racing admission can lose and cannot retract
 accepted bytes. Response-dependent callers must stop waiting on session closure.
 
 The default session-backed Swing suggestion path captures before provider work
-and emits accepted feedback only after conditional admission of a valid grapheme
-replacement. A host-managed popup must capture its own context. Calling the
+and validates replacement boundaries before conditional admission. When a prefix
+reset is available and the snapshot ends at the cursor, it sends that sequence
+and pastes the edited prefix as one compound input. The resulting prefix must be
+single-line and control-free; unsafe replay is rejected without sending input.
+Other contexts use the existing
+grapheme-based Delete/Backspace plan. Accepted feedback means admission, not shell
+acknowledgement. A host-managed popup must capture its own context. Calling the
 default handler without its captured Swing request throws `IllegalStateException`;
 custom handlers own their editing and feedback contract.
 

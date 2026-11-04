@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -27,14 +28,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  * No writer or frame lease is retained. Acceptance still does not confirm remote execution.
  *
  * @property commandLine authoritative snapshot used to calculate editor actions.
+ * @property prefixResetKeys detached key sequence that clears only the editor's text before its cursor,
+ * captured with [commandLine]; empty when that capability is unavailable.
  */
 public class TerminalCommandEditContext internal constructor(
     public val commandLine: TerminalShellCommandLineSnapshot,
+    prefixResetKeys: List<TerminalKeyEvent>,
     internal val owner: Any,
     internal val inputRevision: Long,
     internal val outputRevision: Long,
     internal val shellRevision: Long,
 ) {
+    public val prefixResetKeys: List<TerminalKeyEvent> = copyCommandLinePrefixResetKeys(prefixResetKeys)
+
     private val cancelled = AtomicBoolean()
 
     /** Whether the owner has cancelled this request. Cancellation is permanent. */
@@ -47,4 +53,10 @@ public class TerminalCommandEditContext internal constructor(
     public fun cancel() {
         cancelled.set(true)
     }
+}
+
+/** Detaches the bounded editing sequence at host-factory and request-capture boundaries. */
+internal fun copyCommandLinePrefixResetKeys(keys: List<TerminalKeyEvent>): List<TerminalKeyEvent> {
+    require(keys.size <= 4) { "Command-line prefix reset must contain at most four keys" }
+    return java.util.List.copyOf(keys)
 }

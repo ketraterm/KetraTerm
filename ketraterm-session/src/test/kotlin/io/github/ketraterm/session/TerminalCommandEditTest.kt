@@ -66,6 +66,7 @@ class TerminalCommandEditTest {
                 session.start(10, 3)
                 val expected = checkNotNull(session.captureCommandEdit())
                 assertEquals(snapshot(), expected.commandLine)
+                assertTrue(expected.prefixResetKeys.isEmpty())
                 val events =
                     listOf(
                         TerminalKeyEvent.key(TerminalKey.END),
@@ -77,6 +78,90 @@ class TerminalCommandEditTest {
                 assertNull(session.captureCommandEdit(), "Pending input is not a fresh shell editing snapshot")
                 runCurrent()
                 assertEquals("\u001b[F\u007fstatus\r", connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @Test
+    fun `versioned host detaches its prefix reset keys before returning the factory`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            val keys = mutableListOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.text("r"))
+            val originalKeys = keys.toList()
+            val factory =
+                TerminalShellIntegrationFactory.host(
+                    TerminalShellIntegrationState(),
+                    model,
+                    keys,
+                )
+            keys.clear()
+            session(connector, model, factory).use { session ->
+                session.start(10, 3)
+                val expected = checkNotNull(session.captureCommandEdit())
+
+                assertEquals(snapshot(), expected.commandLine)
+                assertEquals(originalKeys, expected.prefixResetKeys)
+                assertEquals(ACCEPTED, session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 1, "status"))))
+                runCurrent()
+                assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @Test
+    fun `captured reset keys are detached and a changed sequence rejects the edit before any prefix`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            val keys = mutableListOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.text("r"))
+            val originalKeys = keys.toList()
+            val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
+            val factory =
+                TerminalShellIntegrationFactory { context ->
+                    object : TerminalShellIntegration by host.create(context) {
+                        override val commandLinePrefixResetKeys: List<TerminalKeyEvent> get() = keys
+                    }
+                }
+            session(connector, model, factory).use { session ->
+                session.start(10, 3)
+                val expected = checkNotNull(session.captureCommandEdit())
+                model.withCommandLine { _, _ -> keys[1] = TerminalKeyEvent.text("x") }
+
+                assertEquals(originalKeys, expected.prefixResetKeys)
+                assertEquals(STALE_CONTEXT, session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 1, "never"))))
+                runCurrent()
+                assertArrayEquals(byteArrayOf(), connector.writtenBytes)
+
+                val fresh = checkNotNull(session.captureCommandEdit())
+                assertEquals(expected.commandLine, fresh.commandLine)
+                assertEquals(keys, fresh.prefixResetKeys)
+                assertEquals(ACCEPTED, session.submitInput(fresh, listOf(TerminalTextReplacementEvent(0, 1, "status"))))
+                runCurrent()
+                assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @Test
+    fun `prefix reset key sequences are bounded at factory construction and capture`() =
+        runTest {
+            val model = TerminalShellCommandLineState(snapshot())
+            val excessiveKeys = List(5) { TerminalKeyEvent.key(TerminalKey.F12) }
+            assertThrows(IllegalArgumentException::class.java) {
+                TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model, excessiveKeys)
+            }
+            val connector = MockConnector()
+            val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
+            val factory =
+                TerminalShellIntegrationFactory { context ->
+                    object : TerminalShellIntegration by host.create(context) {
+                        override val commandLinePrefixResetKeys: List<TerminalKeyEvent> get() = excessiveKeys
+                    }
+                }
+            session(connector, model, factory).use { session ->
+                session.start(10, 3)
+                assertThrows(IllegalArgumentException::class.java) { session.captureCommandEdit() }
+                assertFalse(session.isClosed)
+                runCurrent()
+                assertArrayEquals(byteArrayOf(), connector.writtenBytes)
             }
         }
 
@@ -240,12 +325,13 @@ class TerminalCommandEditTest {
     private fun TestScope.session(
         connector: MockConnector,
         model: TerminalShellCommandLineState,
+        shellIntegration: TerminalShellIntegrationFactory = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
     ): TerminalSession {
         val dispatcher = StandardTestDispatcher(testScheduler)
         return TerminalSession.create(
             TerminalBuffers.create(10, 3),
             connector,
-            shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
+            shellIntegration = shellIntegration,
             kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,

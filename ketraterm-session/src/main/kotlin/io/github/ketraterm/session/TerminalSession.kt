@@ -646,16 +646,26 @@ public class TerminalSession private constructor(
      * Capture at request time, before asynchronous suggestion work. The host must
      * publish unavailable editing state while its own pending input makes the
      * model untrustworthy; queue idleness is not acknowledgement by a remote shell.
+     *
+     * @throws IllegalArgumentException if the producer's prefix-reset sequence contains more than four keys.
      */
     public fun captureCommandEdit(): TerminalCommandEditContext? =
         synchronized(mutationLock) {
             if (processingOutput) return@synchronized null
-            runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+            val integration = runtime.shellIntegration ?: return@synchronized null
+            integration.withCommandLine { revision, snapshot ->
                 synchronized(outboundWriteLock) {
                     if (!isAcceptingInput() || snapshot == null || !outboundWriter.isIdle()) {
                         null
                     } else {
-                        TerminalCommandEditContext(snapshot, editContextOwner, inputRevision, outputRevision, revision)
+                        TerminalCommandEditContext(
+                            commandLine = snapshot,
+                            prefixResetKeys = integration.commandLinePrefixResetKeys,
+                            owner = editContextOwner,
+                            inputRevision = inputRevision,
+                            outputRevision = outputRevision,
+                            shellRevision = revision,
+                        )
                     }
                 }
             }
@@ -733,8 +743,10 @@ public class TerminalSession private constructor(
      * Success uses the same bounds, mode/policy capture and writer as [submitInput].
      *
      * The caller owns editor semantics: translate valid caret/deletion spans to
-     * events before calling. This method does not infer shell editing units from
-     * UTF-16 offsets. Cancel obsolete requests through [TerminalCommandEditContext.cancel].
+     * events before calling. A captured [TerminalCommandEditContext.prefixResetKeys]
+     * sequence can clear the known prefix before inserting its replacement.
+     * This method does not infer shell editing units from UTF-16 offsets.
+     * Cancel obsolete requests through [TerminalCommandEditContext.cancel].
      * Cancellation/shutdown overlapping admission may win or lose; acceptance is
      * not transport completion or a remote execution acknowledgement.
      */
@@ -744,7 +756,8 @@ public class TerminalSession private constructor(
     ): TerminalInputAdmission =
         finishAdmission {
             synchronized(mutationLock) {
-                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                val integration = runtime.shellIntegration
+                integration?.withCommandLine { revision, snapshot ->
                     synchronized(outboundWriteLock) {
                         inputRejection() ?: when {
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
@@ -754,6 +767,7 @@ public class TerminalSession private constructor(
                                         !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
                                 ) ||
                                 expected.shellRevision != revision ||
+                                expected.prefixResetKeys != integration.commandLinePrefixResetKeys ||
                                 expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)

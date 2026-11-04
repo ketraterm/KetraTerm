@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.shell.integration
 
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
@@ -74,6 +75,8 @@ private class OscShellIntegrationSession(
     private val commandInventoryInput: ShellCommandInventoryInput? = null,
 ) : TerminalShellIntegration {
     private val shellCompletion = NativeCompletionProtocol(context.shellCompletion)
+
+    override val commandLinePrefixResetKeys: List<TerminalKeyEvent> get() = shellCompletion.commandLinePrefixResetKeys
 
     init {
         commandInventoryInput?.bind(context, shellCompletion)
@@ -146,6 +149,7 @@ private class OscShellIntegrationSession(
         }
         when (marker) {
             ShellIntegrationMarker.PROMPT_START -> {
+                shellCompletion.promptStarted()
                 readinessPromptStarted = true
                 mutablePromptReady.value = false
             }

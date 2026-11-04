@@ -18,16 +18,14 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.ui.captureCleanupFailure
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionView
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewSnapshot
-import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalWorkspace
-import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
-import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -220,7 +218,15 @@ internal class StandaloneSuggestionFixture private constructor(
             try {
                 val owner = TerminalWorkspace()
                 workspace = owner
-                val tab = owner.openTab(profile, TerminalWorkspaceOpenOptions())
+                val setup =
+                    if (profile.kind == TerminalProfileKind.POWERSHELL) {
+                        "Set-PSReadLineOption -HistorySaveStyle SaveNothing; [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()"
+                    } else {
+                        null
+                    }
+                check(profile.startupCommand == null) { "Suggestion fixture owns shell setup" }
+                val launch = if (setup != null) profile.copy(startupCommand = TerminalStartupCommand(setup)) else profile
+                val tab = owner.openTab(launch, TerminalWorkspaceOpenOptions())
                 val provider =
                     registry.createProvider(
                         profileId = profile.id,
@@ -234,6 +240,10 @@ internal class StandaloneSuggestionFixture private constructor(
                         StandaloneSuggestionFixture(tab, provider, settings).also { fixture = it }
                     }
                 created.start(decorateProvider)
+                if (setup != null) {
+                    created.awaitExecution(setup)
+                    created.awaitLine("")
+                }
                 created.scenario()
             } catch (caught: Throwable) {
                 failure = caught

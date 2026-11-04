@@ -427,6 +427,7 @@ use `customOscPayloadLimitBytes` themselves.
 | Message body after `KetraTermCompletion;2;` | Meaning |
 | --- | --- |
 | `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
+| `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
 | `Result;epoch;id;Failed` | Correlated failure. |
 | `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
 
@@ -436,6 +437,13 @@ each request. Replies must match the current prompt epoch and pending positive
 request ID. They must also match the captured command and cursor; wrong epochs
 or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
 metadata has no editing authority.
+
+`PrefixReset` lets acceptance clear the text before the real cursor through
+`PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same
+ordered input operation. Text after the cursor is preserved. This avoids relying
+on version-dependent Delete/Backspace behavior. The binding does not execute the
+command and preserves `LASTEXITCODE`. Its capability is cleared at each OSC 133
+prompt start and must be announced again for that prompt.
 
 Complete custom OSC collection is capped at 256 KiB with this producer installed;
 built-in command limits remain unchanged. Replies contain at most 128 candidates,

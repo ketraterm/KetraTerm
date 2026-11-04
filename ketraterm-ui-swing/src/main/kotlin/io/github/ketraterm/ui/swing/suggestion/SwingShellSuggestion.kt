@@ -140,8 +140,8 @@ public enum class SwingShellSuggestionAccentRole {
  *
  * The plan is derived from the suggestion's replacement range and the request
  * cursor. Hosts can use [commandTextAfterReplacement] for learning/feedback
- * while the default Swing acceptance handler uses the delete counts to emit
- * terminal editing keys before pasting [replacementText].
+ * while the default Swing acceptance handler uses either the editor's prefix-reset
+ * capability or these grapheme deletion counts before pasting the replacement.
  *
  * @property startOffset inclusive UTF-16 start offset replaced in the request
  * command text.

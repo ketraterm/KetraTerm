@@ -15,12 +15,14 @@
  */
 package io.github.ketraterm.workspace
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
+import java.util.zip.GZIPOutputStream
 
 /**
  * Applies host-neutral shell integration launch hooks to terminal profiles.
@@ -302,12 +304,27 @@ internal object TerminalShellIntegrationBootstrap {
         )
     }
 
-    private fun encodedPowerShellScript(): String =
-        Base64.getEncoder().encodeToString(
-            (TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT + "\n" + powerShellCompletionScript).toByteArray(
-                Charsets.UTF_16LE,
-            ),
-        )
+    private fun encodedPowerShellScript(): String {
+        // UTF-16 Base64 of the full hooks exceeds Windows' 32,767-character process command-line limit.
+        val script = TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT + "\n" + powerShellCompletionScript
+        val compressed =
+            ByteArrayOutputStream().use { bytes ->
+                GZIPOutputStream(bytes).use { it.write(script.toByteArray(Charsets.UTF_8)) }
+                Base64.getEncoder().encodeToString(bytes.toByteArray())
+            }
+        val bootstrap =
+            """
+            ${'$'}__KetraTermBootstrapStream = [IO.MemoryStream]::new([Convert]::FromBase64String('$compressed'))
+            ${'$'}__KetraTermBootstrapReader = [IO.StreamReader]::new([IO.Compression.GZipStream]::new(
+                ${'$'}__KetraTermBootstrapStream, [IO.Compression.CompressionMode]::Decompress), [Text.Encoding]::UTF8)
+            try { . ([scriptblock]::Create(${'$'}__KetraTermBootstrapReader.ReadToEnd())) }
+            finally {
+                ${'$'}__KetraTermBootstrapReader.Dispose()
+                Microsoft.PowerShell.Utility\Remove-Variable __KetraTermBootstrapReader, __KetraTermBootstrapStream
+            }
+            """.trimIndent()
+        return Base64.getEncoder().encodeToString(bootstrap.toByteArray(Charsets.UTF_16LE))
+    }
 
     private fun hasExplicitPowerShellEntryPoint(command: List<String>): Boolean {
         var index = 1

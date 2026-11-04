@@ -20,11 +20,13 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.session.TerminalInputAdmission
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.swing.Swing
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -42,6 +44,33 @@ import kotlin.time.Duration.Companion.seconds
 /** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
 @Tag("desktop")
 class StandaloneSuggestionDesktopTest {
+    @ParameterizedTest(name = "Unicode acceptance [{0}]")
+    @EnumSource(StandaloneSuggestionShell::class, names = ["WINDOWS_POWERSHELL", "POWERSHELL"])
+    internal fun `PowerShell accepts a supplementary character replacement through its prefix bridge`(
+        shell: StandaloneSuggestionShell,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            val line = "echo \uD83D\uDE80"
+            withSession(shell.profile(directory), directory, decorateProvider = {
+                SwingShellSuggestionProvider { request ->
+                    flowOf(
+                        if (request.commandText == line && request.cursorOffset == line.length) {
+                            listOf(SwingShellSuggestion("accepted", 5, line.length, "test", "ARGUMENT"))
+                        } else {
+                            emptyList()
+                        },
+                    )
+                }
+            }) {
+                type(line)
+                awaitLine(line)
+                awaitPopup(line, "accepted")
+                selectAndAccept("accepted")
+                awaitLine("echo accepted")
+            }
+        }
+
     @ParameterizedTest(name = "editing and cancellation [{0}]")
     @EnumSource(StandaloneSuggestionShell::class)
     internal fun `deletion cancels a slow request and accepts the refreshed edit`(

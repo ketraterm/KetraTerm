@@ -198,7 +198,10 @@ in a command-finished listener before later bounded eviction. Custom shell views
 may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 `captureCommandEdit()` and submit with `submitInput(expected, events)` so stale
-edits are rejected. See [conditional edits](docs/session-concurrency-locks.md#conditional-command-edits)
+edits are rejected. If the editor provides an exact operation for clearing text
+before the cursor, pass its key sequence as `prefixResetKeys` to the host factory.
+The captured context retains that capability alongside the command text. See
+[conditional edits](docs/session-concurrency-locks.md#conditional-command-edits)
 and the [producer contract](docs/session-concurrency-locks.md#selected-shell-integration).
 
 ## KetraTerm's optional producer

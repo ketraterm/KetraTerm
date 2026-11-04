@@ -9,6 +9,7 @@ a terminal or use the Swing/IntelliJ suggestion UI.
 Completion and suggestions are **experimental**, including their engine, sources,
 learning, persistence, and UI APIs. Suggestions may be incomplete, rank poorly,
 or behave unexpectedly in edge cases. APIs may change before stabilization.
+Known issues and remaining work are tracked in the [gap map](../terminal-feature-gap-map.md#completion-and-suggestions).
 
 Kotlin callers can opt in to `ExperimentalTerminalCompletionApi` for the engine
 and `ExperimentalShellSuggestionsApi` for Swing suggestions. Both use
@@ -141,7 +142,9 @@ before generic path suggestions. Directory arguments exclude files; typed values
 such as Git branches exclude unrelated path suggestions. Relevant live values
 precede history-only results, while learning can still influence their order.
 
-Acceptance uses the shell's replacement text and range. Slow native completers
+Acceptance uses the shell's replacement text and range. The PowerShell bridge
+restores the edited command prefix through PSReadLine's exact replacement API,
+preserving text after the cursor. Slow native completers
 can time out. Cancelling a request cannot stop a completer already running inside
 PowerShell. Suggestions also require an unambiguous editable command line with
 the cursor at its end. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)

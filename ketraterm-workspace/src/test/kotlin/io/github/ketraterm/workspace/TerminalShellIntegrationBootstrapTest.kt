@@ -19,6 +19,7 @@ import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.util.*
+import java.util.zip.GZIPInputStream
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.test.*
@@ -110,6 +111,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue("-NoLogo" in integrated.command)
         assertTrue("-NoExit" in integrated.command)
         assertEquals("-EncodedCommand", integrated.command[integrated.command.lastIndex - 1])
+        assertTrue(integrated.command.joinToString(" ").length < 32_767, "Bootstrap must fit Windows' process command-line limit")
 
         val script = decodePowerShellScript(integrated.command.last())
         assertTrue(script.contains("function global:prompt"))
@@ -561,8 +563,6 @@ class TerminalShellIntegrationBootstrapTest {
         }
     }
 
-    private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
-
     private fun integratedPowerShellScript(): String {
         val profile =
             TerminalProfile(
@@ -577,4 +577,11 @@ class TerminalShellIntegrationBootstrapTest {
                 .last(),
         )
     }
+}
+
+/** Reads the generated hook source for launch-contract assertions shared by the bootstrap tests. */
+internal fun decodePowerShellScript(encoded: String): String {
+    val bootstrap = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
+    val payload = bootstrap.substringAfter("FromBase64String('").substringBefore("')")
+    return GZIPInputStream(Base64.getDecoder().decode(payload).inputStream()).bufferedReader(Charsets.UTF_8).use { it.readText() }
 }

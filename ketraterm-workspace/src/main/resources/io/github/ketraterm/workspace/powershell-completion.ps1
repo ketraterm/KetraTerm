@@ -3,11 +3,28 @@ function global:__KetraTermCompletionReady {
     if (-not $global:__KetraTermCompletionInstalled) { return }
     $global:__KetraTermCompletionEpoch = [Guid]::NewGuid().ToString('N')
     $global:__KetraTermCompletionSequence = 0L
-    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;2;Ready;' + $global:__KetraTermCompletionEpoch + ([string][char]7))
+    $capabilities = if ($global:__KetraTermCompletionPrefixResetInstalled) { ';PrefixReset' } else { '' }
+    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;2;Ready;' + $global:__KetraTermCompletionEpoch + $capabilities + ([string][char]7))
 }
 
 function global:__KetraTermCompletionEncode([string] $Value) {
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Value))
+}
+
+# Suggestion acceptance reconstructs this prefix instead of guessing the editor's
+# Backspace units. Replace uses UTF-16 offsets on every supported PSReadLine version.
+function global:__KetraTermResetCompletionPrefix {
+    $savedExitCode = $global:LASTEXITCODE
+    try {
+        $line = ''
+        $cursor = 0
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        if ($cursor -gt 0) {
+            [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $cursor, '')
+        }
+    } finally {
+        $global:LASTEXITCODE = $savedExitCode
+    }
 }
 
 function global:__KetraTermComplete {
@@ -134,5 +151,15 @@ try {
     }
 } catch {
     $global:__KetraTermCompletionInstalled = $false
+}
+
+$global:__KetraTermCompletionPrefixResetInstalled = $false
+try {
+    if ($global:__KetraTermCompletionInstalled) {
+        Set-PSReadLineKeyHandler -Chord 'F12,r' -ScriptBlock { global:__KetraTermResetCompletionPrefix } -ErrorAction Stop
+        $global:__KetraTermCompletionPrefixResetInstalled = $true
+    }
+} catch {
+    # Completion remains usable when the editor cannot register prefix replacement.
 }
 

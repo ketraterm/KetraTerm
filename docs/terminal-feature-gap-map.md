@@ -12,7 +12,6 @@ promise stable APIs or behavior.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 | `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
 | `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
 | `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |
@@ -21,6 +20,31 @@ promise stable APIs or behavior.
 | `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
 | `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: JVM, native PTY and desktop suites, package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. [Standard CI](development/testing.md#ci) runs all three test suites and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
+
+## Completion and suggestions
+
+Known correctness gaps in the [experimental completion system](features/completion.md#stability-experimental):
+
+| Owner | Remaining work |
+| --- | --- |
+| `TODO(session/input/ui/host/profile)` | Correct supplementary-character replacement in Git Bash. In Bash 5.3, one Backspace after `echo 🚀` also removes the preceding space, so the fallback grapheme-counted edit can join the command and argument. Use editor-owned operations where available and cover the affected shell variants with native tests. |
+| `TODO(session/ui)` | Reconcile shell-editor text with screen-derived command snapshots. PowerShell combining text can appear to have trailing spaces absent from the buffer; native inline history predictions can appear after the cursor and suppress completion popups. Distinguish those decorations without stripping genuine whitespace or editable suffixes. |
+| `TODO(ui)` | Prevent a pending automatic debounce from superseding a newer explicit completion request. Pressing Ctrl+Space before the debounce expires can lose command suggestions in parameters-only mode. Keep explicit interaction ownership until input or context invalidates it. |
+| `TODO(completion)` | Preserve the identity of completed tokens in learned-history matching. Lowercasing prior tokens lets arguments learned from `ssh -L` appear after `ssh -l`. Share the context-identity rule between indexing and projection; active-word matching may remain case-insensitive. |
+| `TODO(host/profile)` | Scope IntelliJ imported Gradle tasks to the build selected by the terminal directory and explicit project-directory options. Currently, a terminal in unrelated project Y can receive project X's tasks; relativizing task directories alone does not select the correct build. |
+| `TODO(completion)` | Allow directory traversal while completing file-valued arguments. `curl --config con`, `ssh -i`, and similar options currently exclude navigation directories such as `config/`. Apply the same eligibility rule to direct and fuzzy sources while retaining final file semantics. |
+| `TODO(completion)` | Use one effective-option precedence rule for parsing and suggestion generation. Child options override parent options during resolution, but parent-first suggestion enumeration can retain the parent's description and value hint for a shadowed child flag. |
+| `TODO(completion/host/profile)` | Preserve literal POSIX backslashes throughout path listing and candidate projection. For example, `cat 'foo\b` currently searches `foo/` but can insert a literal backslash path. Align separator interpretation, entry-name validation, and displayed/inserted paths with the filesystem and shell. |
+| `TODO(host/profile)` | Exclude disabled Bash builtins from both command discovery and its refresh signature. `compgen -A builtin` still publishes `times` after `enable -n times`; use enabled-builtin discovery and cover disable/re-enable transitions. |
+
+Maintainability, scalability, and deferred capability work:
+
+| Owner | Remaining work |
+| --- | --- |
+| `TODO(completion)` | Reuse the original request's parsed context during outcome-key resolution. `TerminalCompletionOutcomeKeyResolver` currently reparses unchanged input for every candidate; candidate-specific edited input still needs its own analysis. |
+| `TODO(completion)` | Remove duplicated command-spec lookup in `TerminalCompletionContextResolver` by reusing `findCommandSpec`. |
+| `TODO(host/profile)` | Bound raw PATH enumeration before materializing directory contents in `path-commands.sh`. Existing command-count and text limits apply after executable filtering, so directories with many non-executable entries can consume unbounded temporary worker memory and scan time. Preserve explicit incomplete-inventory handling. |
+| `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 
 ## Transports and execution environments
 

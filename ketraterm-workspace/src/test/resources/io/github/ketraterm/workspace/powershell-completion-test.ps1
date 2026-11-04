@@ -14,7 +14,7 @@ namespace Microsoft.PowerShell {
 function global:Get-Module { param([string] $Name) [pscustomobject]@{ Name = 'PSReadLine' } }
 function global:Set-PSReadLineKeyHandler {
     [CmdletBinding()] param([string] $Chord, [scriptblock] $ScriptBlock)
-    $global:CompletionHandler = $ScriptBlock
+    if ($Chord -eq 'F12,e') { $global:CompletionHandler = $ScriptBlock }
 }
 __SCRIPT__
 function Get-KetraNativeWidget { param([ValidateSet('alpha','beta')][string] $Mode) }

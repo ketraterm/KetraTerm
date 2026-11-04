@@ -16,6 +16,7 @@
 package io.github.ketraterm.shell.integration
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.session.TerminalInputAdmission
@@ -36,6 +37,54 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
+    @Test
+    fun `validated PowerShell hook announces prefix reset only for its prompt`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
+                fun keys() = assertNotNull(fixture.session.captureCommandEdit()).prefixResetKeys
+
+                assertEquals(emptyList(), keys())
+                for (invalid in listOf(
+                    ready("bad-epoch"),
+                    ready().replace(";2;", ";1;"),
+                    ready().replace("Ready;", "Unknown;"),
+                    ready().replace("\u0007", ";Unknown\u0007"),
+                    ready().replace("\u0007", ";PrefixReset;extra\u0007"),
+                )) {
+                    fixture.feed(invalid)
+                    assertEquals(emptyList(), keys())
+                }
+
+                fixture.feed(ready())
+                assertEquals(emptyList(), keys())
+
+                fixture.feed(ready().replace("\u0007", ";PrefixReset\u0007"))
+                val powerShellEdit = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals(
+                    listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent(codepoint = 'r'.code)),
+                    powerShellEdit.prefixResetKeys,
+                )
+                fixture.feed("\r\n\u001b]133;A\u0007$ \u001b]133;B\u0007echo e\u0301")
+                assertEquals(emptyList(), keys())
+                assertEquals(
+                    listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent(codepoint = 'r'.code)),
+                    powerShellEdit.prefixResetKeys,
+                )
+                assertEquals(
+                    TerminalInputAdmission.STALE_CONTEXT,
+                    fixture.session.submitInput(powerShellEdit, listOf(TerminalTextReplacementEvent(0, 1, "wrong"))),
+                )
+
+                fixture.feed(
+                    "\r\n\u001b]133;A\u0007PS> " + ready("b".repeat(32)).replace("\u0007", ";PrefixReset\u0007") +
+                        "\u001b]133;B\u0007echo e\u0301",
+                )
+                assertEquals(powerShellEdit.prefixResetKeys, keys())
+                runCurrent()
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
     @Test
     fun `chunked native reply preserves escaped edits and pre-query acceptance`() =
         runTest {

@@ -20,12 +20,16 @@ import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
+import io.github.ketraterm.session.TerminalStartupCommand
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.io.IOException
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -73,13 +77,32 @@ class TerminalShellIntegrationBootstrapNativeTest {
         }
     }
 
-    private suspend fun TerminalSession.awaitLine(line: String) {
+    private suspend fun TerminalSession.awaitLine(
+        line: String,
+        stage: String = "input",
+    ) {
         try {
             withTimeout(15.seconds) {
                 activeShellCommandLineRevision.first { activeShellCommandLine()?.commandText == line }
             }
         } catch (failure: kotlinx.coroutines.TimeoutCancellationException) {
-            throw AssertionError("Expected editable line '$line', observed ${activeShellCommandLine()}, session ${state.value}", failure)
+            val screen =
+                buildString {
+                    readRenderFrame { frame ->
+                        appendLine("Cursor: ${frame.cursor.column}, ${frame.cursor.row}")
+                        val codeWords = IntArray(frame.columns)
+                        val flags = IntArray(frame.columns)
+                        for (row in 0 until frame.rows) {
+                            frame.copyTextLine(row, codeWords, flags = flags)
+                            val text = buildString { codeWords.forEach { append(if (it in 32..126) it.toChar() else ' ') } }.trimEnd()
+                            if (text.isNotEmpty()) appendLine("$row: $text")
+                        }
+                    }
+                }
+            throw AssertionError(
+                "Expected editable line '$line' after $stage, observed ${activeShellCommandLine()}, session ${state.value}\n$screen",
+                failure,
+            )
         }
     }
 
@@ -513,33 +536,149 @@ class TerminalShellIntegrationBootstrapNativeTest {
             }
         }
 
-    @Test
-    fun `PowerShell native completion round trips through real PSReadLine and PTY`(): Unit =
+    @ParameterizedTest(name = "PowerShell Unicode prefix reset [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell prefix reset preserves the suffix across Unicode editor variants`(
+        executableName: String,
+        @TempDir directory: Path,
+    ): Unit =
         runBlocking {
-            val executable = installedExecutable("pwsh", "powershell.exe")
-            assumeTrue(executable != null, "PowerShell is not installed")
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            val helper = directory.resolve("prefix-reset-test.ps1")
+            checkNotNull(
+                TerminalShellIntegrationBootstrapNativeTest::class.java.getResourceAsStream("powershell-prefix-reset-test.ps1"),
+            ).use { source ->
+                Files.copy(source, helper)
+            }
+            val snapshots = Channel<String>(Channel.UNLIMITED)
+            val listener =
+                object : TerminalWorkspaceListener {
+                    override fun titleChanged(
+                        tab: TerminalWorkspaceTab,
+                        title: String,
+                    ) {
+                        if (title.startsWith("ketra-")) snapshots.trySend(title).getOrThrow()
+                    }
+                }
+            TerminalWorkspace(listener).use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile(
+                                "powershell",
+                                "PowerShell",
+                                listOf(executable!!, "-NoLogo", "-NoProfile"),
+                                workingDirectory = directory,
+                            ),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
+                session.awaitLine("")
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(
+                        listOf(
+                            TerminalPasteEvent(". ([ScriptBlock]::Create([IO.File]::ReadAllText('prefix-reset-test.ps1')))"),
+                            TerminalKeyEvent.key(TerminalKey.ENTER),
+                        ),
+                    ),
+                )
+                assertEquals("ketra-ready", withTimeout(15.seconds) { snapshots.receive() })
+                session.awaitLine("")
+
+                suspend fun assertBuffer(
+                    line: String,
+                    cursor: Int,
+                ) {
+                    val snapshot = withTimeout(15.seconds) { snapshots.receive() }
+                    val fields = snapshot.split(';')
+                    assertEquals(5, fields.size, snapshot)
+                    assertEquals("ketra-buffer", fields[0])
+                    assertEquals(cursor.toString(), fields[2], snapshot)
+                    assertEquals("77", fields[3], "Prefix replacement must preserve LASTEXITCODE")
+                    assertEquals(line, String(Base64.getDecoder().decode(fields[4]), Charsets.UTF_8))
+                }
+
+                val suffix = " tail \uD83D\uDE80"
+                for (prefix in listOf("echo e\u0301", "echo \uD83D\uDE80", "echo \uD83D\uDC69\u200D\uD83D\uDCBB", "")) {
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(listOf(TerminalKeyEvent.key(TerminalKey.F12), TerminalKeyEvent.codepoint('s'.code))),
+                    )
+                    assertBuffer(prefix + suffix, prefix.length)
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            listOf(
+                                TerminalKeyEvent.key(TerminalKey.F12),
+                                TerminalKeyEvent.codepoint('r'.code),
+                                TerminalKeyEvent.key(TerminalKey.F12),
+                                TerminalKeyEvent.codepoint('t'.code),
+                            ),
+                        ),
+                    )
+                    assertBuffer(suffix, 0)
+                    val replacement = "echo accepted"
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(
+                            listOf(
+                                TerminalTextReplacementEvent(0, 0, replacement),
+                                TerminalKeyEvent.key(TerminalKey.F12),
+                                TerminalKeyEvent.codepoint('t'.code),
+                            ),
+                        ),
+                    )
+                    assertBuffer(replacement + suffix, replacement.length)
+                }
+            }
+            snapshots.close()
+        }
+
+    @ParameterizedTest(name = "PowerShell completion round trip [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell native completion round trips through real PSReadLine and PTY`(executableName: String): Unit =
+        runBlocking {
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            val historySetup =
+                "Set-PSReadLineOption -HistorySaveStyle SaveNothing; [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()"
             TerminalWorkspace().use { workspace ->
                 val tab =
                     workspace.openTab(
-                        TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                        TerminalProfile(
+                            "powershell",
+                            "PowerShell",
+                            listOf(executable!!, "-NoLogo", "-NoProfile"),
+                            startupCommand = TerminalStartupCommand(historySetup),
+                        ),
                         TerminalWorkspaceOpenOptions(),
                     )
                 val session = tab.session
 
-                session.awaitLine("")
+                withTimeout(15.seconds) {
+                    session.shellIntegrationState.revision.first {
+                        val state = session.shellIntegrationState
+                        val metadata = state.commandMetadata(state.latestCommandRecordId())
+                        metadata?.commandText == historySetup && metadata.finishedAtEpochMillis != null
+                    }
+                }
+                val historyRecord = session.shellIntegrationState.latestCommandRecordId()
+                assertEquals(0, session.shellIntegrationState.commandMetadata(historyRecord)?.exitCode, "History setup failed")
+                session.awaitLine("", "test history setup")
                 val emptyContext = assertNotNull(session.captureCommandEdit())
                 val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
-                session.awaitLine("Get-Chi")
+                session.awaitLine("Get-Chi", "typing after empty-buffer completion")
                 val expected = assertNotNull(session.captureCommandEdit())
                 val result = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                 assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
-                session.awaitLine("Get-ChildItem")
-                repeat(3) {
+                session.awaitLine("Get-ChildItem", "first acceptance")
+                repeat(3) { iteration ->
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(
@@ -552,7 +691,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             ),
                         ),
                     )
-                    session.awaitLine("Get-Chi")
+                    session.awaitLine("Get-Chi", "deletion in acceptance cycle $iteration")
                     val afterDeletion = assertNotNull(session.captureCommandEdit())
                     val refreshed = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                     assertTrue(refreshed.candidates.any { it.replacementText == "Get-ChildItem" })
@@ -564,7 +703,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(afterDeletion, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
                     )
-                    session.awaitLine("Get-ChildItem")
+                    session.awaitLine("Get-ChildItem", "acceptance cycle $iteration")
                 }
                 val command = "Write-Output 'ketra-accepted'"
                 assertEquals(
@@ -580,13 +719,13 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         state.commandText(state.latestCommandRecordId()) == command
                     }
                 }
-                session.awaitLine("")
+                session.awaitLine("", "executing accepted command")
                 val encodingLine = "Get-Content .\\utf8-extended.txt -Encoding u"
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(assertNotNull(session.captureCommandEdit()), listOf(TerminalPasteEvent(encodingLine))),
                 )
-                session.awaitLine(encodingLine)
+                session.awaitLine(encodingLine, "typing encoding argument")
                 val encodingEdit = assertNotNull(session.captureCommandEdit())
                 val encodings = assertNotNull(session.requestShellCompletions(encodingLine, encodingLine.length))
                 assertTrue(encodings.candidates.any { it.replacementText.equals("Unicode", ignoreCase = true) })
@@ -608,7 +747,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     ),
                 )
                 var currentLine = encodingLine.dropLast(1) + utf8.replacementText
-                session.awaitLine(currentLine)
+                session.awaitLine(currentLine, "accepting encoding argument")
                 for ((line, expectedText) in listOf(
                     "Get-Content -Enc u" to "UTF8",
                     "Get-Content -Encoding:u" to "UTF8",
@@ -621,7 +760,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             listOf(TerminalTextReplacementEvent(0, currentLine.length, line)),
                         ),
                     )
-                    session.awaitLine(line)
+                    session.awaitLine(line, "typing parameter case '$line'")
                     val edit = assertNotNull(session.captureCommandEdit())
                     val answer = assertNotNull(session.requestShellCompletions(line, line.length))
                     assertNull(answer.externalCommandName)
@@ -634,30 +773,37 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     )
                     currentLine = line.take(answer.replacementStartOffset) + candidate.replacementText
-                    session.awaitLine(currentLine)
+                    session.awaitLine(currentLine, "accepting parameter case '$line'")
                 }
             }
         }
 
     @Test
-    fun `PowerShell native hook uses functions aliases and registered completers from its own session`() {
+    fun `PowerShell native hook uses functions aliases and registered completers from its own session`(
+        @TempDir directory: Path,
+    ) {
         val executable = installedExecutable("pwsh", "powershell.exe")
         assumeTrue(executable != null, "PowerShell is not installed")
 
         fun resource(name: String) = checkNotNull(javaClass.getResourceAsStream(name)).use { it.readBytes().toString(Charsets.UTF_8) }
         val script = resource("powershell-completion-test.ps1").replace("__SCRIPT__", resource("powershell-completion.ps1"))
+        val scriptPath = Files.writeString(directory.resolve("completion-test.ps1"), script)
         val result =
             runProcess(
                 listOf(
                     executable!!,
                     "-NoProfile",
                     "-NonInteractive",
-                    "-EncodedCommand",
-                    Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE)),
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    scriptPath.toString(),
                 ),
                 emptyMap(),
             )
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val readiness = result.stdout.lineSequence().first { it.contains("KetraTermCompletion;2;Ready;") }
+        assertTrue(readiness.trimEnd('\u0007', '\r').endsWith(";PrefixReset"), visibleEscapes(readiness))
         val messages =
             result.stdout
                 .lineSequence()
@@ -696,7 +842,11 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals("0", fields(offset)[10], "ls --a must not receive Unix options")
         assertTrue(messages[offset + 1].contains(encoded("-Hidden")))
         for (index in offset + 2..offset + 3) {
-            assertTrue(messages[index].contains(encoded("UTF8")))
+            val replacements =
+                fields(index).drop(11).chunked(4).map { candidate ->
+                    String(Base64.getDecoder().decode(candidate[1]), Charsets.UTF_8)
+                }
+            assertTrue(replacements.any { it.equals("UTF8", ignoreCase = true) }, visibleEscapes(messages[index]))
             assertEquals("", fields(index)[9])
         }
         assertEquals("9", fields(offset + 2)[6])

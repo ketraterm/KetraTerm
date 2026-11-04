@@ -295,8 +295,10 @@ text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 the request when that external context changes. Supply an explicit `editTarget`
 for a custom editor. Normal terminal completion captures editing authority from
 the bound session, which requires a synchronized revisioned command source such
-as `TerminalShellCommandLineState` or the optional OSC producer. A read-only
-StateFlow model alone cannot admit conditional edits. See the
+as `TerminalShellCommandLineState` or the optional OSC producer. The default target
+uses the producer's prefix-reset capability when available; custom editors keep
+their own acceptance contract. A read-only StateFlow model alone cannot admit
+conditional edits. See the
 [conditional edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
 
 Provider `open` runs on the EDT before background collection; keep it cheap.

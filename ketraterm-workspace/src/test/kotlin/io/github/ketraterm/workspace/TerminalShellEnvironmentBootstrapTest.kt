@@ -17,7 +17,6 @@ package io.github.ketraterm.workspace
 
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
-import java.util.*
 import kotlin.io.path.readText
 import kotlin.test.*
 
@@ -217,7 +216,7 @@ class TerminalShellEnvironmentBootstrapTest {
                     enabled = true,
                     scriptDirectory = directory,
                 ).profile
-        val script = String(Base64.getDecoder().decode(powerShell.command.last()), Charsets.UTF_16LE)
+        val script = decodePowerShellScript(powerShell.command.last())
         assertTrue(script.indexOf("_KetraTerm_FORCE_SET_") < script.indexOf("function global:prompt"))
         assertFalse(script.contains("/project/jdk"))
         val fish =
