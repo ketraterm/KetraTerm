@@ -44,6 +44,20 @@ command text unchanged are omitted; explicit completion remains available.
 Enter acceptance and automatic popups are preferences; IntelliJ also uses its
 active keymap. Shell-native Tab completion remains a separate facility.
 
+### Argument hints
+
+Command and option rows show argument placeholders when command specifications
+provide metadata, for example `switch <branch>` and `-m <message>`. Named optional
+arguments use `[name]`. Repeated arguments use the same compact placeholder.
+Git's `checkout` distinguishes
+its optional reference/file argument from subsequent pathspecs; `add` and
+`cherry-pick` describe pathspecs and commits. Hints are never inserted, matched,
+or saved as command text. Native results without specification metadata may omit them.
+
+The shared Swing popup exposes normal and selected hint colors through
+`SwingShellSuggestionStyle`; the IntelliJ view follows the IDE theme. Custom
+providers can set `argumentHint`, and custom views choose how to display it.
+
 ## Sources by host
 
 This table describes the sources available when completion is enabled.

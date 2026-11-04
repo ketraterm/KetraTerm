@@ -245,7 +245,8 @@ private class CompletionRenderer(
         val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
         val matchBackground = if (isSelected) style.selectionMatchBackground else style.matchBackground
         val matchColor = if (isSelected) style.selectionMatchForeground else style.matchForeground
-        text = row.html(matchColor, matchBackground, isSelected)
+        val hintColor = if (isSelected) style.selectionArgumentHintForeground else style.argumentHintForeground
+        text = row.html(matchColor, matchBackground, hintColor, isSelected)
         selected = isSelected
         isOpaque = false
         icon = icons[suggestion.accentRole.ordinal]
@@ -282,6 +283,7 @@ private class CompletionRenderer(
             }
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
+        val hint = displayText(suggestion.argumentHint, 512)
         val html =
             buildString {
                 append("<html>")
@@ -294,6 +296,7 @@ private class CompletionRenderer(
                     offset = end
                 }
                 append(escapeHtml(primary.substring(offset)))
+                if (hint.isNotEmpty()) append("&nbsp;&nbsp;<span>").append(escapeHtml(hint)).append("</span>")
                 append("</html>")
             }
         val tooltip =
@@ -312,7 +315,7 @@ private class CompletionRenderer(
         return CompletionRow(
             html = html,
             tooltip = "<html>" + escapeHtml(tooltip) + "</html>",
-            accessibleName = primary.ifEmpty { fallbackAccessibleName },
+            accessibleName = (primary + if (hint.isEmpty()) "" else " $hint").ifEmpty { fallbackAccessibleName },
             accessibleDescription = accessibleDescription,
         )
     }
@@ -416,7 +419,9 @@ private class CompletionRow(
     val accessibleDescription: String,
 ) {
     private val hasMatches = "<b>" in html
+    private val hasHint = "<span>" in html
     private val matchColors = IntArray(2)
+    private val hintColors = IntArray(2)
     private val matchBackgrounds = IntArray(2)
     private val coloredHtml = arrayOfNulls<String>(2)
 
@@ -426,24 +431,36 @@ private class CompletionRow(
      *
      * @param matchColor opaque ARGB foreground for matched fragments.
      * @param matchBackground opaque ARGB fragment fill.
+     * @param hintColor opaque ARGB foreground for display-only argument placeholders.
      * @param selected whether this markup is for the selected row.
      * @return escaped label markup, retaining the ordinary foreground outside matched spans.
      */
     fun html(
         matchColor: Int,
         matchBackground: Int,
+        hintColor: Int,
         selected: Boolean,
     ): String {
-        if (!hasMatches) return html
+        if (!hasMatches && !hasHint) return html
         val index = if (selected) 1 else 0
         val cached = coloredHtml[index]
-        if (cached != null && matchColors[index] == matchColor && matchBackgrounds[index] == matchBackground) return cached
+        if (cached != null &&
+            matchColors[index] == matchColor &&
+            matchBackgrounds[index] == matchBackground &&
+            hintColors[index] == hintColor
+        ) {
+            return cached
+        }
         val css =
             buildString {
                 append("color:").append(matchColor.toHtmlColor())
                 append(";background-color:").append(matchBackground.toHtmlColor())
             }
-        val colored = html.replace("<b>", "<b style=\"$css\">")
+        val colored =
+            html
+                .replace("<b>", "<b style=\"$css\">")
+                .replace("<span>", "<span style=\"color:${hintColor.toHtmlColor()}\">")
+        hintColors[index] = hintColor
         matchColors[index] = matchColor
         matchBackgrounds[index] = matchBackground
         coloredHtml[index] = colored

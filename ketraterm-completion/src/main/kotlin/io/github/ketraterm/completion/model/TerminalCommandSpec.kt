@@ -122,6 +122,9 @@ public data class TerminalArgumentSpec
  * separate value token when [requiresValue] is true.
  * @property valueHiddenPathPolicy hidden-entry policy used when
  * [valuePathKind] accepts a path.
+ * @property valueName display name for the required value, such as `message` for `-m`.
+ * Empty uses the value's domain/path kind or the generic `value` label. Ignored for flags;
+ * it never changes parsing, quoting, or inserted text.
  * @property exclusiveGroupIds identifiers of mutually exclusive option groups.
  * Options that share any identifier cannot be suggested together once one has
  * already been entered before the completion cursor.
@@ -140,6 +143,7 @@ public data class TerminalOptionSpec
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val valueHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         val exclusiveGroupIds: List<String> = emptyList(),
+        val valueName: String = "",
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }

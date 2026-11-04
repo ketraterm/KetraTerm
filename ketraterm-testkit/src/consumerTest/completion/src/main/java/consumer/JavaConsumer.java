@@ -28,6 +28,11 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var option = new io.github.ketraterm.completion.model.TerminalOptionSpec(
+                List.of("-m"), "", true, io.github.ketraterm.completion.model.TerminalPathArgumentKind.NONE,
+                List.of(), io.github.ketraterm.completion.model.TerminalCompletionValueDomain.NONE,
+                io.github.ketraterm.completion.model.TerminalHiddenPathPolicy.DEFAULT, List.of(), "message");
+        if (!"message".equals(option.getValueName())) throw new AssertionError("Missing option value name");
         TerminalCompletionShellProvider provider = (request, context, limit, continuation) ->
                 new TerminalCompletionShellResult(List.of(), "git.exe");
         var request = new TerminalCompletionRequest("git --v", 7);

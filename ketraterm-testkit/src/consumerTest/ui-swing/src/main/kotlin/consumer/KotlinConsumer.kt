@@ -90,6 +90,8 @@ fun main() =
                         foreground = 0xFFE8EAED.toInt(),
                         matchForeground = 0xFF82AFFC.toInt(),
                         selectionMatchForeground = 0xFFBBDDFF.toInt(),
+                        argumentHintForeground = 0xFFABCDEF.toInt(),
+                        selectionArgumentHintForeground = 0xFFFEDCBA.toInt(),
                     )
                 it.columnSpacing = -1
                 it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
@@ -114,6 +116,18 @@ fun main() =
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
         check(SwingSettings().minimumContrastRatio == 3.0)
         check(interactionSettings.copy {}.shellSuggestionStyle.matchForeground == 0xFF82AFFC.toInt())
+        check(interactionSettings.copy {}.shellSuggestionStyle.argumentHintForeground == 0xFFABCDEF.toInt())
+        check(interactionSettings.copy {}.shellSuggestionStyle.selectionArgumentHintForeground == 0xFFFEDCBA.toInt())
+        val hinted =
+            io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion(
+                "switch",
+                4,
+                6,
+                "spec",
+                "SUBCOMMAND",
+                argumentHint = "<branch>",
+            )
+        check(hinted.copy().argumentHint == "<branch>" && hinted.replacementText == "switch")
         check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)

@@ -63,4 +63,11 @@ fun main() =
                     TerminalCompletionRequest("git --v", 7, shellCapabilities = TerminalShellCapabilities.POWERSHELL),
                 ).last()
         check(options.any { it.replacementText == "--version" })
+        val hints =
+            TerminalCompletionEngines
+                .fromSources(emptyList())
+                .completions(
+                    TerminalCompletionRequest("git sw", 6),
+                ).last()
+        check(hints.single { it.replacementText == "switch" }.argumentHint == "<branch>")
     }

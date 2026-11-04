@@ -20,7 +20,6 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.source.ShellReplacementText
 
 internal class SpecCompletionSource(
@@ -66,6 +65,7 @@ internal class SpecCompletionSource(
                     replacementText = spec.name,
                     displayText = spec.name,
                     detail = spec.description,
+                    argumentHint = spec.argumentHint(),
                     kind = TerminalCompletionCandidateKind.COMMAND,
                     context = context,
                     score = match.sourceScore(COMMAND_BASE_SCORE, prefix, orderIndex++),
@@ -90,6 +90,7 @@ internal class SpecCompletionSource(
                     replacementText = spec.name,
                     displayText = spec.name,
                     detail = spec.description,
+                    argumentHint = spec.argumentHint(),
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
                     context = context.commandLineContext,
                     score = match.sourceScore(SUBCOMMAND_BASE_SCORE, prefix, orderIndex++),
@@ -108,10 +109,7 @@ internal class SpecCompletionSource(
     }
 
     private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
-        val options = ArrayList<TerminalOptionSpec>()
-        for (command in context.commandPath) {
-            options += command.options
-        }
+        val options = context.commandPath.flatMap { it.options }
 
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
@@ -126,6 +124,7 @@ internal class SpecCompletionSource(
                         replacementText = name,
                         displayText = name,
                         detail = option.description,
+                        argumentHint = option.argumentHint(),
                         kind = TerminalCompletionCandidateKind.OPTION,
                         context = context.commandLineContext,
                         score = match.sourceScore(OPTION_BASE_SCORE, prefix, orderIndex++),
@@ -179,6 +178,7 @@ internal class SpecCompletionSource(
         context: TerminalCompletionContext,
         score: Int,
         matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+        argumentHint: String = "",
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacementText,
@@ -190,6 +190,7 @@ internal class SpecCompletionSource(
             kind = kind,
             score = score,
             matchedRanges = matchedRanges,
+            argumentHint = argumentHint,
         )
 
     private fun candidate(
@@ -200,6 +201,7 @@ internal class SpecCompletionSource(
         context: TerminalCommandLineContext,
         score: Int,
         matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+        argumentHint: String = "",
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacementText,
@@ -211,6 +213,7 @@ internal class SpecCompletionSource(
             kind = kind,
             score = score,
             matchedRanges = matchedRanges,
+            argumentHint = argumentHint,
         )
 
     private companion object {

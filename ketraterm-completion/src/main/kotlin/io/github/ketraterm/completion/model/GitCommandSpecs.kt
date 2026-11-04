@@ -41,6 +41,15 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "add",
                         description = commandSpecText("spec.git.add.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "pathspec",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                ),
+                            ),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         options =
                             listOf(
@@ -98,6 +107,7 @@ internal object GitCommandSpecs {
                                     listOf("-m", "--message"),
                                     commandSpecText("spec.git.commit.option.-m.description"),
                                     requiresValue = true,
+                                    valueName = "message",
                                 ),
                                 TerminalOptionSpec(listOf("-a", "--all"), commandSpecText("spec.git.commit.option.-a.description")),
                                 TerminalOptionSpec(listOf("--amend"), commandSpecText("spec.git.commit.option.--amend.description")),
@@ -117,12 +127,28 @@ internal object GitCommandSpecs {
                                     listOf("--fixup"),
                                     commandSpecText("spec.git.commit.option.--fixup.description"),
                                     requiresValue = true,
+                                    valueName = "commit",
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "checkout",
                         description = commandSpecText("spec.git.checkout.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "branch, file, tag or commit",
+                                    isOptional = true,
+                                    pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                                TerminalArgumentSpec(
+                                    "pathspec",
+                                    isOptional = true,
+                                    isVariadic = true,
+                                    pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                ),
+                            ),
                         aliases = listOf("co"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
@@ -133,11 +159,13 @@ internal object GitCommandSpecs {
                                     listOf("-b"),
                                     commandSpecText("spec.git.checkout.option.-b.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-B"),
                                     commandSpecText("spec.git.checkout.option.-B.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                 ),
                                 TerminalOptionSpec(listOf("--detach"), commandSpecText("spec.git.checkout.option.--detach.description")),
                                 TerminalOptionSpec(listOf("--theirs"), commandSpecText("spec.git.checkout.option.--theirs.description")),
@@ -147,6 +175,10 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "switch",
                         description = commandSpecText("spec.git.switch.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec("branch", valueDomain = TerminalCompletionValueDomain.GIT_BRANCH),
+                            ),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
@@ -154,11 +186,13 @@ internal object GitCommandSpecs {
                                     listOf("-c", "--create"),
                                     commandSpecText("spec.git.switch.option.-c.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-C", "--force-create"),
                                     commandSpecText("spec.git.switch.option.-C.description"),
                                     requiresValue = true,
+                                    valueName = "branch",
                                 ),
                                 TerminalOptionSpec(listOf("-d", "--detach"), commandSpecText("spec.git.switch.option.-d.description")),
                             ),
@@ -322,6 +356,7 @@ internal object GitCommandSpecs {
                                     listOf("-n", "--max-count"),
                                     commandSpecText("spec.git.log.option.-n.description"),
                                     requiresValue = true,
+                                    valueName = "count",
                                 ),
                             ),
                     ),
@@ -393,6 +428,14 @@ internal object GitCommandSpecs {
                     TerminalCommandSpec(
                         name = "cherry-pick",
                         description = commandSpecText("spec.git.cherry-pick.description"),
+                        positionalArguments =
+                            listOf(
+                                TerminalArgumentSpec(
+                                    "commit",
+                                    isVariadic = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                                ),
+                            ),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                         options =
                             listOf(

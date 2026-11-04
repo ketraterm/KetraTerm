@@ -38,6 +38,49 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @Test
+    fun `argument hints are escaped styled separately and never inserted`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidate =
+                    suggestion("switch").copy(
+                        argumentHint = "<branch> [path] & \"name\"",
+                        replacementEndOffset = 2,
+                        matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)),
+                    )
+                val style =
+                    SwingShellSuggestionStyle(
+                        argumentHintForeground = 0xFF123456.toInt(),
+                        selectionArgumentHintForeground = 0xFF654321.toInt(),
+                    )
+                view.applyStyle(style)
+                view.update(snapshot(listOf(candidate), 0, 1, 0))
+                for (selected in listOf(false, true)) {
+                    val row =
+                        view.list.cellRenderer.getListCellRendererComponent(
+                            view.list,
+                            candidate,
+                            0,
+                            selected,
+                            false,
+                        ) as javax.swing.JLabel
+                    assertTrue(row.text.contains(if (selected) "color:#654321" else "color:#123456"))
+                    assertTrue(row.text.contains("&lt;branch&gt;&nbsp;[path]&nbsp;&amp;&nbsp;&quot;name&quot;"))
+                    assertFalse(row.text.contains("<b>&lt;branch"))
+                    assertTrue(row.accessibleContext.accessibleName.contains(candidate.argumentHint))
+                }
+                view.applyStyle(style.copy(selectionArgumentHintForeground = 0xFFABCDEF.toInt()))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, true, false) as javax.swing.JLabel
+                assertTrue(row.text.contains("color:#abcdef"))
+                val request = SwingShellSuggestionRequest("sw", 2)
+                assertEquals("switch", candidate.commandTextAfterReplacement(request))
+                assertArrayEquals(intArrayOf(0, 2), candidate.matchedRanges.copyPackedOffsets())
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
     fun `explicit popup colors are honored exactly in normal and selected rows`() =
         onEdt {
             val view = createView(RecordingListener())

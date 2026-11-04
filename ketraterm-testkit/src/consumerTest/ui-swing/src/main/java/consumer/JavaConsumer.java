@@ -128,7 +128,8 @@ public final class JavaConsumer {
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
             draft.setShellSuggestionStyle(new SwingShellSuggestionStyle(
                 0xFF202124, 0xFFE8EAED, 0xFF334455, 0xFFFFFFFF,
-                0xFF82AFFC, 0xFFBBDDFF));
+                0xFF82AFFC, 0xFFBBDDFF, 0xFF202124, 0xFF334455,
+                0xFF666B73, 0xFFADB2BC, 0xFFABCDEF, 0xFFFEDCBA));
             draft.setColumnSpacing(-1);
             draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
             draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
@@ -144,7 +145,9 @@ public final class JavaConsumer {
             draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
-        if (copiedSettings.getShellSuggestionStyle().getMatchForeground() != 0xFF82AFFC)
+        if (copiedSettings.getShellSuggestionStyle().getArgumentHintForeground() != 0xFFABCDEF
+            || copiedSettings.getShellSuggestionStyle().getSelectionArgumentHintForeground() != 0xFFFEDCBA
+            || copiedSettings.getShellSuggestionStyle().getMatchForeground() != 0xFF82AFFC)
             throw new AssertionError("Java suggestion style did not survive copying");
         if (copiedSettings.getShellIntegrationPromptDotHoverColor() != 0xFFFFFFFF
             || copiedSettings.getShellIntegrationFailedPromptDotHoverColor() != 0xFFFF8A8A
@@ -264,7 +267,14 @@ draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && acti
                         return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT;
                     });
                 if (interaction == null) throw new AssertionError("Custom editing target was not captured");
-                var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND");
+                var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND", "status", "",
+                    io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole.COMMAND,
+                    io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionMatchRanges.EMPTY,
+                    "Native", null, null, "[path]");
+                if (!"git status".equals(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKt.commandTextAfterReplacement(
+                    candidate, new SwingShellSuggestionRequest("git st", 6)))) {
+                    throw new AssertionError("Argument hint entered command text");
+                }
                 interaction.publish(List.of(candidate));
                 var publication = interaction.getSnapshot();
                 if (interaction.tryAccept(publication, 0) != SwingShellSuggestionAcceptanceResult.STALE_CONTEXT

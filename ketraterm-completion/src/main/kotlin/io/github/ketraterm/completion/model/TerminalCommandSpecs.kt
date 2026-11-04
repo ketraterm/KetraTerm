@@ -95,10 +95,11 @@ public object TerminalCommandSpecs {
      * description and argument label. Keys are `spec.<canonical.path>.description`,
      * `spec.<canonical.path>.option.<first-option-token>.description`, and
      * `spec.<canonical.path>.argument.<original-name>.name` or `.description`.
+     * Option value labels use `spec.<canonical.path>.option.<first-name>.valueName`.
      * For example: `spec.git.status.description`,
      * `spec.git.status.option.--short.description`, and
      * `spec.kubectl.get.argument.resource.name`. The argument's zero-based ordinal
-     * replaces its name when that name is empty. Dots separate canonical command
+     * replaces its name when that name is empty or contains punctuation/whitespace. Dots separate canonical command
      * and subcommand tokens; aliases and translated labels never become keys.
      * Post-terminator metadata uses `spec.<canonical.path>.argumentAfterDoubleDash.name`
      * and `.description`.
@@ -122,11 +123,18 @@ public object TerminalCommandSpecs {
                     spec.options.map { option ->
                         option.copy(
                             description = localizeNonempty("$key.option.${option.names.first()}.description", option.description, localize),
+                            valueName = localizeNonempty("$key.option.${option.names.first()}.valueName", option.valueName, localize),
                         )
                     },
                 positionalArguments =
                     spec.positionalArguments.mapIndexed { index, argument ->
-                        val argumentKey = "$key.argument.${argument.name.ifEmpty { index.toString() }}"
+                        val name = argument.name
+                        val identifier =
+                            name.takeIf {
+                                it.isNotEmpty() &&
+                                    it.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
+                            }
+                        val argumentKey = "$key.argument.${identifier ?: index}"
                         argument.copy(
                             name = localizeNonempty("$argumentKey.name", argument.name, localize),
                             description = localizeNonempty("$argumentKey.description", argument.description, localize),
@@ -257,9 +265,6 @@ public object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("-w", "--wait"), commandSpecText("spec.code.option.-w.description")),
                 ),
         )
-
-    internal val KUBECTL_RESOURCES: List<String>
-        get() = ContainerCommandSpecs.KUBECTL_RESOURCES
 
     private fun freezeSpecs(specs: List<TerminalCommandSpec>): List<TerminalCommandSpec> =
         immutableList(

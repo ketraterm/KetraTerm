@@ -107,6 +107,7 @@ internal object ContainerCommandSpecs {
                         listOf("-p", "--project-name"),
                         commandSpecText("spec.docker-compose.option.-p.description"),
                         requiresValue = true,
+                        valueName = "project-name",
                     ),
                     TerminalOptionSpec(listOf("-d", "--detach"), commandSpecText("spec.docker-compose.option.-d.description")),
                     TerminalOptionSpec(listOf("--build"), commandSpecText("spec.docker-compose.option.--build.description")),
@@ -140,6 +141,7 @@ internal object ContainerCommandSpecs {
                                     names = listOf("-o", "--output"),
                                     description = commandSpecText("spec.kubectl.get.option.-o.description"),
                                     requiresValue = true,
+                                    valueName = "format",
                                     valueCandidates = listOf("yaml", "json", "wide", "name"),
                                 ),
                                 TerminalOptionSpec(
@@ -150,6 +152,7 @@ internal object ContainerCommandSpecs {
                                     listOf("-l", "--selector"),
                                     commandSpecText("spec.kubectl.get.option.-l.description"),
                                     requiresValue = true,
+                                    valueName = "selector",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-w", "--watch"),
@@ -178,6 +181,7 @@ internal object ContainerCommandSpecs {
                                     listOf("-l", "--selector"),
                                     commandSpecText("spec.kubectl.describe.option.-l.description"),
                                     requiresValue = true,
+                                    valueName = "selector",
                                 ),
                             ),
                     ),
@@ -195,11 +199,13 @@ internal object ContainerCommandSpecs {
                                     listOf("-c", "--container"),
                                     commandSpecText("spec.kubectl.logs.option.-c.description"),
                                     requiresValue = true,
+                                    valueName = "container",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--tail"),
                                     commandSpecText("spec.kubectl.logs.option.--tail.description"),
                                     requiresValue = true,
+                                    valueName = "lines",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--timestamps"),
@@ -218,6 +224,7 @@ internal object ContainerCommandSpecs {
                                     listOf("-c", "--container"),
                                     commandSpecText("spec.kubectl.exec.option.-c.description"),
                                     requiresValue = true,
+                                    valueName = "container",
                                 ),
                             ),
                     ),
@@ -262,6 +269,7 @@ internal object ContainerCommandSpecs {
                                     listOf("-l", "--selector"),
                                     commandSpecText("spec.kubectl.delete.option.-l.description"),
                                     requiresValue = true,
+                                    valueName = "selector",
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--force"),
@@ -306,7 +314,7 @@ internal object ContainerCommandSpecs {
                 ),
         )
 
-    internal val KUBECTL_RESOURCES =
+    private val KUBECTL_RESOURCES =
         listOf(
             "pods",
             "services",
@@ -322,6 +330,3 @@ internal object ContainerCommandSpecs {
             "cronjobs",
         )
 }
-
-internal val KUBECTL_RESOURCES: List<String>
-    get() = ContainerCommandSpecs.KUBECTL_RESOURCES

@@ -82,6 +82,7 @@ class SwingCompletionSuggestionProviderTest {
                                     "custom-source",
                                     TerminalCompletionCandidateKind.SUBCOMMAND,
                                     feedbackToken = token,
+                                    argumentHint = "<message>",
                                 ),
                             ),
                         )
@@ -90,6 +91,7 @@ class SwingCompletionSuggestionProviderTest {
                 )
             val suggestion = provider.suggestions(request("git s", 5)).last().single()
             assertSame(token, suggestion.feedbackToken)
+            assertEquals("<message>", suggestion.argumentHint)
             assertSame(context, suggestion.interactionContext)
         }
 

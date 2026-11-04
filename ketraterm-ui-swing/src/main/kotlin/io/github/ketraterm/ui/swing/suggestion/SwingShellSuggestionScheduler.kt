@@ -147,17 +147,18 @@ internal class SwingShellSuggestionScheduler(
         if (observationJob != null) cancelAndHide()
     }
 
+    /** Retires stale actions; ineligible command text cannot keep a retained popup alive after a no-op edit. */
     fun onInvalidated(dismissed: Boolean = false) {
         checkEdt()
         val revisions = shellCommandLineRevisions ?: return
         val revision = lifecycleRevision
         val invalidation = revisions.value
-        val snapshot = if (dismissed || invalidation < 0L) activeCommandLine?.invoke() else null
+        val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
         if (dismissed) dismissedCommandText = snapshot?.commandText
         invalidatedRevision = invalidation
         invalidatedSnapshot = snapshot
-        cancelAndHide(refreshing = !dismissed)
+        cancelAndHide(refreshing = !dismissed && snapshot != null && shouldRequest(snapshot))
     }
 
     fun onEligibilityChanged(eligible: Boolean) {

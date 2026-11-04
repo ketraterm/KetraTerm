@@ -55,6 +55,7 @@ internal object ToolchainCommandSpecs {
                         names = listOf("--output"),
                         description = commandSpecText("spec.aws.option.--output.description"),
                         requiresValue = true,
+                        valueName = "format",
                         valueCandidates = listOf("json", "text", "table", "yaml", "yaml-stream"),
                     ),
                 ),
@@ -74,11 +75,17 @@ internal object ToolchainCommandSpecs {
                 listOf(
                     TerminalOptionSpec(listOf("-version", "--version", "-v"), commandSpecText("spec.kotlin.option.-version.description")),
                     TerminalOptionSpec(listOf("-help", "-h"), commandSpecText("spec.kotlin.option.-help.description")),
-                    TerminalOptionSpec(listOf("-e"), commandSpecText("spec.kotlin.option.-e.description"), requiresValue = true),
+                    TerminalOptionSpec(
+                        listOf("-e"),
+                        commandSpecText("spec.kotlin.option.-e.description"),
+                        requiresValue = true,
+                        valueName = "expression",
+                    ),
                     TerminalOptionSpec(
                         listOf("-classpath", "-cp"),
                         commandSpecText("spec.kotlin.option.-classpath.description"),
                         requiresValue = true,
+                        valueName = "classpath",
                     ),
                     TerminalOptionSpec(listOf("-include-runtime"), commandSpecText("spec.kotlin.option.-include-runtime.description")),
                     TerminalOptionSpec(listOf("-nowarn"), commandSpecText("spec.kotlin.option.-nowarn.description")),
@@ -105,28 +112,33 @@ internal object ToolchainCommandSpecs {
                         listOf("-classpath", "-cp"),
                         commandSpecText("spec.kotlinc.option.-classpath.description"),
                         requiresValue = true,
+                        valueName = "classpath",
                     ),
                     TerminalOptionSpec(listOf("-include-runtime"), commandSpecText("spec.kotlinc.option.-include-runtime.description")),
                     TerminalOptionSpec(
                         names = listOf("-jvm-target"),
                         description = commandSpecText("spec.kotlinc.option.-jvm-target.description"),
                         requiresValue = true,
+                        valueName = "target",
                         valueCandidates = listOf("1.8", "11", "17", "21", "22", "23", "24", "25"),
                     ),
                     TerminalOptionSpec(
                         listOf("-language-version"),
                         commandSpecText("spec.kotlinc.option.-language-version.description"),
                         requiresValue = true,
+                        valueName = "version",
                     ),
                     TerminalOptionSpec(
                         listOf("-api-version"),
                         commandSpecText("spec.kotlinc.option.-api-version.description"),
                         requiresValue = true,
+                        valueName = "version",
                     ),
                     TerminalOptionSpec(
                         listOf("-opt-in"),
                         commandSpecText("spec.kotlinc.option.-opt-in.description"),
                         requiresValue = true,
+                        valueName = "annotation",
                     ),
                     TerminalOptionSpec(
                         listOf("-Xcontext-receivers"),
@@ -179,7 +191,12 @@ internal object ToolchainCommandSpecs {
                 ),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("-s"), commandSpecText("spec.adb.option.-s.description"), requiresValue = true),
+                    TerminalOptionSpec(
+                        listOf("-s"),
+                        commandSpecText("spec.adb.option.-s.description"),
+                        requiresValue = true,
+                        valueName = "serial",
+                    ),
                     TerminalOptionSpec(listOf("-d"), commandSpecText("spec.adb.option.-d.description")),
                     TerminalOptionSpec(listOf("-e"), commandSpecText("spec.adb.option.-e.description")),
                     TerminalOptionSpec(listOf("--help", "-h"), commandSpecText("spec.adb.option.--help.description")),
@@ -199,6 +216,7 @@ internal object ToolchainCommandSpecs {
                         listOf("--profile", "-p"),
                         commandSpecText("spec.ketra.option.--profile.description"),
                         requiresValue = true,
+                        valueName = "profile",
                     ),
                     TerminalOptionSpec(
                         names = listOf("--directory", "-d"),

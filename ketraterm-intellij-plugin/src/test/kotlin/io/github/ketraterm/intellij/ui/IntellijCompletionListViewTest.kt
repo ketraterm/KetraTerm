@@ -30,6 +30,22 @@ import java.awt.event.MouseWheelEvent
 import javax.swing.JPanel
 
 class IntellijCompletionListViewTest : BasePlatformTestCase() {
+    fun testArgumentHintsRemainSeparateFromMatchesAndAccessible() {
+        val suggestion =
+            suggestion(
+                "switch",
+                SwingShellSuggestionAccentRole.COMMAND,
+                matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)),
+                sourceDisplayText = "Built-in",
+            ).copy(argumentHint = "<branch>\n" + "x".repeat(3000))
+        val item = prepareCompletionListItem(suggestion)
+        assertEquals("switch", item.fragments.joinToString("") { it.text })
+        assertTrue(item.argumentHint.startsWith("<branch>"))
+        assertFalse(item.argumentHint.contains('\n'))
+        assertTrue(item.argumentHint.length < 3000)
+        assertTrue(item.accessibleText.contains("<branch>"))
+    }
+
     fun testPrecomputesMatchFragmentsAndUsesSemanticIcons() {
         val suggestion =
             suggestion(
@@ -242,7 +258,7 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             val moved = mouseEvent(list, MouseEvent.MOUSE_MOVED, x, y, MouseEvent.NOBUTTON)
             list.dispatchEvent(moved)
             list.dispatchEvent(mouseEvent(list, MouseEvent.MOUSE_PRESSED, x, y, MouseEvent.BUTTON1))
-            list.dispatchEvent(mouseWheelEvent(list, x, y, rotation = 1))
+            list.dispatchEvent(mouseWheelEvent(list, x, y))
 
             assertEquals(1, listener.hoveredIndex)
             assertEquals(1, listener.clickedIndex)
@@ -279,7 +295,7 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             assertSame(preparedItem, list.model.getElementAt(1))
             list.dispatchEvent(mouseEvent(list, MouseEvent.MOUSE_MOVED, x, y, MouseEvent.NOBUTTON))
             list.dispatchEvent(mouseEvent(list, MouseEvent.MOUSE_PRESSED, x, y, MouseEvent.BUTTON1))
-            list.dispatchEvent(mouseWheelEvent(list, x, y, rotation = 1))
+            list.dispatchEvent(mouseWheelEvent(list, x, y))
 
             assertSame(publication, listener.hoveredSnapshot)
             assertSame(publication, listener.clickedSnapshot)
@@ -406,7 +422,6 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
         source: java.awt.Component,
         x: Int,
         y: Int,
-        rotation: Int,
     ): MouseWheelEvent =
         MouseWheelEvent(
             source,
@@ -419,7 +434,7 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             false,
             MouseWheelEvent.WHEEL_UNIT_SCROLL,
             1,
-            rotation,
+            1,
         )
 
     private class RecordingListener : SwingShellSuggestionViewListener {

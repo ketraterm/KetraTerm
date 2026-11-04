@@ -98,7 +98,7 @@ internal class IntellijCompletionListView(
             border = JBUI.Borders.empty(0, JBUI.scale(ROW_HORIZONTAL_INSET))
             accessibleContext.accessibleName = KetraTermBundle.message("completion.list.accessibleName")
             accessibleContext.accessibleDescription = KetraTermBundle.message("completion.list.accessibleDescription")
-            toolTipText = ""
+            ToolTipManager.sharedInstance().registerComponent(this)
             addMouseListener(pointerAdapter)
             addMouseMotionListener(pointerAdapter)
             addMouseWheelListener(wheelListener)
@@ -141,7 +141,7 @@ internal class IntellijCompletionListView(
         suggestionList.removeMouseListener(pointerAdapter)
         suggestionList.removeMouseMotionListener(pointerAdapter)
         suggestionList.removeMouseWheelListener(wheelListener)
-        suggestionList.toolTipText = null
+        ToolTipManager.sharedInstance().unregisterComponent(suggestionList)
         footer.removeMouseWheelListener(wheelListener)
         suggestionScrollPane.removeMouseWheelListener(wheelListener)
         suggestionScrollPane.viewport.removeChangeListener(viewportChangeListener)
@@ -263,6 +263,7 @@ internal data class IntellijCompletionTextFragment(
 internal data class IntellijCompletionListItem(
     val fragments: List<IntellijCompletionTextFragment>,
     val detailDisplayText: String,
+    val argumentHint: String,
     val sourceDisplayText: String,
     val icon: Icon,
     val accessibleText: String,
@@ -270,25 +271,28 @@ internal data class IntellijCompletionListItem(
 
 internal fun prepareCompletionListItem(suggestion: SwingShellSuggestion): IntellijCompletionListItem {
     val boundedDisplayText =
-        boundedCompletionText(
-            suggestion.displayText,
-            maximumCodeUnits = MAXIMUM_DISPLAY_CODE_UNITS,
-            maximumGraphemeCount = MAXIMUM_DISPLAY_GRAPHEMES,
-        )
+        boundedCompletionText(suggestion.displayText)
     val detailDisplayText =
         boundedCompletionSecondaryText(
             suggestion.detail,
             maximumCodeUnits = MAXIMUM_DETAIL_CODE_UNITS,
             maximumGraphemeCount = MAXIMUM_DETAIL_GRAPHEMES,
         )
+    val argumentHint =
+        boundedCompletionSecondaryText(
+            suggestion.argumentHint,
+            maximumCodeUnits = MAXIMUM_DETAIL_CODE_UNITS,
+            maximumGraphemeCount = MAXIMUM_DETAIL_GRAPHEMES,
+        )
+    val primaryAccessibleText = boundedDisplayText.text + if (argumentHint.isEmpty()) "" else " $argumentHint"
     val sourceDisplayText = boundedCompletionSourceDisplayText(suggestion.sourceDisplayText)
     val accessibleText =
         if (detailDisplayText.isEmpty()) {
-            KetraTermBundle.message("completion.list.item.accessible.noDetail", boundedDisplayText.text, sourceDisplayText)
+            KetraTermBundle.message("completion.list.item.accessible.noDetail", primaryAccessibleText, sourceDisplayText)
         } else {
             KetraTermBundle.message(
                 "completion.list.item.accessible",
-                boundedDisplayText.text,
+                primaryAccessibleText,
                 detailDisplayText,
                 sourceDisplayText,
             )
@@ -296,6 +300,7 @@ internal fun prepareCompletionListItem(suggestion: SwingShellSuggestion): Intell
     return IntellijCompletionListItem(
         fragments = completionMatchFragments(suggestion.matchedRanges, boundedDisplayText),
         detailDisplayText = detailDisplayText,
+        argumentHint = argumentHint,
         sourceDisplayText = sourceDisplayText,
         icon = completionIconFor(suggestion.accentRole),
         accessibleText = accessibleText,
@@ -358,12 +363,8 @@ private data class BoundedCompletionText(
     val isTruncated: Boolean,
 )
 
-private fun boundedCompletionText(
-    text: String,
-    maximumCodeUnits: Int,
-    maximumGraphemeCount: Int,
-): BoundedCompletionText {
-    val prefix = boundedCompletionPrefix(text, maximumCodeUnits, maximumGraphemeCount)
+private fun boundedCompletionText(text: String): BoundedCompletionText {
+    val prefix = boundedCompletionPrefix(text, MAXIMUM_DISPLAY_CODE_UNITS, MAXIMUM_DISPLAY_GRAPHEMES)
     val sanitizedPrefix = sanitizeCompletionPrimaryText(text, prefix.retainedPrefixLength)
     return BoundedCompletionText(
         text = if (prefix.isTruncated) sanitizedPrefix + ELLIPSIS else sanitizedPrefix,
@@ -525,6 +526,7 @@ private class IntellijCompletionCellRenderer : ColoredListCellRenderer<IntellijC
             )
         }
 
+        if (value.argumentHint.isNotEmpty()) append("  ${value.argumentHint}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         if (value.detailDisplayText.isNotEmpty()) {
             append("  ${value.detailDisplayText}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         }

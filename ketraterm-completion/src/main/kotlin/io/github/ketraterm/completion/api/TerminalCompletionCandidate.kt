@@ -63,6 +63,8 @@ public enum class TerminalCompletionCandidateKind {
  * feedback with a native provider and item. The engine does not interpret it
  * for ranking or outcome equivalence. Fusion preserves the token of the chosen
  * presentation candidate, and [copy] preserves its reference by default.
+ * @property argumentHint display-only argument placeholders, such as `<branch>` or `[path]`.
+ * Hints are separate from insertion text and [matchedRanges] and do not affect ranking or edit identity.
  * @throws IllegalArgumentException if text/source fields are empty, replacement
  * offsets do not form a nonnegative ordered range, or [matchedRanges] do not
  * address [displayText].
@@ -82,6 +84,7 @@ public data class TerminalCompletionCandidate
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
         val feedbackToken: Any? = null,
+        val argumentHint: String = "",
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }

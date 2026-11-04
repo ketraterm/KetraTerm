@@ -108,6 +108,46 @@ class SwingTerminalSuggestionContextTest {
     }
 
     @Test
+    fun `rapid deletion followed by Backspace on an empty prompt closes the retained popup`() {
+        val dispatcher = StandardTestDispatcher()
+        Fixture(
+            settings = SwingSettings.create { it.smartSuggestionsEnabled = true },
+            sessionHandler = true,
+            suggestionDispatcher = dispatcher,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+        ).use { fixture ->
+            onEdt {
+                fixture.session.start(30, 4)
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                dispatcher.scheduler.runCurrent()
+                dispatcher.scheduler.advanceTimeBy(75)
+                dispatcher.scheduler.runCurrent()
+            }
+            assertEquals("git s", fixture.awaitRequest().commandText)
+            fixture.view.awaitVisible()
+            onEdt {
+                assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+                fixture.press(KeyEvent.VK_BACK_SPACE)
+                fixture.editableSource.value = snapshot().copy(commandText = "", cursorOffset = 0, cursorColumn = 0)
+                dispatcher.scheduler.runCurrent()
+            }
+            onEdt {
+                dispatcher.scheduler.runCurrent()
+                assertEquals("", fixture.session.activeShellCommandLine()?.commandText)
+                fixture.press(KeyEvent.VK_BACK_SPACE)
+                dispatcher.scheduler.advanceTimeBy(150)
+                dispatcher.scheduler.runCurrent()
+
+                assertFalse(fixture.terminal.currentShellSuggestionState().visible)
+                assertFalse(fixture.view.component.isVisible)
+                assertTrue(fixture.requests.isEmpty())
+                assertTrue(fixture.accepted.isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `automatic typing retains rows and selection until a fresh publication without admitting stale actions`() {
         val dispatcher = StandardTestDispatcher()
         Fixture(

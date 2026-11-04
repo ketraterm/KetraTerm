@@ -132,12 +132,19 @@ internal class GlobalCompletionRanker {
             private set
         var strongestContext = first.contextAdjustment
             private set
+        private var hintContribution = first.takeIf { it.candidate.argumentHint.isNotEmpty() }
         private var sourcePrior = first.sourcePrior
         private var semanticRelevance = first.semanticRelevance
         private var matchRelevance = first.matchRelevance
         private var exactLearningAdjustment = first.exactLearningAdjustment
 
         fun add(contribution: RankedContribution) {
+            val hint = hintContribution
+            if (contribution.candidate.argumentHint.isNotEmpty() &&
+                (hint == null || EDIT_REPRESENTATIVE_ORDER.compare(contribution, hint) < 0)
+            ) {
+                hintContribution = contribution
+            }
             if (EDIT_REPRESENTATIVE_ORDER.compare(contribution, representative) < 0) representative = contribution
             bestLocalRank = minOf(bestLocalRank, contribution.localRank)
             sourcePrior = maxOf(sourcePrior, contribution.sourcePrior)
@@ -164,7 +171,10 @@ internal class GlobalCompletionRanker {
             }
 
         fun toPublicCandidate(): TerminalCompletionCandidate =
-            representative.candidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
+            representative.candidate.copy(
+                score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt(),
+                argumentHint = hintContribution?.candidate?.argumentHint.orEmpty(),
+            )
     }
 
     private data class RankedContribution(

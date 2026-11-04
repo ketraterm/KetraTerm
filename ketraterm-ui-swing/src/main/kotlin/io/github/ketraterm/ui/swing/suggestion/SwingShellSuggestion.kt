@@ -50,6 +50,8 @@ import java.util.regex.Pattern
  * command text.
  * @property matchedRanges immutable ordered UTF-16 intervals relative to
  * [displayText] used to visually highlight matching fragments.
+ * @property argumentHint display-only placeholders shown after [displayText]. Never inserted,
+ * matched, or included in command-learning text; custom providers may supply their own hint.
  * @throws IllegalArgumentException if text/source/kind fields are invalid,
  * replacement offsets are unordered, or [matchedRanges] do not address
  * [displayText].
@@ -70,6 +72,7 @@ public data class SwingShellSuggestion
         val sourceDisplayText: String = source,
         val interactionContext: Any? = null,
         val feedbackToken: Any? = null,
+        val argumentHint: String = "",
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }

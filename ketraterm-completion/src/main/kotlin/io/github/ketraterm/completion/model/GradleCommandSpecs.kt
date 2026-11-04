@@ -51,6 +51,7 @@ internal object GradleCommandSpecs {
                         names = listOf("--console"),
                         description = commandSpecText("spec.gradle.option.--console.description"),
                         requiresValue = true,
+                        valueName = "mode",
                         valueCandidates = listOf("auto", "plain", "rich", "verbose"),
                     ),
                     TerminalOptionSpec(listOf("--info", "-i"), commandSpecText("spec.gradle.option.--info.description")),
@@ -78,6 +79,7 @@ internal object GradleCommandSpecs {
                         names = listOf("--configuration-cache-problems"),
                         description = commandSpecText("spec.gradle.option.--configuration-cache-problems.description"),
                         requiresValue = true,
+                        valueName = "mode",
                         valueCandidates = listOf("fail", "warn"),
                     ),
                     TerminalOptionSpec(listOf("--daemon"), commandSpecText("spec.gradle.option.--daemon.description")),
@@ -91,6 +93,7 @@ internal object GradleCommandSpecs {
                         listOf("--max-workers"),
                         commandSpecText("spec.gradle.option.--max-workers.description"),
                         requiresValue = true,
+                        valueName = "count",
                     ),
                     TerminalOptionSpec(listOf("--continuous", "-t"), commandSpecText("spec.gradle.option.--continuous.description")),
                     TerminalOptionSpec(
@@ -104,6 +107,7 @@ internal object GradleCommandSpecs {
                         listOf("--exclude-task", "-x"),
                         commandSpecText("spec.gradle.option.--exclude-task.description"),
                         requiresValue = true,
+                        valueName = "task",
                     ),
                     TerminalOptionSpec(
                         names = GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES,

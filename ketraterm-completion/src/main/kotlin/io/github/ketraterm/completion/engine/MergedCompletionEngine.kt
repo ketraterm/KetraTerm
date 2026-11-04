@@ -31,6 +31,7 @@ import io.github.ketraterm.completion.source.appendLearnedHistoryCandidates
 import io.github.ketraterm.completion.source.hasNonPathValueDomain
 import io.github.ketraterm.completion.spec.PathCommandSpecCandidateProjector
 import io.github.ketraterm.completion.spec.SpecCompletionSource
+import io.github.ketraterm.completion.spec.argumentHint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -411,9 +412,15 @@ internal class MergedCompletionEngine(
         candidate: TerminalCompletionCandidate,
     ): TerminalCompletionCandidate {
         if (candidate.kind != TerminalCompletionCandidateKind.COMMAND) return candidate
-        val description = commandSpec(request, candidate)?.description?.takeIf { it.isNotBlank() } ?: return candidate
-        if (candidate.detail == description) return candidate
-        return candidate.copy(detail = if (candidate.detail.isBlank()) description else description + "\n" + candidate.detail)
+        val spec = commandSpec(request, candidate) ?: return candidate
+        val description = spec.description
+        val detail =
+            when {
+                description.isBlank() || candidate.detail == description -> candidate.detail
+                candidate.detail.isBlank() -> description
+                else -> description + "\n" + candidate.detail
+            }
+        return candidate.copy(detail = detail, argumentHint = candidate.argumentHint.ifEmpty { spec.argumentHint() })
     }
 
     private fun commandSpec(

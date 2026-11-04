@@ -178,6 +178,37 @@ class SwingShellSuggestionSchedulerTest {
         }
 
     @Test
+    fun `a no-op delete after clearing the line cannot retain old suggestions indefinitely`() =
+        onEdtTest {
+            for (command in listOf("", " ", "g", null)) {
+                val fixture = Fixture(backgroundScope)
+                fixture.start()
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git s")), fixture.requests)
+                fixture.scheduler.onInvalidated()
+                fixture.active = command?.let(::snapshot)
+                fixture.revisions.value = 1
+                runCurrent()
+                advanceTimeBy(25.milliseconds)
+                fixture.scheduler.onInvalidated() // Another Delete/Backspace produces no shell change.
+                advanceTimeBy(100.milliseconds)
+                runCurrent()
+
+                assertEquals(false, fixture.refreshing.last(), "line=$command")
+                assertEquals(listOf(snapshot("git s")), fixture.requests)
+                fixture.active = snapshot("git st")
+                fixture.revisions.value = 2
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git s"), snapshot("git st")), fixture.requests)
+                fixture.scheduler.stop()
+            }
+        }
+
+    @Test
     fun `input invalidation suppresses unchanged state until a new shell edit`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)

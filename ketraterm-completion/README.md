@@ -88,6 +88,10 @@ prefer specialized sources with native fallback. See the
 `SessionShellCompletionProvider` in `ketraterm-ui-swing-host` supplies this contract
 for installed PowerShell hooks. See the [shell authority contract](docs/completion-architecture.md#internal-implementation).
 
+Candidates carry optional display-only `argumentHint` text. Command specifications
+supply positional names, optional arguments, and option `valueName` labels;
+these hints do not affect edits or ranking.
+
 Custom engines can resolve and share context with
 `TerminalCompletionContext.resolve(request, commandSpecs)`. See the
 [custom-engine contract](docs/completion-architecture.md#custom-engines-and-direct-source-evaluation).

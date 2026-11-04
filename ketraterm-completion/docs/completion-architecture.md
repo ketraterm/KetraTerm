@@ -102,6 +102,16 @@ POSIX and plain-syntax backslashes remain literal filename characters. An `=`
 introduces a separately normalized path only for a resolved attached option value;
 an `=` within an ordinary filename remains part of that path.
 
+Command specifications format display-only `argumentHint` metadata separately from
+candidate labels, matched ranges, and insertion text. Positional declarations retain
+names and optionality for display, while repetition remains part of argument
+resolution rather than an ellipsis in the hint. Option `valueName` labels required
+values. Scalar path/domain metadata supplies a type label when no ordered declaration
+exists. Fusion retains hint metadata from the strongest equivalent hint-bearing
+candidate without changing the chosen edit or ranking. Verified native command rows
+can receive catalog hints alongside descriptions; native parameter results are not
+given potentially incompatible catalog option hints.
+
 After any initial shell query, each request captures one compiled learning-index
 set before ordinary source evaluation.
 The set contains opaque ranking lookup, eligible replay history, and derived

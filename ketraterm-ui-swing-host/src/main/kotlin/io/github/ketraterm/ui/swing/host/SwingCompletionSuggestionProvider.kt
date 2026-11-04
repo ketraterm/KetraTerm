@@ -117,6 +117,7 @@ public class SwingCompletionSuggestionProvider
                 kind = kind.name,
                 displayText = displayText,
                 detail = detail,
+                argumentHint = argumentHint,
                 accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
                 interactionContext = requestContext,
                 feedbackToken = feedbackToken,

@@ -261,7 +261,8 @@ fun suggestionSettings() = SwingSettings.create {
 }
 ```
 
-The style also exposes match backgrounds, border, and overflow text colors. Every
+The style also exposes match backgrounds, border, overflow text, and normal/selected
+argument-hint colors (`argumentHintForeground` and `selectionArgumentHintForeground`). Every
 role has a concrete default in the built-in dark palette. Colors are packed ARGB;
 text and fills must be opaque, while a transparent border removes the outline.
 Colors are rendered exactly, with no theme lookup or automatic contrast changes.
@@ -269,7 +270,8 @@ Call `reloadSettings()` after changing settings; the popup updates without
 replacing its suggestions or selection.
 Custom views retain control of their own styling. Providers supply label-relative
 `matchedRanges`, including disjoint fuzzy matches; the default view colors those
-fragments without repeating the match.
+fragments without repeating the match. Providers can supply display-only `argumentHint`
+text beside the label; hints never become part of the accepted command.
 
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to

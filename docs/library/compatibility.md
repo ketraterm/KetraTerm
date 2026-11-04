@@ -85,6 +85,19 @@ ABI checks do not establish threading, lifecycle, coordinate, or protocol
 correctness. Those require semantic tests and the module contracts. Product
 release verification remains separate; see the [gap map](../terminal-feature-gap-map.md#product-and-release-work).
 
+### Experimental completion argument hints
+
+The 0.x argument-hint API adds fields to the experimental completion candidate,
+option specification, Swing suggestion, and suggestion-style data classes.
+Existing Java constructor overloads remain available, but Kotlin default-constructor
+and `copy` signatures change. Recompile consumers of these experimental models.
+
+This development migration refreshes only the retained `completion` and
+`ui-swing-host` clients, with reviewed sources, ABI snapshots, artifacts, and
+provenance. Other retained-client baselines remain unchanged. The refreshed
+clients verify subsequent upgrades; they do not establish binary compatibility
+with the pre-hint models.
+
 ### Color-reset and change-report baseline decision
 
 The 0.x color-reset and mode 2031/2048 migration deliberately establishes a new

@@ -51,19 +51,21 @@ class IntellijCompletionRegistryTest {
                         shellCapabilities = TerminalShellCapabilities.POWERSHELL,
                         shellProvider =
                             TerminalCompletionShellProvider { request, _, _ ->
-                                if (request.commandLine == "dock") {
-                                    listOf(
-                                        TerminalCompletionCandidate(
-                                            "docker",
-                                            0,
-                                            4,
-                                            "powershell",
-                                            TerminalCompletionCandidateKind.COMMAND,
-                                        ),
-                                    )
-                                } else {
-                                    emptyList()
-                                }
+                                TerminalCompletionShellResult(
+                                    if (request.commandLine == "dock") {
+                                        listOf(
+                                            TerminalCompletionCandidate(
+                                                "docker",
+                                                0,
+                                                4,
+                                                "powershell",
+                                                TerminalCompletionCandidateKind.COMMAND,
+                                            ),
+                                        )
+                                    } else {
+                                        emptyList()
+                                    },
+                                )
                             },
                     )
                 val provider = registry.createProvider(native)
@@ -197,7 +199,7 @@ class IntellijCompletionRegistryTest {
                     coroutineScope = this,
                 )
 
-            registry.resetLearning()
+            registry.resetLearning().await()
 
             assertTrue(learningStore.snapshot().rankingStats.isEmpty())
             assertTrue(learningStore.snapshot().replayCommands.isEmpty())
@@ -451,7 +453,10 @@ class IntellijCompletionRegistryTest {
             } finally {
                 registry.closeAndFlush()
             }
-            assertThrows(IllegalStateException::class.java) { registry.resetLearning() }
+            assertThrows(IllegalStateException::class.java) {
+                val unexpectedReset = registry.resetLearning()
+                unexpectedReset.cancel()
+            }
             assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
         }
 

@@ -86,7 +86,12 @@ internal object PackageManagerCommandSpecs {
                         listOf("--recursive", "-r"),
                         commandSpecText("spec.pnpm.option.--recursive.description"),
                     ),
-                    TerminalOptionSpec(listOf("--filter"), commandSpecText("spec.pnpm.option.--filter.description"), requiresValue = true),
+                    TerminalOptionSpec(
+                        listOf("--filter"),
+                        commandSpecText("spec.pnpm.option.--filter.description"),
+                        requiresValue = true,
+                        valueName = "selector",
+                    ),
                     TerminalOptionSpec(listOf("--save-dev", "-D"), commandSpecText("spec.pnpm.option.--save-dev.description")),
                     TerminalOptionSpec(listOf("--save-peer"), commandSpecText("spec.pnpm.option.--save-peer.description")),
                     TerminalOptionSpec(listOf("--global", "-g"), commandSpecText("spec.pnpm.option.--global.description")),
@@ -203,6 +208,7 @@ internal object PackageManagerCommandSpecs {
                         listOf("--features"),
                         commandSpecText("spec.cargo.option.--features.description"),
                         requiresValue = true,
+                        valueName = "features",
                     ),
                     TerminalOptionSpec(listOf("--all-features"), commandSpecText("spec.cargo.option.--all-features.description")),
                     TerminalOptionSpec(
@@ -219,6 +225,7 @@ internal object PackageManagerCommandSpecs {
                         listOf("-p", "--package"),
                         commandSpecText("spec.cargo.option.-p.description"),
                         requiresValue = true,
+                        valueName = "package",
                     ),
                 ),
         )

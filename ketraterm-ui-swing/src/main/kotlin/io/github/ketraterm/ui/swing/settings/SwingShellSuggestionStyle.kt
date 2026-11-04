@@ -37,6 +37,9 @@ import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
  * at construction. These are independent values afterwards, including when using [copy].
  * @property border popup outline; zero alpha omits it.
  * @property secondaryForeground overflow counter foreground.
+ * @property argumentHintForeground ordinary argument-placeholder foreground; defaults to [secondaryForeground] at construction.
+ * @property selectionArgumentHintForeground selected argument-placeholder foreground; defaults to [argumentHintForeground].
+ * These are concrete independent values after construction, including when using [copy].
  * @throws IllegalArgumentException if a non-border color is translucent.
  */
 @ExperimentalShellSuggestionsApi
@@ -53,6 +56,8 @@ public data class SwingShellSuggestionStyle
         val selectionMatchBackground: Int = selectionBackground,
         val border: Int = 0xFF666B73.toInt(),
         val secondaryForeground: Int = 0xFFADB2BC.toInt(),
+        val argumentHintForeground: Int = secondaryForeground,
+        val selectionArgumentHintForeground: Int = argumentHintForeground,
     ) {
         init {
             require(
@@ -66,6 +71,8 @@ public data class SwingShellSuggestionStyle
                     matchBackground,
                     selectionMatchBackground,
                     secondaryForeground,
+                    argumentHintForeground,
+                    selectionArgumentHintForeground,
                 ).all { it ushr 24 == 0xFF },
             ) { "Suggestion text and background colors must be opaque" }
         }

@@ -21,10 +21,12 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionCandidat
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;)V
-	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
 	public final fun component11 ()Ljava/lang/Object;
+	public final fun component12 ()Ljava/lang/String;
 	public final fun component2 ()I
 	public final fun component3 ()I
 	public final fun component4 ()Ljava/lang/String;
@@ -33,9 +35,10 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionCandidat
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()I
 	public final fun component9 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
-	public final fun copy (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
-	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
+	public final fun copy (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgumentHint ()Ljava/lang/String;
 	public final fun getDetail ()Ljava/lang/String;
 	public final fun getDisplayText ()Ljava/lang/String;
 	public final fun getFeedbackToken ()Ljava/lang/Object;
@@ -640,7 +643,8 @@ public final class io/github/ketraterm/completion/model/TerminalOptionSpec {
 	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
 	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;)V
 	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Z
@@ -649,8 +653,9 @@ public final class io/github/ketraterm/completion/model/TerminalOptionSpec {
 	public final fun component6 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
 	public final fun component7 ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
 	public final fun component8 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
-	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalOptionSpec;Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalOptionSpec;Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDescription ()Ljava/lang/String;
 	public final fun getExclusiveGroupIds ()Ljava/util/List;
@@ -659,6 +664,7 @@ public final class io/github/ketraterm/completion/model/TerminalOptionSpec {
 	public final fun getValueCandidates ()Ljava/util/List;
 	public final fun getValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
 	public final fun getValueHiddenPathPolicy ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun getValueName ()Ljava/lang/String;
 	public final fun getValuePathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
