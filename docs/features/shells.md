@@ -65,6 +65,12 @@ When PSReadLine is loaded, the PowerShell bootstrap also installs the private
 reads the live editing buffer and calls `TabExpansion2` without submitting or
 replacing the command. Each prompt announces a fresh completion epoch.
 
+Direct interactive Bash launches load the user's startup files before installing
+prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible prompt.
+An explicit `--norc` launch keeps startup files disabled and receives only the
+environment hook. Explicit WSL Bash launches also use the environment hook, which
+can be replaced by guest startup files.
+
 Bash 5.3+ with `base64` checks background command discovery at each terminal prompt for
 [command suggestions](completion.md#sources-by-host), including explicit Bash
 launches inside WSL. It installs no completion key binding and does not invoke

@@ -115,7 +115,7 @@ internal object TerminalShellIntegrationBootstrap {
         val shellProfile = profile.copy(command = shellCommand)
         val integrated =
             when (shellName) {
-                "bash", "bash.exe" -> withBashIntegration(shellProfile, scriptDirectory)
+                "bash", "bash.exe" -> withBashPromptEnvironment(shellProfile)
                 "zsh", "zsh.exe" -> withZshIntegration(shellProfile, scriptDirectory)
                 "fish", "fish.exe" -> withFishIntegration(shellProfile)
                 else -> return profile
@@ -184,15 +184,23 @@ internal object TerminalShellIntegrationBootstrap {
     ): TerminalProfile {
         val command = profile.command
         if (hasExplicitBashEntryPoint(command)) return profile
+        val wrapped = withBashStartupWrapper(profile, scriptDirectory)
+        if (wrapped !== profile) return wrapped
         if (profile.shellEnvironment != TerminalShellEnvironment.Empty || profile.startupCommand != null) {
-            return withBashStartupWrapper(profile, scriptDirectory)
+            return profile
         }
+        return withBashPromptEnvironment(profile)
+    }
 
+    // Guest shells cannot source a host-native rcfile path. Explicit --norc launches
+    // also retain the environment-only hook instead of enabling startup files.
+    private fun withBashPromptEnvironment(profile: TerminalProfile): TerminalProfile {
+        if (hasExplicitBashEntryPoint(profile.command)) return profile
         val promptCommand = profile.environment["PROMPT_COMMAND"]
         val environment =
             profile.environment +
                 mapOf(
-                    "PROMPT_COMMAND" to joinedShellCommands(BASH_PROMPT_COMMAND, promptCommand),
+                    "PROMPT_COMMAND" to listOfNotNull(BASH_PROMPT_COMMAND, promptCommand, "__ketraterm_finish_prompt").joinToString("\n"),
                     OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
@@ -257,9 +265,11 @@ internal object TerminalShellIntegrationBootstrap {
         unset _KetraTerm_BASH_LOGIN_SHELL _KetraTerm_BASH_NO_PROFILE
         ${TerminalShellEnvironmentBootstrap.bash}
         if [[ ${'$'}(declare -p PROMPT_COMMAND 2>/dev/null) == 'declare -a '* ]]; then
-            PROMPT_COMMAND=(${shellSingleQuote(BASH_PROMPT_COMMAND)} "${'$'}{PROMPT_COMMAND[@]}")
+            PROMPT_COMMAND=(${shellSingleQuote(BASH_PROMPT_COMMAND)} "${'$'}{PROMPT_COMMAND[@]}" __ketraterm_finish_prompt)
         else
-            PROMPT_COMMAND=${shellSingleQuote(BASH_PROMPT_COMMAND)}"${'$'}{PROMPT_COMMAND:+; ${'$'}PROMPT_COMMAND}"
+            PROMPT_COMMAND=${shellSingleQuote(
+            BASH_PROMPT_COMMAND,
+        )}${'$'}'\n'"${'$'}{PROMPT_COMMAND-}"${'$'}'\n__ketraterm_finish_prompt'
         fi
         """.trimIndent()
 
@@ -500,6 +510,7 @@ internal object TerminalShellIntegrationBootstrap {
 
     private val BASH_PROMPT_COMMAND =
         """
+        __ketraterm_prompt_status=${'$'}?
         if [[ -z ${'$'}{__KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             __KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED=1
             __ketraterm_command_started=0
@@ -536,7 +547,7 @@ internal object TerminalShellIntegrationBootstrap {
                 esac
             }
             __ketraterm_prompt_command() {
-                local __ketraterm_status=${'$'}?
+                local __ketraterm_status=${'$'}{1:-${'$'}?}
                 __ketraterm_in_prompt=1
                 if [[ ${'$'}{__ketraterm_command_started:-0} == 1 ]]; then
                     __ketraterm_osc133 "D;${'$'}__ketraterm_status"
@@ -546,6 +557,11 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_osc7
                 __ketraterm_osc133 A
                 __ketraterm_completion_ready
+                return ${'$'}__ketraterm_status
+            }
+            __ketraterm_finish_prompt() {
+                local __ketraterm_status=${'$'}?
+                __ketraterm_install_prompt_end
                 __ketraterm_in_prompt=0
                 return ${'$'}__ketraterm_status
             }
@@ -561,7 +577,7 @@ internal object TerminalShellIntegrationBootstrap {
             }
             trap '__ketraterm_preexec' DEBUG
         fi
-        __ketraterm_prompt_command
+        __ketraterm_prompt_command "${'$'}__ketraterm_prompt_status"
         """.trimIndent()
 
     internal val FISH_INIT_COMMAND =

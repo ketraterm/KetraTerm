@@ -1100,6 +1100,42 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
     }
 
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "PROMPT_COMMAND=user_prompt",
+            "PROMPT_COMMAND=(user_prompt ': second callback')",
+            "PROMPT_COMMAND='user_prompt; # user comment'",
+        ],
+    )
+    fun `ordinary Bash startup keeps markers when bashrc replaces the prompt hook`(
+        promptCommand: String,
+        @TempDir directory: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "bash is not installed")
+        val home = Files.createDirectory(directory.resolve("home"))
+        Files.writeString(
+            home.resolve(".bashrc"),
+            "user_prompt() { local status=\"${'$'}?\"; PS1='test> '; printf 'USER_PROMPT=%s\\n' \"${'$'}status\"; }\n$promptCommand\n",
+        )
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf(bash!!, "-i"),
+                environment = mapOf("HOME" to home.toString(), "TERM" to "xterm-256color"),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory.resolve("hooks")).profile
+        val result = runProcess(launch.command, environment = launch.environment, standardInput = "false\nprintf 'BODY\\n'\nexit\n")
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val markers = Regex("\u001b]133;([^\u0007]+)\u0007").findAll(result.stdout).map { it.groupValues[1] }.toList()
+        assertEquals(listOf("A", "B", "C", "D;1", "A", "B", "C", "D;0", "A", "B", "C"), markers, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("USER_PROMPT=1"), visibleEscapes(result.stdout))
+        assertEquals(3, Regex("test> \u001b]133;B\u0007").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+    }
+
     @Test
     fun `Bash startup applies project toolchain after bashrc replaces environment and prompt hook`(
         @TempDir tempDir: Path,
@@ -1152,7 +1188,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
         assertTrue(result.stdout.contains("HOME_RESULT=$jdk"), visibleEscapes(result.stdout))
         assertTrue(result.stdout.contains("RC_RESULT=yes"), visibleEscapes(result.stdout))
-        assertTrue(result.stdout.lineSequence().any { it.trimEnd('\r') == "PROJECT_BIN_FIRST=yes" }, visibleEscapes(result.stdout))
+        val visibleOutput = result.stdout.replace(Regex("\u001b][^\u0007]*\u0007"), "")
+        assertTrue(visibleOutput.lineSequence().any { it.trimEnd('\r') == "PROJECT_BIN_FIRST=yes" }, visibleEscapes(result.stdout))
         assertTrue(result.stdout.contains("PROJECT_JAVA"), visibleEscapes(result.stdout))
         assertTrue(!result.stdout.contains("declare -x _KetraTerm_FORCE_"), visibleEscapes(result.stdout))
         assertTrue(result.stdout.contains("\u001B]133;A\u0007"), visibleEscapes(result.stdout))
@@ -1401,7 +1438,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             TerminalProfile(
                 id = "bash",
                 displayName = "Bash",
-                command = listOf(bash!!),
+                command = listOf(bash!!, "--norc"),
             )
         val bootstrap =
             TerminalShellIntegrationBootstrap
@@ -1441,7 +1478,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             TerminalProfile(
                 id = "bash",
                 displayName = "Bash",
-                command = listOf(bash!!),
+                command = listOf(bash!!, "--norc"),
                 environment = mapOf("TERM" to "xterm-256color"),
             )
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
@@ -1455,7 +1492,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 ),
                 environment = integrated.environment,
                 standardInput =
-                    "$bootstrap; __ketraterm_preexec; { clear >/dev/null 2>&1 || printf '\\033[H\\033[2J\\033[3J'; }; true; __ketraterm_prompt_command; __ketraterm_preexec; false; __ketraterm_prompt_command\n",
+                    "$bootstrap; __ketraterm_preexec; { clear >/dev/null 2>&1 || printf '\\033[H\\033[2J\\033[3J'; }; true; __ketraterm_prompt_command; __ketraterm_finish_prompt; __ketraterm_preexec; false; __ketraterm_prompt_command\n",
             )
 
         assertEquals(1, result.exitCode)
