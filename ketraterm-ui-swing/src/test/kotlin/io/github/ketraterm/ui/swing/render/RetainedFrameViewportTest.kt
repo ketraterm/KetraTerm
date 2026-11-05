@@ -27,6 +27,7 @@ class RetainedFrameViewportTest {
         source.writeText("aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeee")
         val full = TerminalRenderCache(10, 5)
         full.updateFrom(source, Int.MAX_VALUE, Int.MAX_VALUE)
+        assertTrue(full.cursorPendingWrap)
         val viewport = RetainedFrameViewport(source)
         val cache = TerminalRenderCache(10, 5)
         for ((visible, offset, requested, first, count) in listOf(
@@ -50,6 +51,7 @@ class RetainedFrameViewportTest {
             assertSame(full.palette, cache.palette)
             assertEquals(full.cursorRow - first, cache.cursorRow)
             assertEquals(full.cursorRow - first in 0 until count, cache.cursorVisible)
+            assertEquals(full.cursorPendingWrap, cache.cursorPendingWrap)
         }
         val after = TerminalRenderCache(10, 5)
         after.updateFrom(source, Int.MAX_VALUE, Int.MAX_VALUE)

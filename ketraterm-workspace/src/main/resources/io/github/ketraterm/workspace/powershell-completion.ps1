@@ -55,7 +55,10 @@ function global:__KetraTermComplete {
                     if ($begin -gt $cursor -or ($finish -lt $cursor -and $line.Substring($finish, $cursor - $finish).Trim().Length -gt 0)) { continue }
                     if ($null -eq $activeCommand -or $begin -gt $activeCommand.Extent.StartOffset) { $activeCommand = $node }
                 }
-                if ($null -ne $activeCommand) {
+                # Application identity only selects argument-completion policy. Looking up an
+                # unfinished command name repeats discovery that TabExpansion2 already owns.
+                if ($null -ne $activeCommand -and $activeCommand.CommandElements.Count -gt 0 -and
+                    $cursor -gt $activeCommand.CommandElements[0].Extent.EndOffset) {
                     $name = $activeCommand.GetCommandName()
                     if (-not [string]::IsNullOrEmpty($name)) {
                         $command = $ExecutionContext.InvokeCommand.GetCommand($name, [Management.Automation.CommandTypes]::All)

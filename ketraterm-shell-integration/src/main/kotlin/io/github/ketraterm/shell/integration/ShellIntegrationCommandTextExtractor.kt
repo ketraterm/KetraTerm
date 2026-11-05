@@ -82,6 +82,9 @@ internal class ShellIntegrationCommandTextExtractor(
     /**
      * Extracts one bounded command from [frame].
      *
+     * [cursorColumn] is the exclusive text boundary, one past the visible cursor
+     * when the frame reports delayed wrap.
+     *
      * @return reconstructed command text, or `null` when its marker range is
      * absent, reversed, too large, or contains incomplete render data.
      */
@@ -136,7 +139,7 @@ internal class ShellIntegrationCommandTextExtractor(
      * @param promptEndLineId stable line id recorded at OSC 133 prompt end.
      * @param promptEndColumn first command column on the prompt-end line.
      * @param cursorRow zero-based cursor row in [frame].
-     * @param cursorColumn zero-based cursor column in [frame].
+     * @param cursorColumn exclusive text boundary, including the last cell when wrap is pending.
      * @param destination reusable primitive output with at least
      * [TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS] elements.
      * @param allowVisibleSuffix whether a native hook can verify that text after the cursor is decoration.

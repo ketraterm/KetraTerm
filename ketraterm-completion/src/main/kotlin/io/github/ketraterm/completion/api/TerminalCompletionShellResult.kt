@@ -21,8 +21,8 @@ package io.github.ketraterm.completion.api
  * @param candidates shell-escaped edits for the exact requested buffer; copied into an immutable list.
  *   An empty answer is authoritative at shell-owned positions.
  * @property externalCommandName resolved application name after following aliases, for example `git.exe`.
- *   Null denotes a shell command, function, script, or unresolved invocation. The engine uses this
- *   identity to retain catalog options only for a compatible external command when the shell returns
+ *   Null denotes a shell command, function, script, unresolved invocation, or command-name completion.
+ *   The engine uses this identity to retain catalog options only for a compatible external command when the shell returns
  *   generic paths or no candidates. This metadata must never be executed.
  */
 @ExperimentalTerminalCompletionApi

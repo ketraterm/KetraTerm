@@ -187,7 +187,9 @@ private class OscShellIntegrationSession(
             historySize = frame.historySize
             liveRows = frame.rows
             val cursor = frame.cursor
-            cursorColumn = cursor.column
+            // The visible cursor stays on the last cell during delayed wrap;
+            // text boundaries are already one column beyond that cell.
+            cursorColumn = cursor.column + if (frame.cursorPendingWrap) 1 else 0
             if (cursor.row in 0 until frame.rows) {
                 cursorLineId = frame.lineId(cursor.row)
             }
@@ -202,7 +204,7 @@ private class OscShellIntegrationSession(
                         promptEndLineId = promptEndLineId,
                         promptEndColumn = promptEndColumn,
                         cursorRow = cursor.row,
-                        cursorColumn = cursor.column,
+                        cursorColumn = cursorColumn,
                     )
             }
             if (event.marker == ShellIntegrationMarker.PROMPT_END && promptStartedForCommandText) {
@@ -212,7 +214,7 @@ private class OscShellIntegrationSession(
                         startLineId = promptStartLineId,
                         startColumn = promptStartColumn,
                         endRow = cursor.row,
-                        endColumn = cursor.column,
+                        endColumn = cursorColumn,
                     )
             }
         }
@@ -231,7 +233,7 @@ private class OscShellIntegrationSession(
                         promptEndLineId = promptEndLineId,
                         promptEndColumn = promptEndColumn,
                         cursorRow = cursor.row,
-                        cursorColumn = cursor.column,
+                        cursorColumn = cursor.column + if (frame.cursorPendingWrap) 1 else 0,
                     )
             }
         }
@@ -355,7 +357,8 @@ private class OscShellIntegrationSession(
     private fun activeCommandLineFrom(frame: TerminalRenderFrame): TerminalShellCommandLineSnapshot? {
         val cursor = frame.cursor
         if (cursor.row !in 0 until frame.rows) return null
-        val requiresShellConfirmation = !commandTextExtractor.isCursorAtVisibleLineEnd(frame, cursor.row, cursor.column)
+        val insertionColumn = cursor.column + if (frame.cursorPendingWrap) 1 else 0
+        val requiresShellConfirmation = !commandTextExtractor.isCursorAtVisibleLineEnd(frame, cursor.row, insertionColumn)
         if (requiresShellConfirmation && !shellCompletion.canConfirmCommandLine) return null
         val commandText =
             commandTextExtractor.extract(
@@ -363,7 +366,7 @@ private class OscShellIntegrationSession(
                 promptEndLineId = promptEndLineId,
                 promptEndColumn = promptEndColumn,
                 cursorRow = cursor.row,
-                cursorColumn = cursor.column,
+                cursorColumn = insertionColumn,
             ) ?: return null
         return TerminalShellCommandLineSnapshot(
             commandText = commandText,
@@ -474,7 +477,7 @@ private class OscShellIntegrationSession(
                 historySize = frame.historySize
                 liveRows = frame.rows
                 cursorRow = frame.cursorRow
-                cursorColumn = frame.cursorColumn
+                cursorColumn = frame.cursorColumn + if (frame.cursorPendingWrap) 1 else 0
                 status =
                     extractor.fingerprint(
                         cache = frame,
@@ -490,7 +493,7 @@ private class OscShellIntegrationSession(
         private val historyFrameConsumer =
             TerminalRenderFrameConsumer { frame ->
                 cursorRow = frame.cursor.row
-                cursorColumn = frame.cursor.column
+                cursorColumn = frame.cursor.column + if (frame.cursorPendingWrap) 1 else 0
                 status =
                     extractor.fingerprint(
                         frame = frame,

@@ -40,9 +40,11 @@ Terminal suggestions require an editable command context, normally supplied by
 Unsupported shells do not gain command tracking merely by enabling completion.
 Custom hosts can supply their own context and editing authority.
 
-Fish's inline autosuggestions can make the editable context unavailable because
-there is no Fish editor-buffer confirmation bridge. Disable them with
-`set -g fish_autosuggestion_enabled 0` to use KetraTerm's popup consistently.
+Fish's inline autosuggestions and some redraws of wrapped input can make the
+editable context unavailable because there is no Fish editor-buffer confirmation
+bridge. `set -g fish_autosuggestion_enabled 0` removes the inline-prediction
+conflict. Suggestions still require an unambiguous prompt-to-cursor context;
+KetraTerm does not guess how cursor-positioned rows form an editable command.
 
 ## Using suggestions
 

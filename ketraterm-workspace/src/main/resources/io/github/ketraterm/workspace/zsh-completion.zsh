@@ -161,6 +161,9 @@ function __ketraterm_zsh_completion_ready() {
     # Only PATH discovery runs in the background; never accumulate workers.
     # A command substitution around the launch restores its inherited tty modes
     # on exit, racing ZLE's raw mode. Launch directly and capture $! in this shell.
+    # Keep nested collectors in the shell's process group so tty restoration
+    # cannot stop a background job and PTY shutdown reaches all descendants.
+    builtin unsetopt MONITOR
     (
         __ketraterm_zsh_publish_commands "$__ketraterm_zsh_completion_path_epoch" "$__ketraterm_zsh_completion_scan_id" Path "$aliases_enabled" > "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" &&
             command "$__ketraterm_zsh_completion_mv" -f -- "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.ready"

@@ -374,6 +374,78 @@ class OscShellIntegrationTest {
         session.close()
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["cd al", " git sta", "12345678", "  cd al"])
+    fun `a prompt filling the last column does not become command text`(command: String) {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            connector.feedFromHost("\u001B]133;A\u0007prompt> \u001B]133;B\u0007".ascii())
+            assertEquals("", session.activeShellCommandLine()?.commandText)
+            for (byte in command.ascii()) connector.feedFromHost(byteArrayOf(byte))
+            val active = requireNotNull(session.activeShellCommandLine())
+            assertEquals(command, active.commandText)
+            assertEquals(command.length, active.cursorOffset)
+
+            val extractor = ShellIntegrationCommandTextExtractor()
+            val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            session.readRenderFrame { frame ->
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.COMPLETE,
+                    extractor.fingerprint(
+                        frame,
+                        frame.lineId(0),
+                        8,
+                        frame.cursor.row,
+                        frame.cursor.column + if (frame.cursorPendingWrap) 1 else 0,
+                        frameFingerprint,
+                    ),
+                )
+            }
+            val cache = TerminalRenderCache(8, 4).also { it.updateFrom(session) }
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.COMPLETE,
+                extractor.fingerprint(
+                    cache,
+                    cache.lineIds[0],
+                    8,
+                    cache.cursorRow,
+                    cache.cursorColumn + if (cache.cursorPendingWrap) 1 else 0,
+                    cacheFingerprint,
+                ),
+            )
+            assertEquals(command.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+            assertArrayEquals(frameFingerprint, cacheFingerprint)
+            connector.feedFromHost("\u001B]133;C\u0007".ascii())
+            assertEquals(command, session.shellIntegrationState.commandText(session.shellIntegrationState.latestCommandRecordId()))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [19, 20])
+    fun `Fish cross-row redraw without a fresh prompt boundary leaves editing context unavailable`(promptWidth: Int) {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 20, rows = 4).use { session ->
+            val promptLayout = if (promptWidth == 19) "\u001B[K\r\u001B[19C" else "\r\r\n"
+            connector.feedFromHost(("\u001B]133;A\u0007\r" + "p".repeat(promptWidth) + "\u001B]133;B\u0007" + promptLayout).ascii())
+            assertEquals("", session.activeShellCommandLine()?.commandText)
+
+            // Captured Fish 3.7 repaint after typing "  echo a": cursor addressing and
+            // hard line breaks replace the original layout without another OSC 133 B.
+            val redraw =
+                if (promptWidth == 19) {
+                    "\b   echo a\u001B[A\r\r\n\u001B[7C" +
+                        "\b\b\b\b\b\becho a\u001B[A\r\r\n\u001B[7C"
+                } else {
+                    "\u001B[A\u001B[18C    echo a\u001B[A\r\r\n\u001B[8C" +
+                        "\b\b\b\b\b\becho a\u001B[A\r\r\n\u001B[8C"
+                }
+            connector.feedFromHost(redraw.ascii())
+            session.readRenderFrame { frame -> assertFalse(frame.lineWrapped(0)) }
+            assertNull(session.activeShellCommandLine())
+        }
+    }
+
     @Test
     fun `OSC 133 command start preserves argument separator at soft wrap`() {
         val connector = MockConnector()

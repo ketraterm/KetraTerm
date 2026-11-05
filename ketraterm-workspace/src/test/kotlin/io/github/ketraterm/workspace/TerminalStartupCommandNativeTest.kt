@@ -24,10 +24,13 @@ import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.session.TerminalStartupCommandStatus
 import io.github.ketraterm.shell.integration.OscShellIntegration
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -155,6 +158,15 @@ class TerminalStartupCommandNativeTest {
                         assertEquals("1", Files.readString(result))
                         assertEquals(listOf("startup"), Files.readAllLines(journal).map { it.removePrefix("\uFEFF") })
                         assertFalse(session.isClosed)
+                        // Shell shutdown may save history in HOME; finish it before TempDir deletes that directory.
+                        session.encodePaste(TerminalPasteEvent("exit"))
+                        session.encodeKey(TerminalKeyEvent(key = TerminalKey.ENTER))
+                        val closed =
+                            withTimeout(20_000.milliseconds) {
+                                session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                            }
+                        assertEquals(0, closed.event.exitCode)
+                        assertFalse(closed.event.locallyRequested)
                     }
             } finally {
                 completedCommands.close()

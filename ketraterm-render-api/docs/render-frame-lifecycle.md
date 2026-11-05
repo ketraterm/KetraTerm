@@ -42,6 +42,12 @@ Its default implementation adapts the immutable `cursor` value; providers can
 override it to avoid creating a cursor object. Blink mode is terminal state;
 current blink phase and timing belong to the UI.
 
+`cursorPendingWrap` distinguishes a cursor waiting to wrap after the last occupied
+cell from a cursor positioned on that cell. Its visible coordinates stay unchanged;
+text extraction uses the following column as its exclusive boundary. Providers
+without this information inherit `false`. `TerminalRenderCache` preserves the flag
+and includes it in cursor-change detection.
+
 <a id="2-monotonic-generation-counters"></a>
 
 ## 2. Generation counters

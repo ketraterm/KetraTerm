@@ -283,17 +283,23 @@ public final class io/github/ketraterm/session/TerminalShellCommandInventoryStat
 
 public final class io/github/ketraterm/session/TerminalShellCommandLineSnapshot {
 	public fun <init> (Ljava/lang/String;III)V
+	public fun <init> (Ljava/lang/String;IIIZ)V
+	public synthetic fun <init> (Ljava/lang/String;IIIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()I
 	public final fun component3 ()I
 	public final fun component4 ()I
+	public final fun component5 ()Z
 	public final fun copy (Ljava/lang/String;III)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public final fun copy (Ljava/lang/String;IIIZ)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;Ljava/lang/String;IIIILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;Ljava/lang/String;IIIZILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommandText ()Ljava/lang/String;
 	public final fun getCursorColumn ()I
 	public final fun getCursorOffset ()I
 	public final fun getCursorRow ()I
+	public final fun getRequiresShellConfirmation ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

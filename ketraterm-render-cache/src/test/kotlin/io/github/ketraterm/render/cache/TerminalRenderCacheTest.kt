@@ -720,6 +720,43 @@ class TerminalRenderCacheTest {
     }
 
     @Test
+    fun `delayed wrap is copied and invalidated independently of visible cursor coordinates`() {
+        val frame = MutableFrame(columns = 3, rows = 1)
+        val source = TerminalRenderCache(columns = 3, rows = 1)
+        val copy = TerminalRenderCache(columns = 3, rows = 1)
+        source.updateFrom(frame.reader)
+        copy.updateFrom(source)
+        assertFalse(source.cursorPendingWrap)
+
+        frame.cursorPendingWrap = true
+        source.updateFrom(frame.reader)
+        copy.updateFrom(source)
+        assertTrue(source.cursorPendingWrap)
+        assertTrue(copy.cursorPendingWrap)
+        assertTrue(source.cursorChangedOnLastUpdate)
+        assertTrue(copy.cursorChangedOnLastUpdate)
+        assertEquals(frame.cursor, source.cursor)
+
+        source.updateFrom(frame.reader)
+        copy.updateFrom(source)
+        assertFalse(source.cursorChangedOnLastUpdate)
+        assertFalse(copy.cursorChangedOnLastUpdate)
+
+        frame.cursorPendingWrap = false
+        source.updateFrom(frame.reader)
+        copy.updateFrom(source)
+        assertFalse(source.cursorPendingWrap)
+        assertFalse(copy.cursorPendingWrap)
+        assertTrue(source.cursorChangedOnLastUpdate)
+        assertTrue(copy.cursorChangedOnLastUpdate)
+
+        frame.cursorPendingWrap = true
+        source.updateFrom(frame.reader)
+        source.reset()
+        assertFalse(source.cursorPendingWrap)
+    }
+
+    @Test
     fun `active buffer is cached`() {
         val frame = MutableFrame(columns = 3, rows = 1)
         frame.activeBuffer = TerminalRenderBufferKind.ALTERNATE
@@ -1015,6 +1052,7 @@ class TerminalRenderCacheTest {
         override var discardedCount: Long = 0L
         override var palette: TerminalColorPalette = TerminalColorPalette()
         override var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override var cursorPendingWrap: Boolean = false
         override var cursor: TerminalRenderCursor =
             TerminalRenderCursor(
                 column = 0,

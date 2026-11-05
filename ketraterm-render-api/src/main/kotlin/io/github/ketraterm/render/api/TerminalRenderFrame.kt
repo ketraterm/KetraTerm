@@ -157,6 +157,14 @@ public interface TerminalRenderFrame {
     public val cursor: TerminalRenderCursor
 
     /**
+     * Whether the cursor is awaiting an automatic wrap after filling the active right margin.
+     * The visible [cursor] remains on the last occupied cell while its logical text
+     * position is immediately after that cell. This flag does not move the cursor
+     * overlay. Providers without delayed-wrap information return false.
+     */
+    public val cursorPendingWrap: Boolean get() = false
+
+    /**
      * Returns the generation for visible [row].
      *
      * The generation changes when visual cell content, attributes, hyperlink

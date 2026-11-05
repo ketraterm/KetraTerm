@@ -56,4 +56,13 @@ public data class TerminalShellCommandLineSnapshot
             require(cursorColumn >= 0) { "cursorColumn must be >= 0, was $cursorColumn" }
             require(cursorRow >= 0) { "cursorRow must be >= 0, was $cursorRow" }
         }
+
+        /** Preserves the original JVM copy entry points without dropping shell-confirmation requirements. */
+        public fun copy(
+            commandText: String = this.commandText,
+            cursorOffset: Int = this.cursorOffset,
+            cursorColumn: Int = this.cursorColumn,
+            cursorRow: Int = this.cursorRow,
+        ): TerminalShellCommandLineSnapshot =
+            TerminalShellCommandLineSnapshot(commandText, cursorOffset, cursorColumn, cursorRow, requiresShellConfirmation)
     }

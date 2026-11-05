@@ -21,12 +21,10 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
 import io.github.ketraterm.session.TerminalStartupCommand
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.future.await
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
@@ -37,6 +35,8 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardWatchEventKinds.ENTRY_CREATE
+import java.nio.file.WatchService
 import java.util.*
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -87,7 +87,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             withTimeout(15.seconds) {
                 activeShellCommandLineRevision.first { activeShellCommandLine()?.commandText == line }
             }
-        } catch (failure: kotlinx.coroutines.TimeoutCancellationException) {
+        } catch (failure: TimeoutCancellationException) {
             val screen =
                 buildString {
                     readRenderFrame { frame ->
@@ -370,6 +370,131 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     }
                 }
                 session.awaitLine("")
+            }
+        }
+
+    @ParameterizedTest(name = "Zsh inventory worker completes before close: {0}")
+    @ValueSource(booleans = [false, true])
+    fun `zsh background inventory progresses without terminal noise and stops with its session`(
+        completeInventory: Boolean,
+        @TempDir tempDir: Path,
+    ): Unit =
+        runBlocking(Dispatchers.IO) {
+            val zsh = installedExecutable("zsh")
+            assumeTrue(zsh != null && !isWindows(), "Native POSIX zsh is not installed")
+            val mkfifo = assertNotNull(installedExecutable("mkfifo"))
+            val bin = Files.createDirectory(tempDir.resolve("bin"))
+            val gate = tempDir.resolve("finder.gate")
+            assertEquals(0, runProcess(listOf(mkfifo, gate.toString())).exitCode)
+            for (name in listOf("base64", "mv")) {
+                Files.createSymbolicLink(bin.resolve(name), Path.of(assertNotNull(installedExecutable(name))))
+            }
+            Files.writeString(
+                bin.resolve("find"),
+                """
+                #!/bin/sh
+                [ "${'$'}5" != 0 ] || exit 0
+                printf '%s\n' "${'$'}${'$'}" > "${'$'}KETRA_TEST_ROOT/finder.pending"
+                "${'$'}KETRA_TEST_ROOT/bin/mv" "${'$'}KETRA_TEST_ROOT/finder.pending" "${'$'}KETRA_TEST_ROOT/finder.ready"
+                read release < "${'$'}KETRA_TEST_ROOT/finder.gate"
+                printf './ketra_path_marker\0'
+                """.trimIndent() + "\n",
+            )
+            assertTrue(bin.resolve("find").toFile().setExecutable(true))
+            Files.writeString(bin.resolve("ketra_path_marker"), "#!/bin/sh\n")
+            assertTrue(bin.resolve("ketra_path_marker").toFile().setExecutable(true))
+            Files.writeString(
+                tempDir.resolve(".zshrc"),
+                "setopt MONITOR\nprintf '%s' ${'$'}${'$'} > \"${'$'}KETRA_TEST_ROOT/shell.pid\"\nPROMPT='ketra> '\n",
+            )
+            tempDir.fileSystem.newWatchService().use { watcher ->
+                tempDir.register(watcher, ENTRY_CREATE)
+                TerminalWorkspace().use { workspace ->
+                    val session =
+                        workspace
+                            .openTab(
+                                TerminalProfile(
+                                    "zsh",
+                                    "Zsh",
+                                    listOf(zsh!!, "-d", "-i"),
+                                    workingDirectory = tempDir,
+                                    environment =
+                                        mapOf(
+                                            "ZDOTDIR" to tempDir.toString(),
+                                            "KETRA_TEST_ROOT" to tempDir.toString(),
+                                            "PATH" to bin.toString(),
+                                        ),
+                                ),
+                                TerminalWorkspaceOpenOptions(),
+                            ).session
+                    val workers = mutableListOf<ProcessHandle>()
+                    try {
+                        awaitCreatedFile(tempDir.resolve("finder.ready"), watcher)
+                        val shellPid = Files.readString(tempDir.resolve("shell.pid")).toLong()
+                        val finder = ProcessHandle.of(Files.readString(tempDir.resolve("finder.ready")).trim().toLong()).orElseThrow()
+                        val lineage = mutableListOf<ProcessHandle>()
+                        for (process in generateSequence(finder) { it.parent().orElse(null) }) {
+                            lineage += process
+                            if (process.pid() == shellPid) break
+                        }
+                        assertEquals(shellPid, lineage.last().pid(), "Only this session's descendants belong to the fixture")
+                        workers += lineage.dropLast(1)
+                        assertTrue(workers.size > 1, "The finder must run in the background inventory process tree")
+                        session.awaitLine("")
+                        if (completeInventory) {
+                            assertEquals(
+                                0,
+                                runProcess(
+                                    listOf("/bin/sh", "-c", "printf 'release\\n' > ${shellSingleQuote(gate.toString())}"),
+                                ).exitCode,
+                            )
+                            withTimeout(15.seconds) {
+                                session.shellCommandInventory.first { inventory ->
+                                    inventory?.commands?.any { it.displayText == "ketra_path_marker" } == true
+                                }
+                                workers.forEach { it.onExit().await() }
+                            }
+                            session.awaitLine("")
+                        }
+                        session.readRenderFrame { frame ->
+                            val codeWords = IntArray(frame.columns)
+                            val flags = IntArray(frame.columns)
+                            val lines =
+                                (0 until frame.rows).mapNotNull { row ->
+                                    frame.copyTextLine(row, codeWords, flags = flags)
+                                    buildString { codeWords.forEach { append(if (it in 32..126) it.toChar() else ' ') } }
+                                        .trimEnd()
+                                        .takeIf(String::isNotEmpty)
+                                }
+                            assertEquals(listOf("ketra>"), lines, "Inventory work must not print job-control messages in the terminal")
+                        }
+                        session.close()
+                        withTimeout(15.seconds) { workers.forEach { it.onExit().await() } }
+                    } finally {
+                        if (Files.exists(tempDir.resolve("shell.pid"))) {
+                            ProcessHandle.of(Files.readString(tempDir.resolve("shell.pid")).toLong()).ifPresent { shell ->
+                                workers += shell.descendants().toList()
+                            }
+                        }
+                        workers.forEach { if (it.isAlive) it.destroyForcibly() }
+                    }
+                }
+            }
+        }
+
+    private suspend fun awaitCreatedFile(
+        path: Path,
+        watcher: WatchService,
+    ): Unit =
+        withContext(Dispatchers.IO) {
+            withTimeout(15.seconds) {
+                while (!Files.exists(path)) {
+                    runInterruptible(Dispatchers.IO) {
+                        val key = watcher.take()
+                        key.pollEvents()
+                        check(key.reset()) { "Native fixture directory is no longer watchable" }
+                    }
+                }
             }
         }
 
@@ -1090,7 +1215,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         if (application != null) {
             assertTrue(messages[5].contains(";Command;${encoded(application[1])};${encoded(application[0])};"), visibleEscapes(messages[5]))
             assertTrue(messages[6].contains(";Command;${encoded(application[0])};${encoded(application[0])};"), visibleEscapes(messages[6]))
-            assertEquals(encoded(application[0]), fields(5)[9], "Application identity")
+            assertEquals("", fields(5)[9], "Command-name completion needs no external application identity")
             assertEquals("", fields(6)[9], "A shadowing function is not an external application")
             for (index in 7..10) assertEquals(encoded(application[0]), fields(index)[9], visibleEscapes(messages[index]))
             assertEquals("", fields(11)[9], "The cursor is outside the nested command")
@@ -1351,6 +1476,28 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(result.stdout.contains("LOGIN_RESULT=project-jdk:relocated:/project/bin:/usr/bin:/bin"), visibleEscapes(result.stdout))
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
+
+    @ParameterizedTest(name = "Fish initial command boundary with {0}-column prompt")
+    @ValueSource(ints = [12, 19, 20])
+    fun `fish initial prompt at the right margin leaves an empty command line`(promptWidth: Int): Unit =
+        runBlocking {
+            val fish = installedExecutable("fish", "fish.exe")
+            assumeTrue(fish != null, "fish is not installed")
+            val prompt = "p".repeat(promptWidth)
+            val setup =
+                "set -g fish_greeting; set -g fish_history ''; set -g fish_autosuggestion_enabled 0; " +
+                    "function fish_prompt; printf '%s' '$prompt'; end; function fish_right_prompt; end"
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile("fish", "Fish", listOf(fish!!, "--no-config", "-C", setup, "-i")),
+                            TerminalWorkspaceOpenOptions.create { it.columns = 20 },
+                        ).session
+                session.awaitLine("", "rendering the $promptWidth-column prompt")
+                assertEquals(0, session.activeShellCommandLine()?.cursorOffset)
+            }
+        }
 
     @Test
     fun `fish startup reapplies toolchain after user config and consumes markers`(

@@ -41,7 +41,8 @@ public data class TerminalShellCompletionCandidate
  * The producer must validate bounds, Unicode, text sizes, and candidate controls before publication.
  * [candidates] is copied at construction and cannot be mutated.
  * [externalCommandName] identifies the resolved application after following aliases, or is null
- * for shell commands, functions, scripts, and unresolved invocations. It is metadata, never code.
+ * for shell commands, functions, scripts, unresolved invocations, or command-name completion.
+ * It is argument-completion metadata, never code.
  */
 public class TerminalShellCompletionResult
     @JvmOverloads
