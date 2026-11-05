@@ -1618,7 +1618,8 @@ public class SwingTerminal
                     revalidate()
                 }
                 if (next.shellSuggestionAutomaticMode != previous.shellSuggestionAutomaticMode) {
-                    if (activeSuggestionInteraction == null || activeSuggestionIsAutomatic ||
+                    if (activeSuggestionInteraction == null ||
+                        activeSuggestionIsAutomatic ||
                         shellSuggestionController?.isRefreshing == true
                     ) {
                         cancelAndHideShellSuggestionsOnEdt("Automatic suggestion mode changed")

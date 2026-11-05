@@ -774,7 +774,8 @@ public class TerminalSession private constructor(
                                 (
                                     (
                                         expected.commandLine.requiresShellConfirmation ||
-                                            expected.inputRevision != inputRevision || expected.outputRevision != outputRevision
+                                            expected.inputRevision != inputRevision ||
+                                            expected.outputRevision != outputRevision
                                     ) &&
                                         !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
                                 ) ||
