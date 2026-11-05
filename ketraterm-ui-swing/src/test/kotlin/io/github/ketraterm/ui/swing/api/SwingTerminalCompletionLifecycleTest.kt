@@ -329,6 +329,57 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
+    fun `shortening the shell command cancels its pending source before refreshed acceptance`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "git sta")
+            val terminal = terminal(testScheduler)
+            val entered = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            val status = SwingShellSuggestion("status", 4, 6, "test", "ARGUMENT")
+            val provider =
+                SwingShellSuggestionProvider { request ->
+                    if (request.commandText == "git sta") {
+                        flow {
+                            entered.complete(Unit)
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                cancelled.complete(Unit)
+                            }
+                        }
+                    } else {
+                        flowOf(listOf(status))
+                    }
+                }
+            try {
+                terminal.bind(fixture.session)
+                terminal.setShellSuggestionProvider(provider)
+                runCurrent()
+                val old = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(old, provider)
+                entered.await()
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git st", 6, 6, 0)
+                runCurrent()
+                cancelled.await()
+                assertTrue(old.isClosed)
+                assertFalse(old.publish(listOf(status)))
+
+                val refreshed = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(refreshed, provider)
+                runCurrent()
+                assertEquals(listOf(status), refreshed.snapshot.suggestions)
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
+                runCurrent()
+                assertEquals("\u007f\u007fstatus", fixture.connector.output.toString(Charsets.UTF_8))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `provider replacement cancels its in-flight source and rejects old publications`() =
         onEdtTest {
             val terminal = terminal(testScheduler)

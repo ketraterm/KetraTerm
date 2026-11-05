@@ -83,23 +83,24 @@ class TerminalStartupCommandNativeTest {
             assumeTrue(executable != null, "$shell is not installed")
             val journal = directory.resolve("journal.txt")
             val result = directory.resolve("result.txt")
+            val acknowledge = if (shell == "powershell") "[Console]::Write([char]7)" else "printf '\\007'"
             val startup =
                 if (shell == "powershell") {
                     "${'$'}startupRuns = 1 + [int]${'$'}startupRuns; Add-Content -LiteralPath '${journal.toString().replace(
                         "'",
                         "''",
-                    )}' -Value startup"
+                    )}' -Value startup; $acknowledge"
                 } else {
                     "STARTUP_RUNS=${'$'}(( ${'$'}{STARTUP_RUNS:-0} + 1 )); printf 'startup\\n' >> '${journal.toString().replace(
                         '\\',
                         '/',
-                    ).replace("'", "'\\''")}'"
+                    ).replace("'", "'\\''")}'; $acknowledge"
                 }
             val next =
                 if (shell == "powershell") {
-                    "[IO.File]::WriteAllText('${result.toString().replace("'", "''")}', [string]${'$'}startupRuns)"
+                    "[IO.File]::WriteAllText('${result.toString().replace("'", "''")}', [string]${'$'}startupRuns); $acknowledge"
                 } else {
-                    "printf '%s' \"${'$'}STARTUP_RUNS\" > '${result.toString().replace('\\', '/').replace("'", "'\\''")}'"
+                    "printf '%s' \"${'$'}STARTUP_RUNS\" > '${result.toString().replace('\\', '/').replace("'", "'\\''")}'; $acknowledge"
                 }
             val profile =
                 TerminalProfile(
@@ -111,14 +112,23 @@ class TerminalStartupCommandNativeTest {
                     startupCommand = TerminalStartupCommand(startup),
                 )
             val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory.resolve("bootstrap")).profile
-            val prompts = Channel<Unit>(Channel.UNLIMITED)
+            val completedCommands = Channel<Unit>(Channel.UNLIMITED)
             val listener =
                 object : PtyEventListener by PtyEventListener.NONE {
+                    private var outputAcknowledged = false
+
+                    override fun bell(session: TerminalSession) {
+                        outputAcknowledged = true
+                    }
+
                     override fun shellIntegrationMarker(
                         session: TerminalSession,
                         event: ShellIntegrationEvent,
                     ) {
-                        if (event.marker == ShellIntegrationMarker.PROMPT_END) prompts.trySend(Unit)
+                        if (event.marker == ShellIntegrationMarker.PROMPT_END && outputAcknowledged) {
+                            outputAcknowledged = false
+                            completedCommands.trySend(Unit).getOrThrow()
+                        }
                     }
                 }
             try {
@@ -135,19 +145,19 @@ class TerminalStartupCommandNativeTest {
                             draft.eventListener = listener
                         },
                     ).use { session ->
-                        // The initial prompt submits startup; the next prompt proves that command finished.
-                        withTimeout(20_000.milliseconds) { repeat(2) { prompts.receive() } }
+                        // A redraw can repeat prompt markers; require the command's output acknowledgement first.
+                        withTimeout(20_000.milliseconds) { completedCommands.receive() }
                         assertEquals(TerminalStartupCommandStatus.SUBMITTED, session.startupCommandStatus?.value)
                         assertEquals(listOf("startup"), Files.readAllLines(journal).map { it.removePrefix("\uFEFF") })
                         session.encodePaste(TerminalPasteEvent(next))
                         session.encodeKey(TerminalKeyEvent(key = TerminalKey.ENTER))
-                        withTimeout(20_000.milliseconds) { prompts.receive() }
+                        withTimeout(20_000.milliseconds) { completedCommands.receive() }
                         assertEquals("1", Files.readString(result))
                         assertEquals(listOf("startup"), Files.readAllLines(journal).map { it.removePrefix("\uFEFF") })
                         assertFalse(session.isClosed)
                     }
             } finally {
-                prompts.close()
+                completedCommands.close()
             }
         }
 }

@@ -17,9 +17,12 @@ package io.github.ketraterm.workspace
 
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -93,16 +96,16 @@ class ShellCommandCollectorNativeTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
-    fun `large directories retain complete results and overflow never reports success`(shell: String) {
-        val output =
-            runCollector(
-                shell,
+    fun `large directories retain complete results and overflow never reports success`(
+        shell: String,
+        @TempDir directory: Path,
+    ) {
+        shellCommand(shell)
+        val setup =
+            if (shell.startsWith("wsl-")) {
                 """
                 command mkdir bin
                 chmod_command=${'$'}(command -v chmod)
-                native_find=${'$'}(command -v find)
-                command mkdir tools
-                command ln -s "${'$'}native_find" tools/find
                 for ((start=0; start<32769; start+=1000)); do
                     batch=()
                     for ((i=start; i<start+1000 && i<32769; i++)); do
@@ -112,9 +115,28 @@ class ShellCommandCollectorNativeTest {
                     done
                     command "${'$'}chmod_command" +x "${'$'}{batch[@]}"
                 done
-                PATH="${'$'}PWD/tools:${'$'}PWD/bin"
-                __ketraterm_collect_path_commands
-                """.trimIndent(),
+                """.trimIndent()
+            } else {
+                val bin = Files.createDirectory(directory.resolve("bin"))
+                // Share executables below NTFS's link limit; .exe avoids MSYS probing every shebang.
+                for (start in 0 until 32769 step 512) {
+                    val executable = Files.writeString(directory.resolve("executable_$start"), "#!/bin/sh\n")
+                    assertTrue(executable.toFile().setExecutable(true, false))
+                    repeat(minOf(512, 32769 - start)) { Files.createLink(bin.resolve("command_${start + it}.exe"), executable) }
+                }
+                "builtin cd -- '${directory.toString().replace('\\', '/').replace("'", "'\\''")}' || exit 13"
+            }
+        val output =
+            runCollector(
+                shell,
+                setup + "\n" +
+                    """
+                    native_find=${'$'}(command -v find)
+                    command mkdir tools
+                    command ln -s "${'$'}native_find" tools/find
+                    PATH="${'$'}PWD/tools:${'$'}PWD/bin"
+                    __ketraterm_collect_path_commands
+                    """.trimIndent(),
             )
         val records = output.split('\u0000')
         assertEquals("__ketraterm_inventory_overflow", records.last())

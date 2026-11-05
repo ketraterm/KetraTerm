@@ -18,6 +18,7 @@ import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 // Modules share a display; serialize their real-window suites even under --parallel.
 abstract class DesktopTestDisplay : BuildService<BuildServiceParameters.None>
@@ -52,6 +53,7 @@ subprojects {
                     testClassesDirs = testSources.get().output.classesDirs
                     classpath = testSources.get().runtimeClasspath
                     useJUnitPlatform { includeTags(suite) }
+                    testLogging { exceptionFormat = TestExceptionFormat.FULL }
                     // Many modules legitimately have no tests in one of the environment-dependent suites.
                     failOnNoDiscoveredTests.set(false)
                     // Installed tools, shell state, and the desktop are not reproducible Gradle inputs.

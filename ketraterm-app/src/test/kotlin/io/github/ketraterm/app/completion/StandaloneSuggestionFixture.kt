@@ -102,10 +102,6 @@ internal class StandaloneSuggestionFixture private constructor(
         awaitLine("")
     }
 
-    fun discardPopupUpdates() {
-        while (publications.tryReceive().isSuccess) { /* Consume earlier completed requests. */ }
-    }
-
     suspend fun awaitPopup(
         line: String,
         replacement: String,

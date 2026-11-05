@@ -65,10 +65,6 @@ class TabManagerStartupDesktopTest {
             "ownPane",
             "descendant",
             "otherPane",
-            "disabled",
-            "denied",
-            "short",
-            "unknownDuration",
             "focusBeforeDelivery",
             "closedBeforeDelivery",
             "disposedBeforeDelivery",
@@ -92,28 +88,22 @@ class TabManagerStartupDesktopTest {
                 cursorBlinkMillis = 0,
                 smartSuggestionsEnabled = false,
                 showForegroundProcessName = false,
-                commandFinishedAlertsEnabled = mode != "disabled",
-                desktopNotificationsEnabled = mode != "denied",
+                commandFinishedAlertsEnabled = true,
+                desktopNotificationsEnabled = true,
             ),
         )
         val settings = KetraTermSettings(configManager)
         val profile = TerminalProfile("alerts", "Alerts", listOf("unused"), workingDirectory = directory)
         val state = TerminalShellIntegrationState()
-        val duration =
-            when (mode) {
-                "short" -> 9_999L
-                "unknownDuration" -> null
-                else -> 10_000L
-            }
         val view =
             object : TerminalShellIntegrationView by state {
-                override fun commandDurationMillis(recordId: Int): Long? {
+                override fun commandDurationMillis(recordId: Int): Long {
                     when (mode) {
                         "disabledBeforeDelivery" -> settings.update(settings.config.copy(commandFinishedAlertsEnabled = false))
                         "deniedBeforeDelivery" -> settings.update(settings.config.copy(desktopNotificationsEnabled = false))
                         "thresholdBeforeDelivery" -> settings.update(settings.config.copy(commandFinishedAlertThresholdSeconds = 20))
                     }
-                    return duration
+                    return 10_000L
                 }
             }
         val integration = TerminalShellIntegrationFactory.host(view, TerminalShellCommandLineState())

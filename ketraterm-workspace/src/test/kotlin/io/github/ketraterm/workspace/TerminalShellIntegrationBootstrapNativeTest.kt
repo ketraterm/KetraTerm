@@ -151,7 +151,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
     fun `zsh PATH discovery identity changes with cwd only for relative entries`() {
         val zsh = installedExecutable("zsh", "zsh.exe")
         assumeTrue(zsh != null, "zsh is not installed")
-        assertPathDiscoveryIdentity(listOf(zsh!!, "-f", "-i"), "__ketraterm_zsh_completion")
+        assertPathDiscoveryIdentity(listOf(zsh!!, "-d", "-i"), "__ketraterm_zsh_completion")
     }
 
     private fun assertPathDiscoveryIdentity(

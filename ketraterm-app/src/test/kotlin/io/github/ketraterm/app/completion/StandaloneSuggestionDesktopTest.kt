@@ -23,12 +23,13 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
@@ -71,55 +72,22 @@ class StandaloneSuggestionDesktopTest {
             }
         }
 
-    @ParameterizedTest(name = "editing and cancellation [{0}]")
+    @ParameterizedTest(name = "editing and acceptance [{0}]")
     @EnumSource(StandaloneSuggestionShell::class)
-    internal fun `deletion cancels a slow request and accepts the refreshed edit`(
+    internal fun `deletion refreshes suggestions and accepts the shell edit`(
         shell: StandaloneSuggestionShell,
         @TempDir directory: Path,
     ): Unit =
         runBlocking {
-            val profile = shell.profile(directory)
-            val slowRequestEntered = CompletableDeferred<Unit>()
-            val slowRequestCancelled = CompletableDeferred<Unit>()
-            withSession(profile, directory, decorateProvider = { provider ->
-                object : SwingShellSuggestionProvider by provider {
-                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
-                        if (request.commandText != "git sta") return provider.open(request)
-                        return SwingShellSuggestionSource(
-                            flow {
-                                try {
-                                    slowRequestEntered.complete(Unit)
-                                    awaitCancellation()
-                                } finally {
-                                    slowRequestCancelled.complete(Unit)
-                                }
-                            },
-                        )
-                    }
-                }
-            }) {
-                type("git st")
-                awaitLine("git st")
-                awaitPopup("git st", "status")
-                type("a")
+            withSession(shell.profile(directory), directory) {
+                type("git sta")
                 awaitLine("git sta")
-                withTimeout(15.seconds) { slowRequestEntered.await() }
-                discardPopupUpdates()
+                awaitPopup("git sta", "status")
                 key(KeyEvent.VK_BACK_SPACE)
                 awaitLine("git st")
-                withTimeout(15.seconds) { slowRequestCancelled.await() }
                 awaitPopup("git st", "status")
-                key(KeyEvent.VK_BACK_SPACE)
-                awaitLine("git s")
-                awaitPopup("git s", "status")
                 selectAndAccept("status")
                 awaitLine("git status")
-                repeat("git status".length) { key(KeyEvent.VK_BACK_SPACE) }
-                awaitLine("")
-                type("echo 'SMOKE_OK'")
-                key(KeyEvent.VK_ENTER)
-                awaitExecution("echo 'SMOKE_OK'")
-                awaitLine("")
             }
         }
 

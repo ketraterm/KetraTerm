@@ -100,7 +100,16 @@ class PtyProcessNativeTest {
     fun `real PTY detects a running executable and clears it after exit`() =
         runBlocking {
             val session = startReadySession()
-            val expected = if (isWindows()) "powershell.exe" else "sh"
+            val expected =
+                if (isWindows()) {
+                    "powershell.exe"
+                } else {
+                    Path
+                        .of("/bin/sh")
+                        .toRealPath()
+                        .fileName
+                        .toString()
+                }
             val detected =
                 withTimeout(10.seconds) {
                     session.foregroundProcessName.first { it.equals(expected, ignoreCase = true) }
