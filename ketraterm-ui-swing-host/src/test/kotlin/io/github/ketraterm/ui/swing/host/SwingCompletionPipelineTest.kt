@@ -125,33 +125,35 @@ class SwingCompletionPipelineTest {
     @Test
     fun `shortening and moving the cursor accepts the live branch once without path or history takeover`() =
         runBlocking {
-            withTimeout(10_000) {
-                for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
-                    var nativeQueries = 0
-                    val learning =
-                        TerminalCompletionLearningStore().apply {
-                            repeat(10) { recordCommandResult("git switch feature/old", true, null, null, System.currentTimeMillis()) }
-                            recordCommandResult("git switch feature/local", true, null, null, System.currentTimeMillis())
-                        }
-                    val engine =
-                        TerminalCompletionEngines.fromSources(
-                            listOf(
-                                TerminalCompletionSourceEntry(TerminalCompletionSources.git("git") { _, _ -> branches("feature/local") }),
-                                TerminalCompletionSourceEntry(
-                                    TerminalCompletionSources.path { listOf(TerminalFileEntry("local.txt", false)) },
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val terminal = onEdt { terminal() }
+                try {
+                    withTimeout(10_000) {
+                        var nativeQueries = 0
+                        val learning =
+                            TerminalCompletionLearningStore().apply {
+                                repeat(10) { recordCommandResult("git switch feature/old", true, null, null, System.currentTimeMillis()) }
+                                recordCommandResult("git switch feature/local", true, null, null, System.currentTimeMillis())
+                            }
+                        val engine =
+                            TerminalCompletionEngines.fromSources(
+                                listOf(
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSources.git("git") { _, _ -> branches("feature/local") },
+                                    ),
+                                    TerminalCompletionSourceEntry(
+                                        TerminalCompletionSources.path { listOf(TerminalFileEntry("local.txt", false)) },
+                                    ),
                                 ),
-                            ),
-                            learningStore = learning,
-                            shellProvider =
-                                TerminalCompletionShellProvider { _, _, _ ->
-                                    nativeQueries++
-                                    TerminalCompletionShellResult(emptyList())
-                                },
-                        )
-                    val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext(shellCapabilities = shell) })
-                    val terminal = onEdt { terminal() }
-                    val accepted = ArrayList<SwingShellSuggestionAcceptance>()
-                    try {
+                                learningStore = learning,
+                                shellProvider =
+                                    TerminalCompletionShellProvider { _, _, _ ->
+                                        nativeQueries++
+                                        TerminalCompletionShellResult(emptyList())
+                                    },
+                            )
+                        val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext(shellCapabilities = shell) })
+                        val accepted = ArrayList<SwingShellSuggestionAcceptance>()
                         val old = onEdt { begin(terminal, provider, "git switch feature/loc", accepted = accepted) }
                         val oldPublication = publication(old)
                         val line = "git switch feature/lox --quiet"
@@ -168,9 +170,9 @@ class SwingCompletionPipelineTest {
                             assertEquals(1, replacement.deleteAfterCursorCount)
                         }
                         assertEquals(0, nativeQueries)
-                    } finally {
-                        onEdt { terminal.dispose() }
                     }
+                } finally {
+                    onEdt { terminal.dispose() }
                 }
             }
         }

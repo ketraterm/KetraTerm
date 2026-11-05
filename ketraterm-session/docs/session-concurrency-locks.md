@@ -112,7 +112,11 @@ no other input was admitted, and no viewport mutation occurred. The session
 records the resulting input/output revisions; any later input/output invalidates
 that permission. Changed-away-and-back rendered text cannot renew an old context.
 Results complete outside session locks. Cancellation retains the pending wire
-slot until a reply/new prompt, and closure cancels the waiter.
+slot until a reply/new prompt. A replacement request can await that retirement,
+then recapture and revalidate its buffer before sending a new query. Waiting and
+query execution share the same two-second deadline; cancelling a waiting caller
+does not release another caller's wire slot. Closure cancels both response and
+retirement waiters. A concurrent query whose consumer is still active remains busy.
 
 A screen-derived snapshot with `requiresShellConfirmation` contains only the
 prompt-to-cursor prefix: visible text after the cursor may be a shell prediction

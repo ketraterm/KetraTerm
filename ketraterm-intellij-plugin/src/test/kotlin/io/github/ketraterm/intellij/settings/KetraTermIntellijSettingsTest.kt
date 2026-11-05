@@ -29,6 +29,7 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import io.github.ketraterm.workspace.TerminalProfileKind
 import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
@@ -38,6 +39,33 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `PowerShell keeps explicit suggestions without enabling automatic shell queries`() {
+        val service = KetraTermIntellijSettings()
+        for (mode in SwingShellSuggestionAutomaticMode.entries) {
+            val preferences =
+                service.state.copy(
+                    themeId = "nord",
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = true,
+                    shellSuggestionAutomaticMode = mode.name.lowercase(),
+                )
+            service.loadState(preferences)
+            val powerShell = service.current(TerminalProfileKind.POWERSHELL)
+            assertTrue(powerShell.smartSuggestionsEnabled)
+            assertFalse(powerShell.shellSuggestionsEnabled)
+            assertEquals(mode, powerShell.shellSuggestionAutomaticMode)
+            assertTrue(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+            assertEquals(preferences, service.state)
+            assertTrue(
+                requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java).shellSuggestionsEnabled,
+            )
+        }
+        service.loadState(service.state.copy(shellSuggestionsEnabled = false, smartSuggestionsEnabled = false))
+        assertFalse(service.current(TerminalProfileKind.POWERSHELL).smartSuggestionsEnabled)
+        assertFalse(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+    }
+
     @Test
     fun `automatic popup mode defaults for old XML normalizes invalid values and survives restart`() {
         val service = KetraTermIntellijSettings()

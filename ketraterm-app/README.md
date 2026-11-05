@@ -53,7 +53,7 @@ settings and does not use this file.
 
 Suggestions are enabled by default. Use the Shell Suggestions section in settings
 to control completion, automatic popups, Enter acceptance, and learning persistence;
-see [completion availability](../docs/features/completion.md).
+PowerShell uses explicit requests (Ctrl+Space). See [completion availability](../docs/features/completion.md).
 
 Native local profiles receive a small `ketra` companion command:
 

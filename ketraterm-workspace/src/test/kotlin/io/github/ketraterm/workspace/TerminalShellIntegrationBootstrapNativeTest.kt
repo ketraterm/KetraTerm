@@ -1017,7 +1017,20 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 val line = "ketra_smoke_e"
                 session.submitInput(TerminalPasteEvent(line))
                 session.awaitLine(line, "typing alias")
-                val result = assertNotNull(session.requestShellCompletions(line, line.length), "First alias completion")
+                assertNotNull(
+                    session.captureCommandEdit(),
+                    "First alias query has no editable context; current ${session.activeShellCommandLine()}",
+                )
+                val queryStarted =
+                    kotlin.time.TimeSource.Monotonic
+                        .markNow()
+                val response = session.requestShellCompletions(line, line.length)
+                val result =
+                    assertNotNull(
+                        response,
+                        "First alias completion failed after ${queryStarted.elapsedNow()}; " +
+                            "available=${session.shellCompletionAvailable}, current=${session.activeShellCommandLine()}",
+                    )
                 assertTrue(result.candidates.any { it.replacementText == "ketra_smoke_echo" })
                 assertEquals(line, session.activeShellCommandLine()?.commandText)
             }

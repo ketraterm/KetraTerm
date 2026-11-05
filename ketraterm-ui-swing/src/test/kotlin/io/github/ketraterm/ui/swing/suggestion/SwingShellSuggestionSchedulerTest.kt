@@ -26,6 +26,34 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
     @Test
+    fun `automatic requests require confirmed command text and resume when it becomes available`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+
+            fixture.active = snapshot("git s")
+            fixture.revisions.value = 1
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s")), fixture.requests)
+
+            fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.revisions.value = 2
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+            assertFalse(fixture.refreshing.last())
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `explicit request before initial observation suppresses the same automatic request`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)

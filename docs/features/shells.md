@@ -35,6 +35,12 @@ They are installed for supported interactive launches when shell integration is
 enabled. Explicit script/command execution and incompatible startup flags can
 prevent installation.
 
+Automatic integration targets the shell launched by the terminal profile.
+Starting another shell, `ssh`, or a multiplexer inside that shell does not carry
+a supported prompt-tracking or suggestion context into the child environment.
+Ordinary terminal input/output and the child's own completion remain available;
+nested-shell integration is outside the supported scope.
+
 | Shell / launch | Automatic hooks | Completion dialect | Startup command |
 | --- | --- | --- | --- |
 | Windows PowerShell / PowerShell | Yes | PowerShell | Yes |

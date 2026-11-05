@@ -87,15 +87,16 @@ functions, cmdlets, scripts, and aliases to other applications retain shell auth
 A deferred native answer is reused if catalog/host evaluation produces no candidates.
 Other modeled argument positions use progressive catalog and host sources first, with
 native fallback only when they produce no candidates. Retained learning does not
-count as a structured-source answer: when it is the only available result, its
-publication waits for the native fallback to finish, then participates in ranking.
+count as a structured-source answer: it can publish while native fallback is
+pending, but does not suppress that fallback.
 An unrecognized option makes argument ownership uncertain. Native queries and their
 answers use a context without inferred argument constraints; the original catalog
 context remains available when the shell returns null and local fallback is needed.
 Unmodeled arguments query
 the shell before publishing and use its successful answer instead of generic file
-or replay guesses. No candidates are published while a native query could
-invalidate their captured editing context.
+or replay guesses. The engine does not own terminal editing authority. Session-backed
+hosts must validate the captured edit context when publishing and accepting results;
+a source finishing does not make an obsolete editor context safe again.
 Path outcomes normalize separators according to `backslashPathSeparator`, quoting,
 and trailing directory separators. PowerShell additionally normalizes leading `./`
 when Windows separators are enabled; insertion keeps the chosen source's original edit.

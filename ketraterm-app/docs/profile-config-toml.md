@@ -76,7 +76,7 @@ All keys below belong to `[behavior]`. Boolean values are `true` or `false`.
 | `command_finished_alerts_enabled` | `false` | Notify when a long-running command finishes while its originating pane is unfocused; requires shell integration. |
 | `command_finished_alert_threshold_seconds` | `10` | Inclusive minimum observed command duration; clamped to `1..86400` seconds. |
 | `smart_suggestions_enabled` | `true` | Master switch for completion and learning. |
-| `shell_suggestions_enabled` | `true` | Automatic suggestions when the master switch is enabled. Explicit requests need only the master switch. |
+| `shell_suggestions_enabled` | `true` | Automatic suggestions for eligible non-PowerShell profiles when the master switch is enabled. PowerShell requires explicit completion. Explicit requests need only the master switch. |
 | `shell_suggestion_automatic_mode` | `"always"` | `"always"` or `"parameters_only"`. The latter suppresses executable-name popups; subcommands, options, arguments, and explicit completion remain available. |
 | `accept_selected_suggestion_with_enter` | `true` | Enter accepts an already selected suggestion; otherwise it reaches the shell. |
 | `suggestion_learning_persistence_enabled` | `false` | Persist compact completion-learning metadata when completion is enabled. |

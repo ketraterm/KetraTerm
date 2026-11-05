@@ -695,6 +695,8 @@ public class TerminalSession private constructor(
      * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
      * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
      * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
+     * A replacement request waits for that cancelled slot within its existing timeout, then revalidates
+     * the current buffer. Concurrent requests with an active consumer still return null.
      * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
      * Provisional snapshots reuse that verified result while their exact context remains current,
      * so confirmation and candidate collection do not invoke the native completer twice.
@@ -704,43 +706,63 @@ public class TerminalSession private constructor(
         cursorOffset: Int,
     ): TerminalShellCompletionResult? {
         currentCoroutineContext().ensureActive()
-        val expected = captureCommandEdit() ?: return null
-        if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
-        var confirmedResult: TerminalShellCompletionResult? = null
-        val query =
-            try {
-                synchronized(mutationLock) {
-                    runtime.shellIntegration?.withCommandLine { revision, snapshot ->
-                        synchronized(outboundWriteLock) {
-                            if (
-                                !isAcceptingInput() ||
-                                inputRevision != expected.inputRevision ||
-                                outputRevision != expected.outputRevision ||
-                                revision != expected.shellRevision ||
-                                snapshot != expected.commandLine
-                            ) {
-                                return@synchronized null
+        return withTimeoutOrNull(2_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
+    }
+
+    private suspend fun awaitShellCompletions(
+        commandLine: String,
+        cursorOffset: Int,
+    ): TerminalShellCompletionResult? {
+        while (true) {
+            val expected = captureCommandEdit() ?: return null
+            if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
+            var confirmedResult: TerminalShellCompletionResult? = null
+            var retiring: Deferred<Unit>? = null
+            val query =
+                try {
+                    synchronized(mutationLock) {
+                        runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                            synchronized(outboundWriteLock) {
+                                if (
+                                    !isAcceptingInput() ||
+                                    inputRevision != expected.inputRevision ||
+                                    outputRevision != expected.outputRevision ||
+                                    revision != expected.shellRevision ||
+                                    snapshot != expected.commandLine
+                                ) {
+                                    return@synchronized null
+                                }
+                                confirmedResult = runtime.shellCompletion.confirmedResult(expected)
+                                if (confirmedResult != null) return@synchronized null
+                                retiring =
+                                    runtime.shellCompletion.pending
+                                        ?.takeUnless { it.deferred.isActive }
+                                        ?.retired
+                                if (retiring != null) return@synchronized null
+                                var generation = 0L
+                                renderReader.readRenderFrame { generation = it.frameGeneration }
+                                val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
+                                outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
+                                inputRevision++
+                                pending
                             }
-                            confirmedResult = runtime.shellCompletion.confirmedResult(expected)
-                            if (confirmedResult != null) return@synchronized null
-                            var generation = 0L
-                            renderReader.readRenderFrame { generation = it.frameGeneration }
-                            val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
-                            outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
-                            inputRevision++
-                            pending
                         }
                     }
+                } catch (failure: OutboundCapacityException) {
+                    failWrite(failure)
+                    return null
                 }
-            } catch (failure: OutboundCapacityException) {
-                failWrite(failure)
-                return null
-            } ?: return confirmedResult
-        outboundWriter.signalPending()
-        return try {
-            withTimeoutOrNull(2_000.milliseconds) { query.deferred.await() }
-        } finally {
-            query.deferred.cancel(CancellationException("Shell completion request ended"))
+            if (query == null) {
+                val previous = retiring ?: return confirmedResult
+                previous.await()
+                continue
+            }
+            outboundWriter.signalPending()
+            return try {
+                query.deferred.await()
+            } finally {
+                query.deferred.cancel(CancellationException("Shell completion request ended"))
+            }
         }
     }
 
@@ -1524,7 +1546,10 @@ public class TerminalSession private constructor(
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
         }
-        completedShellQuery?.let { it.deferred.complete(it.response) }
+        completedShellQuery?.let {
+            it.deferred.complete(it.response)
+            it.retired.complete(Unit)
+        }
         invalidateRender(immediate = false)
     }
 
@@ -1861,8 +1886,11 @@ public class TerminalSession private constructor(
             cleanup {
                 runtime.shellCompletion
                     .close()
-                    ?.deferred
-                    ?.cancel(CancellationException("Terminal session closed"))
+                    ?.let {
+                        val cancellation = CancellationException("Terminal session closed")
+                        it.deferred.cancel(cancellation)
+                        it.retired.cancel(cancellation)
+                    }
             }
             cleanup { outboundWriter.close() }
             cleanup {

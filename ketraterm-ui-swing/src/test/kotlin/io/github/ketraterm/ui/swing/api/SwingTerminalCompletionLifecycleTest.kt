@@ -42,12 +42,13 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCompletionLifecycleTest {
     @Test
-    fun `shell confirms a prediction-free prefix before provider collection and acceptance`() =
+    fun `only an explicit request confirms a provisional prefix before provider collection and acceptance`() =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
             val view = RecordingView()
             val terminal = terminal(testScheduler, view)
             val requests = ArrayList<SwingShellSuggestionRequest>()
+            var opened = 0
             val confirmed = TerminalShellCompletionResult("git s", 5, 4, 5, emptyList())
             val provider =
                 object : SwingShellSuggestionProvider {
@@ -58,11 +59,24 @@ class SwingTerminalCompletionLifecycleTest {
                             emit(listOf(suggestion))
                         }.flowOn(StandardTestDispatcher(testScheduler))
 
-                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        opened++
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
                 }
             try {
+                terminal.setShellSuggestionProvider(provider)
                 terminal.bind(fixture.session)
+                focus(terminal, true)
                 runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertNull(terminal.beginActiveShellSuggestionInteraction(SwingShellSuggestionTrigger.AUTOMATIC))
+                assertNull(terminal.beginShellSuggestionInteraction(request, SwingShellSuggestionTrigger.AUTOMATIC))
+                runCurrent()
+                assertEquals(0, opened)
+                assertTrue(requests.isEmpty())
+                assertEquals("", fixture.connector.output.toString(Charsets.UTF_8))
                 val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
                 terminal.presentShellSuggestions(interaction)
                 terminal.requestShellSuggestions(interaction, provider)
@@ -76,6 +90,7 @@ class SwingTerminalCompletionLifecycleTest {
                 runCurrent()
 
                 assertEquals(listOf(request), requests)
+                assertEquals(1, opened)
                 assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
                 assertEquals(
                     "\u001b[24~",

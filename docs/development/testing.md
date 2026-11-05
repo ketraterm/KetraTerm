@@ -75,8 +75,11 @@ same desktop. Avoid interacting with their windows during a run.
 ## CI
 
 The standard [Test Suite workflow](../../.github/workflows/tests.yml) runs all three
-suites in each OS job. Shell/display setup is platform-level; no job or class-name
-filter is added for suggestions, settings, tabs, or future application features.
+suites in each OS job. Published-consumer checks run afterward in a separate step,
+including when the test suites fail, so their compiler processes do not compete
+with live shell and desktop scenarios. Shell/display setup is platform-level; no
+job or class-name filter is added for suggestions, settings, tabs, or future
+application features.
 Reports are retained on success and failure. Existing packaging/consumer and IDE
 checks remain in that workflow; long differential campaigns retain their separate
 campaign workflow.
@@ -97,5 +100,7 @@ claim that coverage. Example from the repository root:
 
 The current suggestion scenarios drive component key handlers with live shells;
 they do not verify OS keyboard injection or packaged application installation.
+PowerShell scenarios request suggestions explicitly through the component API;
+POSIX shell scenarios exercise automatic suggestions.
 Such tests should use the same desktop execution contract when added, with their
 actual launch and input mechanisms documented in their owning fixture.

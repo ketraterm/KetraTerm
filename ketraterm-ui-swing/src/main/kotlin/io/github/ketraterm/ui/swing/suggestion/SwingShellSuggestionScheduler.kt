@@ -218,6 +218,7 @@ internal class SwingShellSuggestionScheduler(
     private fun isEligibleNow(): Boolean = isFocused() && isEligible()
 
     private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
+        if (snapshot.requiresShellConfirmation) return false
         val text = snapshot.commandText
         val cursorOffset = snapshot.cursorOffset
         var nonWhitespaceCharacters = 0

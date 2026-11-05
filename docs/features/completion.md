@@ -20,13 +20,16 @@ the same stability contract.
 
 ## Availability
 
-Completion and automatic suggestions are **enabled by default in both products**.
+Completion is **enabled by default in both products**. Automatic suggestions are
+enabled for eligible non-PowerShell profiles. **PowerShell completion is explicit
+only:** press Ctrl+Space (or the configured IDE action shortcut). Automatic-popup
+preferences do not enable background PowerShell completion requests.
 Settings expose the master switch, automatic popups, Enter acceptance, and optional
 learning persistence. Automatic popups can appear **Always** (the default) or
 **Only for parameters**. Parameter-only mode includes subcommands, options, and
 arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
-Explicit saved preferences remain effective.
+Saved preferences remain effective within this shell policy.
 Library hosts enable and configure their own provider and presentation.
 
 Use **Reset learned suggestions...** in settings to clear learned commands and
@@ -132,7 +135,7 @@ multi-colon refspecs are left untouched. Remaining Git coverage is listed in the
 
 ### PowerShell suggestions
 
-With prompt hooks and PSReadLine installed, suggestions use `TabExpansion2` in
+An explicit request with prompt hooks and PSReadLine installed uses `TabExpansion2` in
 the running shell. This includes available commands, session functions, aliases,
 and installed argument completers. Catalog descriptions enrich commands verified
 by the shell. Bare names and executable extensions merge when they resolve to
@@ -153,7 +156,8 @@ Acceptance uses the shell's replacement text and range. The PowerShell bridge
 restores the edited command prefix through PSReadLine's exact replacement API,
 preserving text after the cursor. Slow native completers
 can time out. Cancelling a request cannot stop a completer already running inside
-PowerShell. Suggestions use the confirmed editor buffer even when inline history
+PowerShell. The products do not run these native requests automatically while typing.
+Explicit suggestions use the confirmed editor buffer even when inline history
 predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
 real editable suffix text. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)
 for request limits and validation.

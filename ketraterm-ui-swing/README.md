@@ -236,6 +236,11 @@ for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
+Automatic requests require an unambiguous command snapshot and do not perform
+native shell confirmation of screen-derived prefixes. Explicit requests may
+confirm such a prefix through the session. Hosts using a provider that invokes
+the live shell should disable automatic popups for that provider, as the products
+do for PowerShell.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for
 parameter-only automatic requests. The shared completion adapter forwards it

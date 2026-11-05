@@ -169,6 +169,9 @@ public class TerminalShellCompletionChannel internal constructor(
         val frameGeneration: Long,
     ) {
         val deferred = CompletableDeferred<TerminalShellCompletionResult?>()
+
+        // Consumer cancellation does not mean that the shell has consumed its request.
+        val retired = CompletableDeferred<Unit>()
         var responded = false
         var response: TerminalShellCompletionResult? = null
         var editInvalidated = false

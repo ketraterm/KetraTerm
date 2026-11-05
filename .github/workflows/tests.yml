@@ -40,6 +40,7 @@ jobs:
           java-version: '25'
 
       - name: Setup Gradle
+        id: setup_gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Setup Node for process tests and release automation
@@ -68,12 +69,16 @@ jobs:
       - name: Run JVM, Native, and Desktop Suites (Linux with Xvfb)
         if: runner.os == 'Linux'
         run: |
-          xvfb-run -a ./gradlew test nativeTest desktopTest :ketraterm-testkit:publishedConsumerTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+          xvfb-run -a ./gradlew test nativeTest desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
 
       - name: Run JVM, Native, and Desktop Suites (Windows & macOS)
         if: runner.os != 'Linux'
         run: |
-          ./gradlew test nativeTest desktopTest :ketraterm-testkit:publishedConsumerTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+          ./gradlew test nativeTest desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+
+      - name: Test Published Consumers
+        if: ${{ !cancelled() && steps.setup_gradle.outcome == 'success' }}
+        run: ./gradlew :ketraterm-testkit:publishedConsumerTest --continue
 
       - name: Run IntelliJ Plugin Tests (Linux)
         if: runner.os == 'Linux'

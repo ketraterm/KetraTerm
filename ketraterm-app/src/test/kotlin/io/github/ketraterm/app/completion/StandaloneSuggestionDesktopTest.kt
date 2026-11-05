@@ -66,6 +66,7 @@ class StandaloneSuggestionDesktopTest {
             }) {
                 type(line)
                 awaitLine(line)
+                requestSuggestions()
                 awaitPopup(line, "accepted")
                 selectAndAccept("accepted")
                 awaitLine("echo accepted")
@@ -82,9 +83,11 @@ class StandaloneSuggestionDesktopTest {
             withSession(shell.profile(directory), directory) {
                 type("git sta")
                 awaitLine("git sta")
+                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("git sta", "status")
                 key(KeyEvent.VK_BACK_SPACE)
                 awaitLine("git st")
+                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("git st", "status")
                 selectAndAccept("status")
                 awaitLine("git status")
@@ -115,6 +118,7 @@ class StandaloneSuggestionDesktopTest {
                 awaitLine("")
                 type("ketra_smoke_e")
                 awaitLine("ketra_smoke_e")
+                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("ketra_smoke_e", "ketra_smoke_echo")
                 selectAndAccept("ketra_smoke_echo")
                 awaitLine("ketra_smoke_echo")
@@ -144,6 +148,7 @@ class StandaloneSuggestionDesktopTest {
                     val source = withContext(Dispatchers.Swing) { provider.open(SwingShellSuggestionRequest("cd al", 5)) }
                     assertTrue(withTimeout(15.seconds) { source.suggestions.last() }.isEmpty())
                 } else {
+                    if (shell.isPowerShell) requestSuggestions()
                     val paths = awaitPopup("cd al", "alpha/")
                     assertTrue(paths.visibleSuggestions.none { it.displayText == "also.txt" })
                     val artifacts = Path.of(System.getProperty("terminal.test.artifactsDirectory", "build/test-artifacts/desktopTest"))
@@ -160,6 +165,7 @@ class StandaloneSuggestionDesktopTest {
                     )
                     type("cd in")
                     awaitLine("cd in")
+                    if (shell.isPowerShell) requestSuggestions()
                     awaitPopup("cd in", "inside/")
                 }
             }

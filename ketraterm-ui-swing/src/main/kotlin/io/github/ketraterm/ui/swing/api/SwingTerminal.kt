@@ -2164,6 +2164,7 @@ public class SwingTerminal
          * [TerminalShellCommandLineSnapshot.requiresShellConfirmation] through
          * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
          * before collecting a provider; conditional session admission also rejects unconfirmed edits.
+         * Automatic interactions reject provisional session text instead of querying the shell to confirm it.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -2191,6 +2192,7 @@ public class SwingTerminal
                 bound?.activeShellCommandLine()?.takeIf {
                     it.commandText == effectiveRequest.commandText && it.cursorOffset == effectiveRequest.cursorOffset
                 }
+            if (automatic && observed?.requiresShellConfirmation == true) return null
             val revision = suggestionRevision + 1
             cancelAndHideShellSuggestionsOnEdt(
                 "Shell suggestion request replaced",

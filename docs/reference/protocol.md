@@ -461,7 +461,9 @@ policy belongs to the [completion engine](../../ketraterm-completion/docs/comple
 
 Waiting expires after two seconds. Cancelled/timed-out requests retain the wire
 slot until their reply or a new prompt, so a late result cannot satisfy a newer
-request. Native completers run in the shell and may continue after host cancellation.
+request. A replacement request can wait for that slot within its own two-second
+deadline, then revalidate the current command buffer before sending its query.
+Native completers run in the shell and may continue after host cancellation.
 Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
 for the validation required before suggestion acceptance.
 

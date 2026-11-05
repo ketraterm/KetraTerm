@@ -24,6 +24,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -131,6 +132,114 @@ class TerminalShellCompletionTest {
         }
 
     @Test
+    fun `latest query waits for a cancelled wire request then confirms the current buffer`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                old.cancelAndJoin()
+                fixture.model.value = TerminalShellCommandLineSnapshot("git st", 6, 6, 0, true)
+
+                val latest = async { fixture.session.requestShellCompletions("git st", 6) }
+                runCurrent()
+                assertFalse(latest.isCompleted, "A cancelled wire request must not discard the final typing update")
+                assertEquals("q", fixture.writtenText(), "Only one native query may be in flight")
+
+                fixture.reply()
+                runCurrent()
+                assertFalse(latest.isCompleted, "The old reply cannot confirm the new buffer")
+                assertEquals("qq", fixture.writtenText())
+                fixture.reply(commandLine = "git st", cursorOffset = 6, requestId = 2)
+                runCurrent()
+                assertNotNull(latest.await())
+            }
+        }
+
+    @Test
+    fun `replacement query revalidates its buffer after the cancelled slot retires`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                old.cancelAndJoin()
+                val latest = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertFalse(latest.isCompleted)
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("other", 5, 5, 0, true)
+                fixture.reply()
+                runCurrent()
+                assertNull(latest.await())
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @Test
+    fun `waiting for retirement and a new reply share one deadline`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                old.cancelAndJoin()
+                val latest = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                advanceTimeBy(1_500)
+                fixture.reply()
+                runCurrent()
+                assertEquals("qq", fixture.writtenText())
+                assertFalse(latest.isCompleted)
+
+                advanceTimeBy(500)
+                runCurrent()
+                assertNull(latest.await())
+                fixture.reply(requestId = 2)
+                runCurrent()
+                val fresh = checkNotNull(fixture.session.captureCommandEdit())
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("never"))))
+            }
+        }
+
+    @Test
+    fun `cancelling a waiting replacement does not retire another request`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                old.cancelAndJoin()
+                val intermediate = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                intermediate.cancelAndJoin()
+                val latest = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertFalse(latest.isCompleted)
+                assertEquals("q", fixture.writtenText())
+
+                fixture.reply()
+                runCurrent()
+                assertEquals("qq", fixture.writtenText())
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(latest.await())
+            }
+        }
+
+    @Test
+    fun `session closure cancels a replacement waiting for wire retirement`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                old.cancelAndJoin()
+                val latest = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                fixture.session.close()
+                runCurrent()
+                assertTrue(latest.isCancelled)
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @Test
     fun `confirmed contexts still honor cancellation and session ownership`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -204,13 +313,14 @@ class TerminalShellCompletionTest {
         fun reply(
             commandLine: String = "git s",
             requestId: Long = 1,
+            cursorOffset: Int = 5,
         ) {
             channel.respond(
                 "epoch",
                 requestId,
                 TerminalShellCompletionResult(
                     commandLine,
-                    5,
+                    cursorOffset,
                     4,
                     5,
                     listOf(TerminalShellCompletionCandidate("status", "status", "", TerminalShellCompletionKind.ARGUMENT)),

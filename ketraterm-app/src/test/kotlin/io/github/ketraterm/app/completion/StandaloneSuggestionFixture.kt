@@ -63,7 +63,7 @@ internal class StandaloneSuggestionFixture private constructor(
     private var window: JFrame? = null
     private val terminal =
         SwingTerminal(
-            settingsProvider = settings::current,
+            settingsProvider = { settings.current(tab.profile.kind) },
             hostServices =
                 SwingHostServices.create { draft ->
                     draft.shellSuggestionViewFactory =
@@ -183,6 +183,8 @@ internal class StandaloneSuggestionFixture private constructor(
         }
 
     suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
+
+    suspend fun requestSuggestions() = withContext(Dispatchers.Swing) { terminal.requestActiveShellSuggestions() }
 
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }

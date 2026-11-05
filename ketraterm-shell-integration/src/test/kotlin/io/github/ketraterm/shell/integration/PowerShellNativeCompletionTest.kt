@@ -258,10 +258,10 @@ class PowerShellNativeCompletionTest {
                 val query = async { it.session.requestShellCompletions("Get-Chi", 7) }
                 runCurrent()
                 query.cancelAndJoin()
-                assertNull(it.session.requestShellCompletions("Get-Chi", 7))
-                it.feed(reply("Get-Chi"))
-                runCurrent()
                 val next = async { it.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                assertFalse(next.isCompleted)
+                it.feed(reply("Get-Chi"))
                 runCurrent()
                 it.feed(reply("Get-Chi", id = 1))
                 assertFalse(next.isCompleted)
