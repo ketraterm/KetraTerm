@@ -21,9 +21,11 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
 import io.github.ketraterm.session.TerminalStartupCommand
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
@@ -489,7 +491,12 @@ class TerminalShellIntegrationBootstrapNativeTest {
             assumeTrue(bash != null, "Bash is not installed")
             assumeBashCommandInventory(bash!!)
             val inputrc = tempDir.resolve("inputrc")
-            Files.writeString(inputrc, "set enable-active-region on\nset enable-bracketed-paste on\nset editing-mode emacs\n")
+            withContext(Dispatchers.IO) {
+                Files.writeString(
+                    inputrc,
+                    "set enable-active-region on\nset enable-bracketed-paste on\nset editing-mode emacs\n"
+                )
+            }
             TerminalWorkspace().use { workspace ->
                 val tab =
                     workspace.openTab(
@@ -580,7 +587,9 @@ class TerminalShellIntegrationBootstrapNativeTest {
             val executable = installedExecutable(executableName)
             assumeTrue(executable != null, "$executableName is not installed")
             val helper = directory.resolve("prefix-reset-test.ps1")
-            Files.writeString(helper, powerShellEditorTestScript("powershell-prefix-reset-test.ps1"))
+            withContext(Dispatchers.IO) {
+                Files.writeString(helper, powerShellEditorTestScript("powershell-prefix-reset-test.ps1"))
+            }
             val snapshots = Channel<String>(Channel.UNLIMITED)
             TerminalWorkspace(powerShellEditorListener(snapshots)).use { workspace ->
                 val session =
@@ -652,7 +661,12 @@ class TerminalShellIntegrationBootstrapNativeTest {
         runBlocking {
             val executable = installedExecutable(executableName)
             assumeTrue(executable != null, "$executableName is not installed")
-            Files.writeString(directory.resolve("prediction-test.ps1"), powerShellEditorTestScript("powershell-prediction-test.ps1"))
+            withContext(Dispatchers.IO) {
+                Files.writeString(
+                    directory.resolve("prediction-test.ps1"),
+                    powerShellEditorTestScript("powershell-prediction-test.ps1")
+                )
+            }
             val snapshots = Channel<String>(Channel.UNLIMITED)
             try {
                 TerminalWorkspace(powerShellEditorListener(snapshots)).use { workspace ->
@@ -972,6 +986,36 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 assertEquals(line, session.activeShellCommandLine()?.commandText)
             }
         }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completes a new session alias as its first native query`(executableName: String): Unit = runBlocking {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val setup = "Set-Alias ketra_smoke_echo Write-Output"
+        TerminalWorkspace().use { workspace ->
+            val session = workspace.openTab(
+                TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile"),
+                    startupCommand = TerminalStartupCommand(setup)),
+                TerminalWorkspaceOpenOptions.create { it.columns = 100 },
+            ).session
+            withTimeout(15.seconds) {
+                session.shellIntegrationState.revision.first {
+                    val state = session.shellIntegrationState
+                    val metadata = state.commandMetadata(state.latestCommandRecordId())
+                    metadata?.commandText == setup && metadata.finishedAtEpochMillis != null
+                }
+            }
+            session.awaitLine("", "defining alias")
+            val line = "ketra_smoke_e"
+            session.submitInput(TerminalPasteEvent(line))
+            session.awaitLine(line, "typing alias")
+            val started = kotlin.time.TimeSource.Monotonic.markNow()
+            val result = assertNotNull(session.requestShellCompletions(line, line.length), "Alias completion after ${started.elapsedNow()}")
+            assertTrue(result.candidates.any { it.replacementText == "ketra_smoke_echo" })
+            assertEquals(line, session.activeShellCommandLine()?.commandText)
+        }
+    }
 
     @Test
     fun `PowerShell native hook uses functions aliases and registered completers from its own session`(

@@ -218,6 +218,8 @@ public class PtyConnector internal constructor(
                 if (read < 0) break
                 if (read == 0) continue
 
+                System.err.println("DEBUG PTY " + buffer.copyOfRange(0, read).toString(Charsets.UTF_8).replace("\u001b", "<ESC>").replace("\r", "<CR>").replace("\n", "<LF>").replace("\u0007", "<BEL>"))
+
                 if (!localCloseRequested.get()) listenerOrThrow().onBytes(buffer, 0, read)
             }
         } catch (exception: Exception) {

@@ -95,6 +95,10 @@ internal enum class StandaloneSuggestionShell(
                 isPowerShell -> listOf("-NoLogo", "-NoProfile")
                 executable == "bash" -> listOf("--noprofile", "--norc", "-i")
                 executable == "zsh" -> listOf("-d", "-i")
+                executable == "fish" ->
+                    // Fish has no editor-buffer confirmation bridge: visible autosuggestions
+                    // intentionally make the screen-derived editing context unavailable.
+                    listOf("-C", "set -g fish_autosuggestion_enabled 0; set -g fish_history ''", "-i")
                 else -> listOf("-i")
             }
         return base.copy(

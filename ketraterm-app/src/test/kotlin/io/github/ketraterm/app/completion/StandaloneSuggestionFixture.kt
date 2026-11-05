@@ -82,7 +82,7 @@ internal class StandaloneSuggestionFixture private constructor(
 
     private suspend fun start(decorateProvider: (SwingShellSuggestionProvider) -> SwingShellSuggestionProvider) {
         withContext(Dispatchers.Swing) {
-            terminal.preferredSize = terminal.preferredGridSize(100, 24)
+            terminal.preferredSize = terminal.preferredGridSize(COLUMNS, ROWS)
             terminal.setShellSuggestionProvider(decorateProvider(provider))
             terminal.bind(session) { failure ->
                 if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
@@ -131,7 +131,7 @@ internal class StandaloneSuggestionFixture private constructor(
                 withContext(Dispatchers.Swing) {
                     "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}"
                 }
-            throw AssertionError("Expected '$replacement' for '$line'; $state; last update=$lastUpdate", failure)
+            throw AssertionError("Expected '$replacement' for '$line'; $state; last update=$lastUpdate\n${screenText()}", failure)
         }
     }
 
@@ -142,7 +142,23 @@ internal class StandaloneSuggestionFixture private constructor(
                 session.renderGeneration.first { session.activeShellCommandLine()?.commandText == line }
             }
         } catch (failure: TimeoutCancellationException) {
-            throw AssertionError("Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}", failure)
+            throw AssertionError(
+                "Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}\n${screenText()}",
+                failure,
+            )
+        }
+    }
+
+    private fun screenText(): String = buildString {
+        session.readRenderFrame { frame ->
+            appendLine("Cursor: ${frame.cursor.column}, ${frame.cursor.row}")
+            val codeWords = IntArray(frame.columns)
+            val flags = IntArray(frame.columns)
+            for (row in 0 until frame.rows) {
+                frame.copyTextLine(row, codeWords, flags = flags)
+                val text = buildString { codeWords.forEach { append(if (it in 32..126) it.toChar() else ' ') } }.trimEnd()
+                if (text.isNotEmpty()) appendLine("$row: $text")
+            }
         }
     }
 
@@ -208,6 +224,9 @@ internal class StandaloneSuggestionFixture private constructor(
     }
 
     companion object {
+        private const val COLUMNS = 100
+        private const val ROWS = 24
+
         suspend fun withSession(
             profile: TerminalProfile,
             directory: Path,
@@ -229,7 +248,10 @@ internal class StandaloneSuggestionFixture private constructor(
                     }
                 check(profile.startupCommand == null) { "Suggestion fixture owns shell setup" }
                 val launch = if (setup != null) profile.copy(startupCommand = TerminalStartupCommand(setup)) else profile
-                val tab = owner.openTab(launch, TerminalWorkspaceOpenOptions())
+                val tab = owner.openTab(launch, TerminalWorkspaceOpenOptions.create {
+                    it.columns = COLUMNS
+                    it.rows = ROWS
+                })
                 val provider =
                     registry.createProvider(
                         profileId = profile.id,

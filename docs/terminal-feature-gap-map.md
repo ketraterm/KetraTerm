@@ -70,8 +70,15 @@ Remaining work:
 
 ## Optional protocol work
 
+The priorities on the compatibility entries below are relative to one another;
+they are not release commitments.
+
 | Owner | Remaining work |
 | --- | --- |
+| `TODO(parser)` | **High priority:** Add the HPR (`CSI Ps a`), VPR (`CSI Ps e`), CUB (`CSI Ps j`), and CUU (`CSI Ps k`) aliases. Applications using these aliases otherwise lose cursor movement and may place output incorrectly. |
+| `TODO(parser/core/host)` | **High priority:** Implement REP (`CSI Ps b`) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output. |
+| `TODO(parser/core/host)` | **Medium priority:** Implement Kitty ED 22 (`CSI 22 J`) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen. |
+| `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
 | `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |
 | `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |
 | `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. |

@@ -216,14 +216,12 @@ class ShellCommandCollectorNativeTest {
                 printf '#!/bin/sh\n' > "${'$'}KETRA_TEST_NAME"
                 command chmod +x "${'$'}KETRA_TEST_NAME"
                 export KETRA_TEST_CAT=${'$'}(command -v cat) KETRA_TEST_STREAM="${'$'}PWD/raw-stream"
-                # 100,000 entries remain below the entry limit but exceed 16 MiB.
+                # 100,096 entries remain below the entry limit but exceed 16 MiB.
                 # Repeated executable names must count before deduplication.
                 batch=()
                 for ((i=0; i<256; i++)); do batch+=("./${'$'}KETRA_TEST_NAME"); done
                 for ((start=0; start<100000; start+=256)); do
-                    count=256
-                    ((start+count <= 100000)) || count=$((100000-start))
-                    printf '%s\0' "${'$'}{batch[@]:0:count}"
+                    printf '%s\0' "${'$'}{batch[@]}"
                 done > raw-stream
                 command cat > find <<'FINDER'
                 #!/bin/sh

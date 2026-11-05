@@ -159,13 +159,11 @@ function __ketraterm_zsh_completion_ready() {
     builtin typeset -g __ketraterm_zsh_completion_path_scan_epoch=$__ketraterm_zsh_completion_path_epoch
     builtin typeset -g __ketraterm_zsh_completion_scan_id=$((${__ketraterm_zsh_completion_scan_id:-0} + 1))
     # Only PATH discovery runs in the background; never accumulate workers.
-    builtin typeset -g __ketraterm_zsh_completion_pid=$(
-        # The worker must never write to the live terminal: even one printf
-        # can be split and interleave with prompt/redraw bytes in the PTY.
-        (
-            __ketraterm_zsh_publish_commands "$__ketraterm_zsh_completion_path_epoch" "$__ketraterm_zsh_completion_scan_id" Path "$aliases_enabled" > "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" &&
-                command "$__ketraterm_zsh_completion_mv" -f -- "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.ready"
-        ) </dev/null >/dev/null 2>&1 &!
-        builtin printf '%s' "$!"
-    )
+    # A command substitution around the launch restores its inherited tty modes
+    # on exit, racing ZLE's raw mode. Launch directly and capture $! in this shell.
+    (
+        __ketraterm_zsh_publish_commands "$__ketraterm_zsh_completion_path_epoch" "$__ketraterm_zsh_completion_scan_id" Path "$aliases_enabled" > "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" &&
+            command "$__ketraterm_zsh_completion_mv" -f -- "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.pending" "$KetraTerm_COMMAND_INVENTORY_DIRECTORY/path.ready"
+    ) </dev/null >/dev/null 2>&1 &!
+    builtin typeset -g __ketraterm_zsh_completion_pid=$!
 }
