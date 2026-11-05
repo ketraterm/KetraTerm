@@ -243,8 +243,9 @@ internal data class Window(
     val tabManager: TabManager,
 ) {
     /**
-     * Opens the initial tab and shows its configured grid before shell output starts.
-     * Failed or cancelled startup releases the window and its workspace.
+     * Establishes the hidden window peer before starting asynchronous terminal creation.
+     * Shows the configured grid before shell output starts. Failed or cancelled startup
+     * releases the window and its workspace.
      * Must be called on the EDT.
      *
      * @param profile shell profile for the initial terminal tab.
@@ -261,22 +262,29 @@ internal data class Window(
                 }
             }
         }
-        val accepted =
-            tabManager.openTab(
-                profile,
-                beforeStart = { complete ->
-                    // Packing must see the installed pane, and output must see the
-                    // resulting viewport rather than an empty window's minimum size.
-                    frame.pack()
-                    frame.setLocationRelativeTo(null)
-                    frame.isVisible = true
-                    val pane = checkNotNull(tabManager.selectedPane)
-                    pane.requestFocus()
-                    complete(null)
-                },
-                onComplete = finish,
-            )
-        if (!accepted) finish(false)
+        try {
+            // A displayable window keeps AWT alive while daemon workers create the first terminal.
+            // Keep it hidden until the installed pane supplies the configured grid dimensions.
+            frame.pack()
+            val accepted =
+                tabManager.openTab(
+                    profile,
+                    beforeStart = { complete ->
+                        // Repack for the installed pane before shell output sees the viewport.
+                        frame.pack()
+                        frame.setLocationRelativeTo(null)
+                        frame.isVisible = true
+                        val pane = checkNotNull(tabManager.selectedPane)
+                        pane.requestFocus()
+                        complete(null)
+                    },
+                    onComplete = finish,
+                )
+            if (!accepted) finish(false)
+        } catch (failure: Throwable) {
+            captureCleanupFailure(failure) { finish(false) }
+            throw failure
+        }
     }
 }
 

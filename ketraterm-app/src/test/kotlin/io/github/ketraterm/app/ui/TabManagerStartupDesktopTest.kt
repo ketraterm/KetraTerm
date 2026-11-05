@@ -33,6 +33,7 @@ import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -51,9 +52,7 @@ import java.util.concurrent.*
 import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
@@ -552,7 +551,7 @@ class TabManagerStartupDesktopTest {
             assertEquals(rows, options.rows)
             onEdt {
                 assertFalse(shown.isDone, "The empty window must not be shown while the pane is still starting")
-                assertFalse(frame.isDisplayable, "Packing must wait until the configured pane is installed")
+                assertTrue(frame.isDisplayable, "The hidden peer must keep AWT alive while terminal creation is blocked")
             }
             release.complete(Unit)
             val packed = shown.get(10, TimeUnit.SECONDS)
@@ -619,7 +618,11 @@ class TabManagerStartupDesktopTest {
                     ).also { Window(frame, it).openInitialTab(profile) }
                 }
             entered.get(10, TimeUnit.SECONDS)
-            onEdt { manager.closeAllTabsWithoutConfirmation { result -> result.fold(closed::complete, closed::completeExceptionally) } }
+            onEdt {
+                assertTrue(frame.isDisplayable, "Cancellation must release the peer created before startup")
+                assertFalse(shown.isDone)
+                manager.closeAllTabsWithoutConfirmation { result -> result.fold(closed::complete, closed::completeExceptionally) }
+            }
             release.complete(Unit)
             closed.get(10, TimeUnit.SECONDS)
             disposed.get(10, TimeUnit.SECONDS)
@@ -630,6 +633,63 @@ class TabManagerStartupDesktopTest {
         } finally {
             release.complete(Unit)
             close(manager, frame, closed)
+        }
+    }
+
+    @Test
+    fun `failure creating the initial peer disposes it and preserves the cause`(
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(smartSuggestionsEnabled = false, showForegroundProcessName = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("startup", "Startup", listOf("unused"), workingDirectory = directory)
+        val failure = IllegalStateException("Packing failed")
+        val frame =
+            onEdt {
+                object : JFrame() {
+                    override fun pack() {
+                        super.pack()
+                        throw failure
+                    }
+                }
+            }
+        val dispatcher = StandardTestDispatcher()
+        var manager: TabManager? = null
+        var terminalWorkspace: TerminalWorkspace? = null
+        try {
+            onEdt {
+                val content = JPanel(CardLayout())
+                frame.contentPane = content
+                manager =
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            workspace(listener, dispatcher) { error("Session creation must not begin without a window peer") }
+                                .also { terminalWorkspace = it }
+                        },
+                    )
+                assertSame(
+                    failure,
+                    assertFailsWith<IllegalStateException> {
+                        Window(frame, requireNotNull(manager)).openInitialTab(profile)
+                    },
+                )
+                assertFalse(frame.isDisplayable)
+                assertFalse(frame.isShowing)
+                assertFalse(requireNotNull(terminalWorkspace).openTabAsync({ profile }, TerminalWorkspaceOpenOptions.create {}) {})
+            }
+        } finally {
+            onEdt {
+                manager?.closeAllTabsWithoutConfirmation()
+                frame.dispose()
+            }
+            dispatcher.scheduler.runCurrent()
         }
     }
 
@@ -761,6 +821,7 @@ class TabManagerStartupDesktopTest {
 
     private fun workspace(
         listener: TerminalWorkspaceListener,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
         createSession: (TerminalWorkspaceOpenOptions) -> TerminalSession,
     ): TerminalWorkspace {
         val factoryType = Class.forName("io.github.ketraterm.workspace.TerminalWorkspaceSessionFactory")
@@ -771,7 +832,7 @@ class TabManagerStartupDesktopTest {
             }
         return TerminalWorkspace::class.java
             .getDeclaredConstructor(TerminalWorkspaceListener::class.java, factoryType, CoroutineDispatcher::class.java)
-            .newInstance(listener, factory, Dispatchers.Default) as TerminalWorkspace
+            .newInstance(listener, factory, dispatcher) as TerminalWorkspace
     }
 
     private fun idleSession(
