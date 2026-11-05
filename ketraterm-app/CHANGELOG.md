@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local paths, and Git references. The popup highlights matches and shows argument hints. Settings control automatic popups and Enter acceptance; saved learning is opt-in and can be reset. See the [completion guide](../docs/features/completion.md) for shell requirements and limitations.
 - Added sticky command headers, enabled by default with an independent setting. The overlay repeats the full original prompt/input row with normal terminal typography, colors and cell spacing while its output is at the viewport top. Clicking reveals the command; scrolling, grid dimensions and PTY sizing remain unchanged.
 - Typing and accepted paste return to live input immediately. Scroll on output now defaults to off so incoming output preserves the reader's position; saved preferences remain effective.
 

@@ -4,10 +4,6 @@ Open work and deliberate limitations. Implemented features belong in the
 [feature catalog](terminal-feature-map.md); completed fixes belong in Git history
 and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
-Implemented [completion and suggestion capabilities](features/completion.md#stability-experimental)
-remain experimental. Their presence in the feature catalog does not
-promise stable APIs or behavior.
-
 ## Product and release work
 
 | Owner | Remaining work |
@@ -23,7 +19,13 @@ promise stable APIs or behavior.
 
 ## Completion and suggestions
 
-Remaining known gaps in the [experimental completion system](features/completion.md#stability-experimental):
+Completion and suggestions are implemented and enabled by default in the standalone
+app and IntelliJ plugin. The engine and shared popup remain
+[experimental](features/completion.md#stability-experimental); library consumers
+can customize or replace both. See the [completion catalog](features/completion.md)
+for supported sources, matching, learning, and UI behavior.
+
+Remaining work:
 
 | Owner | Remaining work |
 | --- | --- |
