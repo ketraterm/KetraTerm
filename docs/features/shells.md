@@ -8,6 +8,10 @@ hooks. Library users choose their own process, transport, and shell integration.
 Profiles are offered in the order below. A configured shell or explicit launch
 command can override the default.
 
+On Windows, both products default to Windows PowerShell 5.1 (`powershell.exe`).
+Installing PowerShell 7 adds a separate **PowerShell** profile; to use it for
+default tabs, select its executable (`pwsh.exe`) in the shell settings.
+
 | Platform | Profiles | Discovery |
 | --- | --- | --- |
 | Windows | Windows PowerShell | System installation, with `powershell.exe` as fallback. |
