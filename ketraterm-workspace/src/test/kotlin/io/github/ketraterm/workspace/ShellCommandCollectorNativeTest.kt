@@ -232,6 +232,9 @@ class ShellCommandCollectorNativeTest {
                 PATH=${'$'}PWD
                 __ketraterm_collect_path_commands
                 """.trimIndent(),
+                // MSYS Bash reads NUL-delimited input one byte per system call.
+                // This deliberately scans 16 MiB; the deadline only bounds a hung process.
+                timeoutSeconds = 300,
             )
         assertEquals("0".repeat(170) + "\u0000__ketraterm_inventory_overflow", output)
     }
@@ -340,6 +343,7 @@ class ShellCommandCollectorNativeTest {
     private fun runCollector(
         shell: String,
         scenario: String,
+        timeoutSeconds: Long = 120,
     ): String {
         val command = shellCommand(shell)
         val collector = checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(UTF_8) }
@@ -360,7 +364,7 @@ class ShellCommandCollectorNativeTest {
         Thread.ofVirtual().name("command-collector-test-output").start(output)
         try {
             process.outputStream.use { it.write(script.toByteArray(UTF_8)) }
-            assertTrue(process.waitFor(120, TimeUnit.SECONDS), "Collector did not finish: $shell")
+            assertTrue(process.waitFor(timeoutSeconds, TimeUnit.SECONDS), "Collector did not finish: $shell")
             val result = output.get(5, TimeUnit.SECONDS)
             assertEquals(0, process.exitValue(), result)
             assumeTrue(result != "__ketraterm_inventory_unsupported", "Command inventory requires Bash 5.3+")

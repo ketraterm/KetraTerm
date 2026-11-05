@@ -149,18 +149,19 @@ internal class StandaloneSuggestionFixture private constructor(
         }
     }
 
-    private fun screenText(): String = buildString {
-        session.readRenderFrame { frame ->
-            appendLine("Cursor: ${frame.cursor.column}, ${frame.cursor.row}")
-            val codeWords = IntArray(frame.columns)
-            val flags = IntArray(frame.columns)
-            for (row in 0 until frame.rows) {
-                frame.copyTextLine(row, codeWords, flags = flags)
-                val text = buildString { codeWords.forEach { append(if (it in 32..126) it.toChar() else ' ') } }.trimEnd()
-                if (text.isNotEmpty()) appendLine("$row: $text")
+    private fun screenText(): String =
+        buildString {
+            session.readRenderFrame { frame ->
+                appendLine("Cursor: ${frame.cursor.column}, ${frame.cursor.row}")
+                val codeWords = IntArray(frame.columns)
+                val flags = IntArray(frame.columns)
+                for (row in 0 until frame.rows) {
+                    frame.copyTextLine(row, codeWords, flags = flags)
+                    val text = buildString { codeWords.forEach { append(if (it in 32..126) it.toChar() else ' ') } }.trimEnd()
+                    if (text.isNotEmpty()) appendLine("$row: $text")
+                }
             }
         }
-    }
 
     suspend fun awaitExecution(line: String) =
         withTimeout(15.seconds) {
@@ -248,10 +249,14 @@ internal class StandaloneSuggestionFixture private constructor(
                     }
                 check(profile.startupCommand == null) { "Suggestion fixture owns shell setup" }
                 val launch = if (setup != null) profile.copy(startupCommand = TerminalStartupCommand(setup)) else profile
-                val tab = owner.openTab(launch, TerminalWorkspaceOpenOptions.create {
-                    it.columns = COLUMNS
-                    it.rows = ROWS
-                })
+                val tab =
+                    owner.openTab(
+                        launch,
+                        TerminalWorkspaceOpenOptions.create {
+                            it.columns = COLUMNS
+                            it.rows = ROWS
+                        },
+                    )
                 val provider =
                     registry.createProvider(
                         profileId = profile.id,
@@ -272,18 +277,21 @@ internal class StandaloneSuggestionFixture private constructor(
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.
-                val edit = assertNotNull(tab.session.captureCommandEdit())
-                val line = edit.commandLine
-                assertEquals(
-                    TerminalInputAdmission.ACCEPTED,
-                    tab.session.submitInput(
-                        edit,
-                        listOf(
-                            TerminalTextReplacementEvent(line.commandText.length - line.cursorOffset, line.cursorOffset, "exit"),
-                            TerminalKeyEvent.key(TerminalKey.ENTER),
-                        ),
-                    ),
-                )
+                withContext(Dispatchers.Swing) { created.terminal.setShellSuggestionProvider(null) }
+                withTimeout(15.seconds) {
+                    tab.session.renderGeneration.first {
+                        // A shell redraw can temporarily invalidate the context after the scenario.
+                        val edit = tab.session.captureCommandEdit() ?: return@first false
+                        val line = edit.commandLine
+                        tab.session.submitInput(
+                            edit,
+                            listOf(
+                                TerminalTextReplacementEvent(line.commandText.length - line.cursorOffset, line.cursorOffset, "exit"),
+                                TerminalKeyEvent.key(TerminalKey.ENTER),
+                            ),
+                        ) == TerminalInputAdmission.ACCEPTED
+                    }
+                }
                 withTimeout(15.seconds) { tab.session.state.first { it is TerminalSessionState.Closed } }
             } catch (caught: Throwable) {
                 failure = caught

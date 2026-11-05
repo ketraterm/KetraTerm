@@ -90,11 +90,7 @@ public class TerminalShellCompletionChannel internal constructor(
         expected: TerminalCommandEditContext,
         frameGeneration: Long,
     ): Pending? {
-        if (epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) {
-            System.err.println("DEBUG completion busy=${pending != null} line=${expected.commandLine}")
-            return null
-        }
-        System.err.println("DEBUG completion begin ${nextRequestId + 1} line=${expected.commandLine}")
+        if (epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
         receipt = null
         return Pending(++nextRequestId, expected, requestInput, frameGeneration).also { pending = it }
     }
@@ -123,7 +119,6 @@ public class TerminalShellCompletionChannel internal constructor(
         ) {
             receipt = Receipt(expected, inputRevision, outputRevision, result)
         } else {
-            System.err.println("DEBUG completion rejected active=${current.deferred.isActive}, result=$result invalidated=${current.editInvalidated}, input=$inputRevision/${expected.inputRevision}, frame=$frameGeneration/${current.frameGeneration}, shell=$shellRevision/${expected.shellRevision}, snapshot=$snapshot/${expected.commandLine}")
             current.response = null
         }
         return current
