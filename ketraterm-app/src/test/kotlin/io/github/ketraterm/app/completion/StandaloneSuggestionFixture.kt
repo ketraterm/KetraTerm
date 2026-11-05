@@ -18,6 +18,11 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.ui.captureCleanupFailure
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.session.TerminalInputAdmission
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -196,8 +201,10 @@ internal class StandaloneSuggestionFixture private constructor(
                 }
                 image
             }
-        Files.createDirectories(output.parent)
-        ImageIO.write(image, "png", output.toFile())
+        withContext(Dispatchers.IO) {
+            Files.createDirectories(output.parent)
+            ImageIO.write(image, "png", output.toFile())
+        }
     }
 
     companion object {
@@ -241,6 +248,21 @@ internal class StandaloneSuggestionFixture private constructor(
                     created.awaitLine("")
                 }
                 created.scenario()
+                // Await the shell's exit before JUnit deletes its working directory.
+                // Closing the workspace requests termination but does not await the OS process.
+                val edit = assertNotNull(tab.session.captureCommandEdit())
+                val line = edit.commandLine
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    tab.session.submitInput(
+                        edit,
+                        listOf(
+                            TerminalTextReplacementEvent(line.commandText.length - line.cursorOffset, line.cursorOffset, "exit"),
+                            TerminalKeyEvent.key(TerminalKey.ENTER),
+                        ),
+                    ),
+                )
+                withTimeout(15.seconds) { tab.session.state.first { it is TerminalSessionState.Closed } }
             } catch (caught: Throwable) {
                 failure = caught
             } finally {

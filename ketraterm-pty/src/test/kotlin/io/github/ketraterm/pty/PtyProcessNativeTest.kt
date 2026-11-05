@@ -99,13 +99,14 @@ class PtyProcessNativeTest {
     @Test
     fun `real PTY detects a running executable and clears it after exit`() =
         runBlocking {
-            val session = startReadySession()
+            // macOS /bin/sh can exec a different shell without being a symlink.
+            val session = startReadySession(unixShell = "/bin/bash")
             val expected =
                 if (isWindows()) {
                     "powershell.exe"
                 } else {
                     Path
-                        .of("/bin/sh")
+                        .of("/bin/bash")
                         .toRealPath()
                         .fileName
                         .toString()
@@ -328,6 +329,7 @@ class PtyProcessNativeTest {
         columns: Int = 40,
         rows: Int = 5,
         readBufferSize: Int = 8192,
+        unixShell: String = "/bin/sh",
     ): TerminalSession {
         val ready = CountDownLatch(1)
         val listener =
@@ -346,7 +348,7 @@ class PtyProcessNativeTest {
                         "$prefix[Console]::Out.Write([char]7); [void][Console]::ReadLine(); ${suffix}exit $exitCode",
                     )
             } else {
-                listOf("/bin/sh", "-c", "${prefix}printf '\\007'; read -r release; ${suffix}exit $exitCode")
+                listOf(unixShell, "-c", "${prefix}printf '\\007'; read -r release; ${suffix}exit $exitCode")
             }
         val session =
             TerminalSessions.localPty(

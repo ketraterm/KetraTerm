@@ -28,6 +28,10 @@ function global:__KetraTermResetCompletionPrefix {
 }
 
 function global:__KetraTermComplete {
+    # Module discovery and registered completers may draw progress over PSReadLine.
+    # This query must not repaint the terminal: the session rejects changed frames.
+    # A local preference leaves the user's interactive preference unchanged.
+    $ProgressPreference = 'SilentlyContinue'
     $savedExitCode = $global:LASTEXITCODE
     $global:__KetraTermCompletionSequence++
     $prefix = 'KetraTermCompletion;2;Result;' + $global:__KetraTermCompletionEpoch + ';' + $global:__KetraTermCompletionSequence + ';'

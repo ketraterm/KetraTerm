@@ -932,6 +932,47 @@ class TerminalShellIntegrationBootstrapNativeTest {
             }
         }
 
+    @ParameterizedTest(name = "PowerShell completion progress [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completion progress does not invalidate its non editing reply`(executableName: String): Unit =
+        runBlocking {
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            val setup =
+                "function Get-KetraProgress { param([string] \$Value) }; " +
+                    "Register-ArgumentCompleter -CommandName Get-KetraProgress -ParameterName Value -ScriptBlock { " +
+                    "Write-Progress -Activity 'Completing' -Status 'Loading' -PercentComplete 50; " +
+                    "Write-Progress -Activity 'Completing' -Completed; " +
+                    "[Management.Automation.CompletionResult]::new('known', 'known', 'ParameterValue', 'known') }"
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile(
+                                "powershell",
+                                "PowerShell",
+                                listOf(executable!!, "-NoLogo", "-NoProfile"),
+                                startupCommand = TerminalStartupCommand(setup),
+                            ),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
+                withTimeout(15.seconds) {
+                    session.shellIntegrationState.revision.first {
+                        val state = session.shellIntegrationState
+                        val metadata = state.commandMetadata(state.latestCommandRecordId())
+                        metadata?.commandText == setup && metadata.finishedAtEpochMillis != null
+                    }
+                }
+                session.awaitLine("", "installing progress completer")
+                val line = "Get-KetraProgress -Value k"
+                session.submitInput(TerminalPasteEvent(line))
+                session.awaitLine(line, "typing progress completion")
+                val result = assertNotNull(session.requestShellCompletions(line, line.length))
+                assertTrue(result.candidates.any { it.replacementText == "known" })
+                assertEquals(line, session.activeShellCommandLine()?.commandText)
+            }
+        }
+
     @Test
     fun `PowerShell native hook uses functions aliases and registered completers from its own session`(
         @TempDir directory: Path,
@@ -1335,8 +1376,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(result.stdout.contains("space%20%25%20directory"), visibleEscapes(result.stdout))
         val directoryUri = assertNotNull(Regex("\u001b]7;([^\u0007]*)\u0007").find(result.stdout)).groupValues[1]
         assertEquals(
-            workingDirectory.toAbsolutePath().normalize(),
-            Path.of(URI("file", null, URI(directoryUri).path, null)).toAbsolutePath().normalize(),
+            workingDirectory.toRealPath(),
+            Path.of(URI("file", null, URI(directoryUri).path, null)).toRealPath(),
             "The shell directory must resolve to the native host directory",
         )
     }
@@ -1407,16 +1448,30 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
     }
 
-    @Test
-    fun `generated fish bootstrap emits prompt command and lifecycle markers when fish is installed`() {
+    @ParameterizedTest(name = "Fish prompt boundary with native markers [{0}]")
+    @ValueSource(booleans = [false, true])
+    fun `generated fish hook terminates the actual prompt without duplicating native lifecycle markers`(nativeMarkers: Boolean) {
         val fish = installedExecutable("fish", "fish.exe")
         assumeTrue(fish != null, "fish is not installed")
+        val features = "--features=${if (nativeMarkers) "mark-prompt" else "no-mark-prompt"}"
+        if (nativeMarkers) {
+            assumeTrue(
+                runProcess(listOf(fish!!, "--no-config", features, "-c", "status test-feature mark-prompt")).exitCode == 0,
+                "Fish has no native prompt markers",
+            )
+        }
 
         val profile =
             TerminalProfile(
                 id = "fish",
                 displayName = "Fish",
-                command = listOf(fish!!),
+                command =
+                    listOf(
+                        fish!!,
+                        features,
+                        "--init-command",
+                        "function fish_prompt; printf 'prompt> '; end",
+                    ),
             )
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
         val result =
@@ -1425,13 +1480,20 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     listOf(
                         "--no-config",
                         "-c",
-                        "emit fish_prompt; emit fish_preexec false; false; emit fish_postexec false; emit fish_prompt",
+                        "emit fish_prompt; fish_prompt; emit fish_preexec false; false; emit fish_postexec false; emit fish_prompt; fish_prompt",
                     ),
             )
 
         assertEquals(0, result.exitCode)
-        assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
-        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
+        if (nativeMarkers) {
+            // In this noninteractive invocation only our hook runs. A/C/D belong to Fish's reader.
+            assertMarkerOrder(result.stdout, "B", "B")
+            assertFalse(Regex("\u001b]133;[ACD]").containsMatchIn(result.stdout), visibleEscapes(result.stdout))
+        } else {
+            assertMarkerOrder(result.stdout, "A", "B", "C", "D;1", "A", "B")
+            assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
+        }
+        assertEquals(2, Regex("prompt> \u001b]133;B\u0007").findAll(result.stdout).count(), visibleEscapes(result.stdout))
     }
 
     private fun commandInventories(output: String): List<List<List<String>>> {

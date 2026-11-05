@@ -569,6 +569,10 @@ internal object TerminalShellIntegrationBootstrap {
         ${TerminalShellEnvironmentBootstrap.fish}
         if not set -q __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED
             set -g __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED 1
+            set -g __ketraterm_fish_native_markers 0
+            if status test-feature mark-prompt
+                set -g __ketraterm_fish_native_markers 1
+            end
             set -g __ketraterm_fish_command_started 0
             function __ketraterm_osc133 --argument-names marker
                 printf '\e]133;%s\a' "${'$'}marker"
@@ -586,6 +590,10 @@ internal object TerminalShellIntegrationBootstrap {
             end
             function __ketraterm_fish_prompt --on-event fish_prompt
                 set -l code ${'$'}status
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    __ketraterm_osc7
+                    return
+                end
                 if test "${'$'}__ketraterm_fish_command_started" = 1
                     __ketraterm_osc133 "D;${'$'}code"
                     set -g __ketraterm_fish_command_started 0
@@ -594,19 +602,28 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_osc133 A
             end
             function __ketraterm_fish_preexec --on-event fish_preexec
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    return
+                end
                 set -g __ketraterm_fish_command_started 1
                 __ketraterm_osc133 C
             end
             function __ketraterm_fish_postexec --on-event fish_postexec
                 set -l code ${'$'}status
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    return
+                end
                 if test "${'$'}__ketraterm_fish_command_started" = 1
                     __ketraterm_osc133 "D;${'$'}code"
                     set -g __ketraterm_fish_command_started 0
                 end
             end
-            set -l __ketraterm_prompt_end (printf '\e]133;B\a')
-            if not string match -q "*${'$'}__ketraterm_prompt_end*" -- "${'$'}SHELL_PROMPT_SUFFIX"
-                set -gx SHELL_PROMPT_SUFFIX "${'$'}SHELL_PROMPT_SUFFIX${'$'}__ketraterm_prompt_end"
+            # Native mark-prompt emits A/C/D, but not the command-line boundary B.
+            # Append B to the actual prompt; older Fish ignores SHELL_PROMPT_SUFFIX.
+            functions --copy fish_prompt __ketraterm_original_fish_prompt
+            function fish_prompt
+                __ketraterm_original_fish_prompt
+                __ketraterm_osc133 B
             end
         end
         """.trimIndent()

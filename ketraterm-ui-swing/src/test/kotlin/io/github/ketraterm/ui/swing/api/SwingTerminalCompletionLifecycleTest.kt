@@ -337,19 +337,25 @@ class SwingTerminalCompletionLifecycleTest {
             val cancelled = CompletableDeferred<Unit>()
             val status = SwingShellSuggestion("status", 4, 6, "test", "ARGUMENT")
             val provider =
-                SwingShellSuggestionProvider { request ->
-                    if (request.commandText == "git sta") {
-                        flow {
-                            entered.complete(Unit)
-                            try {
-                                awaitCancellation()
-                            } finally {
-                                cancelled.complete(Unit)
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        if (request.commandText ==
+                            "git sta"
+                        ) {
+                            flow {
+                                entered.complete(Unit)
+                                try {
+                                    awaitCancellation()
+                                } finally {
+                                    cancelled.complete(Unit)
+                                }
                             }
+                        } else {
+                            flowOf(listOf(status))
                         }
-                    } else {
-                        flowOf(listOf(status))
-                    }
+
+                    override fun open(request: SwingShellSuggestionRequest) =
+                        SwingShellSuggestionSource(suggestions(request).flowOn(StandardTestDispatcher(testScheduler)))
                 }
             try {
                 terminal.bind(fixture.session)

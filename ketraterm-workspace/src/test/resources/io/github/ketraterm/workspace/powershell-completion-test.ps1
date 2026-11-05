@@ -23,6 +23,7 @@ Set-Alias knw Get-KetraNativeWidget
 Set-Alias '0000' Get-KetraNativeWidget
 Set-Alias '00 space' Get-KetraNativeWidget
 Register-ArgumentCompleter -CommandName Get-KetraCustomCompleter -ParameterName Value -ScriptBlock {
+    if ($ProgressPreference -ne 'SilentlyContinue') { throw 'Completion must suppress progress rendering' }
     [System.Management.Automation.CompletionResult]::new("'native value'", 'native value',
         [System.Management.Automation.CompletionResultType]::ParameterValue, 'native detail')
 }
@@ -33,6 +34,7 @@ function Complete-Test([string] $Line, [int] $Cursor = -1) {
     [Console]::WriteLine()
 }
 $global:LASTEXITCODE = 77
+$global:ProgressPreference = 'Continue'
 global:__KetraTermCompletionReady
 [Console]::WriteLine()
 Complete-Test 'Get-KetraNativeWi'
@@ -68,4 +70,5 @@ Complete-Test 'cat -Enc u'
 Complete-Test 'cat -Encoding:u'
 Complete-Test 'mkdir -p:'
 [Console]::WriteLine("EXIT=$global:LASTEXITCODE")
+if ($global:ProgressPreference -ne 'Continue') { throw 'Completion changed the interactive progress preference' }
 
