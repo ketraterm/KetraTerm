@@ -1,0 +1,20 @@
+name: Set up CI JVM
+description: Shared JBR toolchain and Gradle cache configuration
+inputs:
+  cache-encryption-key:
+    description: Optional key for persisting Gradle configuration-cache entries
+    required: false
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v6
+      with:
+        distribution: jetbrains
+        java-version: '25'
+    - uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-encryption-key: ${{ inputs.cache-encryption-key }}
+        gradle-home-cache-includes: |
+          caches
+          notifications
+          jdks

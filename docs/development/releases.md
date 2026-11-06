@@ -19,10 +19,13 @@ The workflow:
 4. Commits the changelogs to `master` and creates `v{version}` on that commit
    in one atomic push. If `master` advances during verification, the push
    fails; rerun against the updated branch. Existing tags are never moved.
-5. Publishes Maven artifacts, builds application binaries, and creates the
+5. Runs the full [CI validation set](testing.md#ci) on the exact tagged revision,
+   including native/desktop suites, three-platform consumers, and IDE tests.
+   Publication waits for this verification to succeed.
+6. Publishes Maven artifacts, builds application binaries, and creates the
    GitHub release with notes from all three versioned changelog sections.
    Relative links in those notes point to the tagged source.
-6. Triggers website/documentation publication through the existing
+7. Triggers website/documentation publication through the existing
    `workflow_run` hook after successful completion, so downloads reflect the
    published assets. The release bot's push can also trigger ordinary push
    workflows before publication finishes.
