@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="README.html">Guides</a><a   href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="terminal-feature-map.html">Feature map</a><a  href="features/terminal.html">Terminal</a><a  href="features/shells.html">Shell integration</a><a  href="features/desktop.html">Swing view & hosts</a><a  href="features/completion.html">Completion</a><a  href="features/embedding.html">Embedding</a><a aria-current="page" href="terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="library/configuration.html">Configuration</a><a  href="library/compatibility.html">Compatibility</a><a  href="library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="reference/protocol.html">Protocols</a><a  href="reference/notifications.html">Notifications</a><a  href="reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Feature gaps</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#product-and-release-work">Product and release work</a><a class="depth-2" href="#transports-and-execution-environments">Transports and execution environments</a><a class="depth-2" href="#shell-integration">Shell integration</a><a class="depth-2" href="#input">Input</a><a class="depth-2" href="#rendering-and-interaction">Rendering and interaction</a><a class="depth-2" href="#optional-protocol-work">Optional protocol work</a><a class="depth-2" href="#accepted-limitations">Accepted limitations</a><a class="depth-2" href="#intentional-exclusions">Intentional exclusions</a><a class="depth-2" href="#status-labels">Status Labels</a><a class="depth-2" href="#resolved-audit-findings">Resolved audit findings</a></nav></details><div class="article-content"><div class="prose"><h1 id="feature-gaps">Feature gaps</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="terminal-feature-map.html">Feature map</a><a  href="features/terminal.html">Terminal</a><a  href="features/shells.html">Shell integration</a><a  href="features/desktop.html">Swing view & hosts</a><a  href="features/completion.html">Completion</a><a  href="features/embedding.html">Embedding</a><a aria-current="page" href="terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="library/configuration.html">Configuration</a><a  href="library/compatibility.html">Compatibility</a><a  href="library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="reference/protocol.html">Protocols</a><a  href="reference/notifications.html">Notifications</a><a  href="reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Feature gaps</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#product-and-release-work">Product and release work</a><a class="depth-2" href="#completion-and-suggestions">Completion and suggestions</a><a class="depth-2" href="#transports-and-execution-environments">Transports and execution environments</a><a class="depth-2" href="#shell-integration">Shell integration</a><a class="depth-2" href="#input">Input</a><a class="depth-2" href="#rendering-and-interaction">Rendering and interaction</a><a class="depth-2" href="#optional-protocol-work">Optional protocol work</a><a class="depth-2" href="#accepted-limitations">Accepted limitations</a><a class="depth-2" href="#intentional-exclusions">Intentional exclusions</a><a class="depth-2" href="#status-labels">Status Labels</a><a class="depth-2" href="#resolved-audit-findings">Resolved audit findings</a></nav></details><div class="article-content"><div class="prose"><h1 id="feature-gaps">Feature gaps</h1>
 <p>Open work and deliberate limitations. Implemented features belong in the
 <a href="terminal-feature-map.html">feature catalog</a>; completed fixes belong in Git history
 and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release commitments.</p>
@@ -35,10 +35,6 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 </tr>
 </thead>
 <tbody><tr>
-<td><code>TODO(host/profile)</code></td>
-<td>Restore completion settings controls and learning-reset actions in both products, with defaults, persistence, and tests updated together. The master switch remains off by default.</td>
-</tr>
-<tr>
 <td><code>TODO(host/profile)</code></td>
 <td>Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output.</td>
 </tr>
@@ -64,11 +60,35 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 </tr>
 <tr>
 <td><code>TODO(host/profile)</code></td>
-<td>Gate binary/plugin delivery on checks of the exact release revision: opt-in native PTY tests (<code>-Dterminal.pty.host=true</code>), package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. Ordinary CI runs tests and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set.</td>
+<td>Gate binary/plugin delivery on checks of the exact release revision: JVM, native PTY and desktop suites, package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. <a href="development/testing.html#ci">Standard CI</a> runs all three test suites and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set.</td>
 </tr>
 <tr>
 <td><code>TODO(policy)</code></td>
 <td>Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline.</td>
+</tr>
+</tbody></table></div>
+<h2 id="completion-and-suggestions">Completion and suggestions</h2>
+<p>Completion is implemented and enabled by default in the standalone app and
+IntelliJ plugin. PowerShell suggestions require an explicit request; other eligible
+profiles can show automatic popups. The engine and shared popup remain
+<a href="features/completion.html#stability-experimental">experimental</a>; library consumers
+can customize or replace both. See the <a href="features/completion.html">completion catalog</a>
+for supported sources, matching, learning, and UI behavior.</p>
+<p>Nested-shell integration is deliberately outside the supported scope; see
+<a href="features/shells.html#prompt-hooks-and-completion-dialects">shell support</a>. Automatic
+PowerShell requests are not part of the product behavior because native completers
+share the interactive shell&#39;s input and cannot be cancelled once running.</p>
+<p>Remaining work:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Remaining work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TODO(completion)</code></td>
+<td>Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in <a href="features/completion.html#sources-by-host">completion sources</a>.</td>
 </tr>
 </tbody></table></div>
 <h2 id="transports-and-execution-environments">Transports and execution environments</h2>
@@ -166,6 +186,8 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 </tr>
 </tbody></table></div>
 <h2 id="optional-protocol-work">Optional protocol work</h2>
+<p>The priorities on the compatibility entries below are relative to one another;
+they are not release commitments.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -174,6 +196,22 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 </tr>
 </thead>
 <tbody><tr>
+<td><code>TODO(parser)</code></td>
+<td><strong>High priority:</strong> Add the HPR (<code>CSI Ps a</code>), VPR (<code>CSI Ps e</code>), CUB (<code>CSI Ps j</code>), and CUU (<code>CSI Ps k</code>) aliases. Applications using these aliases otherwise lose cursor movement and may place output incorrectly.</td>
+</tr>
+<tr>
+<td><code>TODO(parser/core/host)</code></td>
+<td><strong>High priority:</strong> Implement REP (<code>CSI Ps b</code>) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output.</td>
+</tr>
+<tr>
+<td><code>TODO(parser/core/host)</code></td>
+<td><strong>Medium priority:</strong> Implement Kitty ED 22 (<code>CSI 22 J</code>) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen.</td>
+</tr>
+<tr>
+<td><code>TODO(parser/core/host)</code></td>
+<td><strong>Medium priority:</strong> Implement XTSAVE and XTRESTORE (<code>CSI ? Pm s</code> / <code>CSI ? Pm r</code>) for DEC modes. Applications using them cannot currently restore the mode state they saved.</td>
+</tr>
+<tr>
 <td><code>TODO(parser/core/session/render/ui/policy)</code></td>
 <td>Kitty graphics extensions beyond the <a href="features/terminal.html#host-integration-and-queries">implemented inline image subset</a>: indexed wire formats (<code>f=8/16</code>), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The <a href="development/kitty-graphics-contract.html">implementation contract</a> defines existing resource and lifecycle policies.</td>
 </tr>
@@ -283,7 +321,7 @@ Frame publication does not prove screen presentation.</li>
 <td><strong>Resolved 2026-10-30.</strong> Documented OSC 9;4 states now drive retained, permission-controlled session progress and both products, with percentage/spinning shell-icon rings and five-minute stale expiry. Products always enable progress independently of title permission; embedders can control progress separately. See the <a href="reference/protocol.html#progress-reporting">contract</a> and <a href="development/osc-progress-reporting.html">verification record</a>.</td>
 </tr>
 </tbody></table></div>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

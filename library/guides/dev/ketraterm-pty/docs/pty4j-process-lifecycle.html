@@ -101,15 +101,15 @@ not inspected. Treat this information as presentation metadata rather than a
 process-control guarantee.</p>
 <h2 id="native-validation">Native validation</h2>
 <p>Ordinary module tests use fake process streams and do not require a native shell.
-<code>PtyRealProcessTest</code> is skipped unless <code>terminal.pty.host=true</code>:</p>
-<pre><code class="language-text">./gradlew :ketraterm-pty:test --tests &quot;io.github.ketraterm.pty.PtyRealProcessTest&quot; &quot;-Dterminal.pty.host=true&quot;
+<code>PtyProcessNativeTest</code> belongs to the native suite:</p>
+<pre><code class="language-text">./gradlew :ketraterm-pty:nativeTest
 </code></pre>
 <p>The native suite requires working Pty4J support and a local shell: <code>/bin/sh</code> on
 Unix, or <code>cmd.exe</code> and <code>powershell.exe</code> on Windows. Its OSC 52 byte harness also
 requires <code>node</code> on PATH and the repository&#39;s <code>tools/osc52/osc52.mjs</code>.
 Tests use explicit output/readiness signals and deadlines; skipped native tests
 do not establish platform support for the current environment.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -44,7 +44,7 @@ threading, failure behavior, and compatibility impact. Avoid unrelated refactors
 ./gradlew runIde
 ./gradlew test
 </code></pre>
-<p>Its <a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-intellij-plugin/README.md">README</a> describes IDE requirements and
+<p>Its <a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-intellij-plugin/README.md">README</a> describes IDE requirements and
 library integration. Root build commands do not run the plugin&#39;s checks.</p>
 <h3 id="code-formatting">Code Formatting</h3>
 <p>Run <code>./gradlew spotlessApply</code> in the owning build before submitting Kotlin or
@@ -56,12 +56,16 @@ changed:</p>
 ./gradlew :ketraterm-session:test
 ./gradlew :ketraterm-ui-swing:test
 ./gradlew test
+./gradlew nativeTest
+./gradlew desktopTest
 ./gradlew publicationChecks
 </code></pre>
 <p>Use exact byte-stream tests for parser-to-core behavior and explicit handshakes
 or controlled schedulers for concurrent behavior. Cover relevant malformed input,
 bounds, recovery, and chunking. Native PTY and external-oracle tests have separate
-requirements documented by their modules.</p>
+requirements documented by their modules. The <a href="docs/development/testing.html">test organization guide</a>
+defines JVM, native-process, and desktop suites, tags, naming, fixtures, and CI.
+<code>test</code> is headless; run <code>desktopTest</code> on an interactive or virtual display.</p>
 <p>Public API changes need KDoc, an intentionally reviewed ABI baseline, and Java/Kotlin
 consumer verification. <code>publicationChecks</code> runs the release verification against
 a build-local Maven repository without publishing remotely. Update the canonical
@@ -70,7 +74,7 @@ feature and gap maps when supported behavior or scope changes.</p>
 <p>Use a short imperative subject that identifies the change. Explain its reason
 and relevant tradeoffs in the body, and reference an issue when one exists.
 Describe the final implementation rather than the sequence of experiments.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/CONTRIBUTING.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/CONTRIBUTING.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

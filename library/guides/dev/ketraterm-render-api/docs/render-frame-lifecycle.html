@@ -56,6 +56,11 @@ consumer should finish its current read before requesting another viewport.</p>
 Its default implementation adapts the immutable <code>cursor</code> value; providers can
 override it to avoid creating a cursor object. Blink mode is terminal state;
 current blink phase and timing belong to the UI.</p>
+<p><code>cursorPendingWrap</code> distinguishes a cursor waiting to wrap after the last occupied
+cell from a cursor positioned on that cell. Its visible coordinates stay unchanged;
+text extraction uses the following column as its exclusive boundary. Providers
+without this information inherit <code>false</code>. <code>TerminalRenderCache</code> preserves the flag
+and includes it in cursor-change detection.</p>
 <p><a id="2-monotonic-generation-counters"></a></p>
 <h2 id="2-generation-counters">2. Generation counters</h2>
 <p>Compare generations for equality or inequality, never for ordering: counters can
@@ -166,7 +171,7 @@ provider must override it to resolve the range and expose the frame atomically.
 <code>TerminalSession</code> provides that serialization for its readers. For bounded copied
 range data, see
 <a href="../../ketraterm-render-cache/README.html"><code>TerminalRenderRangeCopy</code></a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

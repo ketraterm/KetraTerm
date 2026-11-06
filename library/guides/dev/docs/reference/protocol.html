@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#progress-reporting">Progress reporting</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#progress-reporting">Progress reporting</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#private-powershell-completion-metadata">Private PowerShell completion metadata</a><a class="depth-2" href="#private-bash-command-inventory">Private Bash command inventory</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -237,6 +237,9 @@ the APC header, separator and terminator.</p>
 Standalone parsers without that integration retain the ordinary collection limit.
 Permissions and decoded-size limits are checked again before execution.</p>
 <h2 id="query-allowlists">Query allowlists</h2>
+<p>The optional PowerShell completion exchange below is host-initiated semantic
+input. Receiving its OSC metadata never sends a terminal reply, executes command
+text, or requests completion by itself; it adds no terminal-response allowlist entry.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -492,9 +495,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -615,6 +618,166 @@ This advertises grapheme processing, not complete conformance to the original
 <a href="https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex">Unicode Core draft</a>:
 KetraTerm retains its documented <a href="../../ketraterm-core/docs/terminal-core-contract.html#unicode-scalar-and-width-policy">VS15/VS16 width policy</a>
 and <a href="#streaming-grapheme-placement">streaming placement</a>.</p>
+<h2 id="private-powershell-completion-metadata">Private PowerShell completion metadata</h2>
+<p>The same optional producer also accepts the bounded Bash command inventory
+<a href="#private-bash-command-inventory">described below</a>.</p>
+<p>The optional OSC shell producer accepts <code>OSC 633;KetraTermCompletion;2;... BEL</code>
+(ST is also accepted) from the workspace&#39;s PSReadLine hook. All envelope fields
+are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+The session&#39;s default parser forwards unknown OSC bodies synchronously to the
+selected producer. Custom parser factories must forward <code>observeCustomOsc</code> and
+use <code>customOscPayloadLimitBytes</code> themselves.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Message body after <code>KetraTermCompletion;2;</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Ready;epoch</code></td>
+<td>New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero.</td>
+</tr>
+<tr>
+<td><code>Ready;epoch;PrefixReset</code></td>
+<td>Also advertises the installed <code>F12,r</code> prefix-reset binding. Plain <code>Ready</code> does not advertise this capability.</td>
+</tr>
+<tr>
+<td><code>Result;epoch;id;Failed</code></td>
+<td>Correlated failure.</td>
+</tr>
+<tr>
+<td><code>Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...</code></td>
+<td>Exact live buffer and UTF-16 replacement range, with Base64 <code>line</code> and <code>externalCommandName</code>. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip.</td>
+</tr>
+</tbody></table></div>
+<p>The host admits at most one request per session, sending the semantic <code>F12,e</code>
+chord through ordinary ordered input. Host and hook increment their counters for
+each request. Replies must match the current prompt epoch and pending positive
+request ID. They must also match the captured command and cursor; wrong epochs
+or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
+metadata has no editing authority.</p>
+<p><code>PrefixReset</code> lets acceptance clear the text before the real cursor through
+<code>PSConsoleReadLine.Replace(0, cursor, &quot;&quot;)</code>, then paste the edited prefix in the same
+ordered input operation. Text after the cursor is preserved. This avoids relying
+on version-dependent Delete/Backspace behavior. The binding does not execute the
+command and preserves <code>LASTEXITCODE</code>. Its capability is cleared at each OSC 133
+prompt start and must be announced again for that prompt.</p>
+<p>Complete custom OSC collection is capped at 256 KiB with this producer installed;
+built-in command limits remain unchanged. Replies contain at most 128 candidates,
+a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
+tooltip per candidate. Ranges must contain the cursor and stay within the buffer
+on scalar boundaries. Command, application-name, and replacement controls are rejected. Application names are limited to 512 UTF-16 units. The hook
+bounds its serialized body below the collection limit and preserves <code>LASTEXITCODE</code>.</p>
+<p>Empty command buffers use bounded <code>Get-Command</code> discovery. The hook uses PowerShell&#39;s
+parser to quote command names that require explicit invocation. For simple executable
+names it removes an extension only after resolving the long and short invocation
+to the same application/script path and type. Shadowing functions and aliases do
+not authorize that normalization. The command authority and catalog enrichment
+policy belongs to the <a href="../../ketraterm-completion/docs/completion-architecture.html#internal-implementation">completion engine</a>.</p>
+<p>Waiting expires after ten seconds, allowing cold PowerShell module discovery.
+Callers can cancel earlier. Cancelled/timed-out requests retain the wire
+slot until their reply or a new prompt, so a late result cannot satisfy a newer
+request. A replacement request can wait for that slot within its own ten-second
+deadline, then revalidate the current command buffer before sending its query.
+Native completers run in the shell and may continue after host cancellation.
+Session closure releases retained state. See <a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional editing</a>
+for the validation required before suggestion acceptance.</p>
+<h2 id="private-bash-command-inventory">Private Bash command inventory</h2>
+<p>Bash and zsh share a versioned snapshot protocol. Each message uses
+<code>OSC 633;KetraTermCommands;3;... BEL</code> for PATH executables and
+<code>OSC 633;KetraTermShellCommands;3;... BEL</code> for shell-local commands (or ST).
+Each source has independent epochs, scan order, deadlines, and atomic snapshots:</p>
+<p>Workspace PATH workers write their <code>Begin</code>/<code>Chunk</code>/<code>End</code> or <code>Fail</code> envelopes to
+<code>path.pending</code> in a private session directory, then rename it to <code>path.ready</code>.
+They never write to the PTY: concurrent terminal writes can split and interleave
+OSC envelopes with Readline/ZLE redraws or prompt markers. <code>Ready</code> and shell-local
+metadata remain foreground output. The host supplies the mailbox through
+<code>KetraTerm_COMMAND_INVENTORY_DIRECTORY</code> (WSL receives a translated guest path).
+The optional <code>ShellCommandInventoryInput</code> accepts only complete BEL-terminated
+PATH envelopes, at most 8 MiB encoded and 258 frames, and checks the live epoch
+before passing records to the same inventory decoder. It cannot inject terminal
+text, prompt markers, native completion replies, or environment announcements.
+File arrival may precede <code>Ready</code>; the host retains one bounded pending file and
+retries, replacing it when a newer file arrives. Terminal bytes are never injected
+or replayed to deliver file metadata. Session closure detaches the input.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Suffix</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Ready;epoch</code></td>
+<td>Announce the current shell environment.</td>
+</tr>
+<tr>
+<td><code>Begin;epoch;scan</code></td>
+<td>Start a complete replacement snapshot.</td>
+</tr>
+<tr>
+<td><code>Chunk;epoch;scan;sequence;data</code></td>
+<td>Append complete records; sequences start at zero.</td>
+</tr>
+<tr>
+<td><code>End;epoch;scan;chunks;entries;bytes</code></td>
+<td>Verify exact totals and atomically publish.</td>
+</tr>
+<tr>
+<td><code>Fail;epoch;scan;reason</code></td>
+<td>Abandon the scan (<code>Overflow</code> or <code>Unavailable</code> from workspace hooks).</td>
+</tr>
+</tbody></table></div>
+<p>Epochs have 32 lowercase hexadecimal characters; scan IDs are positive increasing
+integers within an epoch. A changed Ready epoch clears that source&#39;s old command authority and
+publishes <code>PENDING</code>. Same-environment refresh keeps the last complete snapshot,
+including when refresh fails. Without a complete snapshot, failure publishes
+<code>UNAVAILABLE</code>; it does not enable unverified catalog fallback. Other ready sources
+remain usable. Shell-local names override matching PATH entries. The merged
+snapshot enforces the same entry/text limits; combined overflow publishes
+unavailable rather than truncating. READY can contain one ready source while
+another is pending. Retained source snapshots share candidate strings with the
+merged index; at most two bounded source assemblies can exist. Null session inventory
+means no installed producer. Superseded epoch/scan messages cannot publish results.</p>
+<p><code>data</code> is standard Base64 of UTF-8 NUL-terminated quadruples: display name,
+shell-escaped insertion, kind (<code>C</code> command or <code>A</code> alias), and literal alias definition.
+An empty insertion reuses the name. Command definitions must be empty; empty alias
+definitions also represent definitions exceeding the producer&#39;s 4096-byte bound.
+Definitions are never executed. Zero chunks/entries/bytes at End publishes a complete
+empty inventory. Duplicate names, controls in names/insertions, invalid UTF-8,
+unknown kinds, incomplete records, missing/repeated/out-of-order chunks, and
+incorrect totals reject the entire scan.</p>
+<p>Decoded chunks are at most 48 KiB, with at most 256 chunks, 4 MiB decoded bytes,
+32,768 entries, and 2,097,152 retained UTF-16 text units per snapshot. Names allow
+512 units and insertions/definitions 4096 each. Identical name/insertion strings
+share storage. Workspace hooks enforce conservative UTF-8 byte budgets for text.
+The existing 256 KiB custom OSC bound still applies independently. Overflow emits
+Fail, never a successful truncated End. Assemblies expire after 60 seconds when
+protocol/output activity next checks the deadline; idle partial buffers remain
+bounded and are released at session closure. Completed snapshots expose an immutable
+sorted list, binary prefix lookup, and a cached alias map.</p>
+<p>The workspace PATH collector streams immediate directory entries under separate
+scan budgets: 4,096 PATH components, 131,072 entries, and 16 MiB of entry bytes
+(including <code>./</code> and NUL delimiters). Components count even when empty, repeated,
+or inaccessible; entries count before duplicate, executable, or directory filtering.
+Emitted names remain limited to 32,768 unique executables and 2 MiB including
+NUL terminators. Exceeding any budget emits <code>Overflow</code>. The collector requires a
+compatible <code>find</code> from PATH or the shell&#39;s standard utility path. Missing tools
+and incomplete enumeration emit <code>Unavailable</code>. These budgets bound the collector&#39;s
+own storage and work, not the external utility&#39;s memory or filesystem call duration.</p>
+<p>Workspace hooks check shell-local state and PATH independently at each prompt,
+with at most one background PATH worker. Bounded shell-local state publishes
+at the prompt, independently of PATH I/O. Unchanged PATH discovery is eligible 60 seconds after a prompt observes its
+worker completing. Shell-local changes reuse executable authority; only PATH
+changes, or directory changes with relative/empty PATH entries, invalidate it.
+PATH changes during an active worker require a subsequent prompt after it finishes.
+This is one-way shell
+metadata, not a terminal query: it emits no host reply, installs no key binding,
+and grants no editing authority. Consumers retain ordinary conditional-edit checks.
+It supplies command availability and alias definitions for semantic argument analysis;
+it does not advertise native argument or remote filesystem completion.
+See <a href="../features/completion.html#sources-by-host">completion scope</a>.</p>
 <h2 id="streaming-grapheme-placement">Streaming grapheme placement</h2>
 <p>Printable prefixes are published at each parser call boundary. Segmentation
 continues across calls; retained continuations update the same cell with its
@@ -628,7 +791,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

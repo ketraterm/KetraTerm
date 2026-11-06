@@ -194,7 +194,10 @@ in a command-finished listener before later bounded eviction. Custom shell views
 may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 <code>captureCommandEdit()</code> and submit with <code>submitInput(expected, events)</code> so stale
-edits are rejected. See <a href="docs/session-concurrency-locks.html#conditional-command-edits">conditional edits</a>
+edits are rejected. If the editor provides an exact operation for clearing text
+before the cursor, pass its key sequence as <code>prefixResetKeys</code> to the host factory.
+The captured context retains that capability alongside the command text. See
+<a href="docs/session-concurrency-locks.html#conditional-command-edits">conditional edits</a>
 and the <a href="docs/session-concurrency-locks.html#selected-shell-integration">producer contract</a>.</p>
 <h2 id="ketraterms-optional-producer">KetraTerm&#39;s optional producer</h2>
 <p>Add <a href="../ketraterm-shell-integration/README.html"><code>ketraterm-shell-integration</code></a> and
@@ -220,7 +223,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

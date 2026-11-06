@@ -40,7 +40,6 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
 import javax.swing.SwingUtilities
 
@@ -48,9 +47,7 @@ fun createTerminalView(session: TerminalSession): SwingTerminal {
     return createUnboundTerminalView().apply { bind(session) }
 }
 
-fun createUnboundTerminalView(
-    provider: SwingShellSuggestionProvider? = null,
-): SwingTerminal {
+fun createUnboundTerminalView(): SwingTerminal {
     check(SwingUtilities.isEventDispatchThread()) { &quot;Create terminal views on the EDT&quot; }
 
     val settings = SwingSettings.create {
@@ -76,9 +73,7 @@ fun createUnboundTerminalView(
         it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
     }
 
-    return SwingTerminal(settingsProvider = { settings }).apply {
-        setShellSuggestionProvider(provider)
-    }
+    return SwingTerminal(settingsProvider = { settings })
 }
 </code></pre>
 <p>The font name is a host choice; use a font available in your environment.
@@ -191,7 +186,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -212,24 +207,88 @@ including padding, bidi placement, and scrolling.</p>
 become steady outlines; bars and underlines remain steady. Application-hidden
 cursors stay hidden.</p>
 <h3 id="suggestion-request-ownership">Suggestion request ownership</h3>
+<p><strong>Experimental.</strong> Suggestions may be incomplete, rank poorly, or behave unexpectedly
+in edge cases. Suggestion providers, editing targets, interactions,
+and custom views follow the <a href="../docs/features/completion.html#stability-experimental">completion stability policy</a>.</p>
+<p>Opt in to <code>ExperimentalShellSuggestionsApi</code> where you configure or use suggestions.
+Creating, configuring, and binding the terminal without suggestions needs no opt-in.
+See the <a href="../ketraterm-ui-swing-host/README.html#completion-bridge">completion adapter example</a>
+for suggestion-specific setup.</p>
 <p>Call <code>setShellSuggestionProvider(provider)</code> on the EDT before or after binding.
 The provider survives rebinding; replacing it cancels current requests without
 closing the provider. Passing <code>null</code> disables configured provider requests.
 The host retains ownership of engines, sources, persistence, and their resources.</p>
 <p>The terminal coordinates automatic focus, eligibility, debounce, and session
 observation. <code>smartSuggestionsEnabled</code> gates all suggestions;
-<code>shellSuggestionsEnabled</code> gates automatic popups. An explicit
+<code>shellSuggestionsEnabled</code> gates automatic popups. Set <code>shellSuggestionAutomaticMode</code>
+to <code>SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY</code> to show automatic popups
+for subcommands, options, and arguments; the default is <code>ALWAYS</code>. An explicit
 <code>requestActiveShellSuggestions()</code> uses the bound session&#39;s command source and
-remains available when automatic popups are disabled. Use
-<code>refreshShellSuggestions()</code> to reconcile changes to external ranking context.</p>
+remains available when automatic popups are disabled or limited to parameters.
+Automatic refreshes cannot replace an active explicit request.
+Automatic requests require an unambiguous command snapshot and do not perform
+native shell confirmation of screen-derived prefixes. Explicit requests may
+confirm such a prefix through the session. Hosts using a provider that invokes
+the live shell should disable automatic popups for that provider, as the products
+do for PowerShell.
+Custom providers must honor <code>SwingShellSuggestionRequest.includeCommandNames</code>
+using their shell-aware command context; the terminal sets it to <code>false</code> for
+parameter-only automatic requests. The shared completion adapter forwards it
+to the engine. Use
+<code>refreshShellSuggestions()</code> on the EDT when external context such as the working
+directory changes. It immediately cancels pending work and closes existing
+suggestions, including explicit requests. Automatic suggestions then refresh
+after the normal debounce; with automatic popups disabled, request them explicitly again.</p>
+<p>The embedded automatic popup updates in place as you type. Previous rows remain
+visible while results refresh, but cannot be accepted until fresh results arrive.</p>
+<p>Use <code>SwingSettings.shellSuggestionStyle</code> to customize the built-in popup:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun suggestionSettings() = SwingSettings.create {
+    it.shellSuggestionStyle = SwingShellSuggestionStyle(
+        background = 0xFF202124.toInt(),
+        foreground = 0xFFE8EAED.toInt(),
+        selectionBackground = 0xFF334455.toInt(),
+        selectionForeground = 0xFFFFFFFF.toInt(),
+        matchForeground = 0xFF82AFFC.toInt(),
+        selectionMatchForeground = 0xFFBBDDFF.toInt(),
+    )
+}
+</code></pre>
+<p>The style also exposes match backgrounds, border, overflow text, and normal/selected
+argument-hint colors (<code>argumentHintForeground</code> and <code>selectionArgumentHintForeground</code>). Every
+role has a concrete default in the built-in dark palette. Colors are packed ARGB;
+text and fills must be opaque, while a transparent border removes the outline.
+Colors are rendered exactly, with no theme lookup or automatic contrast changes.
+The built-in popup uses <code>SwingSettings.font</code>; icons, spacing, and size bounds scale
+with that font.
+Call <code>reloadSettings()</code> after changing settings; the popup updates without
+replacing its suggestions or selection.
+Custom views retain control of their own styling. Providers supply label-relative
+<code>matchedRanges</code>, including disjoint fuzzy matches; the default view colors those
+fragments without repeating the match. Providers can supply display-only <code>argumentHint</code>
+text beside the label; hints never become part of the accepted command.</p>
+<p>Nested <code>PATH</code> rows show the name first and parent context in <code>secondaryForeground</code>
+(<code>selectionForeground</code> on selection). Long paths shorten to the available width;
+hover and accessibility retain the full path, and acceptance inserts the original
+replacement. Visible match fragments keep their supplied highlights.
+Custom providers set <code>backslashPathSeparator = false</code> when <code>PATH</code> labels contain
+literal POSIX backslashes. The standard completion adapter supplies this policy.</p>
+<p>During ordinary typing, old rows remain briefly to avoid flicker. A slow refresh
+clears them after 200 ms while collection continues; stale rows cannot be accepted.</p>
 <p>For command text outside the session, call <code>requestShellSuggestions</code> with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 <code>AUTOMATIC</code>; pass <code>EXPLICIT</code> for an explicit command. The host must replace or hide
 the request when that external context changes. Supply an explicit <code>editTarget</code>
 for a custom editor. Normal terminal completion captures editing authority from
 the bound session, which requires a synchronized revisioned command source such
-as <code>TerminalShellCommandLineState</code> or the optional OSC producer. A read-only
-StateFlow model alone cannot admit conditional edits. See the
+as <code>TerminalShellCommandLineState</code> or the optional OSC producer. The default target
+uses the producer&#39;s prefix-reset capability when available; custom editors keep
+their own acceptance contract. A read-only StateFlow model alone cannot admit
+conditional edits. See the
 <a href="../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional edit contract</a>.</p>
 <p>Provider <code>open</code> runs on the EDT before background collection; keep it cheap.
 Each interaction captures its source and feedback handler and accepts one provider
@@ -342,7 +401,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

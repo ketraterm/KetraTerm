@@ -162,12 +162,24 @@ callback, append product-specific items, and show the menu from the host callbac
 on the EDT. See <a href="../ketraterm-ui-swing/README.html#how-to-extend-custom-host-services">Swing host services</a>
 for callback configuration.</p>
 <h2 id="completion-bridge">Completion bridge</h2>
+<p><strong>Experimental.</strong> Completion adapters and suggestion extension points follow
+the <a href="../docs/features/completion.html#stability-experimental">completion stability policy</a>.</p>
+<p>To use the running PowerShell session as the command authority, set
+<code>shellProvider = SessionShellCompletionProvider(session)</code> in
+<code>TerminalCompletionEngines.fromSources</code> and supply
+<code>TerminalShellCapabilities.POWERSHELL</code> in its requests. The adapter lives in
+<code>io.github.ketraterm.ui.swing.host</code>; the engine contract lives in
+<code>io.github.ketraterm.completion.api</code>. The provider borrows its session and owns no jobs.
+It preserves shell quoting, replacement ranges, and presentation metadata, and
+participates in normal caller cancellation. See the <a href="../docs/features/completion.html#sources-by-host">availability and bounds</a>.</p>
 <p><code>SwingCompletionSuggestionProvider</code> adapts a
 <a href="../ketraterm-completion/README.html"><code>TerminalCompletionEngine</code></a> to the terminal&#39;s
 suggestion contract. It preserves replacement ranges, source identity,
 presentation fields, matched ranges, and opaque feedback tokens. The host selects
 the engine and sources and supplies current profile, directory, and shell metadata.</p>
-<pre><code class="language-kotlin">import io.github.ketraterm.completion.api.TerminalCompletionEngine
+<pre><code class="language-kotlin">@file:OptIn(io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi::class, io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class)
+
+import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
@@ -194,6 +206,9 @@ fun installCompletion(
 </code></pre>
 <p>The terminal opens the provider on the EDT, capturing one immutable context and
 feedback handler before background collection. Keep <code>contextProvider</code> cheap.
+When that context changes, call <code>terminal.refreshShellSuggestions()</code> on the EDT
+to invalidate work and results captured for the previous context. Updating the
+context supplier alone does not invalidate an already opened request.
 Direct calls to <code>suggestions(request)</code> capture context in the caller&#39;s thread;
 the returned flow is cold and runs engine work only when collected. This adapter
 does not choose a dispatcher, launch jobs, or close the engine. Collection
@@ -233,7 +248,7 @@ clipboard services and choose write-consent policy.</p>
 to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
 resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
 bundled English catalog. The selected locale is captured; static component
-labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
 defines keys and arguments. Message arguments are plain text, not markup.</p>
 <p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
 hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
@@ -252,7 +267,7 @@ work is present. The clock stops while the container is hidden; close it on the
 EDT at owner disposal to detach its listener. Hosts may omit animation, freeze
 phase for reduced motion, or provide their own timing and session observation.
 See the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

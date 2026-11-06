@@ -108,6 +108,10 @@ per event. An entire text replacement uses that same snapshot for Delete,
 Backspace, and paste phases. Custom state implementations must return one
 coherent mode word. Interpret it with <code>TerminalInputState</code> helpers, not raw bit
 positions.</p>
+<p>A nonempty text replacement in bracketed-paste mode ends with an empty bracketed
+paste. This collapses Readline&#39;s active paste region at the insertion cursor
+without changing text or adding an undo step. Ordinary clipboard paste retains
+its normal highlighting. Deletion-only replacements emit no paste frames.</p>
 <p>This word includes cursor/keypad modes, newline mode, DECBKM, bracketed paste,
 focus reporting, mouse tracking/encoding, xterm key resources, and Kitty flags.
 A coherent mode read does not synchronize grid reads or terminal mutation.</p>
@@ -389,7 +393,7 @@ discard. Close clears retained payload storage; subsequent writes throw
 <code>IllegalStateException</code>. Closing must not race a writer. This cleanup cannot
 erase JVM strings or platform clipboard data. Session owns authorization,
 deadlines, and transport commitment; input does not read the clipboard.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

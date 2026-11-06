@@ -54,6 +54,11 @@ Standalone and IntelliJ products configure these helpers independently.</p>
 <td>Completion evaluates candidates; Swing coordinates request lifetime and editing admission.</td>
 </tr>
 <tr>
+<td>Native shell completion</td>
+<td><code>SessionShellCompletionProvider</code></td>
+<td>Session owns correlation and lifetime; the shell supplies command authority and escaped argument edits. Products choose whether to install the provider.</td>
+</tr>
+<tr>
 <td>Clipboard consent</td>
 <td>Pane prompt, window reader, dialog and message helpers</td>
 <td>Session controls permission, deadlines, and terminal replies; hosts provide clipboard access and presentation.</td>
@@ -73,7 +78,7 @@ close the terminal, session, or completion engine.</p>
 <p>Tests cover search state and palette changes, overlay geometry, shortcut
 validation, completion context/feedback preservation, localization, clipboard
 admission, prompt cancellation, and session read/write ordering. See the <a href="../ARCHITECTURE.html">repository architecture</a> for cross-module relationships.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing-host/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-ui-swing-host/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

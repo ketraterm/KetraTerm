@@ -54,6 +54,12 @@ the hooks and decides whether they are expected from startup. The standard
 <a href="../ketraterm-workspace/README.html"><code>TerminalWorkspace</code></a> performs that launch
 adaptation for supported profiles. Direct PTY users pass the chosen factory
 through <code>PtyOptions.shellIntegration</code>.</p>
+<p>For independently transported PATH inventories, create one
+<code>ShellCommandInventoryInput</code> per session and pass it as <code>commandInventoryInput</code>
+to <code>OscShellIntegration.configured</code>. Deliver complete bounded snapshots through
+<code>accept(bytes)</code>; <code>false</code> means their live-shell epoch is not current yet. The host
+owns transport, retry, and cleanup. Workspace manages the private file mailbox
+automatically. Background workers must not write metadata to the live PTY.</p>
 <p><code>OscShellIntegration</code> and <code>configured(false)</code> still accept later reports, such as
 hooks installed manually or by a nested shell. <code>configured(true)</code> sets the
 immutable launch expectation exposed by <code>session.promptMarkersExpected</code>; it
@@ -78,13 +84,25 @@ bounds retained prompt planes to 8 MiB, retiring the oldest prompt copies first
 without removing their command metadata; a missing capture stays unavailable.
 The view chooses fonts and presentation, while the producer retains only terminal
 render data. Custom producers can pass the same snapshot to <code>recordCommandStart</code>.</p>
-<p><code>session.activeShellCommandLine()</code> returns an immutable snapshot only when the
-prompt context is available and the cursor is at the visible command end. Use
+<p><code>session.activeShellCommandLine()</code> returns an immutable snapshot when the prompt
+context is available and the cursor is at the visible command end. With the native
+PowerShell bridge, a visible suffix instead produces a provisional prefix marked
+<code>requiresShellConfirmation</code>; follow the session&#39;s
+<a href="../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional-edit contract</a>
+before using it for suggestions. Use
 <code>session.activeShellCommandLineRevision</code> to observe edits; session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session&#39;s conditional-edit APIs when admitting asynchronous suggestions.</p>
 <h2 id="readiness-and-trust">Readiness and trust</h2>
+<p>With workspace PowerShell hooks and PSReadLine, this producer also decodes
+<a href="../docs/reference/protocol.html#private-powershell-completion-metadata">native completion metadata</a>.
+Call <code>session.requestShellCompletions(commandLine, cursorOffset)</code> from a caller-owned
+coroutine, or install <code>SessionShellCompletionProvider</code> from <code>ketraterm-ui-swing-host</code>
+in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
+return null; caller cancellation propagates. The native handler reads the current
+buffer and does not submit the command. Custom parser factories must explicitly
+forward the selected producer&#39;s custom OSC callback and collection limit.</p>
 <p>A prompt becomes ready after an ordered <code>A</code>/<code>B</code> pair in the primary screen.
 Command markers, alternate-screen output, and a local primary-buffer clear
 invalidate that readiness. Session decides when to submit an explicitly configured
@@ -104,7 +122,7 @@ defines notification, frame borrowing, and observation lifetime.</p>
 <p>Hosts using their own shell integration depend on <code>ketraterm-session</code> and supply
 <code>TerminalShellIntegrationFactory.host</code>. That selected model remains authoritative;
 OSC metadata does not supplement it. Such hosts do not need this module.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

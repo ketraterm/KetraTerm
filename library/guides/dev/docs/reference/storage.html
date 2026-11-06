@@ -57,20 +57,21 @@ application/project settings. Library embedders choose their own persistence.</p
 <p>Raw terminal output is not saved automatically. Explicit output export is a
 separate user action.</p>
 <h2 id="completion-learning">Completion learning</h2>
-<p>Persistence is opt-in and requires completion to be enabled. Standalone uses
-<code>suggestion_learning_persistence_enabled</code> under <code>[behavior]</code>. Product settings
-controls are currently hidden; see <a href="../features/completion.html#availability">completion availability</a>.</p>
-<p>A product starting with persistence disabled neither loads nor writes the
-learning file. Enabling hydrates the fixed file once. Disabling prevents new
-writes but does not clear in-memory learning or cancel a file operation already
-in progress. An unreadable/rejected file blocks ordinary writes until an explicit
-learning reset or a new coordinator lifecycle.</p>
-<p>Dirty state is checkpointed every 30 seconds and on shutdown. Products allow up
-to 500 ms for final persistence, so shutdown is not an unconditional durability
-guarantee. Files are bounded; replacement is atomic where the filesystem supports
-it, with ordinary replacement as a fallback. The
-<a href="../../ketraterm-completion-persistence/README.html">persistence module</a> defines worker,
-failure, and lifecycle contracts.</p>
+<p>Saved learning is <strong>opt-in</strong> and requires completion to be enabled. Both products
+provide a persistence setting; standalone also supports
+<code>suggestion_learning_persistence_enabled</code> under <code>[behavior]</code>.</p>
+<p>With persistence disabled, startup does not load the saved file and new activity
+is kept in memory. Turning persistence off leaves previously saved data in place.
+Unreadable or unsupported saved data is preserved rather than silently overwritten.</p>
+<p>Use <strong>Reset learned suggestions...</strong> in settings to clear learned commands and
+ranking preferences from memory and disk, even when suggestions or persistence
+are disabled. The action asks for confirmation and reports success after saved
+data is cleared. Errors allow retry, and closing settings does not cancel the
+reset. The file keeps an empty format header. Shell history and terminal output
+are unaffected; later activity can be learned according to the current settings.</p>
+<p>Learning is saved periodically and at shutdown. Products allow up to 500 ms for
+the final write, so the latest activity may be lost if saving cannot finish.
+Integrators should follow the <a href="../../ketraterm-completion-persistence/README.html#lifecycle-and-failures">persistence lifecycle contract</a>.</p>
 <h2 id="file-format">File format</h2>
 <p>Version 3 starts with <code>KetraTerm_COMMAND_COMPLETION_LEARNING&lt;TAB&gt;3</code>.
 Ranking rows precede replay rows:</p>
@@ -102,7 +103,7 @@ still contribute opaque ranking evidence; malformed UTF-16 is not learned.</p>
 deterministic digests can be guessed from candidate commands. Filtering is
 best-effort and cannot identify every secret. Treat the learning file as
 sensitive local command-derived data.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/docs/reference/storage.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/docs/reference/storage.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

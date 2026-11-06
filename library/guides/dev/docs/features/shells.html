@@ -28,6 +28,9 @@ hooks. Library users choose their own process, transport, and shell integration.
 <h2 id="automatic-discovery">Automatic discovery</h2>
 <p>Profiles are offered in the order below. A configured shell or explicit launch
 command can override the default.</p>
+<p>On Windows, both products default to Windows PowerShell 5.1 (<code>powershell.exe</code>).
+Installing PowerShell 7 adds a separate <strong>PowerShell</strong> profile; to use it for
+default tabs, select its executable (<code>pwsh.exe</code>) in the shell settings.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -82,6 +85,11 @@ start), and <code>D</code> (command finish, with optional exit status).
 They are installed for supported interactive launches when shell integration is
 enabled. Explicit script/command execution and incompatible startup flags can
 prevent installation.</p>
+<p>Automatic integration targets the shell launched by the terminal profile.
+Starting another shell, <code>ssh</code>, or a multiplexer inside that shell does not carry
+a supported prompt-tracking or suggestion context into the child environment.
+Ordinary terminal input/output and the child&#39;s own completion remain available;
+nested-shell integration is outside the supported scope.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -151,6 +159,34 @@ They require shell integration and are unavailable for WSL launchers.</p>
 <p>PowerShell command-start/finish tracking requires a <code>PSConsoleHostReadLine</code>
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell directory reports cover filesystem locations only.</p>
+<p>When PSReadLine is loaded, the PowerShell bootstrap also installs the private
+<code>F12,e</code> chord for <a href="completion.html#sources-by-host">native suggestions</a>. The handler
+reads the live editing buffer and calls <code>TabExpansion2</code> without submitting or
+replacing the command. Each prompt announces a fresh completion epoch.</p>
+<p>Direct interactive Bash launches load the user&#39;s startup files before installing
+prompt hooks, preserving existing <code>PROMPT_COMMAND</code> callbacks and the visible prompt.
+An explicit <code>--norc</code> launch keeps startup files disabled and receives only the
+environment hook. Explicit WSL Bash launches also use the environment hook, which
+can be replaced by guest startup files.</p>
+<p>Bash 5.3+ with <code>base64</code> checks background command discovery at each terminal prompt for
+<a href="completion.html#sources-by-host">command suggestions</a>, including explicit Bash
+launches inside WSL. It installs no completion key binding and does not invoke
+programmable argument completers. Prompt-time discovery includes session aliases
+and functions as well as builtins and executable commands from the shell&#39;s <code>PATH</code>.
+Git Bash and Cygwin publish native Windows directory URIs so local path and Git
+completion resolve the same directory as the shell.
+Literal alias definitions feed shared argument analysis while accepted edits preserve
+the user&#39;s alias; see the <a href="completion.html#sources-by-host">supported alias subset</a>.</p>
+<p>zsh uses the same inventory protocol, command authority, and alias analysis.
+With <code>zsh/parameter</code> and <code>base64</code> available, it discovers enabled ordinary aliases,
+functions (including autoloads), and builtins at terminal prompts. Executable
+discovery runs independently in the background. Same-environment scans are coalesced;
+complete snapshots replace command authority atomically without silent truncation.
+See <a href="completion.html#sources-by-host">completion discovery and bounds</a>.
+This includes explicit zsh launches inside WSL
+and has been verified with zsh 5.9. Discovery does not invoke ZLE, load autoloaded
+functions, or run argument completers. Global and suffix aliases are not modeled;
+normal shell Tab completion remains available.</p>
 <h2 id="features-supplied-by-shell-metadata">Features supplied by shell metadata</h2>
 <div class="table-scroll"><table>
 <thead>
@@ -204,7 +240,7 @@ Native standalone profiles also receive the <code>ketra version</code>, <code>ke
 <code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
 <p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
 and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

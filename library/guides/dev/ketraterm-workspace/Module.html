@@ -69,6 +69,22 @@ The <a href="README.html">README</a> describes construction, listener threading,
 <td>Internal shell bootstrappers</td>
 <td>Prepare shell startup hooks and environment reapplication without interpreting terminal output.</td>
 </tr>
+<tr>
+<td><code>powershell-completion.ps1</code> resource</td>
+<td>Install the PSReadLine chord, read the live buffer, and serialize bounded native completion results.</td>
+</tr>
+<tr>
+<td><code>path-commands.sh</code> resource</td>
+<td>Shared Bash/zsh PATH enumeration in an isolated subshell, with optional native directory-type filtering, shell executable checks, and a builtin fallback.</td>
+</tr>
+<tr>
+<td>Internal <code>ShellCommandInventoryFiles</code></td>
+<td>Own the private session mailbox, bounded I/O polling, and cleanup; forward bytes to the shell-integration decoder.</td>
+</tr>
+<tr>
+<td><code>bash-completion.bash</code>, <code>zsh-completion.zsh</code> resources</td>
+<td>Combine shell tables with discovered executables and publish bounded inventory snapshots.</td>
+</tr>
 </tbody></table></div>
 <h2 id="lifecycle-and-concurrency">Lifecycle and concurrency</h2>
 <p>The workspace protects registry and selection state with its own lock. Tab title
@@ -104,7 +120,10 @@ suite. Tests cover profile discovery, tab selection, listener failures, cleanup,
 clipboard routing, and shell bootstrap behavior. Native shell integration and
 startup-command tests are environment-dependent; inspect their assumptions when
 validating changes to launch behavior.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
+<p>Use <code>./gradlew :ketraterm-workspace:nativeTest</code> for real shell/bootstrap and
+PSReadLine/PTY tests. The <a href="../docs/development/testing.html">shared test guide</a>
+defines the suite selection and environment requirements.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

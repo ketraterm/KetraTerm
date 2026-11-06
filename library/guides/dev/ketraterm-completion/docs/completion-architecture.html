@@ -28,8 +28,12 @@ ranked suggestions. It owns semantic parsing, source coordination, ranking, and
 bounded in-memory learning. Hosts own environment access and interaction. Start
 with the <a href="../README.html">README</a> for construction and a runnable example.</p>
 <h2 id="public-surface">Public Surface</h2>
+<p>The completion subsystem is <strong>experimental</strong>, including the public
+contracts below. See the <a href="../../docs/features/completion.html#stability-experimental">stability policy</a>.</p>
 <p>Consumers use <code>io.github.ketraterm.completion.api</code> and
 <code>io.github.ketraterm.completion.model</code>.</p>
+<p>Pass <code>shellProvider</code> to <code>TerminalCompletionEngines.fromSources</code> to use live shell
+command discovery and completion alongside the catalog and host sources.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -54,8 +58,12 @@ with the <a href="../README.html">README</a> for construction and a runnable exa
 <td>One suspending provider evaluated against the shared semantic context.</td>
 </tr>
 <tr>
+<td><code>TerminalCompletionShellProvider</code></td>
+<td>Optional live authority for command candidates, alias metadata, and native argument edits.</td>
+</tr>
+<tr>
 <td><code>TerminalCompletionEngines</code> / <code>TerminalCompletionSources</code></td>
-<td>Engine composition and adapters for paths, Gradle tasks, and dynamic values.</td>
+<td>Engine composition and adapters for paths, Gradle tasks, Git snapshots, and dynamic values.</td>
 </tr>
 <tr>
 <td><code>TerminalCommandSpec</code>, <code>TerminalOptionSpec</code>, <code>TerminalArgumentSpec</code></td>
@@ -67,6 +75,8 @@ with the <a href="../README.html">README</a> for construction and a runnable exa
 </tr>
 </tbody></table></div>
 <p>Candidate replacement offsets address the original request&#39;s command line.
+Outcome grouping tokenizes the edited input, independently of alias-expanded
+semantic context, so equivalent whole-line, token, and quoted edits merge consistently.
 They are inclusive at the start, exclusive at the end, and must preserve UTF-16
 scalar boundaries. The engine filters edits outside the request or not spanning
 its cursor before ranking. <code>displayText</code>, <code>detail</code>, and <code>matchedRanges</code> describe
@@ -91,10 +101,64 @@ External modules do not import them.</p>
 uses the engine&#39;s command catalog to classify the cursor. The engine shares the
 result with static and host sources and the global ranker. The same catalog
 supplies the static source automatically.</p>
-<p>Each request captures one compiled learning-index set before source evaluation.
+<p>Before resolution, the engine captures <code>shellProvider.commandAliases()</code> once.
+Literal Bash and ordinary zsh aliases expand only the completed command prefix in the semantic
+token list, reusing the shared tokenizer and command analyzer. Fixed arguments
+therefore participate in option, subcommand, and repository resolution without
+another source or shell query. Editable tokens retain their original offsets;
+the request text is never rewritten. Expansion is bounded to 16 definitions,
+64 expanded words, and 4,096 UTF-16 units per definition. Custom engines may supply
+the same map to <code>TerminalCompletionContext.resolve</code>. Definitions are not evaluated; see the
+<a href="../../docs/features/completion.html#bash-and-zsh-suggestions">supported alias behavior</a>
+and <a href="../../docs/reference/protocol.html#private-bash-command-inventory">inventory bounds</a>.</p>
+<p>An optional <code>shellProvider</code> answers command positions before initial publication.
+Its answer carries immutable candidates and the resolved external application name;
+empty candidates offer no verified command names.
+The engine enriches verified commands from its catalog and filters
+other command sources against those identities, so speculative catalog entries
+cannot flash before shell discovery finishes. Null means the shell is unsupported
+or unavailable and permits ordinary catalog fallback. Providers own this distinction;
+the session adapter returns empty for busy/stale requests once a native hook is installed.
+PowerShell option positions and arguments following catalog-recognized options query
+native completion first, without catalog argument constraints. The resolved application
+identity permits catalog/host evaluation only for a compatible external application
+whose native answer is empty or contains generic paths. Native parameter/value results,
+functions, cmdlets, scripts, and aliases to other applications retain shell authority.
+A deferred native answer is reused if catalog/host evaluation produces no candidates.
+Other modeled argument positions use progressive catalog and host sources first, with
+native fallback only when they produce no candidates. Retained learning does not
+count as a structured-source answer: it can publish while native fallback is
+pending, but does not suppress that fallback.
+An unrecognized option makes argument ownership uncertain. Native queries and their
+answers use a context without inferred argument constraints; the original catalog
+context remains available when the shell returns null and local fallback is needed.
+Unmodeled arguments query
+the shell before publishing and use its successful answer instead of generic file
+or replay guesses. The engine does not own terminal editing authority. Session-backed
+hosts must validate the captured edit context when publishing and accepting results;
+a source finishing does not make an obsolete editor context safe again.
+Path outcomes normalize separators according to <code>backslashPathSeparator</code>, quoting,
+and trailing directory separators. PowerShell additionally normalizes leading <code>./</code>
+when Windows separators are enabled; insertion keeps the chosen source&#39;s original edit.
+Backslashes remain literal filename characters when that capability is disabled. An <code>=</code>
+introduces a separately normalized path only for a resolved attached option value;
+an <code>=</code> within an ordinary filename remains part of that path.</p>
+<p>Command specifications format display-only <code>argumentHint</code> metadata separately from
+candidate labels, matched ranges, and insertion text. Positional declarations retain
+names and optionality for display, while repetition remains part of argument
+resolution rather than an ellipsis in the hint. Option <code>valueName</code> labels required
+values. Scalar path/domain metadata controls source routing and cannot establish
+operand count or requiredness, so it does not produce command hints. Opaque domain
+identifiers never become display labels; unnamed values use a path type or <code>value</code>.
+Fusion retains hint metadata from the strongest equivalent hint-bearing
+candidate without changing the chosen edit or ranking. Verified native command rows
+can receive catalog hints alongside descriptions; native parameter results are not
+given potentially incompatible catalog option hints.</p>
+<p>After any initial shell query, each request captures one compiled learning-index
+set before ordinary source evaluation.
 The set contains opaque ranking lookup, eligible replay history, and derived
 observed tokens. A snapshot-identity and shell-syntax cache reuses compiled
-indexes across requests. Learning mutations during evaluation affect the next
+indexes across requests. Learning mutations after this capture affect the next
 request, keeping one request internally consistent.</p>
 <h3 id="custom-engines-and-direct-source-evaluation">Custom engines and direct source evaluation</h3>
 <p><code>TerminalCompletionContext.resolve(request, commandSpecs)</code> uses the same parsing
@@ -104,8 +168,9 @@ or <code>TerminalCompletionSources.valueDomainCandidates</code>. The default cat
 bundled; an empty catalog provides lexical context without inferred command,
 option, or positional metadata.</p>
 <p>Resolution performs no host I/O, scheduling, ranking, or caching. Empty, unknown,
-and incomplete lines produce partial contexts. At an <code>OPERATOR</code> position,
-callers should skip source evaluation. Custom engines own candidate limits,
+and incomplete lines produce partial contexts. When <code>isCompletionAllowed</code> is false,
+callers should skip source evaluation. This covers operators, exhausted modeled
+argument modes, and unsupported refspec expressions. Custom engines own candidate limits,
 replacement validation, ranking, source concurrency, failure handling, and
 cancellation.</p>
 <p>Context-owned collections are immutable and can be retained across suspension
@@ -128,11 +193,19 @@ positional. It is empty for unknown commands; unknown options do not acquire
 inferred value ownership.</li>
 <li><code>precedingOptionValues(optionName)</code> returns all completed values for a known
 option, including repeats, inherited options, and empty values. Any declared
-alias is accepted using trimmed, case-insensitive spec lookup. Separate and
+alias is accepted using case-sensitive spec lookup with surrounding whitespace trimmed. Separate and
 <code>--name=value</code> forms share decoded value semantics. Unknown options, valueless
 flags, pending values, and the active word are excluded. The caller chooses
 first, last, or all values; no last-value-wins policy is imposed.</li>
+<li><code>precedingOptionValues(option)</code> selects only occurrences of that exact catalog
+declaration from <code>commandPath</code>. Use it when parent and child options share a
+spelling but have different meanings, such as Git&#39;s root and <code>switch</code> <code>-C</code> options.</li>
 </ul>
+<p><code>TerminalCompletionRequest.includeCommandNames</code> defaults to <code>true</code>. Hosts can set it
+to <code>false</code> for parameter-only completion: the engine resolves the context once and
+returns an empty snapshot at an executable name before source or native-completion
+work. Subcommands, options, and arguments remain eligible. Custom engines must
+honor the same request contract.</p>
 <h3 id="evaluation-and-failure-behavior">Evaluation and failure behavior</h3>
 <p>Collection starts a cold structured coroutine flow. The engine evaluates specs
 and retained learning first, then launches one child per host source. Completed
@@ -140,6 +213,9 @@ sources are incorporated serially, and a changed global ranking is emitted
 without waiting for slower sources. Each emission replaces the preceding
 snapshot; unchanged rankings are not emitted again. Normal completion leaves
 the final result available to the caller.</p>
+<p>Ready learned arguments can publish while a native fallback or a host query is
+pending. They do not suppress fallback when no structured source has a result;
+shell-authoritative contexts still resolve their native answer first.</p>
 <p>Every source receives an output limit of 256. The engine also bounds each source
 result and returns at most 256 globally ranked candidates per snapshot. These
 are safety limits independent of the number of rows a UI presents. Source
@@ -150,6 +226,9 @@ limit is not an I/O budget or a request deadline.</p>
 contribute an empty result. Unexpected errors are reported, fail collection,
 and cancel sibling sources. Independent source cancellation contributes an
 empty result; cancelling the request collection cancels all source work.
+Shell alias-metadata reads use the same failure boundary as shell completion
+queries. An unavailable alias snapshot contributes no definitions, while shell
+command authority is still queried normally; fatal errors stop the request.
 Failure handlers may run concurrently and must return promptly without
 throwing. Sources must cooperate with cancellation and must not launch their
 own jobs. A shared engine can evaluate concurrent requests, so host providers
@@ -203,6 +282,20 @@ is not a wildcard. Directory canonicalization trims surrounding whitespace and
 normalizes a trailing slash; it does not resolve filesystem aliases. Opaque
 ranking evidence may fall back from exact context to directory-only,
 profile-only, and global evidence.</p>
+<p>Replay and observed-token indexes compare completed literal tokens by decoded
+text, including case and quoted whitespace. Expression-bearing tokens retain
+their original shell spelling, so <code>$HOME</code>, <code>&quot;$HOME&quot;</code>, and <code>&#39;$HOME&#39;</code> have distinct
+identities. Only active-token matching ignores case. The history index owns
+context matching; candidate projection uses its matched rows without repeating
+those checks.</p>
+<p>History replay preserves raw spelling for simple POSIX/PowerShell variables,
+mixed quoted fragments, POSIX tilde/glob patterns, and PowerShell special escapes.
+Observed-token inference uses only proven literals. Rows containing substitutions,
+braced expressions, PowerShell arrays/indexing, control syntax, or unfinished quoting are omitted from replay;
+the conservative plain dialect also omits expression-bearing rows. No expression
+is evaluated. Attached-value edits require identical raw option prefixes so
+projection cannot slice through different quoting or escapes. These rules apply
+when rebuilding derived indexes; stored command text and ranking evidence remain unchanged.</p>
 <p>Suggestion feedback never creates replay rows. Explicit dismissal supplies
 negative evidence; passive closure and rejected editing attempts should not be
 recorded as dismissal. Successful command executions are the authority for
@@ -255,6 +348,9 @@ operator.</p>
 completing <code>cd </code> targets an empty argument. A learned <code>cd project/</code> is projected
 as <code>project/</code> in that argument context. History entries that cannot be projected
 safely are omitted.</p>
+<p>Option names retain case-sensitive identity, including short options such as
+Git&#39;s <code>-s</code> and <code>-S</code>. Candidate matching remains case-insensitive; completing one
+spelling can still suggest a distinct spelling that differs only in case.</p>
 <p>The exact <code>--</code> token ends option and subcommand resolution after the cursor has
 passed it. While the cursor remains attached to <code>--</code>, it is still an option
 prefix. Later tokens are positional. Attached option values such as
@@ -266,10 +362,26 @@ values through <code>TerminalCompletionValueDomain</code>, and paths through
 including <code>NONE</code>; it does not fall back to positional metadata.
 <code>positionalArguments</code> takes precedence over scalar positional fields and can
 declare an optional argument or a variadic final argument.
+<code>positionalArgumentAfterDoubleDash</code> optionally supplies uniform argument metadata
+after a completed option terminator; it overrides ordinary positional metadata.
+It leaves the original positional history and edit offsets intact, and does not
+activate when <code>--</code> is consumed as an option value. Git checkout/reset use it for
+path-only arguments. Git push/pull/fetch use ordinary ordered arguments:
+<code>GIT_REMOTE</code> for the repository, then variadic <code>GIT_BRANCH</code> references. A Git-specific
+context interprets resolved option occurrences and refspec component boundaries
+once; option-looking values and words after <code>--</code> do not become mode flags.
+The engine skips sources, history, and native fallback for exhausted modes.
 <code>exclusiveGroupIds</code> suppresses conflicting completed options before the cursor.
 <code>repeatableSubcommands</code> models sibling task values such as <code>gradle clean build</code>.</p>
 <p>Path sources activate for explicit path-like command prefixes or declared path
-arguments. The expected path kind filters entries; <code>TerminalHiddenPathPolicy</code>
+arguments. A path-like argument prefix also enables lexical fallback when no
+dynamic domain is declared. Explicit non-path domains suppress
+both direct and indexed filesystem queries, even when their prefix contains a
+slash. Specs declaring both paths and a value domain permit both sources.
+The engine also rejects incompatible path candidates from native and custom
+sources before deciding whether structured results satisfy the request.
+Directory arguments exclude files; file arguments also offer directories for
+traversal while retaining their <code>FILE</code> context. <code>TerminalHiddenPathPolicy</code>
 controls dot-prefixed entries. Its default hides them for an empty prefix and
 reveals them after a leading dot. Shell quoting preserves an existing quote
 style when safe and uses the request&#39;s replacement policy otherwise.</p>
@@ -303,47 +415,102 @@ compiled from replay and are not a separate persisted learning family.</p>
 <td>Gradle matching, project scoping, replacement, and limit.</td>
 </tr>
 <tr>
+<td><code>git</code></td>
+<td>Host-bounded <code>TerminalGitCompletionSnapshot</code> of local/tracking branches, tags, remotes, and the current branch.</td>
+<td>Mode-dependent reference selection, component matching, refspec edits, and limit.</td>
+</tr>
+<tr>
 <td><code>valueDomain</code></td>
 <td>Complete host-bounded values for the declared domain.</td>
 <td>Matching, quoting, replacement, and limit.</td>
 </tr>
 </tbody></table></div>
-<p>Fuzzy providers own fuzzy matching; Gradle and value-domain providers leave
+<p>Fuzzy providers own fuzzy matching and can supply <code>TerminalFuzzyPathEntry.matchedRanges</code>
+relative to the unquoted path. The source preserves these ranges without matching
+again, including when replacement text needs shell quoting or a directory suffix.
+Gradle and value-domain providers leave
 matching to the shared source. These loaders receive the immutable request and
 resolved context, not the engine&#39;s output limit. They require an independent
 visit, input, result, or time budget. A Gradle loader reads its available model;
 completion must not start Gradle to discover tasks.</p>
+<p>Gradle loaders select the build from the request directory and the last completed
+<code>--project-dir</code>/<code>-p</code> value in the resolved context. For its current project, the
+loader supplies that selector spelling in <code>TerminalGradleTask.projectDirectory</code>,
+or <code>.</code> without an override. Short names use that project; leading-colon task
+paths remain relative to the selected build. IntelliJ selects the deepest
+containing imported build root before traversing tasks, using the same directory
+containment helper as fuzzy project paths. It omits ambiguous short names when
+model bounds prevent determining the current project.</p>
+<p>The Git source shares the value-domain matcher and shell replacement encoder.
+Standalone and IntelliJ loaders supply repository data without duplicating command
+policy. A plain composite refspec replaces only the active component; quoted or
+escaped tokens are re-encoded as one token to preserve literal values. Composite
+refspec editing excludes whole-command history so accepting a suggestion cannot
+replace the untouched component with a remembered command. The supported forms
+and local-data limitations live in the <a href="../../docs/features/completion.html#sources-by-host">capability catalog</a>.</p>
 <p><code>valueDomainCandidates</code> projects already-loaded groups for aggregate providers
 without constructing a nested adapter per request. Optional canonical command
 restrictions narrow a provider&#39;s validity. Fuzzy paths require typed path text
 by default; a context-specific provider can permit an empty prefix.</p>
 <p>Direct path requests preserve a lexical directory prefix and the authoritative
-working-directory URI. Hosts interpret home, drive, UNC, and authority semantics
+working-directory URI. Provider paths use <code>/</code> separators and preserve literal
+backslashes. <code>TerminalShellCapabilities.backslashPathSeparator</code> distinguishes
+Windows separators from filename characters independently of shell quoting;
+<code>normalizePathSeparators</code> applies that convention to decoded input. Direct and
+indexed sources, ranking, and the Swing adapter share this captured capability.
+Hosts interpret home, drive, UNC, and authority semantics
 and reject locations they cannot safely map. The completion engine does not
 probe filesystems or turn remote authorities into local paths.</p>
 <h2 id="ranking-policy">Ranking Policy</h2>
 <p>Sources rank locally before global fusion. Source-local numeric scores are not
 compared across providers. The global ranker projects candidates onto the command
-they produce, groups equivalent outcomes, and combines each distinct source&#39;s
-best local rank using reciprocal-rank fusion. Duplicate rows from one source do
-not multiply support. <code>TerminalCompletionSourceEntry.priority</code> contributes a
-small prior clamped to <code>[-20, 20]</code>; named <code>TerminalCompletionSourcePrior</code> values
-provide the shared baseline for built-in source families.</p>
+they produce and groups equivalent outcomes. Semantic fit takes precedence over
+match quality: expected domain values and modeled arguments stay above unrelated
+filesystem candidates. Within the same semantic class, exact matches precede
+prefix matches, then word-boundary matches and other provider results. Matching
+uses the projected, decoded active word rather than the provider&#39;s display label
+or an entire history edit. Path matching compares entry names, respecting
+PowerShell separators.</p>
+<p>Within those classes, non-path value domains prefer live results over history-only
+outcomes. Better text matches still take precedence, and learning can reorder live
+candidates. Paths and command sequences retain their learning-based ordering:
+directory listings and specs do not enumerate every useful nested path or sequence.
+Ranking then uses the strongest reciprocal local rank and the
+strongest bounded source prior, plus context and exact learning evidence. Reporting
+the same outcome through additional providers does not accumulate votes or
+increase its score merely because more sources exist. Published scores encode
+the same ordering as the result list. <code>TerminalCompletionSourceEntry.priority</code>
+contributes a small prior clamped to <code>[-20, 20]</code>; named
+<code>TerminalCompletionSourcePrior</code> values provide the shared baseline for built-in
+source families. Native command candidates use the shared lexical matcher before
+local ranking, so shell enumeration order cannot bury a short command beneath
+longer helper names.</p>
 <p>Outcome comparison accounts for shell quoting. Declared path values also ignore
 a redundant trailing separator; it does not resolve <code>..</code>, symlinks, URI
 authorities, environment variables, or filesystem case.</p>
 <p>Semantic context and bounded exact learning evidence adjust the fused result.
+Recency reflects executions and accepted suggestions; dismissal reduces preference
+without renewing the command&#39;s usage timestamp. Equivalent contributing edits
+retain the strongest signed learning adjustment independently of the chosen
+presentation. Evidence is never summed across providers; equal-strength conflicting
+adjustments favor dismissal. An edit with no evidence cannot erase another edit&#39;s
+positive or negative preference.
 Failed executions do not penalize ordering. Ranking evidence never becomes an
 extra provider vote. Learned candidates act as a fallback, allowing live semantic
 providers to supply presentation while matching learned evidence strengthens
 the same outcome.</p>
-<p>The edit representative favors semantic fit, narrower replacement ranges, the
-source prior, local rank, and stable tie-breakers. Presentation selection can
-choose only a contributor with the same edit. Its complete candidate metadata,
-including <code>feedbackToken</code>, is preserved together; the engine replaces only its
-score with the fused global score. Presentation selection does not change the
-admitted edit or final ordering. Ordering is deterministic for the same request,
-source results, learning snapshot, and evaluation time.</p>
+<p>One representative supplies both the edit and its complete presentation metadata,
+including <code>feedbackToken</code>. Selection favors primary providers, semantic fit,
+shorter replacement text, source prior, local rank, and stable tie-breakers.
+Each outcome retains that representative and aggregate relevance values; it does
+not retain the contributing candidate list. The ranker replaces the chosen
+candidate&#39;s score with the global score. For shell-verified commands, the engine
+adds catalog descriptions to the winning row after merging, preserving its edit,
+source, feedback token, and provider detail. Later duplicate providers therefore
+cannot remove catalog descriptions. Bare PowerShell command and catalog alias
+lookup ignores case; POSIX lookup remains case-sensitive.
+Ordering is deterministic for the same
+request, source results, learning snapshot, and evaluation time.</p>
 <h2 id="ranking-calibration">Ranking Calibration</h2>
 <p>Use <code>CompletionRankingReplayTest</code> as the deterministic gate for changes to
 priors, recency, smoothing, and evidence clamps. Its representative path, Git,
@@ -354,7 +521,7 @@ Add anonymized failure cases before changing weights.</p>
 evidence, hostile output bounds, and learned history backed by a full snapshot.
 The prewarmed history case measures the compiled-index cache hit; first-use
 compilation is separate work.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-completion/docs/completion-architecture.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-completion/docs/completion-architecture.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

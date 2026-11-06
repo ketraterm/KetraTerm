@@ -22,12 +22,10 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><a href="README.html">ketraterm-completion-persistence</a></li><li><span aria-current="page">Module ketraterm-completion-persistence</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#components">Components</a><a class="depth-2" href="#file-boundary">File boundary</a></nav></details><div class="article-content"><div class="prose"><h1 id="module-ketraterm-completion-persistence">Module ketraterm-completion-persistence</h1>
-<p>Shared product implementation for bounded local-file completion learning. This
-module depends on <code>ketraterm-completion</code> and coroutines; it has no dependency on
-session, workspace, Swing, PTY, or IntelliJ. It is outside the supported library
-publication and ABI boundary. <a href="README.html">README.md</a> covers product integration,
-lifecycle, failures, and privacy.</p>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><a href="README.html">ketraterm-completion-persistence</a></li><li><span aria-current="page">Module ketraterm-completion-persistence</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#components">Components</a></nav></details><div class="article-content"><div class="prose"><h1 id="module-ketraterm-completion-persistence">Module ketraterm-completion-persistence</h1>
+<p>Internal product storage for bounded completion-learning snapshots. Dependencies
+are <code>ketraterm-completion</code> and coroutines; products own paths, settings, diagnostics,
+and lifecycle scopes. The <a href="README.html">README</a> covers integration and lifecycle.</p>
 <h2 id="components">Components</h2>
 <div class="table-scroll"><table>
 <thead>
@@ -38,38 +36,27 @@ lifecycle, failures, and privacy.</p>
 </thead>
 <tbody><tr>
 <td><code>TerminalCompletionLearningCoordinator</code></td>
-<td>Synchronous learning mutations and one lifecycle-bound persistence worker.</td>
+<td>Synchronous store mutations and one lifecycle-bound worker for loading, checkpoints, reset, and shutdown.</td>
 </tr>
 <tr>
 <td><code>CompletionLearningFileStore</code></td>
-<td>Internal fixed-path, bounded file reads and replacement, with replay-policy filtering.</td>
+<td>Bounded file access, replay-policy checks, and same-directory temporary-file replacement.</td>
 </tr>
 <tr>
 <td><code>CompletionLearningSnapshotCodec</code></td>
-<td>Internal strict versioned line encoding and decoding.</td>
+<td>Strict versioned encoding, decoding, and row bounds.</td>
 </tr>
 </tbody></table></div>
-<p>The coordinator serializes recording, reset, and lifecycle transitions around
-one state lock. Its conflated wakeup carries no snapshots or per-event controls.
-The worker loads once, observes current enablement, and snapshots the latest
-state for a checkpoint. Revision tracking distinguishes dirty, attempted, and
-successfully persisted state, so sustained recording does not postpone a
-checkpoint and failed writes do not spin.</p>
-<p>Reset has a separate revision: it supersedes hydration and writes an empty
-snapshot promptly, including when ordinary persistence is disabled. A flushing
-close awaits the required final write; a non-flushing close cancels the worker.
-The caller owns the scope and any bounded shutdown wait.</p>
-<h2 id="file-boundary">File boundary</h2>
-<p>Version 3 uses a header followed by ranking rows and then replay rows. Text
-fields use URL-safe Base64 with strict UTF-8 decoding. Base64 is an encoding,
-not encryption. Codec details are internal, not a snapshot interchange API.</p>
-<p>Bounds are defined by the codec and file store.</p>
-<p>Loading rejects unsupported schemas, malformed rows, invalid row ordering, and
-exceeded bounds. Saving retains rows within the storage bounds. Both directions
-recheck replay policy and successful evidence; hydration additionally passes
-through the learning store&#39;s host filter. The temporary file is created beside
-the target and cleaned after the replacement attempt.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-completion-persistence/Module.md">View source on GitHub ↗</a></div></div></main></div>
+<p>The coordinator protects revisions with a state lock and wakes the worker through
+a conflated signal. File I/O runs outside the lock. Dirty, attempted, persisted,
+and reset revisions keep writes ordered without queueing a snapshot per event.
+The file store cleans temporary files after replacement attempts and uses atomic
+replacement where supported, with ordinary replacement as a fallback.</p>
+<p>The <a href="../docs/reference/storage.html#file-format">storage reference</a> owns the format
+and privacy description. The engine&#39;s <a href="../ketraterm-completion/docs/completion-architecture.html#learning-and-privacy">learning contract</a>
+owns replay eligibility and host filtering; the file boundary rechecks replay
+policy and successful ranking evidence before accepting stored command text.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-completion-persistence/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

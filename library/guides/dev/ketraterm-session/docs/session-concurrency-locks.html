@@ -122,19 +122,50 @@ per-key markers; bulk bytes themselves do not enter those counters.</p>
 <p>Capture <code>captureCommandEdit()</code> before requesting or calculating asynchronous
 suggestions. It returns null unless the session is running, the writer is idle,
 no output batch is in progress (including a graphics decode yield),
-an authoritative editing snapshot is available, and the selected producer supports
+an editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 <code>submitInput(expected, events)</code> using that same context.</p>
 <p>Final validation and queue reservation share mutation, producer, and outbound
 serialization. Intervening input, output, resize, or host-model assignment makes
 an older context stale. Equal assignments and changes away from and back to the
 same snapshot still invalidate it. Semantic input revisions conservatively
-advance even when modes suppress its bytes; empty input has the event-specific
-rules described by the API.</p>
+advance even when modes suppress its bytes, except for a single key-release event
+that emits no bytes. Such a release cannot edit the shell buffer and must not
+invalidate suggestions captured after the preceding key press. Encoded releases
+still invalidate contexts. Empty input has the event-specific rules described by
+the API.</p>
+<p><code>requestShellCompletions(commandLine, cursorOffset)</code> is the bounded exception for
+an installed native producer&#39;s non-editing request/reply exchange. Admission
+revalidates the exact captured buffer under the same producer guard and queues
+its key chord atomically. A correlated result preserves pre-query contexts only
+when the producer revision/snapshot and render frame generation stay unchanged,
+no other input was admitted, and no viewport mutation occurred. The session
+records the resulting input/output revisions; any later input/output invalidates
+that permission. Changed-away-and-back rendered text cannot renew an old context.
+Results complete outside session locks. Cancellation retains the pending wire
+slot until a reply/new prompt. A replacement request can await that retirement,
+then recapture and revalidate its buffer before sending a new query. Waiting and
+query execution share the same <a href="../../docs/reference/protocol.html#private-powershell-completion-metadata">native completion deadline</a>;
+cancelling a waiting caller
+does not release another caller&#39;s wire slot. Closure cancels both response and
+retirement waiters. A concurrent query whose consumer is still active remains busy.</p>
+<p>A screen-derived snapshot with <code>requiresShellConfirmation</code> contains only the
+prompt-to-cursor prefix: visible text after the cursor may be a shell prediction
+or a real editable suffix. Query the native completer before publishing suggestions.
+Only an exact buffer and cursor match confirms the prefix; real suffixes, including
+whitespace, fail confirmation. Conditional admission rejects unconfirmed contexts.
+The session reuses the confirmed native result for an unchanged provisional
+snapshot, avoiding a second query during candidate collection. Confirmation also
+permits a fresh capture of that same context and expires under the checks above.</p>
 <p>Rejection returns <code>STALE_CONTEXT</code>, <code>UNSUPPORTED_CONTEXT</code>, <code>CANCELLED</code>, or the
 usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
 use the ordinary bounded compound queue. Callers still own editor semantics:
 UTF-16 text offsets do not determine the shell&#39;s deletion units.</p>
+<p>A producer may supply <code>commandLinePrefixResetKeys</code>: up to four semantic key events
+that clear text before the cursor without executing it or changing the suffix.
+The default is empty. Capture detaches these keys as <code>expected.prefixResetKeys</code>;
+admission rejects the edit if the producer&#39;s sequence has changed. Hosts can pass
+the sequence to the versioned <code>TerminalShellIntegrationFactory.host</code> overload.</p>
 <p>Host-owned projections should use <code>TerminalShellCommandLineState</code>. Its assignments
 and session checks share a guard. The StateFlow-only host factory remains readable
 but cannot provide conditional contexts. A custom producer may implement
@@ -144,9 +175,15 @@ outside it, and obey the lock order above.</p>
 An idle writer does not acknowledge remote processing. <code>expected.cancel()</code> rejects
 future checks, but cancellation racing admission can lose and cannot retract
 accepted bytes. Response-dependent callers must stop waiting on session closure.</p>
-<p>The default session-backed Swing suggestion path captures before provider work
-and emits accepted feedback only after conditional admission of a valid grapheme
-replacement. A host-managed popup must capture its own context. Calling the
+<p>The default session-backed Swing suggestion path captures before provider work,
+confirms provisional snapshots before collecting results, and validates
+replacement boundaries before conditional admission. When a prefix
+reset is available and the snapshot ends at the cursor, it sends that sequence
+and pastes the edited prefix as one compound input. The resulting prefix must be
+single-line and control-free; unsafe replay is rejected without sending input.
+Other contexts use the existing
+grapheme-based Delete/Backspace plan. Accepted feedback means admission, not shell
+acknowledgement. A host-managed popup must capture its own context. Calling the
 default handler without its captured Swing request throws <code>IllegalStateException</code>;
 custom handlers own their editing and feedback contract.</p>
 <h2 id="bounds-and-backpressure">Bounds and backpressure</h2>
@@ -347,7 +384,7 @@ attempt. Readiness observation stops when submission or cancellation finishes.
 Closing the session stops its observations without clearing metadata or
 cancelling host flows.</p>
 <h3 id="terminal-command-line-concurrency-scope">Terminal command-line concurrency scope</h3>
-<p><code>activeShellCommandLine</code> reads the selected authoritative snapshot; host snapshots
+<p><code>activeShellCommandLine</code> reads the selected producer&#39;s snapshot; host snapshots
 need no terminal mutation lock, while protocol producers may use serialized grid
 reads. Null is authoritative. Host text bounds and remote acknowledgement remain
 host responsibilities. Every versioned host assignment advances its guarded
@@ -414,7 +451,7 @@ An eager I/O dispatcher is suitable for byte fixtures, but scheduling tests need
 one controlled scheduler or explicit entered/release/completed handshakes.
 Submission return and fake-process exit do not prove queued output was written.
 PTY reply tests must keep the child alive until expected output completes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
