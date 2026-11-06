@@ -62,7 +62,7 @@ public enum class TerminalCompletionCandidateKind {
  * @property feedbackToken optional provider-owned runtime token for correlating
  * feedback with a native provider and item. The engine does not interpret it
  * for ranking or outcome equivalence. Fusion preserves the token of the chosen
- * presentation candidate, and [copy] preserves its reference by default.
+ * presentation candidate, and `copy()` preserves its reference by default.
  * @property argumentHint display-only argument placeholders, such as `<branch>` or `[path]`.
  * Hints are separate from insertion text and [matchedRanges] and do not affect ranking or edit identity.
  * @throws IllegalArgumentException if text/source fields are empty, replacement

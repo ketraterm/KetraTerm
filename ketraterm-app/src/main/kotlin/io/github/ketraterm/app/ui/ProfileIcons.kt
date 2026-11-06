@@ -17,8 +17,8 @@ package io.github.ketraterm.app.ui
 
 import com.formdev.flatlaf.extras.FlatSVGIcon
 import io.github.ketraterm.workspace.TerminalProfileKind
-import java.awt.AlphaComposite
-import java.awt.Graphics2D
+import java.awt.Component
+import java.awt.Graphics
 import java.util.*
 import javax.swing.Icon
 
@@ -31,29 +31,33 @@ import javax.swing.Icon
 internal class ProfileIcons {
     private val icons = EnumMap<TerminalProfileKind, Icon>(TerminalProfileKind::class.java)
 
-    fun paint(
-        g2: Graphics2D,
-        profileKind: TerminalProfileKind,
-        x: Int,
-        y: Int,
-        selected: Boolean,
-        highlighted: Boolean,
-    ) {
-        val previousComposite = g2.composite
-        g2.composite =
-            AlphaComposite.SrcOver.derive(
-                if (selected || highlighted) ACTIVE_OPACITY else INACTIVE_OPACITY,
-            )
-        try {
-            icon(profileKind).paintIcon(null, g2, x, y)
-        } finally {
-            g2.composite = previousComposite
-        }
-    }
-
     internal fun icon(profileKind: TerminalProfileKind): Icon =
         icons.getOrPut(profileKind) {
-            FlatSVGIcon(resourcePath(profileKind), ICON_WIDTH, ICON_HEIGHT)
+            val source = FlatSVGIcon(resourcePath(profileKind))
+            // The selected terminal palette can differ from FlatLaf's light/dark theme.
+            source.colorFilter =
+                FlatSVGIcon.ColorFilter { color ->
+                    when (color.rgb and 0xFFFFFF) {
+                        0x6E6E6E, 0xCED0D6 -> Chrome.textPrimary
+                        else -> color
+                    }
+                }
+            val scale = minOf(ICON_WIDTH.toFloat() / source.iconWidth, ICON_HEIGHT.toFloat() / source.iconHeight)
+            val glyph = source.derive(scale)
+            object : Icon {
+                override fun getIconWidth(): Int = ICON_WIDTH
+
+                override fun getIconHeight(): Int = ICON_HEIGHT
+
+                override fun paintIcon(
+                    component: Component?,
+                    graphics: Graphics,
+                    x: Int,
+                    y: Int,
+                ) {
+                    glyph.paintIcon(component, graphics, x + (ICON_WIDTH - glyph.iconWidth) / 2, y + (ICON_HEIGHT - glyph.iconHeight) / 2)
+                }
+            }
         }
 
     private fun resourcePath(profileKind: TerminalProfileKind): String =
@@ -76,7 +80,5 @@ internal class ProfileIcons {
         private const val RESOURCE_DIR = "io/github/ketraterm/app/icons"
         private const val ICON_WIDTH = 14
         private const val ICON_HEIGHT = 12
-        private const val ACTIVE_OPACITY = 1f
-        private const val INACTIVE_OPACITY = 0.63f
     }
 }

@@ -585,14 +585,7 @@ internal class TabBar(
             progressIcon.progress = progress
             progressIcon.paintIcon(this, g2, iconX - 2, y + (h - 16) / 2)
         } else {
-            profileIcons.paint(
-                g2 = g2,
-                profileKind = entry.profileKind,
-                x = iconX,
-                y = iconDrawY,
-                selected = useSelectedShape,
-                highlighted = index == tabHoverIndex,
-            )
+            profileIcons.icon(entry.profileKind).paintIcon(this, g2, iconX, iconDrawY)
         }
 
         val titleFg =
