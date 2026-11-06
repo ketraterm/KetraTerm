@@ -26,6 +26,11 @@ import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
+import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -105,7 +110,7 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
         assertTrue(entries.single().isDirectory)
     }
 
-    fun testLiteralBackslashesSurviveGoToFileSearchAndExcludeBroadenedMatches() {
+    fun testLiteralBackslashPathsUseFilesystemCompletionWithoutBroadenedProjectMatches() {
         assumeTrue("Literal backslash filenames require a POSIX filesystem", FileSystems.getDefault().separator == "/")
         val directory = Files.createTempDirectory("ketraterm-literal-paths")
         try {
@@ -128,11 +133,27 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
                 IndexingTestUtil.waitUntilIndexesAreReady(project)
                 val loader = IntellijProjectFileLoader(project)
                 val uri = directory.toUri().toString()
-
-                assertEquals(listOf("foo\\bar.kt"), runBlocking { loader.load(uri, "foo\\b") }.map { it.path })
-                assertEquals(listOf("dir\\name/Main.kt"), runBlocking { loader.load(uri, "dir\\name/Ma") }.map { it.path })
                 val absolutePrefix = directory.resolve("foo\\b").invariantSeparatorsPathString
-                assertEquals(listOf("foo\\bar.kt"), runBlocking { loader.load(uri, absolutePrefix) }.map { it.path })
+                val hostContext = IntellijCompletionContext("test", { uri }, TerminalShellCapabilities.POSIX)
+                val sources =
+                    listOf(
+                        TerminalCompletionSources.path(TerminalLocalFileSystemProvider(scanner = hostContext.directoryScanner)),
+                        intellijProjectFileCompletionSource(loader::load),
+                    )
+                for ((prefix, expected) in listOf(
+                    "foo\\b" to "foo\\bar.kt",
+                    "dir\\name/Ma" to "dir\\name/Main.kt",
+                    absolutePrefix to directory.resolve("foo\\bar.kt").invariantSeparatorsPathString,
+                )) {
+                    // Go to File cannot see these POSIX names. Keep the exact path
+                    // and shell quoting through the filesystem source used by the product.
+                    assertEmpty(runBlocking { loader.load(uri, prefix) })
+                    val line = "cat '$prefix"
+                    val request = TerminalCompletionRequest(line, line.length, uri, shellCapabilities = TerminalShellCapabilities.POSIX)
+                    val context = TerminalCompletionContext.resolve(request)
+                    val candidates = runBlocking { sources.flatMap { it.complete(request, context, 64) } }
+                    assertEquals(prefix, listOf("'$expected'"), candidates.map { it.replacementText })
+                }
             } finally {
                 PsiTestUtil.removeContentEntry(module, root)
             }

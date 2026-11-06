@@ -22,6 +22,7 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.session.TerminalInputAdmission
+import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingHostServices
@@ -138,8 +139,7 @@ internal class StandaloneSuggestionFixture private constructor(
     suspend fun awaitLine(line: String) {
         try {
             withTimeout(15.seconds) {
-                // Live extraction can see a redraw ahead of the deduplicated command-line signal.
-                session.renderGeneration.first { session.activeShellCommandLine()?.commandText == line }
+                awaitEditableLine(session, line)
             }
         } catch (failure: TimeoutCancellationException) {
             throw AssertionError(
@@ -229,6 +229,18 @@ internal class StandaloneSuggestionFixture private constructor(
     companion object {
         private const val COLUMNS = 100
         private const val ROWS = 24
+
+        internal suspend fun awaitEditableLine(
+            session: TerminalSession,
+            line: String,
+        ) {
+            session.renderGeneration.first {
+                val edit = session.captureCommandEdit() ?: return@first false
+                val snapshot = edit.commandLine
+                edit.cancel()
+                snapshot.commandText == line && snapshot.cursorOffset == line.length && !snapshot.requiresShellConfirmation
+            }
+        }
 
         suspend fun withSession(
             profile: TerminalProfile,

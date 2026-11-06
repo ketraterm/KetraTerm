@@ -34,9 +34,6 @@ internal class IntellijCompletionPathMatcher(
     /** Whether the query's final component matches the target name, independently of its ancestors. */
     fun matchesName(name: String): Boolean = empty || nameMatcher.match(name) != null
 
-    /** Whether the original qualified query matches a path returned by a broadened IDE search. */
-    fun matchesPath(path: String): Boolean = empty || fullMatcher.match(path) != null
-
     /** Returns display-relative UTF-16 fragments, preferring the basename over unrelated ancestors. */
     fun ranges(path: String): TerminalCompletionMatchRanges {
         if (empty) return TerminalCompletionMatchRanges.EMPTY

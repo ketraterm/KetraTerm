@@ -36,7 +36,6 @@ import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
-import kotlin.io.path.invariantSeparatorsPathString
 
 /**
  * Queries IntelliJ's Go to File engine for bounded fuzzy paths.
@@ -71,6 +70,9 @@ internal class IntellijProjectFileLoader(
         cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
         if (prefix.substringAfterLast('/').isEmpty()) return emptyList()
+        // IntelliJ's VFS excludes literal backslash names even on POSIX. The
+        // ordinary filesystem source handles them without changing the query.
+        if ('\\' in prefix) return emptyList()
         val workingDirectory =
             resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) {
                 project.guessProjectDir()?.toNioPath()
@@ -87,10 +89,6 @@ internal class IntellijProjectFileLoader(
                 }
             if (findContainingCompletionRoot(workingDirectory, roots) { it } == null) return@readAction emptyList()
             val pathMatcher = IntellijCompletionPathMatcher(prefix)
-            // Go to File treats every backslash as a directory separator. Broaden
-            // only its query, then require the original literal name and path.
-            val searchPrefix = prefix.replace('\\', '*')
-            val broadenedQuery = searchPrefix != prefix
             val model = GotoFileModel(project)
             try {
                 val itemProvider = model.getItemProvider(null)
@@ -101,7 +99,7 @@ internal class IntellijProjectFileLoader(
                 val paths = HashSet<String>(initialCapacity)
                 var visited = 0
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
-                val parameters = FindSymbolParameters.wrap(searchPrefix, GlobalSearchScope.projectScope(project))
+                val parameters = FindSymbolParameters.wrap(prefix, GlobalSearchScope.projectScope(project))
                 itemProvider.filterElementsWithWeights(
                     viewModel,
                     parameters,
@@ -115,10 +113,6 @@ internal class IntellijProjectFileLoader(
                         if (!pathMatcher.matchesName(file.name)) return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
-                        if (broadenedQuery) {
-                            val qualifiedPath = if (prefix.startsWith('/')) filePath.invariantSeparatorsPathString else path
-                            if (!pathMatcher.matchesPath(qualifiedPath)) return@Processor true
-                        }
                         if (paths.add(path)) {
                             results.add(
                                 TerminalFuzzyPathEntry(

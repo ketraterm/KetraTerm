@@ -82,8 +82,8 @@ This table describes the sources available when completion is enabled.
 | Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
 | Bash command inventory | Commands, alias definitions, functions, and enabled builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
 | zsh command inventory | Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires `zsh/parameter` and `base64`; verified with zsh 5.9. Literal aliases inform argument semantics. | Same inventory and command authority. |
-| Files and directories | Bounded local directory scans. | IDE virtual filesystem with local scan fallback. |
-| Project-wide files | No project index. | IDE fuzzy filename lookup with match highlighting, while the terminal is inside the project's content roots. |
+| Files and directories | Bounded local directory scans. | The same bounded local scans, including files outside the IDE index or excluded from the project. |
+| Project-wide files | No project index. | IDE fuzzy filename lookup with match highlighting, while the terminal is inside the project's content roots. Names containing literal backslashes use ordinary directory completion because IntelliJ's VFS excludes them. |
 | Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
 | Git remote names | Bounded `git remote` query of local configuration. | Configured remotes from the selected IDE repository. |
 | Recent Git commits | No dynamic source. | Up to 50 commits for supported commit arguments. |

@@ -214,7 +214,6 @@ internal class KetraTermCompletionService(
                             TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
                         ),
                     ),
-                directoryScanner = IntellijProjectDirectoryScanner(project),
                 projectDirectory = project.guessProjectDir()?.toNioPath(),
             )
         return runtime.registry.createProvider(context)
