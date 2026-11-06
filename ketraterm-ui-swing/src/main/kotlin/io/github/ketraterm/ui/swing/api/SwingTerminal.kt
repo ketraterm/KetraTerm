@@ -189,7 +189,11 @@ public class SwingTerminal
                 repaint()
             }
         private val viewportController =
-            SwingViewportController(hostServices.viewportListener, chrome) { renderMappingChanged, scrollComplete ->
+            SwingViewportController(
+                hostServices.viewportListener,
+                chrome,
+                smoothScrolling = settings.smoothScrolling,
+            ) { renderMappingChanged, scrollComplete ->
                 handleViewportScrollOnEdt(renderMappingChanged, scrollComplete)
             }
         private val renderCache =
@@ -1059,8 +1063,9 @@ public class SwingTerminal
          *
          * Positive values move farther back into scrollback; negative values move
          * toward the live viewport. Fractional values accumulate until they
-         * produce a whole-row destination. Animation may render between rows,
-         * but always completes on the destination row.
+         * produce a whole-row destination. With [SwingSettings.smoothScrolling] enabled,
+         * animation may render between rows but completes on the destination row;
+         * otherwise each destination applies immediately.
          *
          * Divider mode counts a prompt band as one slot, alongside text rows.
          * @param deltaLines signed slot delta.
@@ -1584,6 +1589,7 @@ public class SwingTerminal
                         next.promptDecoration != previous.promptDecoration
                 if (geometryChanged) viewportController.finishScroll()
                 settings = next
+                viewportController.smoothScrolling = next.smoothScrolling
                 if (next.shellSuggestionStyle != previous.shellSuggestionStyle || next.font != previous.font) {
                     shellSuggestionController?.reloadAppearance()
                 }

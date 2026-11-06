@@ -33,7 +33,7 @@ These are library controls; individual products expose a subset in their setting
 | Geometry | Line height, signed integer column spacing, and separate primary/alternate-screen padding. |
 | Colors and decorations | Palette, cursor shape/blink, selection/search colors, prompt dots/dividers, failed-command rails, and visual-bell styling. |
 | Links and menus | Custom link detection, presentation and activation, plus host-owned context menus. |
-| Scrolling | Output-follow policy, viewport observation/control, and optional built-in scrollbar overlay or external host scrollbars. |
+| Scrolling | Optional smooth animation (enabled by default), output-follow policy, viewport observation/control, and optional built-in scrollbar overlay or external host scrollbars. See the [Swing guide](../../ketraterm-ui-swing/README.md). |
 | Mouse and clipboard | Independent mouse-reporting/wheel policies, copy on selection, clipboard/primary middle-button paste, and deferred host paste handling. |
 | Search UI | Programmatic literal, whole-word and regex search, case sensitivity, result navigation/state, and separately styled host search chrome with explanatory option tooltips and keyboard-focusable controls. Hosts own search command bindings and supply current shortcut hints; the shared bar installs no command shortcuts. |
 

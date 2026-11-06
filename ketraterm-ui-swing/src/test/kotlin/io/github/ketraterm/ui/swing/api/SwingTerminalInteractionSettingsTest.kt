@@ -45,6 +45,43 @@ import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
     @Test
+    fun `initial smooth scrolling setting applies to programmatic and wheel input`() =
+        fixture(smoothScrolling = false) {
+            scrollIntoHistory()
+
+            repeat(3) { view.scrollViewportBy(-0.25) }
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+            view.scrollViewportBy(-0.25)
+            assertEquals(1.0, view.viewportState().scrollbackOffset)
+            wheel(1.0)
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            wheel(-1.0)
+            assertEquals(1.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
+    fun `smooth scrolling reload settles pending motion and supports subsequent toggles`() =
+        fixture {
+            scrollIntoHistory()
+            view.scrollViewportBy(-1.0)
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+
+            settings = settings.copy { it.smoothScrolling = false }
+            view.reloadSettings()
+            assertEquals(1.0, view.viewportState().scrollbackOffset)
+            view.scrollViewportBy(-1.0)
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+
+            settings = settings.copy { it.smoothScrolling = true }
+            view.reloadSettings()
+            view.scrollViewportBy(2.0)
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            settings = settings.copy { it.smoothScrolling = false }
+            view.reloadSettings()
+            assertEquals(2.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
     fun `search style reload repaints existing matches and preserves search and session palette`() =
         fixture {
             feed("\rAA AA\u001b[?25l")
@@ -1816,10 +1853,11 @@ class SwingTerminalInteractionSettingsTest {
     private fun fixture(
         startSession: Boolean = true,
         middleClickPasteHandler: SwingTerminalMiddleClickPasteHandler? = null,
+        smoothScrolling: Boolean = true,
         action: Fixture.() -> Unit,
     ) {
         SwingUtilities.invokeAndWait {
-            val fixture = Fixture(startSession, middleClickPasteHandler)
+            val fixture = Fixture(startSession, middleClickPasteHandler, smoothScrolling)
             try {
                 fixture.action()
             } finally {
@@ -1833,6 +1871,7 @@ class SwingTerminalInteractionSettingsTest {
     private class Fixture(
         startSession: Boolean,
         middleClickPasteHandler: SwingTerminalMiddleClickPasteHandler? = null,
+        smoothScrolling: Boolean = true,
     ) {
         val dispatcher = StandardTestDispatcher()
         val output = ByteArrayOutputStream()
@@ -1871,6 +1910,7 @@ class SwingTerminalInteractionSettingsTest {
                 it.alternateScreenPadding = SwingPadding()
                 it.shellIntegrationDecorationGutterWidth = 0
                 it.cursorBlinkMillis = 0
+                it.smoothScrolling = smoothScrolling
                 it.middleClickPaste = true
                 it.copyOnSelection = true
                 it.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF

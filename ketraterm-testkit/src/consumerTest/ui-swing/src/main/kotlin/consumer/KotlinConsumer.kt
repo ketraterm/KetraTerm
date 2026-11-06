@@ -79,9 +79,11 @@ private const val HOST_PASTE = "primary selection from published consumer"
 fun main() =
     runBlocking {
         check(SwingSettings().alternateScreenWheelToArrowEnabled)
+        check(SwingSettings().smoothScrolling)
         val interactionSettings =
             SwingSettings.create {
                 it.mouseReportingEnabled = false
+                it.smoothScrolling = false
                 it.alternateScreenWheelToArrowEnabled = false
                 it.copyOnSelection = true
                 it.middleClickPaste = true
@@ -115,6 +117,7 @@ fun main() =
                 it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
             }
         check(interactionSettings == interactionSettings.copy {})
+        check(!interactionSettings.copy {}.smoothScrolling)
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
         check(SwingSettings().minimumContrastRatio == 3.0)
         check(interactionSettings.copy {}.shellSuggestionStyle.matchForeground == 0xFF82AFFC.toInt())

@@ -33,6 +33,21 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @Test
+    fun `smooth scrolling defaults on and survives detached builder updates`() {
+        val defaults = SwingSettings()
+        assertTrue(defaults.smoothScrolling)
+        val disabled = defaults.copy { it.smoothScrolling = false }
+        assertFalse(disabled.smoothScrolling)
+        assertNotEquals(defaults, disabled)
+        val draft = disabled.toBuilder()
+        assertEquals(disabled, draft.build())
+        assertEquals(disabled.hashCode(), draft.build().hashCode())
+        draft.smoothScrolling = true
+        assertEquals(defaults, draft.build())
+        assertFalse(disabled.smoothScrolling)
+    }
+
+    @Test
     fun `sticky headers are independent copied settings and participate in equality`() {
         val defaults = SwingSettings.create { it.promptDecoration = SwingPromptDecoration.NONE }
         assertTrue(defaults.stickyCommandHeadersEnabled)
