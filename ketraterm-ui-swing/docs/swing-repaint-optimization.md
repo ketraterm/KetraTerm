@@ -138,7 +138,11 @@ clipboard access and deferred host completion.
 
 The EDT-owned header resolves the top authored output row through shared viewport
 geometry. Ownership and immutable prompt capture are queried only when the top
-logical line, shell revision or binding changes. Raster preparation uses `GridPainter`
+logical line, shell revision or binding changes. The original captured row must still exist
+in the screen or scrollback. A metadata-only frame read checks retention when the source,
+prompt capture or content generation changes; a known retained position avoids rescanning
+history during ordinary output, and fractional scrolling reuses the result.
+Raster preparation uses `GridPainter`
 with the captured primitive row and the current terminal settings, metrics and palette.
 The resulting single-row image is composited after grid content and before the
 scrollbar and visual bell. A ten-pixel shadow with Gaussian opacity falloff is composed into the cached
@@ -146,7 +150,7 @@ image during preparation, keeping one image blit per paint. The prompt is first
 rendered on an opaque surface to preserve LCD text antialiasing, then copied into
 the final image with its transparent shadow. The full opaque device-pixel area is
 initialized before logical drawing, including fractional-scale rounding fringes.
-The header has no separator rule. The shadow clips to the content bottom without
+A subtle contact edge maintains separation on very dark themes. The shadow clips to the content bottom without
 compressing its falloff and has no pointer hit area. Painting
 performs no shell queries or source reads.
 

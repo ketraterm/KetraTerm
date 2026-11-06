@@ -17,6 +17,8 @@ package io.github.ketraterm.benchmark
 
 import com.sun.management.ThreadMXBean
 import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationState
@@ -46,6 +48,12 @@ open class StickyCommandHeaderBenchmark {
     private val cache = TerminalRenderCache(80, 24)
     private val geometry = TerminalVisualViewportGeometry()
     private val header = StickyCommandHeader(SwingTerminalChrome())
+    private val reader =
+        object : TerminalRenderFrameReader {
+            private val frame = TerminalRenderBenchmarkFrame(List(34) { "output".padEnd(80) })
+
+            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(frame)
+        }
     private val metrics = SwingMetrics(8, 20, 14, 16, 8, 0, 1)
     private lateinit var settings: SwingSettings
     private lateinit var graphics: Graphics2D
@@ -87,7 +95,7 @@ open class StickyCommandHeaderBenchmark {
     @Benchmark
     open fun fractionalScroll(): Int {
         geometry.updateContentOrigin(-((tick++ and 15) / 16.0))
-        header.update(state, cache, geometry, settings, metrics, 640, 480, null)
+        header.update(state, cache, geometry, settings, metrics, 640, 480, null, reader)
         return header.recordId
     }
 
@@ -110,7 +118,7 @@ open class StickyCommandHeaderBenchmark {
     @Benchmark
     open fun commandTransition(): Int {
         val source = if (tick++ and 1 == 0) state else replacement
-        header.update(source, cache, geometry, settings, metrics, 640, 480, null)
+        header.update(source, cache, geometry, settings, metrics, 640, 480, null, reader)
         return header.recordId
     }
 
