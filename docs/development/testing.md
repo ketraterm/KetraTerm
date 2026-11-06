@@ -25,10 +25,10 @@ tasks retain their own toolchains and validation contracts.
 
 ```shell
 ./gradlew test                       # Ordinary local verification; no windows or native shell tests
-./gradlew nativeTest                 # All modules' native process suites
-./gradlew desktopTest                # All modules' real-window suites
+./gradlew :nativeTest                # Declared modules' native process suites
+./gradlew :desktopTest               # Declared modules' real-window suites
 ./gradlew :ketraterm-app:desktopTest  # One module
-./gradlew test nativeTest desktopTest --continue
+./gradlew test :nativeTest :desktopTest --continue
 ```
 
 On Linux, wrap desktop runs with `xvfb-run -a`. On Windows use `gradlew.bat`.
@@ -38,12 +38,16 @@ No additional property is needed to enable PTY fixtures.
 
 Each task writes its own `build/test-results/<task>/` XML and
 `build/reports/tests/<task>/` HTML. Running another suite cannot replace those
-results. Modules without matching tests are valid empty participants in the root
-aggregate tasks.
+results. Declare modules with environment-dependent tests in
+[`gradle/test-environments.properties`](../../gradle/test-environments.properties).
+Root aggregates depend only on those owners; other modules' environment tasks
+skip without launching an empty test JVM. CI checks that every tagged source has
+a declared owner.
 
 Native and desktop tasks always execute when requested and do not use the build
 cache: installed tools, shell state, and desktop behavior can change without a
-source change. Compilation and ordinary tests retain Gradle's incremental behavior.
+source change. Compilation and ordinary tests use Gradle's build cache; Gradle
+tracks their source, runtime classpath, and other declared inputs.
 Fixtures can write diagnostics under `terminal.test.artifactsDirectory`, supplied
 by these tasks as `build/test-artifacts/<task>/`. Use a feature/scenario subdirectory;
 CI retains the common directory without needing a new upload rule for each feature.
@@ -74,15 +78,49 @@ same desktop. Avoid interacting with their windows during a run.
 
 ## CI
 
-The standard [Test Suite workflow](../../.github/workflows/tests.yml) runs all three
-suites in each OS job. Published-consumer checks run afterward in a separate step,
-including when the test suites fail, so their compiler processes do not compete
-with live shell and desktop scenarios. Shell/display setup is platform-level; no
-job or class-name filter is added for suggestions, settings, tabs, or future
-application features.
-Reports are retained on success and failure. Existing packaging/consumer and IDE
-checks remain in that workflow; long differential campaigns retain their separate
-campaign workflow.
+The [Test Suite workflow](../../.github/workflows/tests.yml) plans independent
+validation groups, then runs the selected groups in parallel:
+
+| Group | Validation |
+| --- | --- |
+| Headless | Linux JVM tests, formatting, ABI, and native version metadata. |
+| Platform | Linux native/desktop tests; Windows and macOS JVM/native/desktop tests. Real-window suites remain serialized within each display. |
+| Consumers | Published Kotlin/Java clients, retained clients, and publication metadata. Linux on selective PRs; all three operating systems on full runs. |
+| IntelliJ plugin | Formatting and tests in the independent plugin build. |
+| Benchmarks | JMH compilation and packaging. |
+| Website | Documentation, website tests, formatting, build, and links. |
+| Differential | Bounded terminal-state smoke campaigns. Long campaigns retain their separate scheduled workflow. |
+
+PRs and merge groups select affected groups conservatively. Documentation changes
+run website checks; test changes run JVM tests and the module's declared environment
+suites; production changes also run platform and relevant integration groups.
+Gradle owns downstream test invalidation through runtime classpaths: CI does not
+maintain a second module dependency graph. Build/toolchain/CI changes, unknown
+paths, empty diffs, and failed diff discovery request all groups. Pushes to
+`master`/`main`, daily schedules, manual runs, and reusable callers default to full
+validation. Release publication waits for full validation of the exact tagged
+revision, including all three consumer platforms. Reports are retained on success
+and failure.
+
+Require **CI gate** in branch protection. It succeeds only when planning and every
+selected group succeed; only deliberately unselected groups may skip. When
+adopting this workflow, replace the old OS test and Code Style required checks
+with this gate so deliberately skipped groups cannot leave a PR waiting forever.
+
+The shared JVM setup restores Gradle dependencies, compiled outputs, and cached
+headless test results. Native/desktop results are never cached. Trusted default
+branch runs populate the cache; PRs use setup-gradle's default read-only policy.
+Optionally configure the Actions secret `GRADLE_ENCRYPTION_KEY` to persist Gradle
+configuration-cache entries, following the
+[setup-gradle encryption instructions](https://github.com/gradle/actions/blob/v4/docs/setup-gradle.md#saving-configuration-cache-data).
+Without that secret, including on fork PRs, verification still runs but configuration
+cache entries are not persisted between runners.
+
+Validate CI selection, gating, and release automation locally with:
+
+```shell
+node --test .github/scripts/*.test.mjs
+```
 
 The shell matrix is an environment contract. CI passes
 `-Dterminal.test.requiredShells=...` to require the installed shell profiles used

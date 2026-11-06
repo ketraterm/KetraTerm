@@ -1,24 +1,20 @@
 name: Check website
 
 on:
-  pull_request:
-    paths:
-      - 'website/**'
-      - 'ketraterm-app/src/main/resources/io/github/ketraterm/app/icons/logo.svg'
-      - '**/*.md'
-      - '.github/workflows/*website*'
-      - '.github/workflows/deploy-docs.yml'
-      - '.github/workflows/publish-binaries.yml'
-      - '.github/workflows/release.yml'
-      - '.github/scripts/**'
-      - 'VERSION'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: check-website-${{ github.ref }}
-  cancel-in-progress: true
+  group: check-website-${{ github.workflow }}-${{ inputs.revision || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -27,6 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.revision || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
