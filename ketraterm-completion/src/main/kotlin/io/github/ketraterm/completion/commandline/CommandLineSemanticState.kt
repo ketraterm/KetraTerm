@@ -20,20 +20,21 @@ import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.spec.findNextCommandSpec
 import io.github.ketraterm.completion.spec.findOptionSpec
 
-/** Semantic state produced by one pass over tokens following a known command. */
+/** One semantic pass retaining catalog fallback data and whether unknown option arity limits its authority. */
 internal class CommandLineSemanticState(
     val commandPath: List<TerminalCommandSpec>,
     val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val pendingOptionValue: TerminalOptionSpec?,
-    val optionValues: List<ResolvedOptionValue>,
+    val options: List<ResolvedOption>,
     val positionalArguments: List<String>,
+    val hasUnrecognizedOptions: Boolean,
 )
 
-/** One completed option value associated with the spec resolved at its occurrence. */
-internal class ResolvedOptionValue(
+/** One completed option occurrence; null distinguishes a flag from an empty value. */
+internal class ResolvedOption(
     val option: TerminalOptionSpec,
-    val value: String,
+    val value: String?,
 )
 
 /** Analyzes a known command path once, retaining the state needed by completion. */
@@ -48,8 +49,9 @@ internal fun analyzeCommandTokens(
     var pendingOptionValue: TerminalOptionSpec? = null
     var acceptingSubcommands = true
     var optionsTerminated = false
-    var optionValues: ArrayList<ResolvedOptionValue>? = null
+    var options: ArrayList<ResolvedOption>? = null
     var positionalArguments: ArrayList<String>? = null
+    var hasUnrecognizedOptions = false
     commandPath += rootSpec
 
     var tokenIndex = startIndex
@@ -60,8 +62,8 @@ internal fun analyzeCommandTokens(
         val isPositional =
             when {
                 pendingOptionValue != null -> {
-                    val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
-                    values += ResolvedOptionValue(pendingOptionValue, token)
+                    val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                    values += ResolvedOption(pendingOptionValue, token)
                     pendingOptionValue = null
                     false
                 }
@@ -74,7 +76,9 @@ internal fun analyzeCommandTokens(
 
                 !optionsTerminated && normalized.isTerminalOptionToken() -> {
                     val option = findOptionSpec(commandPath, token)
-                    if (option != null) {
+                    if (option == null) {
+                        hasUnrecognizedOptions = true
+                    } else {
                         if (option.exclusiveGroupIds.isNotEmpty()) {
                             if (usedExclusiveGroupIds == null) {
                                 usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
@@ -83,11 +87,14 @@ internal fun analyzeCommandTokens(
                         }
                         if (option.requiresValue) {
                             if (token.hasAttachedOptionValue()) {
-                                val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
-                                values += ResolvedOptionValue(option, token.substringAfter(OPTION_VALUE_SEPARATOR))
+                                val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                                values += ResolvedOption(option, token.substringAfter(OPTION_VALUE_SEPARATOR))
                             } else {
                                 pendingOptionValue = option
                             }
+                        } else {
+                            val values = options ?: ArrayList<ResolvedOption>().also { options = it }
+                            values += ResolvedOption(option, null)
                         }
                     }
                     false
@@ -118,8 +125,9 @@ internal fun analyzeCommandTokens(
         usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
         optionsTerminated = optionsTerminated,
         pendingOptionValue = pendingOptionValue,
-        optionValues = optionValues ?: emptyList(),
+        options = options ?: emptyList(),
         positionalArguments = positionalArguments ?: emptyList(),
+        hasUnrecognizedOptions = hasUnrecognizedOptions,
     )
 }
 

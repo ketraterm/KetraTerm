@@ -248,6 +248,10 @@ public class TerminalRenderCache(
     public var cursorGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
+    /** Last copied delayed-wrap state, independent of the visible cursor coordinates. */
+    public var cursorPendingWrap: Boolean = false
+        private set
+
     /**
      * Convenience cursor snapshot for tests and compatibility callers.
      *
@@ -487,6 +491,7 @@ public class TerminalRenderCache(
         val oldCursorBlinking = cursorBlinking
         val oldCursorShape = cursorShape
         val oldCursorGeneration = cursorGeneration
+        val oldCursorPendingWrap = cursorPendingWrap
         shapeChangedOnLastUpdate = columns != source.columns || rows != source.rows
         if (columns != source.columns || source.rows > storageRows) {
             resizeStorage(source.columns, source.rows)
@@ -560,6 +565,7 @@ public class TerminalRenderCache(
         cursorBlinking = source.cursorBlinking
         cursorShape = source.cursorShape
         cursorGeneration = source.cursorGeneration
+        cursorPendingWrap = source.cursorPendingWrap
         cursorChangedOnLastUpdate =
             oldHasCursor != hasCursor ||
             oldCursorColumn != cursorColumn ||
@@ -567,7 +573,8 @@ public class TerminalRenderCache(
             oldCursorVisible != cursorVisible ||
             oldCursorBlinking != cursorBlinking ||
             oldCursorShape != cursorShape ||
-            oldCursorGeneration != cursorGeneration
+            oldCursorGeneration != cursorGeneration ||
+            oldCursorPendingWrap != cursorPendingWrap
         sourceReader = source.sourceReader
         hasFrame = true
     }
@@ -733,6 +740,7 @@ public class TerminalRenderCache(
         cursorBlinking = false
         cursorShape = TerminalRenderCursorShape.BLOCK
         cursorGeneration = UNINITIALIZED_GENERATION
+        cursorPendingWrap = false
         historySize = 0
         scrollbackOffset = 0
         discardedCount = 0L
@@ -771,6 +779,7 @@ public class TerminalRenderCache(
         val oldCursorBlinking = cursorBlinking
         val oldCursorShape = cursorShape
         val oldCursorGeneration = cursorGeneration
+        val nextCursorPendingWrap = frame.cursorPendingWrap
 
         frame.copyCursor(reusableCursorSink)
 
@@ -780,7 +789,8 @@ public class TerminalRenderCache(
             oldCursorVisible != nextCursorVisible ||
             oldCursorBlinking != nextCursorBlinking ||
             oldCursorShape != nextCursorShape ||
-            oldCursorGeneration != nextCursorGeneration
+            oldCursorGeneration != nextCursorGeneration ||
+            cursorPendingWrap != nextCursorPendingWrap
 
         hasCursor = true
         cursorColumn = nextCursorColumn
@@ -789,6 +799,7 @@ public class TerminalRenderCache(
         cursorBlinking = nextCursorBlinking
         cursorShape = nextCursorShape
         cursorGeneration = nextCursorGeneration
+        cursorPendingWrap = nextCursorPendingWrap
     }
 
     private fun clearAllClusters() {

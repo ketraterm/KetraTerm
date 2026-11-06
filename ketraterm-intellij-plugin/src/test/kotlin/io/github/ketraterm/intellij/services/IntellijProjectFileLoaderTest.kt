@@ -18,18 +18,66 @@ package io.github.ketraterm.intellij.services
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.testFramework.IndexingTestUtil
+import com.intellij.testFramework.JUnit38AssumeSupportRunner
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
+import io.github.ketraterm.completion.api.TerminalCompletionContext
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import org.junit.Assume.assumeTrue
+import org.junit.runner.RunWith
+import java.nio.file.FileSystems
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.invariantSeparatorsPathString
 
 /** IntelliJ fixture tests for project-file completion through Go to File. */
+@RunWith(JUnit38AssumeSupportRunner::class)
 class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
+    fun testUnqualifiedQueryMatchesNamesInsteadOfAncestorDirectories() {
+        myFixture.addFileToProject("app-server/plugins/Plugin.kt", "")
+        myFixture.addFileToProject("application/Main.kt", "")
+        myFixture.addFileToProject("rendering/apps/player/Player.kt", "")
+        myFixture.addFileToProject("gradle/wrapper/gradle-wrapper.properties", "")
+
+        val paths = load("app").map { it.path }
+
+        assertContainsElements(paths, "app-server", "application", "rendering/apps", "gradle/wrapper")
+        assertFalse(paths.toString(), paths.contains("rendering/apps/player"))
+        assertFalse(paths.toString(), paths.contains("app-server/plugins"))
+        assertFalse(paths.toString(), paths.contains("application/Main.kt"))
+        assertContainsElements(load("player").map { it.path }, "rendering/apps/player")
+        assertContainsElements(load("apps/pl").map { it.path }, "rendering/apps/player")
+    }
+
+    fun testTerminalOutsideTheIndexedProjectDoesNotSearchItsFiles() {
+        myFixture.addFileToProject("settings.gradle.kts", "")
+        var resolutions = 0
+        val loader =
+            IntellijProjectFileLoader(project) { file ->
+                resolutions++
+                Path.of(requireNotNull(project.basePath)).resolve(file.name)
+            }
+        val otherProject = Path.of(requireNotNull(project.basePath)).resolveSibling("another-terminal-project")
+
+        val entries = runBlocking { loader.load(otherProject.toUri().toString(), "sgk") }
+
+        assertEmpty(entries)
+        assertEquals(0, resolutions)
+    }
+
     /** Verifies that a non-contiguous query uses IntelliJ's project-file search. */
     fun testNonContiguousQueryFindsProjectFile() {
         myFixture.addFileToProject("settings.gradle.kts", "")
@@ -37,6 +85,15 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
         val entries = load("sgk")
 
         assertTrue(entries.toString(), entries.any { it.path == "settings.gradle.kts" })
+        val match = entries.single { it.path == "settings.gradle.kts" }
+        assertEquals(
+            "sgk",
+            buildString {
+                for (index in 0 until match.matchedRanges.rangeCount) {
+                    append(match.path.substring(match.matchedRanges.startOffset(index), match.matchedRanges.endOffset(index)))
+                }
+            },
+        )
     }
 
     /** Verifies that IntelliJ applies an explicit fuzzy directory qualifier. */
@@ -51,6 +108,58 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
             entries.map { it.path },
         )
         assertTrue(entries.single().isDirectory)
+    }
+
+    fun testLiteralBackslashPathsUseFilesystemCompletionWithoutBroadenedProjectMatches() {
+        assumeTrue("Literal backslash filenames require a POSIX filesystem", FileSystems.getDefault().separator == "/")
+        val directory = Files.createTempDirectory("ketraterm-literal-paths")
+        try {
+            for (path in listOf(
+                "foo\\bar.kt",
+                "foobar.kt",
+                "foo/bar.kt",
+                "dir\\name/Main.kt",
+                "dir-other-name/Main.kt",
+                "dir/name/Main.kt",
+            )) {
+                val target = directory.resolve(path)
+                Files.createDirectories(target.parent)
+                Files.writeString(target, "")
+            }
+            val root = requireNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(directory))
+            root.refresh(false, true)
+            PsiTestUtil.addContentRoot(module, root)
+            try {
+                IndexingTestUtil.waitUntilIndexesAreReady(project)
+                val loader = IntellijProjectFileLoader(project)
+                val uri = directory.toUri().toString()
+                val absolutePrefix = directory.resolve("foo\\b").invariantSeparatorsPathString
+                val hostContext = IntellijCompletionContext("test", { uri }, TerminalShellCapabilities.POSIX)
+                val sources =
+                    listOf(
+                        TerminalCompletionSources.path(TerminalLocalFileSystemProvider(scanner = hostContext.directoryScanner)),
+                        intellijProjectFileCompletionSource(loader::load),
+                    )
+                for ((prefix, expected) in listOf(
+                    "foo\\b" to "foo\\bar.kt",
+                    "dir\\name/Ma" to "dir\\name/Main.kt",
+                    absolutePrefix to directory.resolve("foo\\bar.kt").invariantSeparatorsPathString,
+                )) {
+                    // Go to File cannot see these POSIX names. Keep the exact path
+                    // and shell quoting through the filesystem source used by the product.
+                    assertEmpty(runBlocking { loader.load(uri, prefix) })
+                    val line = "cat '$prefix"
+                    val request = TerminalCompletionRequest(line, line.length, uri, shellCapabilities = TerminalShellCapabilities.POSIX)
+                    val context = TerminalCompletionContext.resolve(request)
+                    val candidates = runBlocking { sources.flatMap { it.complete(request, context, 64) } }
+                    assertEquals(prefix, listOf("'$expected'"), candidates.map { it.replacementText })
+                }
+            } finally {
+                PsiTestUtil.removeContentEntry(module, root)
+            }
+        } finally {
+            assertTrue(FileUtil.delete(directory.toFile()))
+        }
     }
 
     /** Verifies that a pending write cancels and transparently restarts the IntelliJ read action. */

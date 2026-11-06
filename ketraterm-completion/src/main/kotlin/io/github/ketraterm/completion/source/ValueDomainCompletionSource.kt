@@ -81,13 +81,14 @@ internal fun projectValueDomainCandidates(
     sourceId: String,
     values: List<TerminalCompletionDomainValue>,
     limit: Int,
+    prefix: String = context.activePrefix,
+    omitExactMatch: Boolean = true,
 ): List<TerminalCompletionCandidate> {
     if (context.expectedValueDomain != domain || values.isEmpty()) return emptyList()
-    val prefix = context.activePrefix
     val candidates = BoundedCompletionCandidateCollector(limit)
     for (index in values.indices) {
         val value = values[index]
-        if (prefix.isNotEmpty() && value.value.equals(prefix, ignoreCase = true)) continue
+        if (omitExactMatch && prefix.isNotEmpty() && value.value.equals(prefix, ignoreCase = true)) continue
         val match = CompletionMatcher.match(value.value, prefix) ?: continue
         if (!ShellReplacementText.canEncode(value.value, context.activeTokenQuote, request.shellCapabilities.quoting)) {
             continue

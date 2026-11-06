@@ -1,0 +1,175 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.workspace
+
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.pty.PtyEventListener
+import io.github.ketraterm.pty.PtyOptions
+import io.github.ketraterm.pty.TerminalSessions
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.session.TerminalStartupCommandStatus
+import io.github.ketraterm.shell.integration.OscShellIntegration
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.time.Duration.Companion.milliseconds
+
+@Tag("native")
+class TerminalStartupCommandNativeTest {
+    @Test
+    fun `PowerShell runs startup once and accepts another command`(
+        @TempDir directory: Path,
+    ) {
+        verifyInteractiveShell("powershell", directory)
+    }
+
+    @Test
+    fun `Bash runs startup once and accepts another command`(
+        @TempDir directory: Path,
+    ) {
+        verifyInteractiveShell("bash", directory)
+    }
+
+    private fun verifyInteractiveShell(
+        shell: String,
+        directory: Path,
+    ): Unit =
+        runBlocking {
+            val windows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+            val registry = TerminalProfileRegistry()
+            val profileId =
+                when {
+                    shell == "powershell" && windows -> "windows-powershell"
+                    shell == "bash" && windows -> "git-bash"
+                    else -> shell
+                }
+            val executable =
+                registry
+                    .availableProfiles()
+                    .firstOrNull { it.id == profileId }
+                    ?.command
+                    ?.first()
+                    ?: if (shell == "powershell" && registry.isValidShellPath("pwsh")) {
+                        "pwsh"
+                    } else {
+                        null
+                    }
+            assumeTrue(executable != null, "$shell is not installed")
+            val journal = directory.resolve("journal.txt")
+            val result = directory.resolve("result.txt")
+            val acknowledge = if (shell == "powershell") "[Console]::Write([char]7)" else "printf '\\007'"
+            val startup =
+                if (shell == "powershell") {
+                    "${'$'}startupRuns = 1 + [int]${'$'}startupRuns; Add-Content -LiteralPath '${journal.toString().replace(
+                        "'",
+                        "''",
+                    )}' -Value startup; $acknowledge"
+                } else {
+                    "STARTUP_RUNS=${'$'}(( ${'$'}{STARTUP_RUNS:-0} + 1 )); printf 'startup\\n' >> '${journal.toString().replace(
+                        '\\',
+                        '/',
+                    ).replace("'", "'\\''")}'; $acknowledge"
+                }
+            val next =
+                if (shell == "powershell") {
+                    "[IO.File]::WriteAllText('${result.toString().replace("'", "''")}', [string]${'$'}startupRuns); $acknowledge"
+                } else {
+                    "printf '%s' \"${'$'}STARTUP_RUNS\" > '${result.toString().replace('\\', '/').replace("'", "'\\''")}'; $acknowledge"
+                }
+            val profile =
+                TerminalProfile(
+                    id = shell,
+                    displayName = shell,
+                    command = listOf(requireNotNull(executable), if (shell == "powershell") "-NoProfile" else "-i"),
+                    workingDirectory = directory,
+                    environment = if (shell == "bash") mapOf("HOME" to directory.toString()) else emptyMap(),
+                    startupCommand = TerminalStartupCommand(startup),
+                )
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory.resolve("bootstrap")).profile
+            val completedCommands = Channel<Unit>(Channel.UNLIMITED)
+            val listener =
+                object : PtyEventListener by PtyEventListener.NONE {
+                    private var outputAcknowledged = false
+
+                    override fun bell(session: TerminalSession) {
+                        outputAcknowledged = true
+                    }
+
+                    override fun shellIntegrationMarker(
+                        session: TerminalSession,
+                        event: ShellIntegrationEvent,
+                    ) {
+                        if (event.marker == ShellIntegrationMarker.PROMPT_END && outputAcknowledged) {
+                            outputAcknowledged = false
+                            completedCommands.trySend(Unit).getOrThrow()
+                        }
+                    }
+                }
+            try {
+                TerminalSessions
+                    .localPty(
+                        PtyOptions.create { draft ->
+                            draft.command = launch.command
+                            draft.environment = PtyOptions.defaultEnvironment() + launch.environment
+                            draft.workingDirectory = directory
+                            draft.columns = 120
+                            draft.rows = 20
+                            draft.startupCommand = launch.startupCommand
+                            draft.shellIntegration = OscShellIntegration
+                            draft.eventListener = listener
+                        },
+                    ).use { session ->
+                        // A redraw can repeat prompt markers; require the command's output acknowledgement first.
+                        withTimeout(20_000.milliseconds) { completedCommands.receive() }
+                        assertEquals(TerminalStartupCommandStatus.SUBMITTED, session.startupCommandStatus?.value)
+                        assertEquals(listOf("startup"), Files.readAllLines(journal).map { it.removePrefix("\uFEFF") })
+                        session.encodePaste(TerminalPasteEvent(next))
+                        session.encodeKey(TerminalKeyEvent(key = TerminalKey.ENTER))
+                        withTimeout(20_000.milliseconds) { completedCommands.receive() }
+                        assertEquals("1", Files.readString(result))
+                        assertEquals(listOf("startup"), Files.readAllLines(journal).map { it.removePrefix("\uFEFF") })
+                        assertFalse(session.isClosed)
+                        // Shell shutdown may save history in HOME; finish it before TempDir deletes that directory.
+                        session.encodePaste(TerminalPasteEvent("exit"))
+                        session.encodeKey(TerminalKeyEvent(key = TerminalKey.ENTER))
+                        val closed =
+                            withTimeout(20_000.milliseconds) {
+                                session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                            }
+                        assertEquals(0, closed.event.exitCode)
+                        assertFalse(closed.event.locallyRequested)
+                    }
+            } finally {
+                completedCommands.close()
+            }
+        }
+}

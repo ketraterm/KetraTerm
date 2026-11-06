@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.model.TerminalOptionSpec
+import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +27,36 @@ import org.junit.jupiter.params.provider.EnumSource
 import kotlin.test.*
 
 class TerminalCompletionContextResolutionTest {
+    @Test
+    fun `unknown parameter arity is retained alongside catalog fallback context`() {
+        val context = TerminalCompletionContext.resolve(request("cat file.txt -Encoding u"))
+        assertEquals("cat", context.command?.name)
+        assertEquals("u", context.activePrefix)
+        assertEquals(TerminalPathArgumentKind.FILE_OR_DIRECTORY, context.expectedPathKind)
+        assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain)
+        assertNull(context.activeOption)
+        val fallbackArgument = assertNotNull(context.activePositionalArgument)
+        assertEquals("file", fallbackArgument.name)
+        assertSame(context.currentCommand?.positionalArguments?.single(), fallbackArgument)
+        assertEquals(listOf("file.txt"), context.precedingPositionalArguments)
+        assertTrue(context.hasUnrecognizedOptions)
+    }
+
+    @Test
+    fun `option terminators known option values and words after the cursor do not create unknown options`() {
+        val terminated = TerminalCompletionContext.resolve(request("cat -- -Encoding "))
+        assertFalse(terminated.hasUnrecognizedOptions)
+        assertEquals(TerminalPathArgumentKind.FILE_OR_DIRECTORY, terminated.expectedPathKind)
+
+        val value = TerminalCompletionContext.resolve(request("tool --context -Encoding get f"), catalog)
+        assertFalse(value.hasUnrecognizedOptions)
+        assertEquals(listOf("-Encoding"), value.precedingOptionValues("--context"))
+
+        val earlier = TerminalCompletionContext.resolve(request("cat f -Encoding u").copy(cursorOffset = "cat f".length))
+        assertFalse(earlier.hasUnrecognizedOptions)
+        assertEquals(TerminalPathArgumentKind.FILE_OR_DIRECTORY, earlier.expectedPathKind)
+    }
+
     @Test
     fun `default resolution uses bundled command specifications`() {
         val context = TerminalCompletionContext.resolve(request("git switch fe"))

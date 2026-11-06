@@ -150,6 +150,7 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderFra
 	public abstract fun getColumns ()I
 	public fun getContentGeneration ()J
 	public abstract fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public fun getCursorPendingWrap ()Z
 	public fun getDiscardedCount ()J
 	public abstract fun getFrameGeneration ()J
 	public fun getGraphicsGeneration ()J
@@ -172,6 +173,7 @@ public final class io/github/ketraterm/render/api/TerminalRenderFrame$DefaultImp
 	public static fun copyTextLine (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
 	public static synthetic fun copyTextLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public static fun getContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getCursorPendingWrap (Lio/github/ketraterm/render/api/TerminalRenderFrame;)Z
 	public static fun getDiscardedCount (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getGraphicsGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getHistoryContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J

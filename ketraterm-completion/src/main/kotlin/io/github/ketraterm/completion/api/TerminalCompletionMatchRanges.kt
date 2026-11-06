@@ -23,6 +23,7 @@ package io.github.ketraterm.completion.api
  * are Unicode-scalar boundaries that do not split surrogate pairs. The empty
  * instance is shared; non-empty factories defensively copy caller-owned arrays.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionMatchRanges private constructor(
     private val packedOffsets: IntArray,
 ) {

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import java.util.*
 import java.util.List.copyOf
 
@@ -22,6 +23,7 @@ import java.util.List.copyOf
  * Curated static command specs useful as a bootstrap source before richer
  * imported corpora and host context providers are available.
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCommandSpecs {
     private val DEFAULT_CATALOG: List<TerminalCommandSpec> =
         freezeSpecs(
@@ -53,6 +55,11 @@ public object TerminalCommandSpecs {
                 ToolchainCommandSpecs.kotlinc(),
                 ToolchainCommandSpecs.adb(),
                 ToolchainCommandSpecs.ketra(),
+                NetworkCommandSpecs.curl(),
+                NetworkCommandSpecs.ssh(),
+                MavenCommandSpecs.maven(),
+                DotnetCommandSpecs.dotnet(),
+                ToolchainCommandSpecs.python(),
             ),
         )
 
@@ -93,11 +100,14 @@ public object TerminalCommandSpecs {
      * description and argument label. Keys are `spec.<canonical.path>.description`,
      * `spec.<canonical.path>.option.<first-option-token>.description`, and
      * `spec.<canonical.path>.argument.<original-name>.name` or `.description`.
+     * Option value labels use `spec.<canonical.path>.option.<first-name>.valueName`.
      * For example: `spec.git.status.description`,
      * `spec.git.status.option.--short.description`, and
      * `spec.kubectl.get.argument.resource.name`. The argument's zero-based ordinal
-     * replaces its name when that name is empty. Dots separate canonical command
+     * replaces its name when that name is empty or contains punctuation/whitespace. Dots separate canonical command
      * and subcommand tokens; aliases and translated labels never become keys.
+     * Post-terminator metadata uses `spec.<canonical.path>.argumentAfterDoubleDash.name`
+     * and `.description`.
      */
     @JvmStatic
     public fun defaults(localize: (key: String, english: String) -> String): List<TerminalCommandSpec> =
@@ -118,14 +128,28 @@ public object TerminalCommandSpecs {
                     spec.options.map { option ->
                         option.copy(
                             description = localizeNonempty("$key.option.${option.names.first()}.description", option.description, localize),
+                            valueName = localizeNonempty("$key.option.${option.names.first()}.valueName", option.valueName, localize),
                         )
                     },
                 positionalArguments =
                     spec.positionalArguments.mapIndexed { index, argument ->
-                        val argumentKey = "$key.argument.${argument.name.ifEmpty { index.toString() }}"
+                        val name = argument.name
+                        val identifier =
+                            name.takeIf {
+                                it.isNotEmpty() &&
+                                    it.all { char -> char.isLetterOrDigit() || char == '-' || char == '_' }
+                            }
+                        val argumentKey = "$key.argument.${identifier ?: index}"
                         argument.copy(
                             name = localizeNonempty("$argumentKey.name", argument.name, localize),
                             description = localizeNonempty("$argumentKey.description", argument.description, localize),
+                        )
+                    },
+                positionalArgumentAfterDoubleDash =
+                    spec.positionalArgumentAfterDoubleDash?.let { argument ->
+                        argument.copy(
+                            name = localizeNonempty("$key.argumentAfterDoubleDash.name", argument.name, localize),
+                            description = localizeNonempty("$key.argumentAfterDoubleDash.description", argument.description, localize),
                         )
                     },
             )
@@ -142,14 +166,28 @@ public object TerminalCommandSpecs {
             name = "cd",
             description = commandSpecText("spec.cd.description"),
             aliases = listOf("chdir", "sl", "set-location"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.cd.argument.directory.name"),
+                        isOptional = true,
+                        pathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
+                ),
         )
 
     private fun pushd(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "pushd",
             description = commandSpecText("spec.pushd.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.pushd.argument.directory.name"),
+                        isOptional = true,
+                        pathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
+                ),
         )
 
     private fun ls(): TerminalCommandSpec =
@@ -157,7 +195,15 @@ public object TerminalCommandSpecs {
             name = "ls",
             description = commandSpecText("spec.ls.description"),
             aliases = listOf("dir"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.ls.argument.path.name"),
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-l"), commandSpecText("spec.ls.option.-l.description")),
@@ -173,7 +219,15 @@ public object TerminalCommandSpecs {
             name = "cat",
             description = commandSpecText("spec.cat.description"),
             aliases = listOf("type"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.cat.argument.file.name"),
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-n", "--number"), commandSpecText("spec.cat.option.-n.description")),
@@ -184,7 +238,14 @@ public object TerminalCommandSpecs {
         TerminalCommandSpec(
             name = "mkdir",
             description = commandSpecText("spec.mkdir.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.mkdir.argument.directory.name"),
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-p", "--parents"), commandSpecText("spec.mkdir.option.-p.description")),
@@ -196,7 +257,14 @@ public object TerminalCommandSpecs {
             name = "rm",
             description = commandSpecText("spec.rm.description"),
             aliases = listOf("del", "erase"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.rm.argument.path.name"),
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-r", "-R", "--recursive"), commandSpecText("spec.rm.option.-r.description")),
@@ -236,7 +304,15 @@ public object TerminalCommandSpecs {
         TerminalCommandSpec(
             name = "code",
             description = commandSpecText("spec.code.description"),
-            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            positionalArguments =
+                listOf(
+                    TerminalArgumentSpec(
+                        commandSpecText("spec.code.argument.path.name"),
+                        isOptional = true,
+                        isVariadic = true,
+                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("-r", "--reuse-window"), commandSpecText("spec.code.option.-r.description")),
@@ -246,9 +322,6 @@ public object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("-w", "--wait"), commandSpecText("spec.code.option.-w.description")),
                 ),
         )
-
-    internal val KUBECTL_RESOURCES: List<String>
-        get() = ContainerCommandSpecs.KUBECTL_RESOURCES
 
     private fun freezeSpecs(specs: List<TerminalCommandSpec>): List<TerminalCommandSpec> =
         immutableList(
@@ -272,6 +345,10 @@ public object TerminalCommandSpecs {
                                 argument.copy(valueCandidates = immutableList(argument.valueCandidates))
                             },
                         ),
+                    positionalArgumentAfterDoubleDash =
+                        spec.positionalArgumentAfterDoubleDash?.let {
+                            it.copy(valueCandidates = immutableList(it.valueCandidates))
+                        },
                 )
             },
         )

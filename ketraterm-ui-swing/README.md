@@ -21,7 +21,6 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
 import javax.swing.SwingUtilities
 
@@ -29,9 +28,7 @@ fun createTerminalView(session: TerminalSession): SwingTerminal {
     return createUnboundTerminalView().apply { bind(session) }
 }
 
-fun createUnboundTerminalView(
-    provider: SwingShellSuggestionProvider? = null,
-): SwingTerminal {
+fun createUnboundTerminalView(): SwingTerminal {
     check(SwingUtilities.isEventDispatchThread()) { "Create terminal views on the EDT" }
 
     val settings = SwingSettings.create {
@@ -57,9 +54,7 @@ fun createUnboundTerminalView(
         it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
     }
 
-    return SwingTerminal(settingsProvider = { settings }).apply {
-        setShellSuggestionProvider(provider)
-    }
+    return SwingTerminal(settingsProvider = { settings })
 }
 ```
 
@@ -222,6 +217,15 @@ cursors stay hidden.
 
 ### Suggestion request ownership
 
+**Experimental.** Suggestions may be incomplete, rank poorly, or behave unexpectedly
+in edge cases. Suggestion providers, editing targets, interactions,
+and custom views follow the [completion stability policy](../docs/features/completion.md#stability-experimental).
+
+Opt in to `ExperimentalShellSuggestionsApi` where you configure or use suggestions.
+Creating, configuring, and binding the terminal without suggestions needs no opt-in.
+See the [completion adapter example](../ketraterm-ui-swing-host/README.md#completion-bridge)
+for suggestion-specific setup.
+
 Call `setShellSuggestionProvider(provider)` on the EDT before or after binding.
 The provider survives rebinding; replacing it cancels current requests without
 closing the provider. Passing `null` disables configured provider requests.
@@ -229,10 +233,72 @@ The host retains ownership of engines, sources, persistence, and their resources
 
 The terminal coordinates automatic focus, eligibility, debounce, and session
 observation. `smartSuggestionsEnabled` gates all suggestions;
-`shellSuggestionsEnabled` gates automatic popups. An explicit
+`shellSuggestionsEnabled` gates automatic popups. Set `shellSuggestionAutomaticMode`
+to `SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY` to show automatic popups
+for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
-remains available when automatic popups are disabled. Use
-`refreshShellSuggestions()` to reconcile changes to external ranking context.
+remains available when automatic popups are disabled or limited to parameters.
+Automatic refreshes cannot replace an active explicit request.
+Automatic requests require an unambiguous command snapshot and do not perform
+native shell confirmation of screen-derived prefixes. Explicit requests may
+confirm such a prefix through the session. Hosts using a provider that invokes
+the live shell should disable automatic popups for that provider, as the products
+do for PowerShell.
+Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
+using their shell-aware command context; the terminal sets it to `false` for
+parameter-only automatic requests. The shared completion adapter forwards it
+to the engine. Use
+`refreshShellSuggestions()` on the EDT when external context such as the working
+directory changes. It immediately cancels pending work and closes existing
+suggestions, including explicit requests. Automatic suggestions then refresh
+after the normal debounce; with automatic popups disabled, request them explicitly again.
+
+The embedded automatic popup updates in place as you type. Previous rows remain
+visible while results refresh, but cannot be accepted until fresh results arrive.
+
+Use `SwingSettings.shellSuggestionStyle` to customize the built-in popup:
+
+```kotlin
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun suggestionSettings() = SwingSettings.create {
+    it.shellSuggestionStyle = SwingShellSuggestionStyle(
+        background = 0xFF202124.toInt(),
+        foreground = 0xFFE8EAED.toInt(),
+        selectionBackground = 0xFF334455.toInt(),
+        selectionForeground = 0xFFFFFFFF.toInt(),
+        matchForeground = 0xFF82AFFC.toInt(),
+        selectionMatchForeground = 0xFFBBDDFF.toInt(),
+    )
+}
+```
+
+The style also exposes match backgrounds, border, overflow text, and normal/selected
+argument-hint colors (`argumentHintForeground` and `selectionArgumentHintForeground`). Every
+role has a concrete default in the built-in dark palette. Colors are packed ARGB;
+text and fills must be opaque, while a transparent border removes the outline.
+Colors are rendered exactly, with no theme lookup or automatic contrast changes.
+The built-in popup uses `SwingSettings.font`; icons, spacing, and size bounds scale
+with that font.
+Call `reloadSettings()` after changing settings; the popup updates without
+replacing its suggestions or selection.
+Custom views retain control of their own styling. Providers supply label-relative
+`matchedRanges`, including disjoint fuzzy matches; the default view colors those
+fragments without repeating the match. Providers can supply display-only `argumentHint`
+text beside the label; hints never become part of the accepted command.
+
+Nested `PATH` rows show the name first and parent context in `secondaryForeground`
+(`selectionForeground` on selection). Long paths shorten to the available width;
+hover and accessibility retain the full path, and acceptance inserts the original
+replacement. Visible match fragments keep their supplied highlights.
+Custom providers set `backslashPathSeparator = false` when `PATH` labels contain
+literal POSIX backslashes. The standard completion adapter supplies this policy.
+
+During ordinary typing, old rows remain briefly to avoid flicker. A slow refresh
+clears them after 200 ms while collection continues; stale rows cannot be accepted.
 
 For command text outside the session, call `requestShellSuggestions` with its
 text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
@@ -240,8 +306,10 @@ text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
 the request when that external context changes. Supply an explicit `editTarget`
 for a custom editor. Normal terminal completion captures editing authority from
 the bound session, which requires a synchronized revisioned command source such
-as `TerminalShellCommandLineState` or the optional OSC producer. A read-only
-StateFlow model alone cannot admit conditional edits. See the
+as `TerminalShellCommandLineState` or the optional OSC producer. The default target
+uses the producer's prefix-reset capability when available; custom editors keep
+their own acceptance contract. A read-only StateFlow model alone cannot admit
+conditional edits. See the
 [conditional edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
 
 Provider `open` runs on the EDT before background collection; keep it cheap.

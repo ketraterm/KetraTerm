@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
+import io.github.ketraterm.ui.swing.suggestion.*
 
 /**
  * Shared adapter from Swing suggestion feedback to completion statistics.
@@ -31,6 +29,8 @@ import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
  * @param recordSuggestionFeedback host-owned exact-feedback sink.
  * @param clockEpochMillis host wall-clock supplier.
  */
+@ExperimentalTerminalCompletionApi
+@ExperimentalShellSuggestionsApi
 public class SwingCompletionFeedbackRecorder(
     private val recordSuggestionFeedback: (
         commandLine: String,

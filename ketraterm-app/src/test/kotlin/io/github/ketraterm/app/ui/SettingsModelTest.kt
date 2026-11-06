@@ -23,6 +23,8 @@ import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.io.IOException
 import java.nio.file.Files
@@ -50,6 +52,29 @@ class SettingsModelTest {
     @AfterTest
     fun tearDown() {
         Files.deleteIfExists(tempFile)
+    }
+
+    @Test
+    fun `PowerShell keeps explicit suggestions without enabling automatic shell queries`() {
+        for (mode in SwingShellSuggestionAutomaticMode.entries) {
+            val preferences =
+                settings.config.copy(
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = true,
+                    shellSuggestionAutomaticMode = mode,
+                )
+            settings.update(preferences)
+            val powerShell = settings.current(TerminalProfileKind.POWERSHELL)
+            assertTrue(powerShell.smartSuggestionsEnabled)
+            assertFalse(powerShell.shellSuggestionsEnabled)
+            assertEquals(mode, powerShell.shellSuggestionAutomaticMode)
+            assertTrue(settings.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+            assertEquals(preferences, settings.config)
+            assertEquals(preferences, KetraTermConfigManager(tempFile).load())
+        }
+        settings.update(settings.config.copy(shellSuggestionsEnabled = false, smartSuggestionsEnabled = false))
+        assertFalse(settings.current(TerminalProfileKind.POWERSHELL).smartSuggestionsEnabled)
+        assertFalse(settings.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
     }
 
     @Test

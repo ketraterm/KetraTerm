@@ -116,6 +116,11 @@ launches. Explicit WSL shell launches can receive hooks; startup commands requir
 a directly configured interactive shell with hooks enabled. Invalid startup
 combinations fail before process creation.
 
+Fish uses its own prompt-start and command lifecycle markers when the `mark-prompt`
+feature is enabled. The hooks append the command-line boundary marker to the
+existing `fish_prompt` function in either mode; they do not require
+`SHELL_PROMPT_SUFFIX` support.
+
 `TerminalShellEnvironment` overrides launch environment values and can prepend
 one directory to PATH. With working hooks, these selections are reapplied after
 shell startup files. Otherwise they affect only the initial process environment.

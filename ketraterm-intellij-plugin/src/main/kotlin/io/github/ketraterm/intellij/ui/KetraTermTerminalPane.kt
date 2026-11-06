@@ -35,6 +35,7 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
@@ -351,7 +352,7 @@ internal class KetraTermTerminalPane private constructor(
             val terminal =
                 SwingTerminal(
                     settingsProvider = {
-                        KetraTermIntellijSettings.current().copy { draft ->
+                        KetraTermIntellijSettings.getInstance().current(tab.profile.kind).copy { draft ->
                             draft.osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation()
                         }
                     },
@@ -370,7 +371,8 @@ internal class KetraTermTerminalPane private constructor(
                             draft.viewportListener = scrollbarAdapter
                             draft.scrollbarOverlayEnabled = false
                             draft.shellSuggestionKeymap = KetraTermShellSuggestionKeymap
-                            draft.shellSuggestionViewFactory = IntellijCompletionListViewFactory
+                            draft.shellSuggestionViewFactory =
+                                SwingShellSuggestionViewFactory.createDefault(SwingTerminalMessages.forLocale(KetraTermBundle.locale))
                             draft.uiDispatcher =
                                 TerminalUiDispatcher { runnable ->
                                     ApplicationManager.getApplication().invokeLater(runnable)

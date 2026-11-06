@@ -28,6 +28,42 @@ import kotlin.test.assertNull
 
 class CompletionOutcomeProjectionPropertyTest {
     @Test
+    fun `alias completion outcomes merge regardless of quoting and replacement span`() =
+        runBlocking {
+            for (line in listOf("gs fe", "gs feat", "gs fex --quiet")) {
+                val end = line.indexOf(' ', 3).let { if (it < 0) line.length else it }
+                val request = TerminalCompletionRequest(line, end - 1, shellCapabilities = TerminalShellCapabilities.POSIX)
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, context, _ ->
+                                listOf(
+                                    candidate("feature", 3, end, "runtime"),
+                                    candidate("'feature'", 3, end, "quoted"),
+                                    candidate("gs feature", 0, end, "history"),
+                                ).map {
+                                    it.copy(kind = TerminalCompletionCandidateKind.ARGUMENT, valueDomain = context.expectedValueDomain)
+                                }
+                            }),
+                        ),
+                        shellProvider =
+                            object : TerminalCompletionShellProvider {
+                                override fun commandAliases() = mapOf("gs" to "git switch")
+
+                                override suspend fun complete(
+                                    request: TerminalCompletionRequest,
+                                    context: TerminalCompletionContext,
+                                    limit: Int,
+                                ): TerminalCompletionShellResult? = null
+                            },
+                    )
+                val result = engine.complete(request)
+                assertEquals(1, result.size, line)
+                assertEquals("gs feature" + line.substring(end), request.commandLineAfterCandidate(result.single()))
+            }
+        }
+
+    @Test
     fun `valid scalar replacement ranges project exactly`() =
         runBlocking {
             val random = Random(PROJECTION_SEED)

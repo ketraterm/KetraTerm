@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
  * @property suggestions cold progressive snapshots, collected outside the EDT by the terminal binding.
  * @property feedbackHandler observer for this source's original request, independent of later provider replacement.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionSource(
     public val suggestions: Flow<List<SwingShellSuggestion>>,
     public val feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,

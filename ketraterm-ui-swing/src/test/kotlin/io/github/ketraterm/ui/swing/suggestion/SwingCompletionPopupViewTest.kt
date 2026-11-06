@@ -16,8 +16,14 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
+import io.github.ketraterm.ui.swing.render.SwingColors
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Color
 import java.awt.Font
 import java.awt.event.MouseEvent
@@ -31,6 +37,497 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["foo\\bar.txt", "dir\\name/foo\\bar.txt", "parent/foo\\"])
+    fun `POSIX path presentation preserves literal backslashes in names and parents`(path: String) =
+        onEdt {
+            val nameStart = path.lastIndexOf('/') + 1
+            val name = path.substring(nameStart)
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    backslashPathSeparator = false,
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(path, intArrayOf(nameStart, nameStart + 3)),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(800, 40)
+                val row = view.renderedLabel(candidate)
+                val text = row.text.replace(Regex("<[^>]+>"), "").replace("&nbsp;", " ")
+                val parent = path.substringBeforeLast('/', "")
+
+                assertEquals(name + if (parent.isEmpty()) "" else "  $parent", text)
+                assertTrue(row.text.contains(">foo</b>"))
+                assertEquals(if (parent.isEmpty()) null else "<html>$path</html>", row.toolTipText)
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertEquals(path, candidate.replacementText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
+    @CsvSource("/file.txt, /", "C:\\file.txt, C:\\", "../file.txt, ..")
+    fun `root and navigation context survives name first presentation`(
+        path: String,
+        parent: String,
+    ) = onEdt {
+        val candidate = suggestion(path).copy(kind = "PATH")
+        val view = createView(RecordingListener())
+        try {
+            view.update(snapshot(listOf(candidate), -1, 1, 0))
+            val row = view.renderedLabel(candidate)
+            assertTrue(row.text.startsWith("<html>file.txt"))
+            assertTrue(row.text.endsWith("$parent</span></html>"))
+            assertEquals(path, row.accessibleContext.accessibleName)
+        } finally {
+            view.close()
+        }
+    }
+
+    @Test
+    fun `path shortening preserves deep matching graphemes and escapes full path tooltips`() =
+        onEdt {
+            val parent = "module/" + "unmatched/".repeat(12) + "target\uD83D\uDE80e\u0301/" + "unmatched/".repeat(12)
+            val path = parent + "leaf<&>.txt"
+            val start = path.indexOf("target")
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                            path,
+                            intArrayOf(start, start + "target\uD83D\uDE80e\u0301".length),
+                        ),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(350, 40)
+                val row = view.renderedLabel(candidate)
+                assertTrue(row.text.startsWith("<html>leaf&lt;&amp;&gt;.txt"))
+                assertTrue(row.text.contains(">target\uD83D\uDE80e\u0301</b>"))
+                assertTrue(row.text.contains('\u2026'))
+                assertTrue(row.toolTipText.contains("leaf&lt;&amp;&gt;.txt"))
+                assertEquals(path, row.accessibleContext.accessibleName)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `nested paths show highlighted names first with muted parent context and full paths on hover`() =
+        onEdt {
+            val path = "module/rendering/runs/gaps-build.log"
+            val nameStart = path.indexOf("gaps-")
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    accentRole = SwingShellSuggestionAccentRole.PATH,
+                    replacementText = "'module/rendering/runs/gaps-build.log'",
+                    matchedRanges =
+                        SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                            path,
+                            intArrayOf(nameStart, nameStart + 1, nameStart + 5, nameStart + 6),
+                        ),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.applyStyle(
+                    SwingShellSuggestionStyle(secondaryForeground = 0xFF123456.toInt(), selectionForeground = 0xFF654321.toInt()),
+                )
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(450, 40)
+                val row = view.renderedLabel(candidate)
+                assertTrue(row.text.startsWith("<html><b "))
+                assertTrue(row.text.indexOf("uild.log") < row.text.indexOf("module"))
+                assertTrue(row.text.contains("color:#123456"))
+                assertTrue(row.text.contains(">g</b>aps-<b "))
+                assertEquals("<html>$path</html>", row.toolTipText)
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertEquals("'module/rendering/runs/gaps-build.log'", candidate.replacementText)
+
+                val selected = view.renderedLabel(candidate, selected = true)
+                assertTrue(selected.text.contains("color:#654321"))
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `deep paths shorten parent context to width and recompute for font and size changes`() =
+        onEdt {
+            val path = "module/" + "deep-directory/".repeat(30) + "leaf.txt"
+            val candidate = suggestion(path).copy(kind = "PATH", accentRole = SwingShellSuggestionAccentRole.PATH)
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+
+                fun label(width: Int): String {
+                    view.list.setSize(width, 40)
+                    val label = view.renderedLabel(candidate)
+                    return label.text
+                }
+                val narrow = label(260)
+                assertTrue(narrow.startsWith("<html>leaf.txt"))
+                assertTrue(narrow.contains('\u2026'))
+                assertFalse(narrow.contains("deep-directory/deep-directory/deep-directory"))
+                val wide = label(480)
+                assertTrue(wide.length > narrow.length)
+                view.font = view.list.font.deriveFont(26f)
+                val enlarged = label(480)
+                assertTrue(enlarged.length < wide.length)
+                assertEquals(path, candidate.displayText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `directory paths retain trailing separators and distinguish equal names by parents`() =
+        onEdt {
+            val candidates =
+                listOf("client/src/main/", "server/src/main/").map {
+                    suggestion(it).copy(kind = "PATH", accentRole = SwingShellSuggestionAccentRole.PATH)
+                }
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(candidates, -1, 2, 0))
+                val labels =
+                    candidates.mapIndexed { index, candidate ->
+                        (view.renderedLabel(candidate, index)).text
+                    }
+                assertTrue(labels.all { it.startsWith("<html>main/") })
+                assertTrue(labels[0].contains("client/src"))
+                assertTrue(labels[1].contains("server/src"))
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `font changes scale rows icons and popup bounds without replacing the publication`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidates = List(8) { suggestion("command-$it", detail = "Description $it") }
+                view.update(snapshot(candidates, selectedIndex = 7, total = 20, start = 4))
+                view.size = view.preferredSize
+                view.doLayout()
+                val model = view.list.model
+                val row =
+                    view.list.cellRenderer.getListCellRendererComponent(
+                        view.list,
+                        candidates[0],
+                        0,
+                        false,
+                        false,
+                    ) as javax.swing.JLabel
+                val originalIconWidth = row.icon.iconWidth
+                val originalRowHeight = view.list.getCellBounds(0, 0).height
+                val originalPopupWidth = view.preferredSize.width
+
+                val enlargedFont = Font(Font.MONOSPACED, Font.PLAIN, 26)
+                view.font = enlargedFont
+                view.size = view.preferredSize
+                view.doLayout()
+
+                assertEquals(enlargedFont, view.list.font)
+                assertSame(model, view.list.model)
+                assertSame(candidates[0], model.getElementAt(0))
+                assertEquals(7, view.list.selectedIndex)
+                assertTrue(view.list.getCellBounds(0, 0).height >= originalRowHeight * 1.8)
+                assertEquals(originalPopupWidth * 2, view.preferredSize.width)
+                val enlargedRow =
+                    view.list.cellRenderer.getListCellRendererComponent(view.list, candidates[0], 0, false, false) as javax.swing.JLabel
+                assertEquals(originalIconWidth * 2, enlargedRow.icon.iconWidth)
+                assertEquals("<html>Description&nbsp;0</html>", enlargedRow.toolTipText)
+                assertTrue(
+                    view.list.accessibleContext.accessibleDescription
+                        .contains("20"),
+                )
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `closing the popup releases its font binding`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            val originalFont = view.list.font
+            view.close()
+            view.close()
+            view.font = originalFont.deriveFont(30f)
+            assertEquals(originalFont, view.list.font)
+        }
+
+    @Test
+    fun `argument hints are escaped styled separately and never inserted`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidate =
+                    suggestion("switch").copy(
+                        argumentHint = "<branch> [path] & \"name\"",
+                        replacementEndOffset = 2,
+                        matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)),
+                    )
+                val style =
+                    SwingShellSuggestionStyle(
+                        argumentHintForeground = 0xFF123456.toInt(),
+                        selectionArgumentHintForeground = 0xFF654321.toInt(),
+                    )
+                view.applyStyle(style)
+                view.update(snapshot(listOf(candidate), 0, 1, 0))
+                for (selected in listOf(false, true)) {
+                    val row =
+                        view.list.cellRenderer.getListCellRendererComponent(
+                            view.list,
+                            candidate,
+                            0,
+                            selected,
+                            false,
+                        ) as javax.swing.JLabel
+                    assertTrue(row.text.contains(if (selected) "color:#654321" else "color:#123456"))
+                    assertTrue(row.text.contains("&lt;branch&gt;&nbsp;[path]&nbsp;&amp;&nbsp;&quot;name&quot;"))
+                    assertFalse(row.text.contains("<b>&lt;branch"))
+                    assertTrue(row.accessibleContext.accessibleName.contains(candidate.argumentHint))
+                }
+                view.applyStyle(style.copy(selectionArgumentHintForeground = 0xFFABCDEF.toInt()))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, true, false) as javax.swing.JLabel
+                assertTrue(row.text.contains("color:#abcdef"))
+                val request = SwingShellSuggestionRequest("sw", 2)
+                assertEquals("switch", candidate.commandTextAfterReplacement(request))
+                assertArrayEquals(intArrayOf(0, 2), candidate.matchedRanges.copyPackedOffsets())
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `explicit popup colors are honored exactly in normal and selected rows`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val style =
+                    SwingShellSuggestionStyle(
+                        background = 0xFF101820.toInt(),
+                        foreground = 0xFFDFE1E5.toInt(),
+                        selectionBackground = 0xFF334455.toInt(),
+                        selectionForeground = 0xFFF1F2F3.toInt(),
+                        matchForeground = 0xFF00FF00.toInt(),
+                        selectionMatchForeground = 0xFFFF00FF.toInt(),
+                        matchBackground = 0xFF224466.toInt(),
+                        selectionMatchBackground = 0xFF667788.toInt(),
+                        border = 0xFFFFAA00.toInt(),
+                        secondaryForeground = 0xFF99AABB.toInt(),
+                    )
+                view.applyStyle(style)
+                val candidate =
+                    suggestion(
+                        "switch",
+                    ).copy(matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)))
+                view.update(snapshot(listOf(candidate), -1, 2, 0))
+                assertEquals(style.background, view.background.rgb)
+                assertEquals(style.background, view.list.background.rgb)
+                assertEquals(style.foreground, view.list.foreground.rgb)
+                assertEquals(style.selectionBackground, view.list.selectionBackground.rgb)
+                assertEquals(style.selectionForeground, view.list.selectionForeground.rgb)
+                assertEquals(
+                    style.secondaryForeground,
+                    view.components
+                        .filterIsInstance<javax.swing.JLabel>()
+                        .single()
+                        .foreground.rgb,
+                )
+                for (selected in listOf(false, true)) {
+                    val row =
+                        view.list.cellRenderer.getListCellRendererComponent(
+                            view.list,
+                            candidate,
+                            0,
+                            selected,
+                            false,
+                        ) as javax.swing.JLabel
+                    assertEquals(if (selected) style.selectionForeground else style.foreground, row.foreground.rgb)
+                    assertEquals(if (selected) style.selectionBackground else style.background, row.background.rgb)
+                    assertTrue(
+                        row.text.contains(
+                            if (selected) "color:#ff00ff;background-color:#667788" else "color:#00ff00;background-color:#224466",
+                        ),
+                    )
+                }
+                view.size = view.preferredSize
+                view.doLayout()
+                val image = BufferedImage(view.width, view.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    view.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertEquals(style.border, image.getRGB(0, view.height / 2))
+                view.applyStyle(SwingShellSuggestionStyle())
+                assertEquals(SwingShellSuggestionStyle().foreground, view.list.foreground.rgb)
+                assertEquals(SwingShellSuggestionStyle().selectionBackground, view.list.selectionBackground.rgb)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `construction defaults are concrete values and copy does not implicitly inherit colors`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                view.applyStyle(SwingShellSuggestionStyle(matchForeground = 0xFFCC0000.toInt(), matchBackground = 0xFFEEEEEE.toInt()))
+                val candidate =
+                    suggestion(
+                        "switch",
+                    ).copy(matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)))
+                view.update(snapshot(listOf(candidate), 0, 1, 0))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, true, false) as javax.swing.JLabel
+                assertTrue(row.text.contains("color:#cc0000;background-color:#3a3d44"))
+                val style = SwingShellSuggestionStyle(background = 0xFF123456.toInt())
+                assertEquals(style.background, style.matchBackground)
+                assertEquals(style.selectionBackground, style.selectionMatchBackground)
+                assertEquals(style.matchBackground, style.copy(background = 0xFFABCDEF.toInt()).matchBackground)
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 2.0])
+    fun `popup border is fully visible on every edge at fractional scales`(scale: Double) =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                view.applyStyle(SwingShellSuggestionStyle(background = Color.BLACK.rgb, border = Color.WHITE.rgb))
+                view.update(snapshot(listOf(suggestion("cd")), 0, 1, 0))
+                view.setSize(160, 100)
+                view.doLayout()
+                val image = BufferedImage((view.width * scale).toInt(), (view.height * scale).toInt(), BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    graphics.scale(scale, scale)
+                    view.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertEquals(Color.WHITE.rgb, image.getRGB(0, image.height / 2), "Left edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width - 1, image.height / 2), "Right edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width / 2, 0), "Top edge must not be clipped")
+                assertEquals(Color.WHITE.rgb, image.getRGB(image.width / 2, image.height - 1), "Bottom edge must not be clipped")
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
+    @CsvSource("true, 1", "true, 2", "false, 1", "false, 2")
+    fun `rounded popup retains configured colors and selection at display scales`(
+        dark: Boolean,
+        scale: Int,
+    ) = onEdt {
+        val surface = if (dark) Color(0x292A2D) else Color(0xFAFAFA)
+        val selected = if (dark) Color(0x3A3D44) else Color(0xDDE7F5)
+        val view = createView(RecordingListener())
+        try {
+            view.applyStyle(
+                SwingShellSuggestionStyle(
+                    background = surface.rgb,
+                    foreground = if (dark) 0xFFDFE1E5.toInt() else 0xFF27282B.toInt(),
+                    selectionBackground = selected.rgb,
+                    selectionForeground = if (dark) Color.WHITE.rgb else 0xFF17181B.toInt(),
+                    border = if (dark) 0xFF45474C.toInt() else 0xFFCBCDD2.toInt(),
+                ),
+            )
+            val items =
+                listOf("git", "src/", "--verbose", "git status", "production").mapIndexed { index, text ->
+                    suggestion(
+                        text,
+                        "Suggestion details",
+                        "PowerShell",
+                    ).copy(accentRole = SwingShellSuggestionAccentRole.entries[index])
+                }
+            view.update(snapshot(items, 0, items.size, 0))
+            view.size = view.preferredSize
+            view.doLayout()
+            val image = BufferedImage(view.width * scale, view.height * scale, BufferedImage.TYPE_INT_ARGB)
+            val graphics = image.createGraphics()
+            try {
+                graphics.scale(scale.toDouble(), scale.toDouble())
+                view.paint(graphics)
+            } finally {
+                graphics.dispose()
+            }
+            assertEquals(0, image.getRGB(0, 0) ushr 24, "Rounded corners must expose the terminal underneath")
+            val row = view.list.getCellBounds(0, 0)
+            val sample = SwingUtilities.convertPoint(view.list, row.width - 10, row.y + row.height / 2, view)
+            assertEquals(selected.rgb, image.getRGB(sample.x * scale, sample.y * scale))
+            val preferred = view.preferredSize
+            view.update(snapshot(items, 2, items.size, 0))
+            assertEquals(preferred, view.preferredSize, "Selection must not resize the popup")
+        } finally {
+            view.close()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("292A2D, DFE1E5", "FAFAFA, 27282B", "2459A6, FFFFFF")
+    fun `category icons have distinct silhouettes and readable accents`(
+        backgroundHex: String,
+        foregroundHex: String,
+    ) = onEdt {
+        val view = createView(RecordingListener())
+        try {
+            val silhouettes = mutableSetOf<List<Boolean>>()
+            for (role in SwingShellSuggestionAccentRole.entries) {
+                val candidate = suggestion("example").copy(accentRole = role)
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+                row.background = Color(backgroundHex.toInt(16))
+                row.foreground = Color(foregroundHex.toInt(16))
+                val image = BufferedImage(row.icon.iconWidth, row.icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    row.icon.paintIcon(row, graphics, 0, 0)
+                } finally {
+                    graphics.dispose()
+                }
+                val pixels = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+                val strokes = pixels.filter { it ushr 24 == 255 }
+                assertTrue(strokes.isNotEmpty(), "$role must have a visible silhouette")
+                assertTrue(strokes.all { SwingColors.contrastRatio(it, row.background.rgb) >= 3.0 }, "$role must contrast with its row")
+                assertTrue(silhouettes.add(pixels.map { it ushr 24 >= 128 }), "$role must be distinguishable without color")
+            }
+        } finally {
+            view.close()
+        }
+    }
+
+    @Test
+    fun `compact rows show command text and retain details in tooltip and accessibility`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val candidate = suggestion("btop.exe", detail = "C:\\tools\\btop.exe", sourceDisplayText = "PowerShell")
+                view.update(snapshot(listOf(candidate), 0, 1, 0))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, true, false) as javax.swing.JLabel
+                assertTrue(row.text.contains("btop.exe"))
+                assertFalse(row.text.contains("C:"))
+                assertFalse(row.text.contains("PowerShell"))
+                assertEquals("<html>C:\\tools\\btop.exe</html>", row.toolTipText)
+                assertTrue(row.accessibleContext.accessibleDescription.contains("PowerShell"))
+                assertTrue(view.preferredSize.width < 320)
+            } finally {
+                view.close()
+            }
+        }
+
     @Test
     fun `static bundle text preserves braces and apostrophes verbatim`() {
         val messages =
@@ -58,7 +555,6 @@ class SwingCompletionPopupViewTest {
                             completion.empty=0 possibilités ; affichage 0 à 0
                             completion.role.command=Commande
                             completion.row.description={2} de {1} : {0}
-                            completion.row.tooltip=Depuis {2} : <{0}> — {1}
                             """.trimIndent(),
                         ),
                     ),
@@ -71,7 +567,7 @@ class SwingCompletionPopupViewTest {
                 }
             val view = createView(RecordingListener(), messages)
             try {
-                val candidate = suggestion("git", detail = "Branche", sourceDisplayText = "Projet")
+                val candidate = suggestion("git", detail = "Branche <locale> & projet", sourceDisplayText = "Projet")
                 view.update(snapshot(listOf(candidate), 0, 12, 4))
                 assertEquals("Suggestions de commande", view.list.accessibleContext.accessibleName)
                 assertEquals("12 possibilités ; affichage 5 à 5", view.list.accessibleContext.accessibleDescription)
@@ -81,9 +577,8 @@ class SwingCompletionPopupViewTest {
                 repeat(5) {
                     val renderer =
                         view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
-                    assertEquals("Commande de Projet : Branche", renderer.accessibleContext.accessibleDescription)
-                    assertTrue(renderer.toolTipText.contains("Depuis&nbsp;Projet&nbsp;:&nbsp;&lt;git&gt;"))
-                    assertFalse(renderer.toolTipText.contains("<git>"))
+                    assertEquals("Commande de Projet : Branche <locale> & projet", renderer.accessibleContext.accessibleDescription)
+                    assertEquals("<html>Branche&nbsp;&lt;locale&gt;&nbsp;&amp;&nbsp;projet</html>", renderer.toolTipText)
                 }
                 assertEquals(1, rowMessages)
 
@@ -171,6 +666,7 @@ class SwingCompletionPopupViewTest {
         }
 
     @Test
+    @Tag("desktop") // Swing's list mouse handler queries the platform shortcut modifier through Toolkit.
     fun `mouse click and wheel remain controller-owned interactions`() =
         onEdt {
             val listener = RecordingListener()
@@ -220,7 +716,7 @@ class SwingCompletionPopupViewTest {
         }
 
     @Test
-    fun `tooltips retain bounded full row context`() =
+    fun `hover tooltips show only the description and disappear for rows without one`() =
         onEdt {
             val view = createView(RecordingListener())
             view.update(
@@ -245,11 +741,18 @@ class SwingCompletionPopupViewTest {
                     false,
                 )
 
-            val tooltip = view.list.getToolTipText(event)
-            assertNotNull(tooltip)
-            assertTrue(tooltip!!.contains("git&nbsp;checkout&nbsp;feature/terminal"))
-            assertTrue(tooltip.contains("Switch&nbsp;branch"))
-            assertTrue(tooltip.contains("Git"))
+            try {
+                assertEquals("<html>Switch&nbsp;branch</html>", view.list.getToolTipText(event))
+                val undescribed = suggestion("git", sourceDisplayText = "Built-in")
+                view.update(snapshot(listOf(undescribed), selectedIndex = 0, total = 1, start = 0))
+                assertNull(view.list.getToolTipText(event))
+                val renderer =
+                    view.list.cellRenderer.getListCellRendererComponent(view.list, undescribed, 0, false, false) as javax.swing.JLabel
+                assertNull(renderer.toolTipText)
+                assertTrue(renderer.accessibleContext.accessibleDescription.contains("Built-in"))
+            } finally {
+                view.close()
+            }
         }
 
     @Test
@@ -327,12 +830,149 @@ class SwingCompletionPopupViewTest {
                 )
             view.update(snapshot(listOf(candidate), 0, 1, 0))
             val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
-            assertTrue(renderer.text.contains("<b>git</b>&nbsp;<b>st</b>atus"))
+            assertTrue(
+                Regex(
+                    """<b style="color:(#[0-9a-f]{6});background-color:(#[0-9a-f]{6})">git</b>&nbsp;<b style="color:\1;background-color:\2">st</b>atus""",
+                ).containsMatchIn(renderer.text),
+            )
             view.update(snapshot(listOf(suggestion("x".repeat(10000))), 0, 1, 0))
-            assertTrue(view.preferredSize.width in 320..640)
+            assertTrue(view.preferredSize.width in 220..480)
             view.update(SwingShellSuggestionViewSnapshot.EMPTY)
             assertEquals(java.awt.Dimension(0, 0), view.preferredSize)
             view.close()
+        }
+
+    @ParameterizedTest
+    @CsvSource("292A2D, 3A3D44, 82AFFC", "FAFAFA, DDE7F5, 245EB8", "333333, 005C53, FFD166")
+    fun `match accents color only supplied fragments and remain readable on selected and ordinary rows`(
+        backgroundHex: String,
+        selectionHex: String,
+        matchHex: String,
+    ) = onEdt {
+        val view = createView(RecordingListener())
+        try {
+            view.applyStyle(
+                SwingShellSuggestionStyle(
+                    background = Color.decode("#$backgroundHex").rgb,
+                    selectionBackground = Color.decode("#$selectionHex").rgb,
+                    foreground = if (backgroundHex == "FAFAFA") Color.BLACK.rgb else Color.WHITE.rgb,
+                    selectionForeground = if (backgroundHex == "FAFAFA") Color.BLACK.rgb else Color.WHITE.rgb,
+                    matchForeground = Color.decode("#$matchHex").rgb,
+                ),
+            )
+            val cases =
+                listOf(
+                    Triple("switch", intArrayOf(0, 2), listOf("sw")),
+                    Triple("SWitch", intArrayOf(0, 2), listOf("SW")),
+                    Triple("SwitchBranch", intArrayOf(0, 1, 6, 7), listOf("S", "B")),
+                    Triple("feature/switch", intArrayOf(8, 10), listOf("sw")),
+                    Triple("\uD83D\uDE80Switch", intArrayOf(2, 4), listOf("Sw")),
+                    Triple("<sw&>", intArrayOf(1, 4), listOf("sw&amp;")),
+                    Triple("switch", intArrayOf(), emptyList()),
+                )
+            val coloredFragment = Regex("""<b style="color:(#[0-9a-f]{6});background-color:#[0-9a-f]{6}">(.*?)</b>""")
+            for ((text, offsets, expected) in cases) {
+                val candidate = suggestion(text).copy(matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(text, offsets))
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                for (selected in listOf(false, true)) {
+                    val row =
+                        view.list.cellRenderer.getListCellRendererComponent(
+                            view.list,
+                            candidate,
+                            0,
+                            selected,
+                            false,
+                        ) as javax.swing.JLabel
+                    val fragments = coloredFragment.findAll(row.text).toList()
+                    assertEquals(expected, fragments.map { it.groupValues[2] }, "$text, selected=$selected")
+                    for (fragment in fragments) {
+                        val color = Color.decode(fragment.groupValues[1])
+                        assertNotEquals(row.foreground.rgb, color.rgb)
+                        assertTrue(SwingColors.contrastRatio(color.rgb, row.background.rgb) >= 4.5)
+                    }
+                    assertEquals(text, row.accessibleContext.accessibleName)
+                }
+            }
+        } finally {
+            view.close()
+        }
+    }
+
+    @Test
+    fun `match colors repaint and follow theme changes without republishing candidates`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                view.list.font = Font(Font.MONOSPACED, Font.PLAIN, 24)
+                val candidate =
+                    suggestion(
+                        "switch",
+                    ).copy(matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets("switch", intArrayOf(0, 2)))
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                val markup = ArrayList<String>()
+                for (background in listOf(Color.BLACK, Color.WHITE)) {
+                    view.applyStyle(
+                        SwingShellSuggestionStyle(
+                            background = background.rgb,
+                            selectionBackground = background.rgb,
+                            matchForeground = if (background == Color.BLACK) 0xFF82AFFC.toInt() else 0xFF245EB8.toInt(),
+                        ),
+                    )
+                    for (selected in listOf(false, true)) {
+                        val row =
+                            view.list.cellRenderer.getListCellRendererComponent(
+                                view.list,
+                                candidate,
+                                0,
+                                selected,
+                                false,
+                            ) as javax.swing.JLabel
+                        markup += row.text
+                        val color = Color.decode(Regex("""color:(#[0-9a-f]{6})""").find(row.text)!!.groupValues[1])
+                        row.size = row.preferredSize
+                        val image = BufferedImage(row.width, row.height, BufferedImage.TYPE_INT_ARGB)
+                        val graphics = image.createGraphics()
+                        try {
+                            row.paint(graphics)
+                        } finally {
+                            graphics.dispose()
+                        }
+                        assertTrue(
+                            (30 until image.width).any { x ->
+                                (0 until image.height).any { y ->
+                                    image.getRGB(x, y) == color.rgb
+                                }
+                            },
+                            "Matched text must paint its accent",
+                        )
+                    }
+                }
+                assertEquals(markup[0], markup[1])
+                assertEquals(markup[2], markup[3])
+                assertNotEquals(markup[0], markup[2])
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `truncated matches never color the ellipsis or split a supplementary character`(wholeLabel: Boolean) =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                val text = "x".repeat(4095) + "\uD83D\uDE80suffix"
+                val offsets = if (wholeLabel) intArrayOf(0, text.length) else intArrayOf(4095, 4097)
+                val candidate = suggestion(text).copy(matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(text, offsets))
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                val row = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+                assertEquals(wholeLabel, row.text.contains("<b style="))
+                assertTrue(row.text.endsWith(if (wholeLabel) "</b>\u2026</html>" else "\u2026</html>"))
+                assertFalse(row.text.contains("\uD83D\uDE80"))
+                assertEquals("x".repeat(4095) + "\u2026", row.accessibleContext.accessibleName)
+            } finally {
+                view.close()
+            }
         }
 
     @Test
@@ -343,7 +983,7 @@ class SwingCompletionPopupViewTest {
                 fun label(text: String): javax.swing.JLabel =
                     view.list.cellRenderer.getListCellRendererComponent(
                         view.list,
-                        suggestion(text),
+                        suggestion(text, detail = text),
                         0,
                         false,
                         false,
@@ -404,6 +1044,12 @@ class SwingCompletionPopupViewTest {
             detail = detail,
             sourceDisplayText = sourceDisplayText,
         )
+
+    private fun SwingCompletionPopupView.renderedLabel(
+        candidate: SwingShellSuggestion,
+        index: Int = 0,
+        selected: Boolean = false,
+    ): javax.swing.JLabel = list.cellRenderer.getListCellRendererComponent(list, candidate, index, selected, false) as javax.swing.JLabel
 
     private fun imageContainsNonTransparentPixel(image: BufferedImage): Boolean {
         var y = 0

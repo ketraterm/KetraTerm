@@ -85,6 +85,72 @@ class GradleTaskCompletionSourceTest {
         }
 
     @Test
+    fun `project directory separators follow capabilities without collapsing literal backslashes`() =
+        runBlocking {
+            val source =
+                TerminalCompletionSources.gradleTask(
+                    sourceId = "gradle-task",
+                    tasksProvider = { _, _ ->
+                        listOf(
+                            TerminalGradleTask(":literal:runLiteral", projectDirectory = "foo\\bar"),
+                            TerminalGradleTask(":nested:runNested", projectDirectory = "foo/bar"),
+                        )
+                    },
+                )
+            val capabilities =
+                listOf(
+                    TerminalShellCapabilities.POSIX,
+                    TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+                    TerminalShellCapabilities.POWERSHELL.copy(backslashPathSeparator = false),
+                    TerminalShellCapabilities.POWERSHELL,
+                )
+            for (shell in capabilities) {
+                for ((selector, literalTask) in listOf("foo\\bar" to "runLiteral", "foo/bar" to "runNested")) {
+                    val request = request("gradle -p '$selector' ru").copy(shellCapabilities = shell)
+                    val expected = if (shell.backslashPathSeparator) listOf("runLiteral", "runNested") else listOf(literalTask)
+
+                    assertEquals(expected, source.complete(request).map { it.replacementText }, "$shell: $selector")
+                }
+            }
+        }
+
+    @Test
+    fun `qualified task paths remain rooted in the build after project directory options`() =
+        runBlocking {
+            assertEquals(
+                listOf(":tools:run"),
+                source.complete(request("gradle -p app :tools:ru")).map { it.replacementText },
+            )
+        }
+
+    @Test
+    fun `resolved option values cannot be mistaken for project directory selectors`() =
+        runBlocking {
+            assertEquals(
+                listOf("test"),
+                source.complete(request("gradle --exclude-task -p tools te")).map { it.replacementText },
+            )
+        }
+
+    @Test
+    fun `host directory metadata selects short task names in the current subproject`() =
+        runBlocking {
+            val source =
+                TerminalCompletionSources.gradleTask(
+                    sourceId = "gradle-task",
+                    tasksProvider = { _, _ ->
+                        listOf(
+                            TerminalGradleTask(":rootTask", projectDirectory = ".."),
+                            TerminalGradleTask(":app:run", projectDirectory = "."),
+                            TerminalGradleTask(":tools:run", projectDirectory = "../tools"),
+                        )
+                    },
+                )
+            assertEquals(listOf("run"), source.complete(request("gradle ru")).map { it.replacementText })
+            assertEquals(listOf(":rootTask"), source.complete(request("gradle :ro")).map { it.replacementText })
+        }
+
+    @Test
     fun `does not complete Gradle tasks while an option value is active`() =
         runBlocking {
             assertTrue(source.complete(request("./gradlew -p ap")).isEmpty())

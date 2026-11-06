@@ -21,11 +21,14 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
+import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
+import io.github.ketraterm.ui.swing.host.SessionShellCompletionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
@@ -41,46 +44,86 @@ import kotlin.time.Duration.Companion.milliseconds
  * that remains alive until final learning persistence has completed.
  */
 @Service(Service.Level.APP)
-internal class KetraTermCompletionService : Disposable {
+internal class KetraTermCompletionService(
+    private val persistencePath: Path,
+) : Disposable {
+    constructor() : this(
+        PathManager.getSystemDir().resolve("ketraterm").resolve(TerminalCompletionLearningCoordinator.currentFileName()),
+    )
+
     private val lifecycle = IntellijCompletionLifecycle()
     private val settings = KetraTermIntellijSettings.getInstance()
-    private val persistencePath =
-        PathManager
-            .getSystemDir()
-            .resolve("ketraterm")
-            .resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     @Volatile private var completionRuntime: CompletionRuntime? = null
     private val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @Volatile private var shutdownJob: Job? = null
+    @Volatile private var completionTransition: Job? = null
     private val providersByTab = java.util.IdentityHashMap<TerminalWorkspaceTab, SwingShellSuggestionProvider>()
     private val providerListeners = CopyOnWriteArrayList<() -> Unit>()
     private val settingsListener: () -> Unit = {
         lifecycle.ifOpen {
+            if (completionTransition != null) return@ifOpen
             if (!settings.state.smartSuggestionsEnabled) {
                 val retiring = completionRuntime
                 completionRuntime = null
                 if (retiring != null) {
                     providersByTab.clear()
-                    shutdownJob =
-                        lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    startCompletionTransition(
+                        lifecycleScope.launch(start = CoroutineStart.LAZY) {
                             try {
                                 retiring.registry.closeWithoutFlush()
                             } finally {
                                 retiring.scope.cancel()
-                                SwingUtilities.invokeLater {
-                                    lifecycle.ifOpen { shutdownJob = null }
-                                    notifyProviderListeners()
-                                }
                             }
-                        }
+                        },
+                    )
                 }
             } else {
                 completionRuntime?.registry?.setPersistenceEnabled(settings.completionLearningPersistenceEnabled())
             }
         }
         notifyProviderListeners()
+    }
+
+    /** Clears shared and persisted learning even if suggestions or persistence are disabled. */
+    fun resetLearning(): Deferred<Unit> {
+        val reset =
+            lifecycle.requireOpen {
+                val previous = completionTransition
+                providersByTab.clear()
+                lifecycleScope
+                    .async(start = CoroutineStart.LAZY) {
+                        previous?.join()
+                        val persisted =
+                            lifecycle.requireOpen {
+                                val runtime =
+                                    completionRuntime ?: createCompletionRuntime(persistencePath, persistenceEnabled = false)
+                                        .also { completionRuntime = it }
+                                runtime.registry.resetLearning()
+                            }
+                        persisted.await()
+                    }.also(::startCompletionTransition)
+            }
+        notifyProviderListeners()
+        return reset
+    }
+
+    // Serializes reset with retirement so a former owner cannot restore the cleared snapshot.
+    private fun startCompletionTransition(transition: Job) {
+        completionTransition = transition
+        transition.invokeOnCompletion {
+            SwingUtilities.invokeLater {
+                var reconcile = false
+                lifecycle.ifOpen {
+                    if (completionTransition === transition) {
+                        completionTransition = null
+                        reconcile = true
+                    }
+                }
+                if (reconcile) settingsListener()
+            }
+        }
+        transition.start()
     }
 
     fun addProviderListener(listener: () -> Unit) {
@@ -113,7 +156,7 @@ internal class KetraTermCompletionService : Disposable {
         tab: TerminalWorkspaceTab,
     ): SwingShellSuggestionProvider? =
         lifecycle.requireOpen {
-            if (!settings.state.smartSuggestionsEnabled || shutdownJob != null) return@requireOpen null
+            if (!settings.state.smartSuggestionsEnabled || completionTransition != null) return@requireOpen null
             providersByTab.getOrPut(tab) {
                 val runtime =
                     completionRuntime ?: createCompletionRuntime(persistencePath, settings.completionLearningPersistenceEnabled())
@@ -131,17 +174,19 @@ internal class KetraTermCompletionService : Disposable {
         project: Project,
         tab: TerminalWorkspaceTab,
     ): SwingShellSuggestionProvider {
+        val gitLoader = IntellijGitCompletionLoader(project)
         val context =
             IntellijCompletionContext(
                 profileId = tab.profile.id,
                 workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
+                shellProvider = SessionShellCompletionProvider(tab.session),
                 additionalSources =
                     listOf(
                         TerminalCompletionSourceEntry(
-                            intellijGitCompletionSource(
-                                loader = IntellijGitCompletionLoader(project)::load,
-                            ),
+                            TerminalCompletionSources.git("intellij-git-reference") { request, _ ->
+                                gitLoader.load(request.workingDirectoryUri)
+                            },
                             TerminalCompletionSourcePrior.GIT_REFERENCE,
                         ),
                         TerminalCompletionSourceEntry(
@@ -169,7 +214,7 @@ internal class KetraTermCompletionService : Disposable {
                             TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
                         ),
                     ),
-                directoryScanner = IntellijProjectDirectoryScanner(project),
+                projectDirectory = project.guessProjectDir()?.toNioPath(),
             )
         return runtime.registry.createProvider(context)
     }
@@ -203,7 +248,7 @@ internal class KetraTermCompletionService : Disposable {
         providersByTab.clear()
         val runtime = completionRuntime
         completionRuntime = null
-        val stopping = shutdownJob
+        val stopping = completionTransition
         if (runtime == null && stopping == null) {
             lifecycleScope.cancel()
             return

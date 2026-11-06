@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /**
  * Declarative command specification consumed by the in-process completion
  * engine.
@@ -25,13 +27,18 @@ package io.github.ketraterm.completion.model
  *
  * @property name canonical command or subcommand token.
  * @property description short human-readable description.
- * @property aliases additional tokens that resolve to this command.
+ * @property aliases additional tokens that resolve to this command. Command names
+ * and aliases match case-insensitively; the first matching declaration at the same
+ * level supplies parsing semantics and completion metadata.
  * @property subcommands nested subcommands available after this command.
- * @property options options available at this command level.
+ * @property options options declared at this command level. For each exact option
+ * name, the deepest command's first declaration wins during parsing and completion;
+ * unshadowed aliases of inherited options remain available.
  * @property positionalArguments ordered positional argument declarations. When
  * nonempty, they take precedence over the scalar positional metadata.
  * @property positionalArgumentPathKind file-system path kind accepted by bare
- * positional arguments after this command or subcommand.
+ * positional arguments after this command or subcommand. This routing field does
+ * not imply operand count or requiredness; declare [positionalArguments] for hints.
  * @property positionalArgumentValueDomain dynamic host-owned value domain
  * accepted by bare positional arguments after this command or subcommand.
  * @property positionalArgumentHiddenPathPolicy hidden-entry policy used when
@@ -40,8 +47,12 @@ package io.github.ketraterm.completion.model
  * appear as sibling positional command values. This models task-style CLIs such
  * as Gradle, where `gradle clean build` is a sequence of tasks rather than
  * `build` being nested below `clean`.
+ * @property positionalArgumentAfterDoubleDash metadata applied to every positional
+ * argument after a completed `--` option terminator. `null` retains normal
+ * positional declarations. This does not apply when `--` is an option value.
  * @throws IllegalArgumentException if [name] or any alias is blank.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCommandSpec
     @JvmOverloads
     constructor(
@@ -55,6 +66,7 @@ public data class TerminalCommandSpec
         val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val positionalArgumentHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         val repeatableSubcommands: Boolean = false,
+        val positionalArgumentAfterDoubleDash: TerminalArgumentSpec? = null,
     ) {
         init {
             require(name.isNotBlank()) { "name must not be blank" }
@@ -77,6 +89,7 @@ public data class TerminalCommandSpec
  * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
  * @throws IllegalArgumentException if [valueCandidates] contains a blank value.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalArgumentSpec
     @JvmOverloads
     constructor(
@@ -114,12 +127,17 @@ public data class TerminalArgumentSpec
  * separate value token when [requiresValue] is true.
  * @property valueHiddenPathPolicy hidden-entry policy used when
  * [valuePathKind] accepts a path.
+ * @property valueName display name for the required value, such as `message` for `-m`.
+ * Empty uses the value's path kind or the generic `value` label; domain identifiers
+ * are not display labels. Ignored for flags; it never changes parsing, quoting,
+ * or inserted text.
  * @property exclusiveGroupIds identifiers of mutually exclusive option groups.
  * Options that share any identifier cannot be suggested together once one has
  * already been entered before the completion cursor.
  * @throws IllegalArgumentException if names are empty, or names, values, or
  * exclusive-group identifiers contain blank entries.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalOptionSpec
     @JvmOverloads
     constructor(
@@ -131,6 +149,7 @@ public data class TerminalOptionSpec
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val valueHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         val exclusiveGroupIds: List<String> = emptyList(),
+        val valueName: String = "",
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }
@@ -144,6 +163,7 @@ public data class TerminalOptionSpec
  * File-system path category accepted by a command positional argument or option
  * value.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalPathArgumentKind {
     /** The argument has no known path semantics. */
     NONE,
@@ -154,13 +174,14 @@ public enum class TerminalPathArgumentKind {
     /** The argument should reference a directory. */
     DIRECTORY,
 
-    /** The argument should reference a regular file. */
+    /** The argument should reference a regular file; completion also offers directories for traversal. */
     FILE,
 }
 
 /**
  * Policy for hidden filesystem entries exposed by one path-taking argument.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalHiddenPathPolicy {
     /** Hide dot-prefixed entries for an empty prefix, but show them after `.` is typed. */
     DEFAULT,
@@ -176,7 +197,7 @@ public enum class TerminalHiddenPathPolicy {
  * Stable identifier for a dynamic value domain supplied by host-owned
  * completion providers.
  *
- * The shared completion engine uses this value only for context-aware ranking.
+ * The shared completion engine uses this value for source eligibility and context-aware ranking.
  * It does not fetch domain values itself. Standalone and plugin integrations may
  * provide candidates with matching domains using local process caches, IDE
  * services, project indexes, or other host-owned data sources.
@@ -184,6 +205,7 @@ public enum class TerminalHiddenPathPolicy {
  * @property id stable lowercase domain id.
  * @throws IllegalArgumentException if [id] is blank or contains uppercase characters.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionValueDomain(
     val id: String,
 ) {
@@ -200,6 +222,10 @@ public data class TerminalCompletionValueDomain(
         /** Git branch or ref name. */
         @JvmField
         public val GIT_BRANCH: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.branch")
+
+        /** Configured Git remote name, without contacting the remote. */
+        @JvmField
+        public val GIT_REMOTE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.remote")
 
         /** Git commit object identifier. */
         @JvmField

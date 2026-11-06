@@ -622,12 +622,14 @@ public class TerminalSession private constructor(
 
     /**
      * Returns the active shell command-line snapshot, or `null` after closure
-     * or when no trustworthy editing context is available.
+     * or when the selected producer cannot capture an editing context.
      *
      * The selected integration is authoritative, including `null`. A host
      * snapshot is read directly; a protocol producer may reconstruct bounded
      * text from the grid. Hosts must keep UTF-16 offsets and live-grid anchors
      * current after corresponding output and geometry changes.
+     * Check [TerminalShellCommandLineSnapshot.requiresShellConfirmation] before
+     * using provisional text for suggestions or edits.
      *
      * @return active command-line snapshot, or `null` when unavailable.
      */
@@ -646,20 +648,124 @@ public class TerminalSession private constructor(
      * Capture at request time, before asynchronous suggestion work. The host must
      * publish unavailable editing state while its own pending input makes the
      * model untrustworthy; queue idleness is not acknowledgement by a remote shell.
+     * A snapshot marked [TerminalShellCommandLineSnapshot.requiresShellConfirmation]
+     * can be captured for a native query, but cannot admit edits until that query confirms it.
+     *
+     * @throws IllegalArgumentException if the producer's prefix-reset sequence contains more than four keys.
      */
     public fun captureCommandEdit(): TerminalCommandEditContext? =
         synchronized(mutationLock) {
             if (processingOutput) return@synchronized null
-            runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+            val integration = runtime.shellIntegration ?: return@synchronized null
+            integration.withCommandLine { revision, snapshot ->
                 synchronized(outboundWriteLock) {
                     if (!isAcceptingInput() || snapshot == null || !outboundWriter.isIdle()) {
                         null
                     } else {
-                        TerminalCommandEditContext(snapshot, editContextOwner, inputRevision, outputRevision, revision)
+                        TerminalCommandEditContext(
+                            commandLine = snapshot,
+                            prefixResetKeys = integration.commandLinePrefixResetKeys,
+                            owner = editContextOwner,
+                            inputRevision = inputRevision,
+                            outputRevision = outputRevision,
+                            shellRevision = revision,
+                        )
                     }
                 }
             }
         }
+
+    /**
+     * Whether the running session's producer has announced a native completion hook.
+     * Readiness does not reserve a query slot or guarantee that a later request can be admitted.
+     */
+    public val shellCompletionAvailable: Boolean
+        get() = synchronized(mutationLock) { isAcceptingInput() && runtime.shellCompletion.isReady }
+
+    /**
+     * Immutable command inventories published by the shell; null means no producer.
+     * Pending/failed discovery has an explicit status. Snapshots describe prompt-time
+     * availability, carry no edit authority, and do not imply interactive argument
+     * completion. Session closure publishes null. Reading/subscribing sends no input.
+     */
+    public val shellCommandInventory: StateFlow<TerminalShellCommandInventory?>
+        get() = runtime.shellCompletion.commands
+
+    /**
+     * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
+     * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
+     * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
+     * A replacement request waits for that cancelled slot within its existing timeout, then revalidates
+     * the current buffer. Concurrent requests with an active consumer still return null.
+     * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
+     * Provisional snapshots reuse that verified result while their exact context remains current,
+     * so confirmation and candidate collection do not invoke the native completer twice.
+     * The ten-second deadline allows cold native module discovery; callers can cancel earlier.
+     */
+    public suspend fun requestShellCompletions(
+        commandLine: String,
+        cursorOffset: Int,
+    ): TerminalShellCompletionResult? {
+        currentCoroutineContext().ensureActive()
+        return withTimeoutOrNull(10_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
+    }
+
+    private suspend fun awaitShellCompletions(
+        commandLine: String,
+        cursorOffset: Int,
+    ): TerminalShellCompletionResult? {
+        while (true) {
+            val expected = captureCommandEdit() ?: return null
+            if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
+            var confirmedResult: TerminalShellCompletionResult? = null
+            var retiring: Deferred<Unit>? = null
+            val query =
+                try {
+                    synchronized(mutationLock) {
+                        runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                            synchronized(outboundWriteLock) {
+                                if (
+                                    !isAcceptingInput() ||
+                                    inputRevision != expected.inputRevision ||
+                                    outputRevision != expected.outputRevision ||
+                                    revision != expected.shellRevision ||
+                                    snapshot != expected.commandLine
+                                ) {
+                                    return@synchronized null
+                                }
+                                confirmedResult = runtime.shellCompletion.confirmedResult(expected)
+                                if (confirmedResult != null) return@synchronized null
+                                retiring =
+                                    runtime.shellCompletion.pending
+                                        ?.takeUnless { it.deferred.isActive }
+                                        ?.retired
+                                if (retiring != null) return@synchronized null
+                                var generation = 0L
+                                renderReader.readRenderFrame { generation = it.frameGeneration }
+                                val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
+                                outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
+                                inputRevision++
+                                pending
+                            }
+                        }
+                    }
+                } catch (failure: OutboundCapacityException) {
+                    failWrite(failure)
+                    return null
+                }
+            if (query == null) {
+                val previous = retiring ?: return confirmedResult
+                previous.await()
+                continue
+            }
+            outboundWriter.signalPending()
+            return try {
+                query.deferred.await()
+            } finally {
+                query.deferred.cancel(CancellationException("Shell completion request ended"))
+            }
+        }
+    }
 
     /**
      * Atomically validates [expected] and admits the complete semantic [events].
@@ -669,8 +775,10 @@ public class TerminalSession private constructor(
      * Success uses the same bounds, mode/policy capture and writer as [submitInput].
      *
      * The caller owns editor semantics: translate valid caret/deletion spans to
-     * events before calling. This method does not infer shell editing units from
-     * UTF-16 offsets. Cancel obsolete requests through [TerminalCommandEditContext.cancel].
+     * events before calling. A captured [TerminalCommandEditContext.prefixResetKeys]
+     * sequence can clear the known prefix before inserting its replacement.
+     * This method does not infer shell editing units from UTF-16 offsets.
+     * Cancel obsolete requests through [TerminalCommandEditContext.cancel].
      * Cancellation/shutdown overlapping admission may win or lose; acceptance is
      * not transport completion or a remote execution acknowledgement.
      */
@@ -680,14 +788,22 @@ public class TerminalSession private constructor(
     ): TerminalInputAdmission =
         finishAdmission {
             synchronized(mutationLock) {
-                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                val integration = runtime.shellIntegration
+                integration?.withCommandLine { revision, snapshot ->
                     synchronized(outboundWriteLock) {
                         inputRejection() ?: when {
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
                             expected.owner !== editContextOwner ||
-                                expected.inputRevision != inputRevision ||
-                                expected.outputRevision != outputRevision ||
+                                (
+                                    (
+                                        expected.commandLine.requiresShellConfirmation ||
+                                            expected.inputRevision != inputRevision ||
+                                            expected.outputRevision != outputRevision
+                                    ) &&
+                                        !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
+                                ) ||
                                 expected.shellRevision != revision ||
+                                expected.prefixResetKeys != integration.commandLinePrefixResetKeys ||
                                 expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)
@@ -883,6 +999,7 @@ public class TerminalSession private constructor(
                 if (isSessionClosed()) return null
                 drainResponses()
                 outputRevision++
+                runtime.shellCompletion.invalidateEdit()
                 var resizeCompleted = false
                 var coreResizeCompleted = false
                 try {
@@ -969,6 +1086,7 @@ public class TerminalSession private constructor(
             return mutate {
                 if (isSessionClosed() || resizePending || terminal.width != columns || terminal.height != rows) return false
                 outputRevision++
+                runtime.shellCompletion.invalidateEdit()
                 terminal.setWindowSizePixels(pixelWidth, pixelHeight)
                 drainResponses()
                 true
@@ -1201,8 +1319,9 @@ public class TerminalSession private constructor(
                 }
             else ->
                 admitInput {
-                    outboundWriter.submit(signal = false) { inputEncoder.encodeEvent(event) }
-                    inputRevision++
+                    val byteCount = outboundWriter.submit(signal = false) { inputEncoder.encodeEvent(event) }
+                    // A suppressed physical release cannot change the shell buffer after suggestions were captured.
+                    if (byteCount != 0 || event !is TerminalKeyEvent || event.type != TerminalKeyEventType.RELEASE) inputRevision++
                     if (event.cancelsStartup()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
                 }
         }
@@ -1364,6 +1483,7 @@ public class TerminalSession private constructor(
         bytes.checkBounds(offset, length)
         if (isSessionClosed()) return
 
+        var completedShellQuery: TerminalShellCompletionChannel.Pending? = null
         try {
             checkAdmissionReentry()
             synchronized(mutationAdmission) {
@@ -1408,12 +1528,28 @@ public class TerminalSession private constructor(
                         }
                     }
                 } finally {
-                    synchronized(mutationLock) { processingOutput = false }
+                    synchronized(mutationLock) {
+                        processingOutput = false
+                        if (runtime.shellCompletion.pending?.responded == true) {
+                            completedShellQuery =
+                                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                                    synchronized(outboundWriteLock) {
+                                        var generation = 0L
+                                        renderReader.readRenderFrame { generation = it.frameGeneration }
+                                        runtime.shellCompletion.finish(inputRevision, outputRevision, revision, snapshot, generation)
+                                    }
+                                }
+                        }
+                    }
                 }
                 submitStartupCommand()
             }
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
+        }
+        completedShellQuery?.let {
+            it.deferred.complete(it.response)
+            it.retired.complete(Unit)
         }
         invalidateRender(immediate = false)
     }
@@ -1748,6 +1884,15 @@ public class TerminalSession private constructor(
                 synchronized(connectorResizeLock) { connector.close() }
             }
             cleanup { clipboardReads?.close() }
+            cleanup {
+                runtime.shellCompletion
+                    .close()
+                    ?.let {
+                        val cancellation = CancellationException("Terminal session closed")
+                        it.deferred.cancel(cancellation)
+                        it.retired.cancel(cancellation)
+                    }
+            }
             cleanup { outboundWriter.close() }
             cleanup {
                 synchronized(outboundWriteLock) {
@@ -1763,6 +1908,7 @@ public class TerminalSession private constructor(
             synchronized(mutationAdmission) {
                 synchronized(mutationLock) {
                     cleanup { parser.endOfInput() }
+                    cleanup { runtime.shellIntegration?.sessionClosed() }
                     cleanup {
                         val request = pendingRenderRequest.get()
                         runtime.publisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
@@ -2107,7 +2253,14 @@ public class TerminalSession private constructor(
                 )
             val parser =
                 parserFactory?.create(sink, sink::clipboardWriteLimitBytes)
-                    ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
+                    ?: runtime.shellIntegration?.let { integration ->
+                        TerminalParsers.create(
+                            sink,
+                            sink::clipboardWriteLimitBytes,
+                            integration.customOscPayloadLimitBytes,
+                            integration::observeCustomOsc,
+                        )
+                    } ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
             if (hostPolicy.terminalResponsePolicy == HostControlPolicy.DENY) terminal.clearResponseBytes()
 
             val session =
@@ -2161,9 +2314,10 @@ private class SessionRuntime(
 ) {
     val mutationLock = Any()
     val renderGeneration = MutableStateFlow(-1L)
+    val shellCompletion = TerminalShellCompletionChannel(mutationLock)
     val shellIntegration =
         factory?.create(
-            TerminalShellIntegrationContext(mutationLock, reader, publisher, renderGeneration.asStateFlow()),
+            TerminalShellIntegrationContext(mutationLock, reader, publisher, renderGeneration.asStateFlow(), shellCompletion),
         )
     val shellState = shellIntegration?.state ?: TerminalShellIntegrationState()
 }

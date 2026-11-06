@@ -9,7 +9,7 @@ requirements, and build commands; this file describes host assembly.
 | Package | Responsibility |
 | --- | --- |
 | `io.github.ketraterm.intellij` | Resource bundle and shared plugin entry-point support. |
-| `.ui` | Tool-window assembly, terminal panes, keymap actions, completion presentation, hyperlinks, and IDE dialogs. |
+| `.ui` | Tool-window assembly, terminal panes, keymap actions, completion appearance, hyperlinks, and IDE dialogs. |
 | `.settings` | Application settings snapshots, project startup commands, theme and font adaptation. |
 | `.services` | Project workspace ownership, tab persistence, IDE completion sources, clipboard-client ownership, and notifications. |
 
@@ -34,6 +34,8 @@ The application completion service creates providers for individual workspace
 tabs, owns shared learning, and delegates evaluation, filesystem access, and
 persistence to the corresponding KetraTerm modules. IDE sources supply project
 files, Git data, and Gradle tasks through bounded, request-owned loading.
+The shared Swing popup owns completion rendering and interaction. The plugin
+supplies IDE colors, locale, and shortcuts through settings and host services.
 
 ## Boundary
 

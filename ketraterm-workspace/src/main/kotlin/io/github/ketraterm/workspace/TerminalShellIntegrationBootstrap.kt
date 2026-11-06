@@ -15,12 +15,14 @@
  */
 package io.github.ketraterm.workspace
 
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
+import java.util.zip.GZIPOutputStream
 
 /**
  * Applies host-neutral shell integration launch hooks to terminal profiles.
@@ -36,11 +38,14 @@ internal object TerminalShellIntegrationBootstrap {
      *
      * @param scriptDirectory persistent directory used for generated shell
      *   startup wrappers required by shells without an init-command argument.
+     * @param commandInventoryDirectory session-owned mailbox for background PATH
+     *   snapshots. Without it, Bash/zsh do not start inventory workers.
      */
     fun apply(
         profile: TerminalProfile,
         enabled: Boolean,
         scriptDirectory: Path = defaultScriptDirectory(),
+        commandInventoryDirectory: Path? = null,
     ): ShellIntegrationLaunch {
         require(profile.startupCommand == null || enabled) {
             "Startup commands require shell integration. Enable it or clear the startup command."
@@ -70,12 +75,34 @@ internal object TerminalShellIntegrationBootstrap {
                 "Remove explicit command/script arguments or clear the startup command."
         }
         val promptMarkersExpected = integrated !== profile
-        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(integrated)
+        val inventoryProfile =
+            if (promptMarkersExpected && commandInventoryDirectory != null) {
+                var environment =
+                    integrated.environment +
+                        ("KetraTerm_COMMAND_INVENTORY_DIRECTORY" to commandInventoryDirectory.toString().replace('\\', '/'))
+                if (profile.kind == TerminalProfileKind.WSL || profile.kind == TerminalProfileKind.UBUNTU) {
+                    environment = environment.withWslEnvironmentExport("KetraTerm_COMMAND_INVENTORY_DIRECTORY/up")
+                }
+                integrated.copy(environment = environment)
+            } else {
+                integrated
+            }
+        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(inventoryProfile)
         return ShellIntegrationLaunch(
             profile = if (promptMarkersExpected) TerminalShellEnvironmentBootstrap.withMarkers(launchProfile) else launchProfile,
             promptMarkersExpected = promptMarkersExpected,
         )
     }
+
+    fun supportsCommandInventory(profile: TerminalProfile): Boolean =
+        when (profile.kind) {
+            TerminalProfileKind.BASH, TerminalProfileKind.GIT_BASH, TerminalProfileKind.ZSH -> true
+            TerminalProfileKind.WSL, TerminalProfileKind.UBUNTU -> {
+                val index = explicitWslShellIndex(profile.command)
+                index >= 0 && executableName(profile.command[index]) in setOf("bash", "bash.exe", "zsh", "zsh.exe")
+            }
+            else -> false
+        }
 
     private fun withExplicitWslShellIntegration(
         profile: TerminalProfile,
@@ -88,7 +115,7 @@ internal object TerminalShellIntegrationBootstrap {
         val shellProfile = profile.copy(command = shellCommand)
         val integrated =
             when (shellName) {
-                "bash", "bash.exe" -> withBashIntegration(shellProfile, scriptDirectory)
+                "bash", "bash.exe" -> withBashPromptEnvironment(shellProfile)
                 "zsh", "zsh.exe" -> withZshIntegration(shellProfile, scriptDirectory)
                 "fish", "fish.exe" -> withFishIntegration(shellProfile)
                 else -> return profile
@@ -157,15 +184,23 @@ internal object TerminalShellIntegrationBootstrap {
     ): TerminalProfile {
         val command = profile.command
         if (hasExplicitBashEntryPoint(command)) return profile
+        val wrapped = withBashStartupWrapper(profile, scriptDirectory)
+        if (wrapped !== profile) return wrapped
         if (profile.shellEnvironment != TerminalShellEnvironment.Empty || profile.startupCommand != null) {
-            return withBashStartupWrapper(profile, scriptDirectory)
+            return profile
         }
+        return withBashPromptEnvironment(profile)
+    }
 
+    // Guest shells cannot source a host-native rcfile path. Explicit --norc launches
+    // also retain the environment-only hook instead of enabling startup files.
+    private fun withBashPromptEnvironment(profile: TerminalProfile): TerminalProfile {
+        if (hasExplicitBashEntryPoint(profile.command)) return profile
         val promptCommand = profile.environment["PROMPT_COMMAND"]
         val environment =
             profile.environment +
                 mapOf(
-                    "PROMPT_COMMAND" to joinedShellCommands(BASH_PROMPT_COMMAND, promptCommand),
+                    "PROMPT_COMMAND" to listOfNotNull(BASH_PROMPT_COMMAND, promptCommand, "__ketraterm_finish_prompt").joinToString("\n"),
                     OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
@@ -230,9 +265,11 @@ internal object TerminalShellIntegrationBootstrap {
         unset _KetraTerm_BASH_LOGIN_SHELL _KetraTerm_BASH_NO_PROFILE
         ${TerminalShellEnvironmentBootstrap.bash}
         if [[ ${'$'}(declare -p PROMPT_COMMAND 2>/dev/null) == 'declare -a '* ]]; then
-            PROMPT_COMMAND=(${shellSingleQuote(BASH_PROMPT_COMMAND)} "${'$'}{PROMPT_COMMAND[@]}")
+            PROMPT_COMMAND=(${shellSingleQuote(BASH_PROMPT_COMMAND)} "${'$'}{PROMPT_COMMAND[@]}" __ketraterm_finish_prompt)
         else
-            PROMPT_COMMAND=${shellSingleQuote(BASH_PROMPT_COMMAND)}"${'$'}{PROMPT_COMMAND:+; ${'$'}PROMPT_COMMAND}"
+            PROMPT_COMMAND=${shellSingleQuote(
+            BASH_PROMPT_COMMAND,
+        )}${'$'}'\n'"${'$'}{PROMPT_COMMAND-}"${'$'}'\n__ketraterm_finish_prompt'
         fi
         """.trimIndent()
 
@@ -277,10 +314,27 @@ internal object TerminalShellIntegrationBootstrap {
         )
     }
 
-    private fun encodedPowerShellScript(): String =
-        Base64.getEncoder().encodeToString(
-            (TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT).toByteArray(Charsets.UTF_16LE),
-        )
+    private fun encodedPowerShellScript(): String {
+        // UTF-16 Base64 of the full hooks exceeds Windows' 32,767-character process command-line limit.
+        val script = TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT + "\n" + powerShellCompletionScript
+        val compressed =
+            ByteArrayOutputStream().use { bytes ->
+                GZIPOutputStream(bytes).use { it.write(script.toByteArray(Charsets.UTF_8)) }
+                Base64.getEncoder().encodeToString(bytes.toByteArray())
+            }
+        val bootstrap =
+            """
+            ${'$'}__KetraTermBootstrapStream = [IO.MemoryStream]::new([Convert]::FromBase64String('$compressed'))
+            ${'$'}__KetraTermBootstrapReader = [IO.StreamReader]::new([IO.Compression.GZipStream]::new(
+                ${'$'}__KetraTermBootstrapStream, [IO.Compression.CompressionMode]::Decompress), [Text.Encoding]::UTF8)
+            try { . ([scriptblock]::Create(${'$'}__KetraTermBootstrapReader.ReadToEnd())) }
+            finally {
+                ${'$'}__KetraTermBootstrapReader.Dispose()
+                Microsoft.PowerShell.Utility\Remove-Variable __KetraTermBootstrapReader, __KetraTermBootstrapStream
+            }
+            """.trimIndent()
+        return Base64.getEncoder().encodeToString(bootstrap.toByteArray(Charsets.UTF_16LE))
+    }
 
     private fun hasExplicitPowerShellEntryPoint(command: List<String>): Boolean {
         var index = 1
@@ -447,12 +501,21 @@ internal object TerminalShellIntegrationBootstrap {
             "-f",
         )
 
+    private val pathCommandsScript =
+        checkNotNull(javaClass.getResourceAsStream("path-commands.sh")).use { it.readBytes().toString(Charsets.UTF_8) }
+
+    private val bashCompletionScript =
+        pathCommandsScript + "\n" +
+            checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
+
     private val BASH_PROMPT_COMMAND =
         """
+        __ketraterm_prompt_status=${'$'}?
         if [[ -z ${'$'}{__KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             __KetraTerm_BASH_SHELL_INTEGRATION_INSTALLED=1
             __ketraterm_command_started=0
             __ketraterm_in_prompt=0
+            $bashCompletionScript
             __ketraterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
             __ketraterm_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_hostname" ]] || __ketraterm_hostname=localhost
@@ -468,7 +531,13 @@ internal object TerminalShellIntegrationBootstrap {
                 REPLY=${'$'}__ketraterm_encoded
             }
             __ketraterm_osc7() {
-                __ketraterm_encode_uri_path "${'$'}PWD"
+                local __ketraterm_directory=${'$'}PWD
+                # MSYS/Cygwin mount paths are not native Windows file URI paths.
+                if [[ (${'$'}OSTYPE == msys* || ${'$'}OSTYPE == cygwin*) && -x /usr/bin/cygpath ]]; then
+                    __ketraterm_directory=${'$'}(/usr/bin/cygpath -m -- "${'$'}PWD") || __ketraterm_directory=${'$'}PWD
+                    [[ ${'$'}__ketraterm_directory == /* ]] || __ketraterm_directory=/"${'$'}__ketraterm_directory"
+                fi
+                __ketraterm_encode_uri_path "${'$'}__ketraterm_directory"
                 printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_hostname" "${'$'}REPLY"
             }
             __ketraterm_install_prompt_end() {
@@ -478,7 +547,7 @@ internal object TerminalShellIntegrationBootstrap {
                 esac
             }
             __ketraterm_prompt_command() {
-                local __ketraterm_status=${'$'}?
+                local __ketraterm_status=${'$'}{1:-${'$'}?}
                 __ketraterm_in_prompt=1
                 if [[ ${'$'}{__ketraterm_command_started:-0} == 1 ]]; then
                     __ketraterm_osc133 "D;${'$'}__ketraterm_status"
@@ -487,6 +556,12 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_install_prompt_end
                 __ketraterm_osc7
                 __ketraterm_osc133 A
+                __ketraterm_completion_ready
+                return ${'$'}__ketraterm_status
+            }
+            __ketraterm_finish_prompt() {
+                local __ketraterm_status=${'$'}?
+                __ketraterm_install_prompt_end
                 __ketraterm_in_prompt=0
                 return ${'$'}__ketraterm_status
             }
@@ -502,7 +577,7 @@ internal object TerminalShellIntegrationBootstrap {
             }
             trap '__ketraterm_preexec' DEBUG
         fi
-        __ketraterm_prompt_command
+        __ketraterm_prompt_command "${'$'}__ketraterm_prompt_status"
         """.trimIndent()
 
     internal val FISH_INIT_COMMAND =
@@ -510,6 +585,10 @@ internal object TerminalShellIntegrationBootstrap {
         ${TerminalShellEnvironmentBootstrap.fish}
         if not set -q __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED
             set -g __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED 1
+            set -g __ketraterm_fish_native_markers 0
+            if status test-feature mark-prompt
+                set -g __ketraterm_fish_native_markers 1
+            end
             set -g __ketraterm_fish_command_started 0
             function __ketraterm_osc133 --argument-names marker
                 printf '\e]133;%s\a' "${'$'}marker"
@@ -527,27 +606,40 @@ internal object TerminalShellIntegrationBootstrap {
             end
             function __ketraterm_fish_prompt --on-event fish_prompt
                 set -l code ${'$'}status
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    return
+                end
                 if test "${'$'}__ketraterm_fish_command_started" = 1
                     __ketraterm_osc133 "D;${'$'}code"
                     set -g __ketraterm_fish_command_started 0
                 end
-                __ketraterm_osc7
                 __ketraterm_osc133 A
             end
             function __ketraterm_fish_preexec --on-event fish_preexec
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    return
+                end
                 set -g __ketraterm_fish_command_started 1
                 __ketraterm_osc133 C
             end
             function __ketraterm_fish_postexec --on-event fish_postexec
                 set -l code ${'$'}status
+                if test "${'$'}__ketraterm_fish_native_markers" = 1
+                    return
+                end
                 if test "${'$'}__ketraterm_fish_command_started" = 1
                     __ketraterm_osc133 "D;${'$'}code"
                     set -g __ketraterm_fish_command_started 0
                 end
             end
-            set -l __ketraterm_prompt_end (printf '\e]133;B\a')
-            if not string match -q "*${'$'}__ketraterm_prompt_end*" -- "${'$'}SHELL_PROMPT_SUFFIX"
-                set -gx SHELL_PROMPT_SUFFIX "${'$'}SHELL_PROMPT_SUFFIX${'$'}__ketraterm_prompt_end"
+            # Prompt events (including Fish's own OSC 7 handler) finish before this
+            # output is rendered. Keep the launcher's filesystem authority last.
+            # Older Fish lacks native B and ignores SHELL_PROMPT_SUFFIX.
+            functions --copy fish_prompt __ketraterm_original_fish_prompt
+            function fish_prompt
+                __ketraterm_original_fish_prompt
+                __ketraterm_osc7
+                __ketraterm_osc133 B
             end
         end
         """.trimIndent()
@@ -556,6 +648,8 @@ internal object TerminalShellIntegrationBootstrap {
         """
         if [[ -z ${'$'}{__KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
             typeset -g __KetraTerm_ZSH_SHELL_INTEGRATION_INSTALLED=1
+            $pathCommandsScript
+            ${checkNotNull(javaClass.getResourceAsStream("zsh-completion.zsh")).use { it.readBytes().toString(Charsets.UTF_8) }}
             typeset -g __ketraterm_zsh_command_started=0
             function __ketraterm_osc133() {
                 printf '\033]133;%s\a' "${'$'}1"
@@ -589,6 +683,7 @@ internal object TerminalShellIntegrationBootstrap {
                     __ketraterm_zsh_command_started=0
                 fi
                 __ketraterm_zsh_osc7
+                __ketraterm_zsh_completion_ready
                 __ketraterm_osc133 A
                 return ${'$'}code
             }
@@ -647,6 +742,7 @@ internal object TerminalShellIntegrationBootstrap {
                         ${'$'}global:LASTEXITCODE = ${'$'}nativeExitCode
                     }
                 }
+                global:__KetraTermCompletionReady
                 ${'$'}promptText + ([string][char]27) + ']133;B' + ([string][char]7)
             }
             ${'$'}command = Get-Command PSConsoleHostReadLine -CommandType Function -ErrorAction SilentlyContinue
@@ -664,6 +760,10 @@ internal object TerminalShellIntegrationBootstrap {
             }
         }
         """.trimIndent()
+
+    private val powerShellCompletionScript: String by lazy {
+        checkNotNull(javaClass.getResourceAsStream("powershell-completion.ps1")).use { it.readBytes().toString(Charsets.UTF_8) }
+    }
 
     private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
     private const val LOCAL_OSC7_AUTHORITY = "localhost"

@@ -4,6 +4,10 @@ Command-line completion for Kotlin/JVM hosts. The engine combines command
 specifications, host-provided sources, and optional in-memory learning into
 progressive, ranked suggestions with explicit text replacement ranges.
 
+**Experimental.** Suggestions may be incomplete, rank poorly, or behave unexpectedly
+in edge cases. See the [experimental contract](../docs/features/completion.md#stability-experimental)
+for Kotlin opt-in and API stability details.
+
 The module has no terminal, UI, process, or filesystem dependency. Its coroutine
 API can serve a headless caller or a host-owned suggestion UI.
 
@@ -55,6 +59,10 @@ presentation data; insertion uses `replacementText` and its replacement range.
 Select shell capabilities from authoritative host metadata. Use `POSIX` or
 `POWERSHELL` for their supported lexical and quoting contracts, and the default
 `PLAIN` for other shells. The engine does not infer a dialect from a profile id.
+Path separators are captured separately from quoting: set
+`backslashPathSeparator = true` on POSIX capabilities for environments such as
+Git Bash that accept Windows paths. Native POSIX capabilities preserve literal
+backslashes in filenames.
 
 ## Customize the engine
 
@@ -65,6 +73,10 @@ catalog; custom `TerminalCommandSpec`, `TerminalOptionSpec`, and
 arguments. Keep custom catalogs and their nested collections unchanged while
 the engine is in use. The engine evaluates its catalog automatically.
 
+See the [bundled command catalog](../docs/features/completion.md#built-in-command-catalog)
+for the included tools. Specs cover selected common forms rather than every
+option supported by every installed version.
+
 Register host sources with `TerminalCompletionSourceEntry`. Source factories in
 `TerminalCompletionSources` cover direct paths, fuzzy paths, Gradle tasks, and
 dynamic value domains. A custom `TerminalCompletionSource` receives the request,
@@ -72,6 +84,24 @@ the engine's already-resolved context, and an output limit. It may perform
 bounded suspending host work; it must cooperate with cancellation and move
 blocking operations to an appropriate dispatcher. Reusable filesystem access
 lives in [completion-host](../ketraterm-completion-host/README.md).
+
+Pass a `TerminalCompletionShellProvider` as `shellProvider` when the running shell
+can discover executable commands. A successful shell answer supplies the command
+list, enriched with matching catalog descriptions and learning; unknown catalog
+commands are omitted. Return `TerminalCompletionShellResult` with shell-escaped
+edits and the resolved external application name, or null when unavailable.
+PowerShell parameter completion uses live shell semantics; other modeled arguments
+prefer specialized sources with native fallback. See the
+[shell behavior](../docs/features/completion.md#powershell-suggestions) for details.
+`SessionShellCompletionProvider` in `ketraterm-ui-swing-host` supplies this contract
+for installed PowerShell hooks. See the [shell authority contract](docs/completion-architecture.md#internal-implementation).
+
+Candidates carry optional display-only `argumentHint` text. Command specifications
+supply positional names, optional arguments, and option `valueName` labels;
+these hints do not affect edits or ranking. Declare `positionalArguments` to show
+command operands: scalar path/domain routing metadata alone does not establish
+their number or whether they are required. Hints summarize the declared form;
+they are not a complete synopsis of every option-dependent mode.
 
 Custom engines can resolve and share context with
 `TerminalCompletionContext.resolve(request, commandSpecs)`. See the
@@ -92,6 +122,9 @@ feedback. The store performs no I/O; persistence consumes its immutable
 `snapshot()` and hydrates through `mergeSnapshot()` once per distinct aggregate
 event set.
 
+Replay preserves supported shell-expression spelling. Commands whose syntax
+cannot be replayed safely are omitted; the rules are described in the learning contract below.
+
 The optional `replayFilter` constructor argument adds a host restriction to the
 built-in plaintext policy. `TerminalCompletionLearningStore(replayFilter = { false })`
 retains opaque ranking evidence while disabling plaintext replay. The filter
@@ -99,10 +132,12 @@ also applies to imported replay rows; `clear()` removes learning without
 replacing the filter or capacity. See the [learning and privacy contract](docs/completion-architecture.md#learning-and-privacy)
 for concurrency, failure, and retention rules.
 
-Use `TerminalCommandSpecs.defaults(locale)` for localized catalog descriptions
-and `TerminalCompletionMessages` with the engine and applicable source factories
-for generated descriptions. Canonical command tokens and insertion behavior
-remain unchanged; provider-supplied descriptions remain provider-owned.
+Use `TerminalCommandSpecs.defaults(locale)` for catalog descriptions and argument
+labels, or the `ResourceBundle` and localization-callback overloads to supply your
+own translations. The bundled catalog text is English. Use
+`TerminalCompletionMessages` with the engine and applicable source factories for
+generated descriptions. Canonical command tokens and insertion behavior remain
+unchanged; descriptions supplied by shells or custom providers remain provider-owned.
 
 ## Further reading
 

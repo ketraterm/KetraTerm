@@ -1,5 +1,8 @@
 # KetraTerm Completion Host Support (`:ketraterm-completion-host`)
 
+**Experimental.** This module is part of the
+[experimental completion subsystem](../docs/features/completion.md#stability-experimental).
+
 Local filesystem access for path completion. This module connects the
 [completion engine](../ketraterm-completion/README.md) to bounded, suspending
 directory scans without depending on a terminal session, UI, or product.
@@ -40,6 +43,14 @@ through each `TerminalCompletionRequest`. For a host-selected local `Path`,
 must retain its original authority for validation. Without a working-directory
 URI, the path source returns no candidates.
 
+Hosts can pass a request and its resolved context through
+`TerminalCompletionSourceEnvironment.resolve(request, context, fallbackDirectory)`
+before evaluating local sources. It applies completed root Git `-C` values in order
+and rejects explicit remote or malformed directory metadata. The optional fallback
+is used for relative overrides only when directory metadata is absent. Keep the
+original request for editing and learning; pass the returned request only to the
+local sources. A `null` result means those sources must not run.
+
 The host cancels obsolete completion requests; the provider requires no cleanup.
 See the [request contract](../ketraterm-completion/README.md#request-completions).
 
@@ -49,7 +60,9 @@ See the [request contract](../ketraterm-completion/README.md#request-completions
 `TerminalDirectoryListingRequest` into a normalized absolute local `Path`.
 It accepts relative and absolute paths, `~/` using the configured home directory,
 and Windows drive or UNC syntax when Windows support is enabled. Requests use
-forward slashes; shell parsing and quoting stay in the completion engine.
+forward slashes as separators. Remaining backslashes are literal filename
+characters: POSIX filesystems preserve them; Windows resolution rejects them.
+Shell parsing and quoting stay in the completion engine.
 
 `TerminalLocalFileUriResolver` accepts `file:` working-directory URIs with an
 empty authority or `localhost`. Unsupported schemes, remote authorities, and

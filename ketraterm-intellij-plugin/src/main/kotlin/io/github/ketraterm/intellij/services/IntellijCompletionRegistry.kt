@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalCompletionSourceEnvironment
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -27,6 +28,7 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import java.nio.file.Path
 
 /**
@@ -100,23 +102,38 @@ internal class IntellijCompletionRegistry(
             val engine =
                 TerminalCompletionEngines.fromSources(
                     messages = completionMessages,
-                    sources = sources,
+                    sources =
+                        sources.map { entry ->
+                            entry.copy(
+                                source =
+                                    TerminalCompletionSource { request, completionContext, limit ->
+                                        val sourceRequest =
+                                            TerminalCompletionSourceEnvironment.resolve(
+                                                request,
+                                                completionContext,
+                                                context.projectDirectory,
+                                            )
+                                                ?: return@TerminalCompletionSource emptyList()
+                                        entry.source.complete(sourceRequest, completionContext, limit)
+                                    },
+                            )
+                        },
                     commandSpecs = commandSpecs,
                     learningStore = learningStore,
+                    shellProvider = context.shellProvider,
                 )
             return SwingCompletionSuggestionProvider(
                 engine,
                 context::swingContext,
                 mapOf(
+                    "powershell" to "PowerShell",
                     "spec" to KetraTermBundle.message("completion.source.builtin"),
                     "learned" to KetraTermBundle.message("completion.source.learned"),
                     "observed" to KetraTermBundle.message("completion.source.learned"),
                     "path" to KetraTermBundle.message("completion.source.path"),
                     "intellij-project-file" to KetraTermBundle.message("completion.source.project"),
                     "intellij-gradle-task" to KetraTermBundle.message("completion.source.gradle"),
-                    "intellij-git-branch" to KetraTermBundle.message("completion.source.git"),
-                    "intellij-git-remote-branch" to KetraTermBundle.message("completion.source.git"),
-                    "intellij-git-tag" to KetraTermBundle.message("completion.source.git"),
+                    "intellij-git-reference" to KetraTermBundle.message("completion.source.git"),
                     "intellij-git-commit" to KetraTermBundle.message("completion.source.git"),
                     "intellij-git-status-path" to KetraTermBundle.message("completion.source.git"),
                 ),
@@ -161,12 +178,12 @@ internal class IntellijCompletionRegistry(
         }
     }
 
-    /** Removes all session and persisted completion learning. */
-    fun resetLearning() {
+    /** Clears session learning immediately; completes after saved learning has been cleared. */
+    fun resetLearning(): Deferred<Unit> =
         synchronized(lock) {
-            if (!closed) learning.resetLearning()
+            check(!closed) { "IntelliJ completion registry is closed" }
+            learning.resetLearning()
         }
-    }
 
     /** Disables learning and stops persistence without a final write. */
     suspend fun closeWithoutFlush() {

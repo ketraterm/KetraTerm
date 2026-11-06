@@ -16,10 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
@@ -201,7 +198,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `Gradle task supported by history and statistics outranks an unused sibling`() =
+    fun `accepted Gradle task outranks an unused sibling without multiplying history providers`() =
         runBlocking {
             val commandLine = "./gradlew :app:"
             val task =
@@ -229,6 +226,18 @@ class GlobalEvidenceFusionCompletionEngineTest {
                         entry(source(remembered), 8),
                         entry(source(statistical), 6),
                     ),
+                    snapshot =
+                        learningSnapshot(
+                            rows =
+                                listOf(
+                                    commandLearning(
+                                        commandLine = "./gradlew :app:test",
+                                        profileId = "profile",
+                                        acceptedCount = 8,
+                                        lastUsedEpochMillis = NOW,
+                                    ),
+                                ),
+                        ),
                 ).complete(request(commandLine))
 
             assertEquals("./gradlew :app:test", candidates.first().let { commandLineAfter(it, commandLine) })
@@ -442,6 +451,101 @@ class GlobalEvidenceFusionCompletionEngineTest {
 
             assertEquals(2, candidates.size)
             assertTrue(candidates.map { it.replacementText }.containsAll(listOf("Build/", "build/")))
+        }
+
+    @Test
+    fun `literal trailing backslashes remain distinct path outcomes in POSIX and plain shells`() =
+        runBlocking {
+            val replacements = listOf("build", "'build\\'", "'build\\\\'")
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.PLAIN)) {
+                val engine =
+                    engine(
+                        replacements.mapIndexed { index, replacement ->
+                            entry(source(candidate(replacement, 3, 4, "path-$index", TerminalCompletionCandidateKind.PATH)), 0)
+                        },
+                    )
+                val candidates = engine.complete(request("cd b").copy(shellCapabilities = shell))
+
+                assertEquals(replacements.toSet(), candidates.map { it.replacementText }.toSet(), shell.toString())
+            }
+        }
+
+    @Test
+    fun `equals inside a PowerShell path does not introduce an attached option value`() =
+        runBlocking {
+            val replacements = listOf("build=cache", "'build=./cache'")
+            val engine =
+                engine(
+                    replacements.mapIndexed { index, replacement ->
+                        entry(source(candidate(replacement, 3, 4, "path-$index", TerminalCompletionCandidateKind.PATH)), 0)
+                    },
+                )
+            val candidates = engine.complete(request("cd b").copy(shellCapabilities = TerminalShellCapabilities.POWERSHELL))
+
+            assertEquals(replacements.toSet(), candidates.map { it.replacementText }.toSet())
+        }
+
+    @Test
+    fun `attached path values still merge across PowerShell spellings and edit ranges`() =
+        runBlocking {
+            val line = "tool --directory=b"
+            val engine =
+                engine(
+                    sources =
+                        listOf(
+                            entry(
+                                source(
+                                    candidate(
+                                        "'build/'",
+                                        line.indexOf('=') + 1,
+                                        line.length,
+                                        "files",
+                                        TerminalCompletionCandidateKind.PATH,
+                                    ),
+                                ),
+                                0,
+                            ),
+                            entry(
+                                source(
+                                    candidate("--directory='.\\build\\'", 5, line.length, "native", TerminalCompletionCandidateKind.PATH),
+                                ),
+                                0,
+                            ),
+                        ),
+                    commandSpecs =
+                        listOf(
+                            TerminalCommandSpec(
+                                "tool",
+                                options =
+                                    listOf(
+                                        TerminalOptionSpec(
+                                            listOf("--directory"),
+                                            requiresValue = true,
+                                            valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                                        ),
+                                    ),
+                            ),
+                        ),
+                )
+            val candidates = engine.complete(request(line).copy(shellCapabilities = TerminalShellCapabilities.POWERSHELL))
+
+            assertEquals("tool --directory='build/'", commandLineAfter(candidates.single(), line))
+            assertEquals("files", candidates.single().source)
+        }
+
+    @Test
+    fun `PowerShell drive roots and UNC roots remain distinct from relative paths`() =
+        runBlocking {
+            val replacements = listOf("C:", "'C:\\'", "/", "'\\\\'")
+            val engine =
+                engine(
+                    replacements.mapIndexed { index, replacement ->
+                        entry(source(candidate(replacement, 3, 3, "path-$index", TerminalCompletionCandidateKind.PATH)), 0)
+                    },
+                )
+            val candidates = engine.complete(request("cd ").copy(shellCapabilities = TerminalShellCapabilities.POWERSHELL))
+
+            assertEquals(replacements.toSet(), candidates.map { it.replacementText }.toSet())
         }
 
     @Test

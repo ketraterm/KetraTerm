@@ -17,12 +17,19 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.*
 import java.awt.event.KeyEvent
+import kotlin.time.Duration.Companion.milliseconds
 
-/** Embedded presentation adapter; the request interaction owns candidates, selection, admission, and feedback. */
+/**
+ * Embedded presentation adapter; the request interaction owns candidates, selection, admission, and feedback.
+ *
+ * @param presentationScope component-owned EDT scope for the bounded refresh grace period.
+ */
 internal class SwingShellSuggestionController(
     private val host: SwingShellSuggestionHost,
     viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
+    private val presentationScope: CoroutineScope,
 ) {
     private var interaction: SwingShellSuggestionInteraction? = null
     private var viewportStartIndex = 0
@@ -30,6 +37,9 @@ internal class SwingShellSuggestionController(
     private var anchorRow = 0
     private var presentationRevision = 0L
     private var visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var retentionJob: Job? = null
+    var isRefreshing: Boolean = false
+        private set
     private val changeListener =
         SwingShellSuggestionInteractionListener { changed ->
             if (interaction === changed) updatePresentation()
@@ -75,6 +85,37 @@ internal class SwingShellSuggestionController(
 
     val popup get() = view.component
 
+    /** Reloads built-in appearance without imposing settings on a custom presentation. */
+    fun reloadAppearance() {
+        val popup = view as? SwingCompletionPopupView ?: return
+        val settings = host.settings
+        popup.applyStyle(settings.shellSuggestionStyle)
+        if (popup.font != settings.font) {
+            popup.font = settings.font
+            host.revalidate()
+        }
+    }
+
+    /** Keeps only the last painted rows. Their closed publication cannot admit pointer or keyboard actions. */
+    fun retainPresentation() {
+        if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return
+        presentationRevision++
+        interaction?.removeChangeListener(changeListener)
+        interaction = null
+        isRefreshing = true
+        if (retentionJob == null) {
+            retentionJob =
+                presentationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    delay(RETAINED_PRESENTATION_GRACE)
+                    retentionJob = null
+                    if (isRefreshing) {
+                        presentationRevision++
+                        clearPresentation()
+                    }
+                }
+        }
+    }
+
     fun present(
         interaction: SwingShellSuggestionInteraction,
         anchorColumn: Int = 0,
@@ -82,6 +123,7 @@ internal class SwingShellSuggestionController(
     ): Boolean {
         require(anchorColumn >= 0 && anchorRow >= 0) { "suggestion anchor must be nonnegative" }
         if (!host.settings.smartSuggestionsEnabled || !interaction.isActive) return false
+        reloadAppearance()
         if (this.interaction !== interaction) {
             this.interaction?.removeChangeListener(changeListener)
             this.interaction = interaction
@@ -95,12 +137,20 @@ internal class SwingShellSuggestionController(
     }
 
     fun hide(): Boolean {
+        retentionJob?.cancel()
+        retentionJob = null
+        isRefreshing = false
         if (interaction == null && !view.component.isVisible && visualSnapshot.visibleSuggestions.isEmpty()) return false
         presentationRevision++
         interaction?.removeChangeListener(changeListener)
         interaction = null
         viewportStartIndex = 0
         val changed = view.component.isVisible || visualSnapshot.visibleSuggestions.isNotEmpty()
+        clearPresentation()
+        return changed
+    }
+
+    private fun clearPresentation() {
         visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
         cleanupSwingResources(
             { view.component.isVisible = false },
@@ -108,22 +158,19 @@ internal class SwingShellSuggestionController(
             host::revalidate,
             host::repaint,
         )
-        return changed
     }
 
     fun close() = cleanupSwingResources({ hide() }, view::close)
 
     fun state(): SwingShellSuggestionState {
-        val active = interaction ?: return SwingShellSuggestionState.EMPTY
-        val current = active.snapshot
-        if (!active.isActive || !view.component.isVisible || current.suggestions.isEmpty()) return SwingShellSuggestionState.EMPTY
+        if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return SwingShellSuggestionState.EMPTY
         return SwingShellSuggestionState(
             true,
-            current.suggestions.size,
-            current.selectedIndex,
+            visualSnapshot.totalSuggestionCount,
+            visualSnapshot.absoluteSelectedIndex,
             anchorColumn,
             anchorRow,
-            current.selectedSuggestion,
+            visualSnapshot.selectedSuggestion,
         )
     }
 
@@ -239,14 +286,29 @@ internal class SwingShellSuggestionController(
             hide()
             return
         }
+        if (isRefreshing && !active.hasPublication) return
+        if (isRefreshing) {
+            isRefreshing = false
+            retentionJob?.cancel()
+            retentionJob = null
+            val previous = visualSnapshot.publication
+            val outcome = previous?.selectedSuggestion?.commandTextAfterReplacement(previous.owner.request)
+            if (outcome != null) {
+                val current = active.snapshot
+                val retained = current.suggestions.indexOfFirst { it.commandTextAfterReplacement(active.request) == outcome }
+                if (retained >= 0 && retained != current.selectedIndex) {
+                    active.select(current, retained)
+                    return
+                }
+            }
+        }
         val revision = ++presentationRevision
         val current = active.snapshot
         val items = current.suggestions
         val maximum = view.maximumVisibleSuggestions
         require(maximum > 0) { "maximumVisibleSuggestions must be positive" }
         if (items.isEmpty()) {
-            visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
-            cleanupSwingResources({ view.component.isVisible = false }, { view.update(visualSnapshot) }, host::revalidate, host::repaint)
+            clearPresentation()
             return
         }
         val selected = current.selectedIndex
@@ -268,15 +330,36 @@ internal class SwingShellSuggestionController(
         if (presentationRevision != revision) return
         host.repaint()
     }
+
+    private companion object {
+        val RETAINED_PRESENTATION_GRACE = 200.milliseconds
+    }
 }
 
+/**
+ * EDT-only component services borrowed by [SwingShellSuggestionController].
+ *
+ * The controller owns popup presentation; the host supplies current policy and Swing lifecycle
+ * operations. Callbacks can reenter the controller, so publication identity is checked after
+ * each callback. Failures propagate after the applicable lifecycle cleanup is attempted.
+ */
 internal interface SwingShellSuggestionHost {
+    /** Current immutable settings; read when handling or presenting an interaction. */
     val settings: SwingSettings
+
+    /** Host shortcut policy used to interpret suggestion actions before terminal input routing. */
     val suggestionKeymap: SwingShellSuggestionKeymap
 
+    /** Requests component layout after popup visibility or preferred size changes. */
     fun revalidate()
 
+    /** Schedules painting of the component regions affected by a presentation change. */
     fun repaint()
 
+    /**
+     * Requests terminal focus after an accepted edit or explicit dismissal.
+     *
+     * @return true when Swing accepts the focus request; this does not guarantee focus transfer.
+     */
     fun requestFocusInWindow(): Boolean
 }

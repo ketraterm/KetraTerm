@@ -22,6 +22,7 @@ import java.util.List.copyOf
 import java.util.Set.copyOf as copySetOf
 
 /** Semantic position of the active completion token. */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalCompletionActivePosition {
     /** Cursor is on a shell operator rather than a command token. */
     OPERATOR,
@@ -72,6 +73,7 @@ public enum class TerminalCompletionActivePosition {
  * @property replacementEndOffset exclusive UTF-16 replacement end offset in the original request command line.
  * @property currentCommand deepest matched command specification in [commandPath], or `null` when no command spec was matched.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionContext
     internal constructor(
         internal val commandLineContext: TerminalCommandLineContext,
@@ -90,18 +92,31 @@ public class TerminalCompletionContext
         staticValueCandidates: List<String> = emptyList(),
         public val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
-        optionValuesBeforeCursor: List<ResolvedOptionValue> = emptyList(),
+        optionsBeforeCursor: List<ResolvedOption> = emptyList(),
         precedingPositionalArguments: List<String> = emptyList(),
+        internal val gitCompletion: GitCompletionContext? = null,
+        /** The command is known, but unknown option arity prevents catalog argument ownership. */
+        internal val hasUnrecognizedOptions: Boolean = false,
+        /** Active token index in the user's input, before aliases add semantic tokens. */
+        internal val originalActiveTokenIndex: Int = commandLineContext.activeTokenIndex,
     ) {
         public val commandPath: List<TerminalCommandSpec> = copyOf(commandPath)
         public val usedOptionExclusiveGroupIds: Set<String> = copySetOf(usedOptionExclusiveGroupIds)
         public val staticValueCandidates: List<String> = copyOf(staticValueCandidates)
-        private val optionValuesBeforeCursor = copyOf(optionValuesBeforeCursor)
+        private val optionsBeforeCursor = copyOf(optionsBeforeCursor)
+
+        /** True when catalog option syntax has already influenced argument interpretation. */
+        internal val hasOptionsBeforeCursor: Boolean get() = optionsBeforeCursor.isNotEmpty()
+
+        /** False on shell operators, exhausted modeled arguments, or unsupported refspec expressions. */
+        public val isCompletionAllowed: Boolean
+            get() = activePosition != TerminalCompletionActivePosition.OPERATOR && gitCompletion?.target != GitCompletionTarget.NONE
 
         /**
          * Decoded words after the executable and strictly before the active token,
          * in input order. Includes subcommands, option names, values, and `--`.
          * Leading environment assignments and the executable are excluded.
+         * Supported POSIX aliases contribute their fixed arguments without changing edit offsets.
          * Available even without a command spec; empty at command/operator positions.
          *
          * Only the cursor's command segment is included, according to the request's
@@ -123,10 +138,33 @@ public class TerminalCompletionContext
          */
         public val precedingPositionalArguments: List<String> = copyOf(precedingPositionalArguments)
 
+        /** Preserves parsed words and command identity while leaving native argument semantics unconstrained. */
+        internal fun withoutArgumentConstraints(): TerminalCompletionContext =
+            TerminalCompletionContext(
+                commandLineContext = commandLineContext,
+                commandTokenIndex = commandTokenIndex,
+                command = command,
+                commandPath = commandPath,
+                activePosition =
+                    if (activePosition == TerminalCompletionActivePosition.OPTION_NAME) {
+                        activePosition
+                    } else {
+                        TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
+                    },
+                usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
+                optionsTerminated = optionsTerminated,
+                activeTokenQuote = activeTokenQuote,
+                attachedOptionValue = attachedOptionValue,
+                optionsBeforeCursor = optionsBeforeCursor,
+                precedingPositionalArguments = precedingPositionalArguments,
+                hasUnrecognizedOptions = hasUnrecognizedOptions,
+                originalActiveTokenIndex = originalActiveTokenIndex,
+            )
+
         /**
          * Returns every completed value for a known option in input order, including
          * repeats and empty values. [optionName] may be any declared alias; matching
-         * follows command-spec lookup (trimmed and case-insensitive). Separate values
+         * follows case-sensitive command-spec lookup, with surrounding whitespace trimmed. Separate values
          * and `--name=value` use the same resolved option and decoded value semantics.
          *
          * Only occurrences resolved by the spec at their position are included,
@@ -139,10 +177,27 @@ public class TerminalCompletionContext
          * @return decoded values, or an empty list when no matching value precedes the cursor.
          */
         public fun precedingOptionValues(optionName: String): List<String> {
-            val normalizedName = normalizeTerminalCommandToken(optionName)
+            val name = optionName.trim()
+            return precedingOptionValues { name in it.names }
+        }
+
+        /**
+         * Returns completed values owned by the exact [option] declaration.
+         *
+         * Use an option instance from this context's [commandPath] to distinguish
+         * parent and child options that share a name. Matching uses reference identity;
+         * a structurally equal copy is a different declaration. Value ordering,
+         * cursor boundaries, and immutability follow [precedingOptionValues].
+         *
+         * @param option catalog declaration whose resolved occurrences are selected.
+         * @return decoded values for this declaration, or an empty list when none precede the cursor.
+         */
+        public fun precedingOptionValues(option: TerminalOptionSpec): List<String> = precedingOptionValues { it === option }
+
+        private inline fun precedingOptionValues(matches: (TerminalOptionSpec) -> Boolean): List<String> {
             var result: ArrayList<String>? = null
-            for (entry in optionValuesBeforeCursor) {
-                if (entry.option.names.any { normalizeTerminalCommandToken(it) == normalizedName }) {
+            for (entry in optionsBeforeCursor) {
+                if (matches(entry.option) && entry.value != null) {
                     val values = result ?: ArrayList<String>().also { result = it }
                     values += entry.value
                 }
@@ -192,6 +247,8 @@ public class TerminalCompletionContext
              * @param commandSpecs the same catalog used by the caller's spec-aware sources;
              * defaults to the bundled command specifications. An empty catalog resolves lexical
              * context without inferred command, option, or positional metadata.
+             * @param commandAliases captured POSIX alias definitions; only literal command-prefix
+             * aliases are interpreted for POSIX requests. No shell expressions are evaluated.
              * @return request-owned context with consistent derived fields and replacement offsets.
              */
             @JvmStatic
@@ -199,12 +256,14 @@ public class TerminalCompletionContext
             public fun resolve(
                 request: TerminalCompletionRequest,
                 commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+                commandAliases: Map<String, String> = emptyMap(),
             ): TerminalCompletionContext =
                 TerminalCompletionContextResolver.resolve(
                     commandLine = request.commandLine,
                     cursorOffset = request.cursorOffset,
                     commandSpecs = commandSpecs,
                     shellSyntax = request.shellCapabilities.syntax,
+                    commandAliases = commandAliases,
                 )
 
             private const val NO_QUOTE = '\u0000'

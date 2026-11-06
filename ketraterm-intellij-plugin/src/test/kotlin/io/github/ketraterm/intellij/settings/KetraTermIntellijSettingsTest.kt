@@ -28,6 +28,8 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import io.github.ketraterm.workspace.TerminalProfileKind
 import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
@@ -37,6 +39,47 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `PowerShell keeps explicit suggestions without enabling automatic shell queries`() {
+        val service = KetraTermIntellijSettings()
+        for (mode in SwingShellSuggestionAutomaticMode.entries) {
+            val preferences =
+                service.state.copy(
+                    themeId = "nord",
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = true,
+                    shellSuggestionAutomaticMode = mode.name.lowercase(),
+                )
+            service.loadState(preferences)
+            val powerShell = service.current(TerminalProfileKind.POWERSHELL)
+            assertTrue(powerShell.smartSuggestionsEnabled)
+            assertFalse(powerShell.shellSuggestionsEnabled)
+            assertEquals(mode, powerShell.shellSuggestionAutomaticMode)
+            assertTrue(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+            assertEquals(preferences, service.state)
+            assertTrue(
+                requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java).shellSuggestionsEnabled,
+            )
+        }
+        service.loadState(service.state.copy(shellSuggestionsEnabled = false, smartSuggestionsEnabled = false))
+        assertFalse(service.current(TerminalProfileKind.POWERSHELL).smartSuggestionsEnabled)
+        assertFalse(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+    }
+
+    @Test
+    fun `automatic popup mode defaults for old XML normalizes invalid values and survives restart`() {
+        val service = KetraTermIntellijSettings()
+        service.loadState(Element("State").deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals("always", service.state.shellSuggestionAutomaticMode)
+        service.loadState(service.state.copy(shellSuggestionAutomaticMode = "invalid"))
+        assertEquals("always", service.state.shellSuggestionAutomaticMode)
+        service.replaceState(service.state.copy(themeId = "nord", shellSuggestionAutomaticMode = " PARAMETERS_ONLY "))
+        val restored = KetraTermIntellijSettings()
+        restored.loadState(requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals("parameters_only", restored.state.shellSuggestionAutomaticMode)
+        assertEquals(SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY, restored.current().shellSuggestionAutomaticMode)
+    }
+
     @Test
     fun `sticky headers default on for old XML and survive restart and Swing conversion`() {
         val service = KetraTermIntellijSettings()
@@ -256,6 +299,7 @@ class KetraTermIntellijSettingsTest {
     @Test
     fun `listener failure does not prevent later consumers from observing committed state`() {
         val service = KetraTermIntellijSettings()
+        service.loadState(service.state.copy(smartSuggestionsEnabled = false))
         val firstFailure = IllegalStateException("pane refresh failed")
         val secondFailure = IllegalArgumentException("policy refresh failed")
         var observed = false
@@ -293,6 +337,7 @@ class KetraTermIntellijSettingsTest {
     fun `listener cancellation remains visible after other consumers are notified`() {
         for (cancellation in listOf(CancellationException("settings caller cancelled"), ProcessCanceledException())) {
             val service = KetraTermIntellijSettings()
+            service.replaceState(service.state.copy(smartSuggestionsEnabled = false))
             val failure = IllegalStateException("pane refresh failed")
             var observed = false
             val attempted = mutableListOf<Int>()
@@ -326,9 +371,10 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
-    fun `smart suggestions default off and map independently from automatic popup`() {
+    fun `smart suggestions default on and map independently from automatic popup`() {
         val defaults = KetraTermIntellijSettings.State(themeId = "nord")
-        assertFalse(defaults.smartSuggestionsEnabled)
+        assertTrue(defaults.smartSuggestionsEnabled)
+        assertTrue(Element("State").deserialize(KetraTermIntellijSettings.State::class.java).smartSuggestionsEnabled)
         assertTrue(defaults.shellSuggestionsEnabled)
         val mapped =
             KetraTermIntellijSettingsMapper.toSwingSettings(
@@ -336,7 +382,14 @@ class KetraTermIntellijSettingsTest {
             )
         assertTrue(mapped.smartSuggestionsEnabled)
         assertFalse(mapped.shellSuggestionsEnabled)
-        assertFalse(KetraTermIntellijSettingsMapper.toSwingSettings(defaults).smartSuggestionsEnabled)
+        assertTrue(KetraTermIntellijSettingsMapper.toSwingSettings(defaults).smartSuggestionsEnabled)
+        val disabled = KetraTermIntellijSettingsMapper.toSwingSettings(defaults.copy(smartSuggestionsEnabled = false))
+        assertFalse(disabled.smartSuggestionsEnabled)
+        assertTrue(disabled.shellSuggestionsEnabled)
+        val restored =
+            requireNotNull(serialize(defaults.copy(smartSuggestionsEnabled = false)))
+                .deserialize(KetraTermIntellijSettings.State::class.java)
+        assertFalse(restored.smartSuggestionsEnabled)
     }
 
     @Test

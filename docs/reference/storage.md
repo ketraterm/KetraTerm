@@ -18,22 +18,24 @@ separate user action.
 
 ## Completion learning
 
-Persistence is opt-in and requires completion to be enabled. Standalone uses
-`suggestion_learning_persistence_enabled` under `[behavior]`. Product settings
-controls are currently hidden; see [completion availability](../features/completion.md#availability).
+Saved learning is **opt-in** and requires completion to be enabled. Both products
+provide a persistence setting; standalone also supports
+`suggestion_learning_persistence_enabled` under `[behavior]`.
 
-A product starting with persistence disabled neither loads nor writes the
-learning file. Enabling hydrates the fixed file once. Disabling prevents new
-writes but does not clear in-memory learning or cancel a file operation already
-in progress. An unreadable/rejected file blocks ordinary writes until an explicit
-learning reset or a new coordinator lifecycle.
+With persistence disabled, startup does not load the saved file and new activity
+is kept in memory. Turning persistence off leaves previously saved data in place.
+Unreadable or unsupported saved data is preserved rather than silently overwritten.
 
-Dirty state is checkpointed every 30 seconds and on shutdown. Products allow up
-to 500 ms for final persistence, so shutdown is not an unconditional durability
-guarantee. Files are bounded; replacement is atomic where the filesystem supports
-it, with ordinary replacement as a fallback. The
-[persistence module](../../ketraterm-completion-persistence/README.md) defines worker,
-failure, and lifecycle contracts.
+Use **Reset learned suggestions...** in settings to clear learned commands and
+ranking preferences from memory and disk, even when suggestions or persistence
+are disabled. The action asks for confirmation and reports success after saved
+data is cleared. Errors allow retry, and closing settings does not cancel the
+reset. The file keeps an empty format header. Shell history and terminal output
+are unaffected; later activity can be learned according to the current settings.
+
+Learning is saved periodically and at shutdown. Products allow up to 500 ms for
+the final write, so the latest activity may be lost if saving cannot finish.
+Integrators should follow the [persistence lifecycle contract](../../ketraterm-completion-persistence/README.md#lifecycle-and-failures).
 
 ## File format
 

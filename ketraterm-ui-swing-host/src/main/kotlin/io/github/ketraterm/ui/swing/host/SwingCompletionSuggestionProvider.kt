@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionEngine
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -28,6 +25,8 @@ import javax.swing.SwingUtilities
 
 /**
  * Host-neutral adapter from the pure completion engine to Swing suggestions.
+ *
+ * **Experimental:** follows the stability contract of [TerminalCompletionEngine].
  *
  * The adapter reads [contextProvider] for every request so hosts can publish
  * current profile and working-directory state without rebuilding the engine.
@@ -45,6 +44,8 @@ import javax.swing.SwingUtilities
  * @param feedbackHandler observer captured with every opened source. Provider
  * replacement never redirects feedback from an already opened request.
  */
+@ExperimentalTerminalCompletionApi
+@ExperimentalShellSuggestionsApi
 public class SwingCompletionSuggestionProvider
     @JvmOverloads
     constructor(
@@ -95,6 +96,7 @@ public class SwingCompletionSuggestionProvider
                         workingDirectoryUri = requestContext.workingDirectoryUri,
                         profileId = requestContext.profileId,
                         shellCapabilities = requestContext.shellCapabilities,
+                        includeCommandNames = request.includeCommandNames,
                     )
                 } catch (_: IllegalArgumentException) {
                     return flowOf(emptyList())
@@ -116,6 +118,8 @@ public class SwingCompletionSuggestionProvider
                 kind = kind.name,
                 displayText = displayText,
                 detail = detail,
+                argumentHint = argumentHint,
+                backslashPathSeparator = requestContext.shellCapabilities.backslashPathSeparator,
                 accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
                 interactionContext = requestContext,
                 feedbackToken = feedbackToken,
@@ -184,6 +188,8 @@ public class SwingCompletionSuggestionProvider
  * @property workingDirectoryUri current authoritative working-directory URI.
  * @property shellCapabilities explicit shell lexical and replacement policy.
  */
+@ExperimentalTerminalCompletionApi
+@ExperimentalShellSuggestionsApi
 public data class SwingCompletionContext
     @JvmOverloads
     constructor(

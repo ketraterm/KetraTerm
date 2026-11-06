@@ -37,6 +37,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler;
 import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteRequest;
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle;
 import io.github.ketraterm.ui.swing.settings.SwingPasteSource;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion;
@@ -125,6 +126,10 @@ public final class JavaConsumer {
             draft.setCopyOnSelection(true);
             draft.setMiddleClickPaste(true);
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
+            draft.setShellSuggestionStyle(new SwingShellSuggestionStyle(
+                0xFF202124, 0xFFE8EAED, 0xFF334455, 0xFFFFFFFF,
+                0xFF82AFFC, 0xFFBBDDFF, 0xFF202124, 0xFF334455,
+                0xFF666B73, 0xFFADB2BC, 0xFFABCDEF, 0xFFFEDCBA));
             draft.setColumnSpacing(-1);
             draft.setSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0x804B6EAF, 0xFFFFFFFF));
             draft.setInactiveSelectionStyle(new io.github.ketraterm.ui.swing.settings.SwingSelectionStyle(0, null, true));
@@ -140,6 +145,10 @@ public final class JavaConsumer {
             draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getShellSuggestionStyle().getArgumentHintForeground() != 0xFFABCDEF
+            || copiedSettings.getShellSuggestionStyle().getSelectionArgumentHintForeground() != 0xFFFEDCBA
+            || copiedSettings.getShellSuggestionStyle().getMatchForeground() != 0xFF82AFFC)
+            throw new AssertionError("Java suggestion style did not survive copying");
         if (copiedSettings.getShellIntegrationPromptDotHoverColor() != 0xFFFFFFFF
             || copiedSettings.getShellIntegrationFailedPromptDotHoverColor() != 0xFFFF8A8A
             || copiedSettings.getShellIntegrationPromptDotHoverHaloColor() != 0x404B6EAF
@@ -158,6 +167,12 @@ public final class JavaConsumer {
             || !copiedSettings.getInactiveSelectionStyle().getReverseVideo()
             || copiedSettings.getSelectionBackground() != copiedSettings.getSelectionStyle().getBackground())
             throw new AssertionError("Java color policies did not survive copying");
+        var parameterSettings = copiedSettings.copy(draft -> draft.setShellSuggestionAutomaticMode(
+                io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY));
+        if (parameterSettings.getShellSuggestionAutomaticMode()
+                != io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+                || new io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest("git", 3, false).getIncludeCommandNames())
+            throw new AssertionError("Java automatic completion mode was lost");
         if (new SwingSettings().getMinimumContrastRatio() != 3.0)
             throw new AssertionError("Java default contrast policy changed");
         var paletteSelection = copiedSettings.copy(draft -> draft.resetSelectionStyle());
@@ -258,7 +273,15 @@ draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && acti
                         return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT;
                     });
                 if (interaction == null) throw new AssertionError("Custom editing target was not captured");
-                var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND");
+                var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND", "status", "",
+                    io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole.COMMAND,
+                    io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionMatchRanges.EMPTY,
+                    "Native", null, null, "[path]", false);
+                if (candidate.getBackslashPathSeparator()) throw new AssertionError("Literal backslash presentation was lost");
+                if (!"git status".equals(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKt.commandTextAfterReplacement(
+                    candidate, new SwingShellSuggestionRequest("git st", 6)))) {
+                    throw new AssertionError("Argument hint entered command text");
+                }
                 interaction.publish(List.of(candidate));
                 var publication = interaction.getSnapshot();
                 if (interaction.tryAccept(publication, 0) != SwingShellSuggestionAcceptanceResult.STALE_CONTEXT

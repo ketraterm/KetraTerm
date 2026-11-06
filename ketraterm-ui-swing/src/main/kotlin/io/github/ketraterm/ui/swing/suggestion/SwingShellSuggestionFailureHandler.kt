@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 /** View-owned provider diagnostics, called once on the EDT after failed request cleanup. */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionFailureHandler {
     /** Reports an operational provider failure; coroutine cancellation is excluded. */
     public fun onSuggestionFailure(

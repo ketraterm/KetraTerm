@@ -113,6 +113,25 @@ class DefaultTerminalInputEncoderCoreStateTest {
     }
 
     @Test
+    fun `replacement collapses active paste region only while real core bracketed mode is enabled`() {
+        val terminal = TerminalBuffers.create(width = 4, height = 2)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+
+        encoder.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "a"))
+        terminal.setBracketedPasteEnabled(true)
+        encoder.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "b"))
+        terminal.setBracketedPasteEnabled(false)
+        encoder.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "c"))
+
+        assertArrayEquals(
+            "a".encodeToByteArray() + esc("[200~") + "b".encodeToByteArray() + esc("[201~") +
+                esc("[200~") + esc("[201~") + "c".encodeToByteArray(),
+            output.bytes,
+        )
+    }
+
+    @Test
     fun `uses real core focus reporting mode for focus encoding`() {
         val terminal = TerminalBuffers.create(width = 4, height = 2)
         val output = RecordingHostOutput()

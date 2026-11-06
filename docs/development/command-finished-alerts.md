@@ -25,7 +25,7 @@ Focused evidence:
 - [Duration regressions](../../ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalShellIntegrationDurationTest.kt): clock rollback, nanosecond wrap, bounds, abandonment, eviction, and synchronous capture.
 - [Session regressions](../../ketraterm-session/src/test/kotlin/io/github/ketraterm/session/TerminalSessionTest.kt): initial/live notification permission, closure, and unavailable policy ownership.
 - [Shared policy regressions](../../ketraterm-workspace/src/test/kotlin/io/github/ketraterm/workspace/TerminalCommandFinishedAlertsTest.kt): defaults, inclusive thresholds, overflow, unknown duration, lifecycle, focus, and denial.
-- [Standalone callbacks](../../ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerStartupTest.kt) and [IDE callbacks](../../ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt): real workspace routing, focus changes, live preferences, revoked session permission, coalescing, slot release, and disposal.
+- [Standalone callbacks](../../ketraterm-app/src/test/kotlin/io/github/ketraterm/app/ui/TabManagerStartupDesktopTest.kt) and [IDE callbacks](../../ketraterm-intellij-plugin/src/test/kotlin/io/github/ketraterm/intellij/services/KetraTermProjectTerminalPersistenceTest.kt): real workspace routing, focus changes, live preferences, revoked session permission, coalescing, slot release, and disposal.
 
 Configuration tests cover legacy defaults, persistence, malformed/overflowing
 standalone values, normalized IDE bounds, and settings controls. Existing shell

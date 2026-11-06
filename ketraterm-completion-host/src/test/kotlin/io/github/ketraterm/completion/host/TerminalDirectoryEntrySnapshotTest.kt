@@ -34,4 +34,19 @@ class TerminalDirectoryEntrySnapshotTest {
         assertEquals(3, snapshot.size)
         assertEquals(listOf("alphaOne", "AlphaTwo"), snapshot.matching("ALPHA").map { it.name })
     }
+
+    @Test
+    fun `backslashes are literal basename characters during prefix matching`() {
+        val snapshot =
+            TerminalDirectoryEntrySnapshot(
+                listOf(
+                    TerminalFileEntry("foo\\baz", false),
+                    TerminalFileEntry("foobar", false),
+                    TerminalFileEntry("foo\\bar", true),
+                ),
+            )
+
+        assertEquals(listOf("foo\\bar", "foo\\baz"), snapshot.matching("FOO\\B").map { it.name })
+        assertEquals(listOf("foobar"), snapshot.matching("foob").map { it.name })
+    }
 }

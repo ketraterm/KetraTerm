@@ -35,6 +35,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -214,6 +215,7 @@ class SwingTerminalCursorBlinkTest {
     }
 
     @Test
+    @Tag("desktop")
     fun `zero cursor blink setting keeps timer stopped and cursor visible`() {
         val component =
             SwingTerminal(
@@ -243,6 +245,7 @@ class SwingTerminalCursorBlinkTest {
     }
 
     @Test
+    @Tag("desktop")
     fun `key events and frame updates reset cursor blinking timer`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val renderReader = SimpleFrameReader()

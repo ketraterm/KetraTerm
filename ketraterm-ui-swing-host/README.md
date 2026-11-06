@@ -139,6 +139,18 @@ for callback configuration.
 
 ## Completion bridge
 
+**Experimental.** Completion adapters and suggestion extension points follow
+the [completion stability policy](../docs/features/completion.md#stability-experimental).
+
+To use the running PowerShell session as the command authority, set
+`shellProvider = SessionShellCompletionProvider(session)` in
+`TerminalCompletionEngines.fromSources` and supply
+`TerminalShellCapabilities.POWERSHELL` in its requests. The adapter lives in
+`io.github.ketraterm.ui.swing.host`; the engine contract lives in
+`io.github.ketraterm.completion.api`. The provider borrows its session and owns no jobs.
+It preserves shell quoting, replacement ranges, and presentation metadata, and
+participates in normal caller cancellation. See the [availability and bounds](../docs/features/completion.md#sources-by-host).
+
 `SwingCompletionSuggestionProvider` adapts a
 [`TerminalCompletionEngine`](../ketraterm-completion/README.md) to the terminal's
 suggestion contract. It preserves replacement ranges, source identity,
@@ -146,6 +158,8 @@ presentation fields, matched ranges, and opaque feedback tokens. The host select
 the engine and sources and supplies current profile, directory, and shell metadata.
 
 ```kotlin
+@file:OptIn(io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi::class, io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class)
+
 import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
@@ -174,6 +188,9 @@ fun installCompletion(
 
 The terminal opens the provider on the EDT, capturing one immutable context and
 feedback handler before background collection. Keep `contextProvider` cheap.
+When that context changes, call `terminal.refreshShellSuggestions()` on the EDT
+to invalidate work and results captured for the previous context. Updating the
+context supplier alone does not invalidate an already opened request.
 Direct calls to `suggestions(request)` capture context in the caller's thread;
 the returned flow is cold and runs engine work only when collected. This adapter
 does not choose a dispatcher, launch jobs, or close the engine. Collection

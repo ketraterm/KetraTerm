@@ -28,6 +28,27 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var posixPaths = new TerminalShellCapabilities(TerminalShellSyntax.POSIX, TerminalShellQuotingPolicy.POSIX, false);
+        var windowsPaths = new TerminalShellCapabilities(TerminalShellSyntax.POSIX, TerminalShellQuotingPolicy.POSIX, true);
+        if (posixPaths.getBackslashPathSeparator() || !windowsPaths.getBackslashPathSeparator()
+                || !"foo\\bar".equals(posixPaths.normalizePathSeparators("foo\\bar"))
+                || !"foo/bar".equals(windowsPaths.normalizePathSeparators("foo\\bar"))) {
+            throw new AssertionError("Path separator policy was lost");
+        }
+        var option = new io.github.ketraterm.completion.model.TerminalOptionSpec(
+                List.of("-m"), "", true, io.github.ketraterm.completion.model.TerminalPathArgumentKind.NONE,
+                List.of(), io.github.ketraterm.completion.model.TerminalCompletionValueDomain.NONE,
+                io.github.ketraterm.completion.model.TerminalHiddenPathPolicy.DEFAULT, List.of(), "message");
+        if (!"message".equals(option.getValueName())) throw new AssertionError("Missing option value name");
+        TerminalCompletionShellProvider provider = (request, context, limit, continuation) ->
+                new TerminalCompletionShellResult(List.of(), "git.exe");
+        var parametersOnly = new TerminalCompletionRequest("git", 3, null, null, TerminalShellCapabilities.PLAIN, false);
+        if (parametersOnly.getIncludeCommandNames()) throw new AssertionError("Command-name restriction was lost");
+        var request = new TerminalCompletionRequest("git --v", 7);
+        var reply = (TerminalCompletionShellResult) provider.complete(request, TerminalCompletionContext.resolve(request), 10, null);
+        if (!"git.exe".equals(reply.getExternalCommandName()) || !reply.getCandidates().isEmpty()) {
+            throw new AssertionError("Shell answer identity was lost");
+        }
         try (var metadata = TerminalCompletionEngines.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-completion.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }

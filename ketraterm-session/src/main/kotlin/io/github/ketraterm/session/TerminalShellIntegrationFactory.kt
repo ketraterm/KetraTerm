@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,12 +39,38 @@ public fun interface TerminalShellIntegrationFactory {
             state: TerminalShellIntegrationView,
             commandLine: TerminalShellCommandLineState,
             promptReady: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow(),
-        ): TerminalShellIntegrationFactory =
-            TerminalShellIntegrationFactory {
+        ): TerminalShellIntegrationFactory = host(state, commandLine, emptyList(), promptReady)
+
+        /**
+         * Selects a versioned host projection with an editor-owned prefix-reset operation.
+         *
+         * The [prefixResetKeys] sequence is detached before this method returns.
+         * Hosts with changing editor capabilities may implement [TerminalShellIntegration]
+         * and guard that capability together with their command-line projection.
+         *
+         * @param state host-owned shell metadata projection.
+         * @param commandLine versioned editing state used for atomic conditional admission.
+         * @param prefixResetKeys at most four non-executing keys that clear text before the cursor
+         * while preserving its suffix, or an empty list when unsupported.
+         * @param promptReady whether the shell is ready to receive startup input.
+         * @return factory that borrows the host projections without taking their lifetime.
+         * @throws IllegalArgumentException if [prefixResetKeys] contains more than four keys.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun host(
+            state: TerminalShellIntegrationView,
+            commandLine: TerminalShellCommandLineState,
+            prefixResetKeys: List<TerminalKeyEvent>,
+            promptReady: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow(),
+        ): TerminalShellIntegrationFactory {
+            val resetKeys = copyCommandLinePrefixResetKeys(prefixResetKeys)
+            return TerminalShellIntegrationFactory {
                 object : TerminalShellIntegration {
                     override val state = state
                     override val promptReady = promptReady
                     override val commandLineChanges = commandLine.changes
+                    override val commandLinePrefixResetKeys = resetKeys
 
                     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = commandLine.value
 
@@ -51,6 +78,7 @@ public fun interface TerminalShellIntegrationFactory {
                         commandLine.withCommandLine(action)
                 }
             }
+        }
 
         /**
          * Selects a host-owned shell model without installing any protocol recorder.

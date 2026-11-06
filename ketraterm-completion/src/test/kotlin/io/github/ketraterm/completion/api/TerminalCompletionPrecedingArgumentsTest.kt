@@ -34,7 +34,8 @@ class TerminalCompletionPrecedingArgumentsTest {
 
         assertEquals(listOf("--context", "QA Region", "-c=Prod=blue", "--flag", "repo", "--namespace", "ns"), context.precedingArguments)
         assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues("--context"))
-        assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues(" -C "))
+        assertEquals(listOf("QA Region", "Prod=blue"), context.precedingOptionValues(" -c "))
+        assertEquals(emptyList(), context.precedingOptionValues("-C"))
         assertEquals(listOf("ns"), context.precedingOptionValues("-n"))
         assertEquals(listOf("repo"), context.precedingPositionalArguments)
         assertEquals(emptyList(), context.precedingOptionValues("--flag"))
@@ -154,6 +155,26 @@ class TerminalCompletionPrecedingArgumentsTest {
         assertEquals(listOf("child", "next"), context.precedingOptionValues("--child-context"))
         assertEquals(listOf("repo"), context.precedingPositionalArguments)
         assertEquals(listOf("tool", "get"), context.commandPath.map { it.name })
+    }
+
+    @Test
+    fun `option declaration lookup separates shadowed occurrences with equal metadata`() {
+        val rootOption = TerminalOptionSpec(listOf("--context", "-c"), requiresValue = true)
+        val childOption = rootOption.copy()
+        val child = TerminalCommandSpec("get", options = listOf(childOption))
+        val catalog = listOf(TerminalCommandSpec("tool", options = listOf(rootOption), subcommands = listOf(child)))
+        val context = resolve("tool -c root --context='' get --context=child -c next active", catalog = catalog)
+
+        assertEquals(listOf("root", "", "child", "next"), context.precedingOptionValues("--context"))
+        val rootValues = context.precedingOptionValues(rootOption)
+        assertEquals(listOf("root", ""), rootValues)
+        assertEquals(listOf("child", "next"), context.precedingOptionValues(childOption))
+        assertEquals(emptyList(), context.precedingOptionValues(rootOption.copy()))
+        assertFailsWith<UnsupportedOperationException> { (rootValues as MutableList<String>).clear() }
+
+        val pending = resolve("tool -c root get --context=active", catalog = catalog)
+        assertEquals(listOf("root"), pending.precedingOptionValues(rootOption))
+        assertEquals(emptyList(), pending.precedingOptionValues(childOption))
     }
 
     @Test

@@ -22,6 +22,10 @@ package io.github.ketraterm.input.event
  * that owns the edited text must translate its text model into the number of
  * Delete and Backspace actions required by the host editor.
  *
+ * With bracketed paste enabled, insertion ends with an empty paste to collapse
+ * Readline's highlighted paste region without moving the cursor. Ordinary
+ * [TerminalPasteEvent] input retains its usual paste behavior.
+ *
  * @property deleteAfterCursorCount Delete key presses emitted before any
  * Backspace presses.
  * @property deleteBeforeCursorCount Backspace key presses emitted after the

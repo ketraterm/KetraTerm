@@ -17,10 +17,10 @@ package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.source.ShellReplacementText
 
 internal class SpecCompletionSource(
@@ -57,15 +57,17 @@ internal class SpecCompletionSource(
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
-        for (i in commandSpecs.indices) {
-            val spec = commandSpecs[i]
-            if (prefix.isNotEmpty() && spec.name.equals(prefix, ignoreCase = true)) continue
-            val match = CompletionMatcher.match(spec.name, prefix) ?: continue
+        val names = commandSpecs.asSequence().map { it.name }.distinctBy(::normalizeTerminalCommandToken)
+        for (name in names) {
+            if (prefix.isNotEmpty() && name.equals(prefix, ignoreCase = true)) continue
+            val match = CompletionMatcher.match(name, prefix) ?: continue
+            val spec = findCommandSpec(commandSpecs, normalizeTerminalCommandToken(name)) ?: continue
             candidates +=
                 candidate(
-                    replacementText = spec.name,
-                    displayText = spec.name,
+                    replacementText = name,
+                    displayText = name,
                     detail = spec.description,
+                    argumentHint = spec.argumentHint(),
                     kind = TerminalCompletionCandidateKind.COMMAND,
                     context = context,
                     score = match.sourceScore(COMMAND_BASE_SCORE, prefix, orderIndex++),
@@ -80,16 +82,18 @@ internal class SpecCompletionSource(
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
-        for (i in subcommands.indices) {
-            val spec = subcommands[i]
+        val names = subcommands.asSequence().map { it.name }.distinctBy(::normalizeTerminalCommandToken)
+        for (name in names) {
+            if (prefix.isNotEmpty() && name.equals(prefix, ignoreCase = true)) continue
+            val match = CompletionMatcher.match(name, prefix) ?: continue
+            val spec = findCommandSpec(subcommands, normalizeTerminalCommandToken(name)) ?: continue
             if (context.isAlreadyUsedRepeatableSubcommand(spec)) continue
-            if (prefix.isNotEmpty() && spec.name.equals(prefix, ignoreCase = true)) continue
-            val match = CompletionMatcher.match(spec.name, prefix) ?: continue
             candidates +=
                 candidate(
-                    replacementText = spec.name,
-                    displayText = spec.name,
+                    replacementText = name,
+                    displayText = name,
                     detail = spec.description,
+                    argumentHint = spec.argumentHint(),
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
                     context = context.commandLineContext,
                     score = match.sourceScore(SUBCOMMAND_BASE_SCORE, prefix, orderIndex++),
@@ -108,30 +112,32 @@ internal class SpecCompletionSource(
     }
 
     private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
-        val options = ArrayList<TerminalOptionSpec>()
-        for (command in context.commandPath) {
-            options += command.options
-        }
+        val names =
+            context.commandPath
+                .asSequence()
+                .flatMap { it.options }
+                .flatMap { it.names }
+                .distinct()
 
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
-        for (option in options) {
+        for (name in names) {
+            if (name == prefix) continue
+            val match = CompletionMatcher.match(name, prefix) ?: continue
+            val option = findOptionSpec(context.commandPath, name) ?: continue
             if (option.exclusiveGroupIds.any(context.usedOptionExclusiveGroupIds::contains)) continue
-            for (name in option.names) {
-                if (prefix.isNotEmpty() && name.equals(prefix, ignoreCase = true)) continue
-                val match = CompletionMatcher.match(name, prefix) ?: continue
-                candidates +=
-                    candidate(
-                        replacementText = name,
-                        displayText = name,
-                        detail = option.description,
-                        kind = TerminalCompletionCandidateKind.OPTION,
-                        context = context.commandLineContext,
-                        score = match.sourceScore(OPTION_BASE_SCORE, prefix, orderIndex++),
-                        matchedRanges = match.matchedRanges,
-                    )
-            }
+            candidates +=
+                candidate(
+                    replacementText = name,
+                    displayText = name,
+                    detail = option.description,
+                    argumentHint = option.argumentHint(),
+                    kind = TerminalCompletionCandidateKind.OPTION,
+                    context = context.commandLineContext,
+                    score = match.sourceScore(OPTION_BASE_SCORE, prefix, orderIndex++),
+                    matchedRanges = match.matchedRanges,
+                )
         }
         return candidates
     }
@@ -151,8 +157,7 @@ internal class SpecCompletionSource(
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
-        for (i in values.indices) {
-            val value = values[i]
+        for (value in values.distinct()) {
             if (prefix.isNotEmpty() && value.equals(prefix, ignoreCase = true)) continue
             val match = CompletionMatcher.match(value, prefix) ?: continue
             val replacementText =
@@ -179,6 +184,7 @@ internal class SpecCompletionSource(
         context: TerminalCompletionContext,
         score: Int,
         matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+        argumentHint: String = "",
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacementText,
@@ -190,6 +196,7 @@ internal class SpecCompletionSource(
             kind = kind,
             score = score,
             matchedRanges = matchedRanges,
+            argumentHint = argumentHint,
         )
 
     private fun candidate(
@@ -200,6 +207,7 @@ internal class SpecCompletionSource(
         context: TerminalCommandLineContext,
         score: Int,
         matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+        argumentHint: String = "",
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacementText,
@@ -211,6 +219,7 @@ internal class SpecCompletionSource(
             kind = kind,
             score = score,
             matchedRanges = matchedRanges,
+            argumentHint = argumentHint,
         )
 
     private companion object {

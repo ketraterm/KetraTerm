@@ -47,6 +47,7 @@ import java.util.function.Predicate
  * @param capacity maximum distinct exact-command rows retained.
  * @throws IllegalArgumentException if [capacity] is not positive.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionLearningStore
     @JvmOverloads
     constructor(

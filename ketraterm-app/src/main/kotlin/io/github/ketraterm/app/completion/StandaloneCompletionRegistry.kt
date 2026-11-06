@@ -16,10 +16,13 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalCompletionSourceEnvironment
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.ui.swing.host.SessionShellCompletionProvider
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
@@ -43,7 +46,7 @@ import java.util.*
 internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
-    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
+    private val specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
@@ -61,16 +64,31 @@ internal class StandaloneCompletionRegistry private constructor(
             ioDispatcher = ioDispatcher,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
+    private val sources =
+        listOf(
+            TerminalCompletionSourceEntry(
+                TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
+                TerminalCompletionSourcePrior.DIRECTORY_PATH,
+            ),
+            TerminalCompletionSourceEntry(
+                TerminalCompletionSources.git(StandaloneGitCompletionLoader.SOURCE_ID, StandaloneGitCompletionLoader(ioDispatcher)::load),
+                TerminalCompletionSourcePrior.GIT_REFERENCE,
+            ),
+        ).map { entry ->
+            entry.copy(
+                source =
+                    TerminalCompletionSource { request, context, limit ->
+                        val sourceRequest =
+                            TerminalCompletionSourceEnvironment.resolve(request, context)
+                                ?: return@TerminalCompletionSource emptyList()
+                        entry.source.complete(sourceRequest, context, limit)
+                    },
+            )
+        }
     private val engine =
         TerminalCompletionEngines.fromSources(
             messages = completionMessages,
-            sources =
-                listOf(
-                    TerminalCompletionSourceEntry(
-                        TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
-                        TerminalCompletionSourcePrior.DIRECTORY_PATH,
-                    ),
-                ),
+            sources = sources,
             commandSpecs = specs,
             learningStore = learningStore,
         )
@@ -100,6 +118,7 @@ internal class StandaloneCompletionRegistry private constructor(
      *
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
+     * @param session session supplying optional live shell completions for this pane.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return provider with request-owned learning feedback for the pane.
      * @throws IllegalStateException if this registry is closed.
@@ -107,6 +126,7 @@ internal class StandaloneCompletionRegistry private constructor(
     fun createProvider(
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+        session: TerminalSession? = null,
         workingDirectoryUriProvider: () -> String? = { null },
     ): SwingShellSuggestionProvider =
         synchronized(lifecycleLock) {
@@ -119,8 +139,20 @@ internal class StandaloneCompletionRegistry private constructor(
                 )
             }
             SwingCompletionSuggestionProvider(
-                engine = engine,
+                engine =
+                    if (session != null && shellCapabilities.syntax != TerminalShellSyntax.PLAIN) {
+                        TerminalCompletionEngines.fromSources(
+                            sources = sources,
+                            shellProvider = SessionShellCompletionProvider(session),
+                            commandSpecs = specs,
+                            learningStore = learningStore,
+                            messages = completionMessages,
+                        )
+                    } else {
+                        engine
+                    },
                 contextProvider = contextProvider,
+                sourceLabels = mapOf("powershell" to "PowerShell", StandaloneGitCompletionLoader.SOURCE_ID to "Git"),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }
@@ -164,12 +196,12 @@ internal class StandaloneCompletionRegistry private constructor(
         }
     }
 
-    /** Removes all session and persisted completion learning. */
-    fun resetLearning() {
+    /** Clears session learning immediately; completes after saved learning has been cleared. */
+    fun resetLearning(): Deferred<Unit> =
         synchronized(lifecycleLock) {
-            if (!closed) learning.resetLearning()
+            check(!closed) { "standalone completion registry is closed" }
+            learning.resetLearning()
         }
-    }
 
     /** Disables learning and stops persistence without a final write. */
     suspend fun closeWithoutFlush() {

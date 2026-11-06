@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+
 /**
  * Immutable host-provided value for one dynamic completion domain.
  *
@@ -29,6 +31,7 @@ package io.github.ketraterm.completion.model
  * @throws IllegalArgumentException if [value] or [displayText] is blank, or if
  * [scoreAdjustment] is outside [MIN_SCORE_ADJUSTMENT] through [MAX_SCORE_ADJUSTMENT].
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionDomainValue
     @JvmOverloads
     constructor(

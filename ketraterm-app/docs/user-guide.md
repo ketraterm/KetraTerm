@@ -52,18 +52,19 @@ the native helper.
 
 ## Completion
 
-KetraTerm suggestions are disabled by default. To enable them, add or change
-this setting in `config.toml`, then restart the app:
+KetraTerm suggestions are enabled by default. Use the Shell Suggestions section
+in settings to change automatic popups, Enter acceptance, and learning persistence.
+The master switch is also available in `config.toml`; restart the app after
+editing the file directly:
 
 ```toml
 [behavior]
 smart_suggestions_enabled = true
 ```
 
-The settings dialog does not currently expose this switch. Suggestions need
-an editable command context from shell integration. Press Ctrl+Space to request
-them, use arrows or Page Up/Page Down to navigate, Tab to accept, and Escape to
-dismiss. Enter accepts an already selected suggestion by default. Shell-native
+Suggestions need an editable command context from shell integration. Press
+Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
+accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
 Tab completion is separate.
 
 Suggestions combine built-in command specifications, local files and directories,

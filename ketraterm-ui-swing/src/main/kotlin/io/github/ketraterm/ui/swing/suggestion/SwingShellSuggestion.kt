@@ -50,10 +50,16 @@ import java.util.regex.Pattern
  * command text.
  * @property matchedRanges immutable ordered UTF-16 intervals relative to
  * [displayText] used to visually highlight matching fragments.
+ * @property argumentHint display-only placeholders shown after [displayText]. Never inserted,
+ * matched, or included in command-learning text; custom providers may supply their own hint.
+ * @property backslashPathSeparator whether `\` separates path components in [displayText]
+ * when [kind] is `PATH`. Forward slashes always separate components. Set to `false` for
+ * POSIX names containing literal backslashes; this affects presentation only, not insertion.
  * @throws IllegalArgumentException if text/source/kind fields are invalid,
  * replacement offsets are unordered, or [matchedRanges] do not address
  * [displayText].
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestion
     @JvmOverloads
     constructor(
@@ -69,6 +75,8 @@ public data class SwingShellSuggestion
         val sourceDisplayText: String = source,
         val interactionContext: Any? = null,
         val feedbackToken: Any? = null,
+        val argumentHint: String = "",
+        val backslashPathSeparator: Boolean = true,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
@@ -93,6 +101,7 @@ public data class SwingShellSuggestion
  * Hosts should provide this from their semantic completion vocabulary rather
  * than making the popup infer visual meaning from source-label text.
  */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionAccentRole {
     /** Command or subcommand completion. */
     COMMAND,
@@ -135,8 +144,8 @@ public enum class SwingShellSuggestionAccentRole {
  *
  * The plan is derived from the suggestion's replacement range and the request
  * cursor. Hosts can use [commandTextAfterReplacement] for learning/feedback
- * while the default Swing acceptance handler uses the delete counts to emit
- * terminal editing keys before pasting [replacementText].
+ * while the default Swing acceptance handler uses either the editor's prefix-reset
+ * capability or these grapheme deletion counts before pasting the replacement.
  *
  * @property startOffset inclusive UTF-16 start offset replaced in the request
  * command text.
@@ -148,6 +157,7 @@ public enum class SwingShellSuggestionAccentRole {
  * @property deleteAfterCursorCount number of Delete key events needed before
  * any Backspace key events.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionReplacement(
     val startOffset: Int,
     val endOffset: Int,
@@ -229,6 +239,7 @@ public fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellS
  * @property selectedSuggestion selected suggestion, or `null` when no
  * suggestion is selected.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionState(
     val visible: Boolean,
     val count: Int,
@@ -259,19 +270,27 @@ public data class SwingShellSuggestionState(
  *
  * @property commandText visible command-line text known to the provider.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
+ * @property includeCommandNames whether executable-name positions are eligible. Providers
+ * must return no candidates at a command name when false, using their shell-aware context.
+ * Subcommands, options, and positional arguments remain eligible.
  */
-public data class SwingShellSuggestionRequest(
-    val commandText: String,
-    val cursorOffset: Int,
-) {
-    init {
-        require(cursorOffset in 0..commandText.length) {
-            "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+@ExperimentalShellSuggestionsApi
+public data class SwingShellSuggestionRequest
+    @JvmOverloads
+    constructor(
+        val commandText: String,
+        val cursorOffset: Int,
+        val includeCommandNames: Boolean = true,
+    ) {
+        init {
+            require(cursorOffset in 0..commandText.length) {
+                "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
+            }
         }
     }
-}
 
 /** Determines whether a provider request follows automatic observation or an explicit user action. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionTrigger {
     /** Requires both smart suggestions and automatic popup to be enabled. */
     AUTOMATIC,
@@ -287,6 +306,7 @@ public enum class SwingShellSuggestionTrigger {
  * @property index global rank of [suggestion] in the current ranked snapshot.
  * @property request command-line context that produced the accepted suggestion.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionAcceptance(
     val suggestion: SwingShellSuggestion,
     val index: Int,
@@ -296,6 +316,7 @@ public data class SwingShellSuggestionAcceptance(
 /**
  * Feedback kind emitted by the reusable suggestion popup.
  */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionFeedbackKind {
     /**
      * The editing authority admitted or applied the selected suggestion.
@@ -320,6 +341,7 @@ public enum class SwingShellSuggestionFeedbackKind {
  * @property request command-line context that produced the suggestion.
  * @property acceptanceResult editing outcome for acceptance attempts, or null for dismissal.
  */
+@ExperimentalShellSuggestionsApi
 public data class SwingShellSuggestionFeedback(
     val kind: SwingShellSuggestionFeedbackKind,
     val suggestion: SwingShellSuggestion,
@@ -330,14 +352,18 @@ public data class SwingShellSuggestionFeedback(
 
 /**
  * Host provider for progressive shell-suggestion snapshots.
+ *
+ * **Experimental:** follows the suggestion stability contract of [SwingShellSuggestionViewFactory].
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionProvider {
     /**
      * Returns a cold stream of suggestions for [request].
      *
      * The reusable Swing terminal invokes this on [kotlinx.coroutines.Dispatchers.Default],
      * outside the Swing Event Dispatch Thread. Implementations must cooperate
-     * with cancellation when a newer request replaces the current one.
+     * with cancellation when a newer request replaces the current one, and honor
+     * [SwingShellSuggestionRequest.includeCommandNames] before querying their sources.
      *
      * @param request command-line context.
      * @return cold stream of ordered suggestion snapshots, best first.
@@ -366,10 +392,12 @@ public fun interface SwingShellSuggestionProvider {
  *
  * Listeners are registered on one [io.github.ketraterm.ui.swing.api.SwingTerminal]
  * and invoked synchronously on the Swing Event Dispatch Thread after its active
- * provider collection is cancelled and its popup is hidden.
+ * provider collection is cancelled and its editing capability is closed. During automatic
+ * refresh, the last painted rows may remain visible until the next publication; they cannot be accepted.
  * A callback failure, including cancellation, propagates to the invoking operation;
  * subsequent listeners and input submission are skipped.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionInvalidationListener {
     /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
     public fun onShellSuggestionsInvalidated()
@@ -386,6 +414,7 @@ public fun interface SwingShellSuggestionInvalidationListener {
  * and stops notification of subsequent listeners. The eligibility change remains applied.
  * Reentrant eligibility changes or disposal supersede the remaining older notifications.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionEligibilityListener {
     /**
      * Reports the latest automatic-suggestion eligibility.
@@ -399,6 +428,7 @@ public fun interface SwingShellSuggestionEligibilityListener {
 /**
  * Host callback invoked for suggestion acceptance and explicit dismissal.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionFeedbackHandler {
     /**
      * Handles one user feedback event.
@@ -421,6 +451,7 @@ public fun interface SwingShellSuggestionFeedbackHandler {
  * Implementations run on the EDT and return the editing authority's actual result.
  * The owning interaction derives feedback and closes the capability exactly once.
  */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionHandler : AutoCloseable {
     /**
      * Attempts the complete edit against the originally captured context.

@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Reset bypasses enablement and the checkpoint interval so persisted learning
  * is replaced promptly. Shutdown awaits the final required write.
  */
-public class TerminalCompletionLearningCoordinator
+class TerminalCompletionLearningCoordinator
     internal constructor(
         private val learningStore: TerminalCompletionLearningStore,
         private val fileStore: CompletionLearningSnapshotFileStore,
@@ -43,7 +43,7 @@ public class TerminalCompletionLearningCoordinator
         private val onPersistenceLoadFailure: (Throwable) -> Unit = {},
     ) {
         /** Creates a learning owner using [Dispatchers.IO] for blocking snapshot file access. */
-        public constructor(
+        constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
@@ -69,7 +69,7 @@ public class TerminalCompletionLearningCoordinator
          * @param onPersistenceLoadFailure invoked once when an existing file is rejected or cannot be read.
          * Exceptions thrown by this diagnostic callback are ignored.
          */
-        public constructor(
+        constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
@@ -107,6 +107,7 @@ public class TerminalCompletionLearningCoordinator
         private var persistedRevision = 0L
         private var attemptedRevision = 0L
         private var resetRevision = 0L
+        private var pendingReset: CompletableDeferred<Unit>? = null
         private var persistenceFailure: Throwable? = null
         private val worker: Deferred<Unit> =
             coroutineScope.async(start = CoroutineStart.UNDISPATCHED) {
@@ -122,7 +123,7 @@ public class TerminalCompletionLearningCoordinator
          * @param workingDirectoryUri optional working-directory URI captured for the command.
          * @param usedAtEpochMillis non-negative completion timestamp.
          */
-        public fun recordCommandResult(
+        fun recordCommandResult(
             commandLine: String,
             successful: Boolean,
             profileId: String?,
@@ -153,7 +154,7 @@ public class TerminalCompletionLearningCoordinator
          * @param workingDirectoryUri optional working-directory URI captured for the event.
          * @param feedbackAtEpochMillis non-negative feedback timestamp.
          */
-        public fun recordSuggestionFeedback(
+        fun recordSuggestionFeedback(
             commandLine: String,
             feedback: TerminalCompletionFeedbackKind,
             profileId: String?,
@@ -181,10 +182,15 @@ public class TerminalCompletionLearningCoordinator
          * The in-memory reset is visible before this method returns. A reset
          * supersedes an in-flight hydration and is written even when ordinary
          * persistence is disabled.
+         *
+         * The returned completion succeeds only after the empty snapshot replaces
+         * saved data, or fails with the write error. Overlapping resets share the
+         * completion of the latest reset. Cancelling a waiter does not cancel storage.
          */
-        public fun resetLearning() {
+        fun resetLearning(): Deferred<Unit> =
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
+                val completion = pendingReset?.takeUnless { it.isCompleted } ?: CompletableDeferred<Unit>().also { pendingReset = it }
                 learningStore.clear()
                 hydrated = true
                 loadBlocked = false
@@ -192,8 +198,8 @@ public class TerminalCompletionLearningCoordinator
                 markDirty()
                 resetRevision = mutationRevision
                 wakeups.trySend(Unit)
+                completion
             }
-        }
 
         /**
          * Enables or disables persistence for the fixed configured path.
@@ -204,7 +210,7 @@ public class TerminalCompletionLearningCoordinator
          *
          * @param enabled whether the fixed snapshot may be read and written.
          */
-        public fun setPersistenceEnabled(enabled: Boolean) {
+        fun setPersistenceEnabled(enabled: Boolean) {
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
                 if (persistenceEnabled == enabled) return
@@ -219,7 +225,7 @@ public class TerminalCompletionLearningCoordinator
          * Calling this method more than once is safe. An unrecovered final
          * write failure is rethrown after the worker stops.
          */
-        public suspend fun closeAndFlush() {
+        suspend fun closeAndFlush() {
             synchronized(stateLock) {
                 if (acceptingEvents) {
                     acceptingEvents = false
@@ -234,7 +240,7 @@ public class TerminalCompletionLearningCoordinator
         }
 
         /** Stops learning and awaits the worker without loading or saving pending state. */
-        public suspend fun closeWithoutFlush() {
+        suspend fun closeWithoutFlush() {
             synchronized(stateLock) {
                 acceptingEvents = false
                 closeRequested = true
@@ -244,6 +250,7 @@ public class TerminalCompletionLearningCoordinator
         }
 
         private suspend fun runWorker() {
+            var workerFailure: Throwable? = null
             try {
                 while (true) {
                     when (nextAction()) {
@@ -255,11 +262,19 @@ public class TerminalCompletionLearningCoordinator
                         WorkerAction.STOP -> return
                     }
                 }
+            } catch (failure: Throwable) {
+                workerFailure = failure
+                throw failure
             } finally {
-                synchronized(stateLock) {
-                    acceptingEvents = false
-                    closeRequested = true
-                }
+                val reset =
+                    synchronized(stateLock) {
+                        acceptingEvents = false
+                        closeRequested = true
+                        pendingReset.also { pendingReset = null }
+                    }
+                reset?.completeExceptionally(
+                    workerFailure ?: CancellationException("completion-learning owner stopped before reset completed"),
+                )
                 wakeups.close()
             }
         }
@@ -372,14 +387,17 @@ public class TerminalCompletionLearningCoordinator
                     writeFailure
                 }
 
-            synchronized(stateLock) {
-                if (failure == null) {
-                    persistedRevision = maxOf(persistedRevision, revision)
-                    persistenceFailure = null
-                } else {
-                    persistenceFailure = failure
+            val completedReset =
+                synchronized(stateLock) {
+                    if (failure == null) {
+                        persistedRevision = maxOf(persistedRevision, revision)
+                        persistenceFailure = null
+                    } else {
+                        persistenceFailure = failure
+                    }
+                    if (resetRevision == revision) pendingReset.also { pendingReset = null } else null
                 }
-            }
+            if (failure == null) completedReset?.complete(Unit) else completedReset?.completeExceptionally(failure)
         }
 
         private fun markDirty() {
@@ -402,7 +420,7 @@ public class TerminalCompletionLearningCoordinator
             STOP,
         }
 
-        public companion object {
+        companion object {
             private const val DEFAULT_CHECKPOINT_INTERVAL_MILLIS = 30_000L
 
             /**
@@ -414,6 +432,6 @@ public class TerminalCompletionLearningCoordinator
              * @return current completion-learning filename.
              */
             @JvmStatic
-            public fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
+            fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
         }
     }

@@ -31,7 +31,7 @@ internal class SwingShellSuggestionScheduler(
     private val isFocused: () -> Boolean,
     private val isEligible: () -> Boolean,
     private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Unit,
-    private val hideSuggestions: () -> Unit,
+    private val hideSuggestions: (refreshing: Boolean) -> Unit,
     private val debounceMillis: Int = 75,
     private val minimumNonWhitespaceCharacters: Int = 2,
 ) {
@@ -44,6 +44,7 @@ internal class SwingShellSuggestionScheduler(
     private var refreshSequence = 0L
     private var lifecycleRevision = 0L
     private var lastRequest: TerminalShellCommandLineSnapshot? = null
+    private var dismissedCommandText: String? = null
 
     val feedbackHandler =
         SwingShellSuggestionFeedbackHandler {
@@ -98,7 +99,7 @@ internal class SwingShellSuggestionScheduler(
                             }
                             invalidatedRevision = null
                             invalidatedSnapshot = null
-                            if (!initialRevision) cancelAndHide()
+                            if (!initialRevision) cancelAndHide(refreshing = true)
                             if (lifecycleRevision == revision) scheduleRefresh()
                         }
                     }
@@ -125,6 +126,7 @@ internal class SwingShellSuggestionScheduler(
         invalidatedRevision = null
         invalidatedSnapshot = null
         lastRequest = null
+        dismissedCommandText = null
         observation?.cancel()
     }
 
@@ -133,6 +135,16 @@ internal class SwingShellSuggestionScheduler(
         checkEdt()
         lastRequest = null
         scheduleRefresh()
+    }
+
+    /** Retires queued automatic work for the command already requested explicitly, even if its results are empty. */
+    fun onExplicitRequest() {
+        checkEdt()
+        val revision = lifecycleRevision
+        val snapshot = activeCommandLine?.invoke()
+        if (lifecycleRevision != revision) return
+        refreshes.value = null
+        lastRequest = snapshot
     }
 
     fun onFocusGained() {
@@ -145,16 +157,18 @@ internal class SwingShellSuggestionScheduler(
         if (observationJob != null) cancelAndHide()
     }
 
-    fun onInvalidated() {
+    /** Retires stale actions; ineligible command text cannot keep a retained popup alive after a no-op edit. */
+    fun onInvalidated(dismissed: Boolean = false) {
         checkEdt()
         val revisions = shellCommandLineRevisions ?: return
         val revision = lifecycleRevision
         val invalidation = revisions.value
-        val snapshot = if (invalidation < 0L) activeCommandLine?.invoke() else null
+        val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
+        if (dismissed) dismissedCommandText = snapshot?.commandText
         invalidatedRevision = invalidation
         invalidatedSnapshot = snapshot
-        cancelAndHide()
+        cancelAndHide(refreshing = !dismissed && snapshot != null && shouldRequest(snapshot))
     }
 
     fun onEligibilityChanged(eligible: Boolean) {
@@ -178,6 +192,8 @@ internal class SwingShellSuggestionScheduler(
         val revision = lifecycleRevision
         val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
+        if (dismissedCommandText != null && snapshot?.commandText == dismissedCommandText) return
+        dismissedCommandText = null
         if (snapshot == null || !shouldRequest(snapshot)) {
             cancelAndHide()
             return
@@ -193,15 +209,16 @@ internal class SwingShellSuggestionScheduler(
         }
     }
 
-    private fun cancelAndHide() {
+    private fun cancelAndHide(refreshing: Boolean = false) {
         refreshes.value = null
         lastRequest = null
-        hideSuggestions()
+        hideSuggestions(refreshing)
     }
 
     private fun isEligibleNow(): Boolean = isFocused() && isEligible()
 
     private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
+        if (snapshot.requiresShellConfirmation) return false
         val text = snapshot.commandText
         val cursorOffset = snapshot.cursorOffset
         var nonWhitespaceCharacters = 0

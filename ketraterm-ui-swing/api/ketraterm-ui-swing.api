@@ -650,6 +650,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
+	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
 	public final fun getStickyCommandHeadersEnabled ()Z
@@ -714,6 +716,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationPromptDotHoverColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
+	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
 	public final fun getStickyCommandHeadersEnabled ()Z
@@ -772,6 +776,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationPromptDotHoverColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotHoverHaloColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
+	public final fun setShellSuggestionAutomaticMode (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;)V
+	public final fun setShellSuggestionStyle (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V
 	public final fun setStickyCommandHeadersEnabled (Z)V
@@ -796,6 +802,52 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Companion
 
 public abstract interface class io/github/ketraterm/ui/swing/settings/SwingSettingsProvider {
 	public abstract fun currentSettings ()Lio/github/ketraterm/ui/swing/settings/SwingSettings;
+}
+
+public final class io/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public fun <init> (II)V
+	public fun <init> (III)V
+	public fun <init> (IIII)V
+	public fun <init> (IIIII)V
+	public fun <init> (IIIIII)V
+	public fun <init> (IIIIIII)V
+	public fun <init> (IIIIIIII)V
+	public fun <init> (IIIIIIIII)V
+	public fun <init> (IIIIIIIIII)V
+	public fun <init> (IIIIIIIIIII)V
+	public fun <init> (IIIIIIIIIIII)V
+	public synthetic fun <init> (IIIIIIIIIIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component10 ()I
+	public final fun component11 ()I
+	public final fun component12 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun component7 ()I
+	public final fun component8 ()I
+	public final fun component9 ()I
+	public final fun copy (IIIIIIIIIIII)Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;IIIIIIIIIIIIILjava/lang/Object;)Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgumentHintForeground ()I
+	public final fun getBackground ()I
+	public final fun getBorder ()I
+	public final fun getForeground ()I
+	public final fun getMatchBackground ()I
+	public final fun getMatchForeground ()I
+	public final fun getSecondaryForeground ()I
+	public final fun getSelectionArgumentHintForeground ()I
+	public final fun getSelectionBackground ()I
+	public final fun getSelectionForeground ()I
+	public final fun getSelectionMatchBackground ()I
+	public final fun getSelectionMatchForeground ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/ketraterm/ui/swing/settings/TerminalClipboardHandler {
@@ -841,6 +893,9 @@ public final class io/github/ketraterm/ui/swing/settings/TerminalTheme$Companion
 	public final fun fromId (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/settings/TerminalTheme;
 }
 
+public abstract interface annotation class io/github/ketraterm/ui/swing/suggestion/ExperimentalShellSuggestionsApi : java/lang/annotation/Annotation {
+}
+
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion {
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
@@ -850,11 +905,15 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion 
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V
-	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component11 ()Ljava/lang/Object;
 	public final fun component12 ()Ljava/lang/Object;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Z
 	public final fun component2 ()I
 	public final fun component3 ()I
 	public final fun component4 ()Ljava/lang/String;
@@ -863,10 +922,12 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion 
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;
 	public final fun component9 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;
-	public final fun copy (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;
-	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;
+	public final fun copy (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionMatchRanges;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;ZILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAccentRole ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAccentRole;
+	public final fun getArgumentHint ()Ljava/lang/String;
+	public final fun getBackslashPathSeparator ()Z
 	public final fun getDetail ()Ljava/lang/String;
 	public final fun getDisplayText ()Ljava/lang/String;
 	public final fun getFeedbackToken ()Ljava/lang/Object;
@@ -938,6 +999,14 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionA
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static fun values ()[Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
+}
+
+public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode : java/lang/Enum {
+	public static final field ALWAYS Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static final field PARAMETERS_ONLY Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
 }
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason : java/lang/Enum {
@@ -1126,13 +1195,17 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionR
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest {
 	public fun <init> (Ljava/lang/String;I)V
+	public fun <init> (Ljava/lang/String;IZ)V
+	public synthetic fun <init> (Ljava/lang/String;IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()I
-	public final fun copy (Ljava/lang/String;I)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
-	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/lang/String;IILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;IZ)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/lang/String;IZILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommandText ()Ljava/lang/String;
 	public final fun getCursorOffset ()I
+	public final fun getIncludeCommandNames ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

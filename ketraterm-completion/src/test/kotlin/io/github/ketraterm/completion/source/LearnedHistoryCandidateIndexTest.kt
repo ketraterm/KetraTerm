@@ -28,6 +28,35 @@ import kotlin.test.assertEquals
 
 class LearnedHistoryCandidateIndexTest {
     @Test
+    fun `completed tokens retain exact case while active prefixes ignore case`() {
+        val snapshot =
+            learningSnapshot(
+                positive("ssh -L Forward"),
+                positive("ssh -l Login"),
+                positive("tool Repo Publish"),
+                positive("tool repo Pull"),
+                positive("Tool Repo Package"),
+            )
+        val cases =
+            mapOf(
+                "ssh -L " to "ssh -L Forward",
+                "ssh -l " to "ssh -l Login",
+                "tool Repo p" to "tool Repo Publish",
+                "tool repo P" to "tool repo Pull",
+                "Tool Repo p" to "Tool Repo Package",
+            )
+        val cache = CompletionLearningIndexCache()
+        for (syntax in TerminalShellSyntax.entries) {
+            val index = cache.indexesFor(snapshot, syntax).history
+            for ((typed, expected) in cases) {
+                val requestLine = TerminalCommandLineTokenizer.parse(typed, typed.length, syntax)
+                val matches = index.matching(requestLine, CompletionLearningContextKey.of(null, null))
+                assertEquals(listOf(expected), matches.map { it.replay.commandLine }, "$syntax: $typed")
+            }
+        }
+    }
+
+    @Test
     fun `lookup selects prior-token context and active prefix without scanning unrelated commands`() =
         runBlocking {
             val snapshot =

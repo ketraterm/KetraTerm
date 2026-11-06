@@ -1,6 +1,19 @@
 public final class io/github/ketraterm/shell/integration/OscShellIntegration : io/github/ketraterm/session/TerminalShellIntegrationFactory {
 	public static final field INSTANCE Lio/github/ketraterm/shell/integration/OscShellIntegration;
 	public static final fun configured (Z)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static final fun configured (ZLio/github/ketraterm/shell/integration/ShellCommandInventoryInput;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static synthetic fun configured$default (ZLio/github/ketraterm/shell/integration/ShellCommandInventoryInput;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
 	public fun create (Lio/github/ketraterm/session/TerminalShellIntegrationContext;)Lio/github/ketraterm/session/TerminalShellIntegration;
+}
+
+public final class io/github/ketraterm/shell/integration/ShellCommandInventoryInput : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/ketraterm/shell/integration/ShellCommandInventoryInput$Companion;
+	public static final field MAX_SNAPSHOT_BYTES I
+	public fun <init> ()V
+	public final fun accept ([B)Z
+	public fun close ()V
+}
+
+public final class io/github/ketraterm/shell/integration/ShellCommandInventoryInput$Companion {
 }
 

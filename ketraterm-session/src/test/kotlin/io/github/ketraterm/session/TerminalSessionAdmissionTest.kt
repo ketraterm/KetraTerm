@@ -61,7 +61,7 @@ class TerminalSessionAdmissionTest {
                 runCurrent()
                 assertArrayEquals(
                     "a\u001b[24~e".toByteArray() + byteArrayOf(0, -1) +
-                        "\u001b[200~p\u001b[201~\u001b[0n\u001b[3~\u007f\u001b[200~r\u001b[201~z".toByteArray(),
+                        "\u001b[200~p\u001b[201~\u001b[0n\u001b[3~\u007f\u001b[200~r\u001b[201~\u001b[200~\u001b[201~z".toByteArray(),
                     connector.writtenBytes,
                 )
             }
@@ -151,7 +151,7 @@ class TerminalSessionAdmissionTest {
                 assertEquals(ACCEPTED, session.submitInput(TerminalKeyEvent.key(TerminalKey.RIGHT)))
                 runCurrent()
                 assertEquals(
-                    "\u001bOC\u001b[3~\u007f\u001b[200~r\u001b[201~\u001b[200~p\u001b[201~" +
+                    "\u001bOC\u001b[3~\u007f\u001b[200~r\u001b[201~\u001b[200~\u001b[201~\u001b[200~p\u001b[201~" +
                         "é🙂\u001b[I\u001b[<0;1;1M\u001bOD\r\u001b[0n\u001b[C",
                     connector.writtenBytes.toString(Charsets.UTF_8),
                 )

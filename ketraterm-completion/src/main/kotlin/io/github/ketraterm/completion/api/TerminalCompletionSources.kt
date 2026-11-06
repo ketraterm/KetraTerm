@@ -17,10 +17,31 @@ package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import io.github.ketraterm.completion.source.*
 
 /** Factories for dependency-free, host-composable completion sources. */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionSources {
+    /**
+     * Creates Git completion using shared command-mode, reference-selection and
+     * refspec-edit rules. [loader] supplies bounded local data for the source request
+     * directory; the host owns I/O, cancellation and freshness. It is not called for
+     * ineligible or exhausted arguments. Remote-name positions need only [TerminalGitCompletionSnapshot.remotes];
+     * reference positions use the reference lists and current branch name.
+     *
+     * No network access is performed by this source. Remote reference suggestions
+     * represent locally known tracking branches, not a remote server inventory.
+     */
+    @JvmStatic
+    public fun git(
+        sourceId: String,
+        loader: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> TerminalGitCompletionSnapshot,
+    ): TerminalCompletionSource {
+        require(sourceId.isNotBlank())
+        return GitCompletionSource(sourceId, loader)
+    }
+
     /**
      * Creates a path autocomplete source backed by a host-provided file system lister.
      *

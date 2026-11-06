@@ -8,6 +8,10 @@ hooks. Library users choose their own process, transport, and shell integration.
 Profiles are offered in the order below. A configured shell or explicit launch
 command can override the default.
 
+On Windows, both products default to Windows PowerShell 5.1 (`powershell.exe`).
+Installing PowerShell 7 adds a separate **PowerShell** profile; to use it for
+default tabs, select its executable (`pwsh.exe`) in the shell settings.
+
 | Platform | Profiles | Discovery |
 | --- | --- | --- |
 | Windows | Windows PowerShell | System installation, with `powershell.exe` as fallback. |
@@ -30,6 +34,12 @@ start), and `D` (command finish, with optional exit status).
 They are installed for supported interactive launches when shell integration is
 enabled. Explicit script/command execution and incompatible startup flags can
 prevent installation.
+
+Automatic integration targets the shell launched by the terminal profile.
+Starting another shell, `ssh`, or a multiplexer inside that shell does not carry
+a supported prompt-tracking or suggestion context into the child environment.
+Ordinary terminal input/output and the child's own completion remain available;
+nested-shell integration is outside the supported scope.
 
 | Shell / launch | Automatic hooks | Completion dialect | Startup command |
 | --- | --- | --- | --- |
@@ -55,6 +65,38 @@ They require shell integration and are unavailable for WSL launchers.
 PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell directory reports cover filesystem locations only.
+
+When PSReadLine is loaded, the PowerShell bootstrap also installs the private
+`F12,e` chord for [native suggestions](completion.md#sources-by-host). The handler
+reads the live editing buffer and calls `TabExpansion2` without submitting or
+replacing the command. Each prompt announces a fresh completion epoch.
+
+Direct interactive Bash launches load the user's startup files before installing
+prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible prompt.
+An explicit `--norc` launch keeps startup files disabled and receives only the
+environment hook. Explicit WSL Bash launches also use the environment hook, which
+can be replaced by guest startup files.
+
+Bash 5.3+ with `base64` checks background command discovery at each terminal prompt for
+[command suggestions](completion.md#sources-by-host), including explicit Bash
+launches inside WSL. It installs no completion key binding and does not invoke
+programmable argument completers. Prompt-time discovery includes session aliases
+and functions as well as builtins and executable commands from the shell's `PATH`.
+Git Bash and Cygwin publish native Windows directory URIs so local path and Git
+completion resolve the same directory as the shell.
+Literal alias definitions feed shared argument analysis while accepted edits preserve
+the user's alias; see the [supported alias subset](completion.md#sources-by-host).
+
+zsh uses the same inventory protocol, command authority, and alias analysis.
+With `zsh/parameter` and `base64` available, it discovers enabled ordinary aliases,
+functions (including autoloads), and builtins at terminal prompts. Executable
+discovery runs independently in the background. Same-environment scans are coalesced;
+complete snapshots replace command authority atomically without silent truncation.
+See [completion discovery and bounds](completion.md#sources-by-host).
+This includes explicit zsh launches inside WSL
+and has been verified with zsh 5.9. Discovery does not invoke ZLE, load autoloaded
+functions, or run argument completers. Global and suffix aliases are not modeled;
+normal shell Tab completion remains available.
 
 ## Features supplied by shell metadata
 

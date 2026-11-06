@@ -75,6 +75,11 @@ public interface TerminalInputEncoder {
                 io.github.ketraterm.input.event
                     .TerminalPasteEvent(event.replacementText),
             )
+            // Collapse a line editor's active paste region; unbracketed empty text emits no bytes.
+            encodePaste(
+                io.github.ketraterm.input.event
+                    .TerminalPasteEvent(""),
+            )
         }
     }
 

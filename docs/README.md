@@ -29,6 +29,7 @@ dependencies and structure; its `docs/` directory holds detailed contracts.
 ## Development
 
 - [Contributing](../CONTRIBUTING.md): local setup, checks, and contribution workflow.
+- [Test organization](development/testing.md): JVM, native process, and desktop suites; naming, fixtures, CI, and reports.
 - [Releasing](development/releases.md): release preparation, publishing, and prereleases.
 - [Architecture](../ARCHITECTURE.md): module boundaries and data flow.
 - [Conformance testing](development/conformance-testing.md): campaigns and failure reproduction.

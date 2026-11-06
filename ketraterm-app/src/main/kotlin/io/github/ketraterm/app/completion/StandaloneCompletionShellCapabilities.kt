@@ -22,14 +22,14 @@ import io.github.ketraterm.workspace.TerminalProfileKind
 internal fun TerminalProfileKind.completionShellCapabilities(): TerminalShellCapabilities =
     when (this) {
         TerminalProfileKind.POWERSHELL -> TerminalShellCapabilities.POWERSHELL
-        TerminalProfileKind.GIT_BASH,
+        TerminalProfileKind.GIT_BASH -> TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true)
         TerminalProfileKind.UBUNTU,
         TerminalProfileKind.BASH,
         TerminalProfileKind.ZSH,
         TerminalProfileKind.WSL,
         TerminalProfileKind.UNIX_SHELL,
         -> TerminalShellCapabilities.POSIX
-        TerminalProfileKind.COMMAND_PROMPT,
+        TerminalProfileKind.COMMAND_PROMPT -> TerminalShellCapabilities.PLAIN.copy(backslashPathSeparator = true)
         TerminalProfileKind.FISH,
         TerminalProfileKind.NUSHELL,
         TerminalProfileKind.DEFAULT,

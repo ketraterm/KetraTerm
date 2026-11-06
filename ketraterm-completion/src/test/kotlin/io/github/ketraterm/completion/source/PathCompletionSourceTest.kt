@@ -16,12 +16,178 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import kotlin.test.*
 
 class PathCompletionSourceTest {
+    @Test
+    fun `POSIX quoting preserves literal backslashes through listing matching and insertion`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("", listing.directoryPrefix)
+                    assertEquals("foo\\b", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("foo\\bar", false))
+                })
+            for ((line, replacement) in listOf(
+                "cat 'foo\\b" to "'foo\\bar'",
+                "cat \"foo\\b" to "\"foo\\\\bar\"",
+                "cat foo\\\\b" to "foo\\\\bar",
+            )) {
+                val candidate = source.complete(request(line, "file:///project")).single()
+                assertEquals(replacement, candidate.replacementText, line)
+                assertEquals("foo\\bar", candidate.displayText, line)
+                assertEquals(0, candidate.matchedRanges.startOffset(0), line)
+                assertEquals(5, candidate.matchedRanges.endOffset(0), line)
+            }
+        }
+
+    @Test
+    fun `POSIX directory and trailing filename backslashes remain literal`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("foo\\dir/", listing.directoryPrefix)
+                    assertEquals("ba", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("bar\\", false))
+                })
+            val candidate = source.complete(request("cat 'foo\\dir/ba", "file:///project")).single()
+            assertEquals("'foo\\dir/bar\\'", candidate.replacementText)
+            assertEquals("bar\\", candidate.displayText)
+        }
+
+    @Test
+    fun `literal POSIX backslashes do not introduce hidden components or activate unknown argument paths`() =
+        runBlocking {
+            val source = PathCompletionSource({ listOf(TerminalFileEntry("foo\\.hidden", false)) })
+            assertEquals("foo\\.hidden", source.complete(request("cat 'foo\\", "file:///project")).single().displayText)
+            val unexpected = PathCompletionSource({ error("A literal backslash does not prove a path argument") })
+            assertTrue(unexpected.complete(request("unknown 'foo\\b", "file:///project")).isEmpty())
+        }
+
+    @Test
+    fun `Windows separators work independently of POSIX shell quoting`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    assertEquals("src/", listing.directoryPrefix)
+                    assertEquals("m", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("main", true), TerminalFileEntry("m\\literal", false))
+                })
+            val capabilities = TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true)
+            val candidate = source.complete(request("cat 'src\\m", "file:///C:/project", capabilities)).single()
+            assertEquals("'src\\main\\'", candidate.replacementText)
+            assertEquals("main\\", candidate.displayText)
+        }
+
+    @Test
+    fun `file arguments include navigation directories without changing their expected path kind`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({
+                    listOf(
+                        TerminalFileEntry("config", isDirectory = true),
+                        TerminalFileEntry("config.json", isDirectory = false),
+                        TerminalFileEntry(".private", isDirectory = true),
+                    )
+                })
+            val lines = listOf("curl --config ", "curl --config con", "curl --config=con", "ssh -i con", "adb install con")
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for (line in lines) {
+                    val request = request(line, "file:///project", shell)
+                    val context = TerminalCompletionContext.resolve(request, TerminalCommandSpecs.defaults())
+                    assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind, line)
+
+                    val candidates = source.complete(request, context, 20)
+
+                    assertEquals(listOf("config/", "config.json"), candidates.map { it.replacementText }, line)
+                    assertEquals(listOf("directory", "file"), candidates.map { it.detail }, line)
+                    val startOffset = if (line.endsWith(' ')) line.length else line.length - 3
+                    assertTrue(candidates.all { it.replacementStartOffset == startOffset && it.replacementEndOffset == line.length }, line)
+                }
+            }
+        }
+
+    @Test
+    fun `accepting a navigation directory continues completion inside a file option`() =
+        runBlocking {
+            val source =
+                PathCompletionSource({ listing ->
+                    when (listing.directoryPrefix) {
+                        "" -> listOf(TerminalFileEntry("config", isDirectory = true))
+                        "config/" -> listOf(TerminalFileEntry("client.conf", isDirectory = false))
+                        else -> error("Unexpected directory: ${listing.directoryPrefix}")
+                    }
+                })
+            val line = "curl --config=con"
+            val directory = source.complete(request(line, "file:///project")).single()
+            val nestedLine = line.replaceRange(directory.replacementStartOffset, directory.replacementEndOffset, directory.replacementText)
+            assertEquals("curl --config=config/", nestedLine)
+
+            val nestedRequest = request(nestedLine, "file:///project")
+            val context = TerminalCompletionContext.resolve(nestedRequest, TerminalCommandSpecs.defaults())
+            assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind)
+            val file = source.complete(nestedRequest, context, 20).single()
+            assertEquals("file", file.detail)
+            assertEquals(
+                "curl --config=config/client.conf",
+                nestedLine.replaceRange(file.replacementStartOffset, file.replacementEndOffset, file.replacementText),
+            )
+        }
+
+    @Test
+    fun `explicit non-path domains exclude direct and indexed files before host queries`() =
+        runBlocking {
+            val direct = TerminalCompletionSources.path { error("Unexpected directory query") }
+            val indexed = TerminalCompletionSources.fuzzyPath("project", { _, _ -> error("Unexpected index query") })
+            val specs =
+                TerminalCommandSpecs.defaults() +
+                    TerminalCommandSpec(
+                        "tool",
+                        options =
+                            listOf(
+                                TerminalOptionSpec(
+                                    listOf("--branch"),
+                                    requiresValue = true,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
+                    )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                val lines = listOf("git switch feature/", "git branch -d feature/", "git switch -- feature/", "tool --branch=feature/")
+                for (line in lines) {
+                    val request = request(line, "file:///project").copy(shellCapabilities = shell)
+                    val context = TerminalCompletionContext.resolve(request, specs)
+                    assertTrue(direct.complete(request, context, 20).isEmpty(), line)
+                    assertTrue(indexed.complete(request, context, 20).isEmpty(), line)
+                }
+            }
+        }
+
+    @Test
+    fun `explicit paths still participate alongside domains and unknown path-like arguments`() =
+        runBlocking {
+            val direct = TerminalCompletionSources.path { listOf(TerminalFileEntry("main", false)) }
+            val indexed = TerminalCompletionSources.fuzzyPath("project", { _, _ -> listOf(TerminalFuzzyPathEntry("src/main", false)) })
+            val specs =
+                TerminalCommandSpecs.defaults() +
+                    TerminalCommandSpec(
+                        "tool",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    )
+            for (line in listOf("tool src/", "unknown src/", "./src/", "git checkout src/", "git reset -- src/")) {
+                val request = request(line, "file:///project")
+                val context = TerminalCompletionContext.resolve(request, specs)
+                val expectedPath = if (line.startsWith("./")) "./src/main" else "src/main"
+                assertEquals(listOf(expectedPath), direct.complete(request, context, 20).map { it.replacementText }, line)
+                assertEquals(listOf("src/main"), indexed.complete(request, context, 20).map { it.replacementText }, line)
+            }
+        }
+
     private val mockProvider = FakeFileSystemProvider()
     private val source = PathCompletionSource(mockProvider)
 

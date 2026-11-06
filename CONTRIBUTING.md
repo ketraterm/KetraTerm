@@ -52,13 +52,17 @@ changed:
 ./gradlew :ketraterm-session:test
 ./gradlew :ketraterm-ui-swing:test
 ./gradlew test
+./gradlew nativeTest
+./gradlew desktopTest
 ./gradlew publicationChecks
 ```
 
 Use exact byte-stream tests for parser-to-core behavior and explicit handshakes
 or controlled schedulers for concurrent behavior. Cover relevant malformed input,
 bounds, recovery, and chunking. Native PTY and external-oracle tests have separate
-requirements documented by their modules.
+requirements documented by their modules. The [test organization guide](docs/development/testing.md)
+defines JVM, native-process, and desktop suites, tags, naming, fixtures, and CI.
+`test` is headless; run `desktopTest` on an interactive or virtual display.
 
 Public API changes need KDoc, an intentionally reviewed ABI baseline, and Java/Kotlin
 consumer verification. `publicationChecks` runs the release verification against

@@ -20,6 +20,7 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 
 /** Captures an editing capability on the EDT before asynchronous suggestion work starts. */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionEditTarget {
     /** Returns a request-owned handler, or null when editing is currently unavailable. */
     public fun capture(request: SwingShellSuggestionRequest): SwingShellSuggestionHandler?
@@ -33,6 +34,10 @@ public fun interface SwingShellSuggestionEditTarget {
          * Captures the session's original versioned command line and atomically admits a complete replacement.
          * A missing model, pending input, or mismatched command line returns null before provider work.
          * Capture never infers acknowledgement by the remote shell.
+         * For end-of-snapshot edits, an advertised prefix-reset operation replaces the known prefix
+         * without relying on Backspace's Unicode behavior. The resulting prefix must be single-line
+         * and control-free; otherwise acceptance reports unsupported without sending input.
+         * Other contexts use grapheme deletion keys.
          */
         @JvmStatic
         public fun createDefault(session: TerminalSession): SwingShellSuggestionEditTarget =
@@ -55,16 +60,30 @@ public fun interface SwingShellSuggestionEditTarget {
                     val replacement =
                         acceptance.suggestion.replacementFor(request)
                             ?: return SwingShellSuggestionAcceptanceResult.INVALID_EDIT
-                    return when (
-                        session.submitInput(
-                            expected,
+                    val input =
+                        if (expected.prefixResetKeys.isNotEmpty() && request.cursorOffset == request.commandText.length) {
+                            // Restore the known prefix through the editor's exact operation. Its unseen suffix stays intact.
+                            val commandText =
+                                request.commandText.replaceRange(
+                                    replacement.startOffset,
+                                    replacement.endOffset,
+                                    replacement.replacementText,
+                                )
+                            if (commandText.any(Char::isISOControl)) return SwingShellSuggestionAcceptanceResult.UNSUPPORTED
+                            expected.prefixResetKeys + TerminalTextReplacementEvent(0, 0, commandText)
+                        } else {
                             listOf(
                                 TerminalTextReplacementEvent(
                                     replacement.deleteAfterCursorCount,
                                     replacement.deleteBeforeCursorCount,
                                     replacement.replacementText,
                                 ),
-                            ),
+                            )
+                        }
+                    return when (
+                        session.submitInput(
+                            expected,
+                            input,
                         )
                     ) {
                         TerminalInputAdmission.ACCEPTED -> SwingShellSuggestionAcceptanceResult.ACCEPTED

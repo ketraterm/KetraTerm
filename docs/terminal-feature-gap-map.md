@@ -8,15 +8,34 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(host/profile)` | Restore completion settings controls and learning-reset actions in both products, with defaults, persistence, and tests updated together. The master switch remains off by default. |
 | `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
 | `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
 | `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |
 | `TODO(host/profile)` | A standalone quick/drop-down terminal with platform-appropriate activation and focus handling. Ordinary terminal windows do not provide this workflow. |
 | `TODO(host/profile)` | A product read-only session toggle that blocks outbound user input while retaining output, selection, and search. Read-only render frames and closed-session presentation are different capabilities. |
 | `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
-| `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: opt-in native PTY tests (`-Dterminal.pty.host=true`), package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. Ordinary CI runs tests and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
+| `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: JVM, native PTY and desktop suites, package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. [Standard CI](development/testing.md#ci) runs all three test suites and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
+
+## Completion and suggestions
+
+Completion is implemented and enabled by default in the standalone app and
+IntelliJ plugin. PowerShell suggestions require an explicit request; other eligible
+profiles can show automatic popups. The engine and shared popup remain
+[experimental](features/completion.md#stability-experimental); library consumers
+can customize or replace both. See the [completion catalog](features/completion.md)
+for supported sources, matching, learning, and UI behavior.
+
+Nested-shell integration is deliberately outside the supported scope; see
+[shell support](features/shells.md#prompt-hooks-and-completion-dialects). Automatic
+PowerShell requests are not part of the product behavior because native completers
+share the interactive shell's input and cannot be cancelled once running.
+
+Remaining work:
+
+| Owner | Remaining work |
+| --- | --- |
+| `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 
 ## Transports and execution environments
 
@@ -57,8 +76,15 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 ## Optional protocol work
 
+The priorities on the compatibility entries below are relative to one another;
+they are not release commitments.
+
 | Owner | Remaining work |
 | --- | --- |
+| `TODO(parser)` | **High priority:** Add the HPR (`CSI Ps a`), VPR (`CSI Ps e`), CUB (`CSI Ps j`), and CUU (`CSI Ps k`) aliases. Applications using these aliases otherwise lose cursor movement and may place output incorrectly. |
+| `TODO(parser/core/host)` | **High priority:** Implement REP (`CSI Ps b`) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output. |
+| `TODO(parser/core/host)` | **Medium priority:** Implement Kitty ED 22 (`CSI 22 J`) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen. |
+| `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
 | `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |
 | `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |
 | `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. |

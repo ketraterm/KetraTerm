@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:OptIn(io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi::class)
+
 package consumer
 
 import io.github.ketraterm.completion.api.*
@@ -22,6 +24,11 @@ import kotlinx.coroutines.runBlocking
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        val posixPaths = TerminalShellCapabilities.POSIX
+        val windowsPaths = posixPaths.copy(backslashPathSeparator = true)
+        check(!posixPaths.backslashPathSeparator && windowsPaths.backslashPathSeparator)
+        check(posixPaths.normalizePathSeparators("foo\\bar") == "foo\\bar")
+        check(windowsPaths.normalizePathSeparators("foo\\bar") == "foo/bar")
         check(
             JavaConsumer
                 .stream()
@@ -44,7 +51,29 @@ fun main() =
                 )
             }
         val engine = TerminalCompletionEngines.fromSources(listOf(TerminalCompletionSourceEntry(source)))
+        check(engine.completions(TerminalCompletionRequest("he", 2, includeCommandNames = false)).last().isEmpty())
         val result = engine.completions(TerminalCompletionRequest("he", 2)).last().single()
         check(result.replacementText == "help" && result.feedbackToken === nativeItem)
         check(result.copy(score = result.score + 1).feedbackToken === nativeItem)
+        val shellEngine =
+            TerminalCompletionEngines.fromSources(
+                emptyList(),
+                shellProvider =
+                    TerminalCompletionShellProvider { _, _, _ ->
+                        TerminalCompletionShellResult(emptyList(), externalCommandName = "git.exe")
+                    },
+            )
+        val options =
+            shellEngine
+                .completions(
+                    TerminalCompletionRequest("git --v", 7, shellCapabilities = TerminalShellCapabilities.POWERSHELL),
+                ).last()
+        check(options.any { it.replacementText == "--version" })
+        val hints =
+            TerminalCompletionEngines
+                .fromSources(emptyList())
+                .completions(
+                    TerminalCompletionRequest("git sw", 6),
+                ).last()
+        check(hints.single { it.replacementText == "switch" }.argumentHint == "<branch>")
     }

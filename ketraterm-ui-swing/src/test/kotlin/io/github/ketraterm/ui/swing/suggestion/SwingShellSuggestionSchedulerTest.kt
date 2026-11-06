@@ -26,6 +26,54 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
     @Test
+    fun `automatic requests require confirmed command text and resume when it becomes available`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+
+            fixture.active = snapshot("git s")
+            fixture.revisions.value = 1
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s")), fixture.requests)
+
+            fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.revisions.value = 2
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+            assertFalse(fixture.refreshing.last())
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `explicit request before initial observation suppresses the same automatic request`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            fixture.scheduler.onExplicitRequest()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+
+            fixture.active = snapshot("git st")
+            fixture.revisions.value = 1
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git st")), fixture.requests)
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `invalidation before the initial revision suppresses the unchanged initial snapshot`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
@@ -156,7 +204,7 @@ class SwingShellSuggestionSchedulerTest {
         }
 
     @Test
-    fun `changed shell snapshot hides old results before debounce fires`() =
+    fun `changed shell snapshot invalidates old actions while retaining presentation during debounce`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
             fixture.start()
@@ -169,11 +217,43 @@ class SwingShellSuggestionSchedulerTest {
             runCurrent()
 
             assertEquals(hides + 1, fixture.hideCount)
+            assertEquals(true, fixture.refreshing.last())
             assertEquals(listOf(snapshot("git s")), fixture.requests)
             advanceTimeBy(75.milliseconds)
             runCurrent()
             assertEquals(listOf(snapshot("git s"), snapshot("git st")), fixture.requests)
             fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `a no-op delete after clearing the line cannot retain old suggestions indefinitely`() =
+        onEdtTest {
+            for (command in listOf("", " ", "g", null)) {
+                val fixture = Fixture(backgroundScope)
+                fixture.start()
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git s")), fixture.requests)
+                fixture.scheduler.onInvalidated()
+                fixture.active = command?.let(::snapshot)
+                fixture.revisions.value = 1
+                runCurrent()
+                advanceTimeBy(25.milliseconds)
+                fixture.scheduler.onInvalidated() // Another Delete/Backspace produces no shell change.
+                advanceTimeBy(100.milliseconds)
+                runCurrent()
+
+                assertEquals(false, fixture.refreshing.last(), "line=$command")
+                assertEquals(listOf(snapshot("git s")), fixture.requests)
+                fixture.active = snapshot("git st")
+                fixture.revisions.value = 2
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git s"), snapshot("git st")), fixture.requests)
+                fixture.scheduler.stop()
+            }
         }
 
     @Test
@@ -265,6 +345,32 @@ class SwingShellSuggestionSchedulerTest {
             advanceTimeBy(75.milliseconds)
             runCurrent()
             assertEquals(3, fixture.requests.size)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `dismissal survives cursor movement and focus refresh until command text changes`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            fixture.scheduler.refreshNow()
+            fixture.scheduler.onInvalidated(dismissed = true)
+            fixture.active = assertNotNull(fixture.active).copy(cursorOffset = 4)
+            fixture.revisions.value++
+            runCurrent()
+            fixture.scheduler.onFocusLost()
+            fixture.scheduler.onFocusGained()
+            fixture.scheduler.refresh()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+            fixture.active = snapshot("git st")
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf("git s", "git st"), fixture.requests.map { it.commandText })
             fixture.scheduler.stop()
         }
 
@@ -498,6 +604,7 @@ class SwingShellSuggestionSchedulerTest {
         val requests = ArrayList<TerminalShellCommandLineSnapshot>()
         var feedbackHandler: SwingShellSuggestionFeedbackHandler? = null
         var hideCount = 0
+        val refreshing = ArrayList<Boolean>()
         var onHide: (() -> Unit)? = null
         val scheduler =
             SwingShellSuggestionScheduler(
@@ -510,8 +617,9 @@ class SwingShellSuggestionSchedulerTest {
                     requests += snapshot
                     feedbackHandler = feedback
                 },
-                hideSuggestions = {
+                hideSuggestions = { retain ->
                     assertTrue(SwingUtilities.isEventDispatchThread())
+                    refreshing += retain
                     hideCount++
                     onHide?.invoke()
                 },

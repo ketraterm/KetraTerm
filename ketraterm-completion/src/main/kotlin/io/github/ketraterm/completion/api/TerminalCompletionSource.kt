@@ -18,7 +18,10 @@ package io.github.ketraterm.completion.api
 /**
  * Suspending completion source contract for one provider such as static
  * command specs, path completion, or IDE context.
+ *
+ * **Experimental:** follows the stability contract of [TerminalCompletionEngine].
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionSource {
     /**
      * Returns candidates produced by this source for [request] and [context].
@@ -47,6 +50,7 @@ public fun interface TerminalCompletionSource {
  * @property priority small cold-start prior added to this source's reciprocal-rank
  * contribution. The merged engine clamps values to `[-20, 20]`.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionSourceEntry
     @JvmOverloads
     constructor(

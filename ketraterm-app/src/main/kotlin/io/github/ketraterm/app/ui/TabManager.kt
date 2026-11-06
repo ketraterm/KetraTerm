@@ -107,7 +107,7 @@ internal class TabManager(
     @Volatile private var completionRegistry: StandaloneCompletionRegistry? = null
     private val completionLifecycle = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @Volatile private var completionShutdown: Job? = null
+    @Volatile private var completionTransition: Job? = null
     private val shutdownStarted = AtomicBoolean()
     private val workspaceShutdown = CompletableFuture<Unit>()
     private val windowResizeController = TerminalWindowResizeController(frame)
@@ -546,7 +546,7 @@ internal class TabManager(
         val completed =
             runBlocking {
                 withTimeoutOrNull(COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS.milliseconds) {
-                    completionShutdown?.join()
+                    completionTransition?.join()
                     if (registry != null) {
                         if (settings.config.smartSuggestionsEnabled) registry.closeAndFlush() else registry.closeWithoutFlush()
                     }
@@ -670,6 +670,7 @@ internal class TabManager(
             val registry = ensureCompletionRegistry()
             val completionProvider =
                 registry?.createProvider(
+                    session = workspaceTab.session,
                     profileId = workspaceTab.profile.id,
                     workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
@@ -1381,42 +1382,77 @@ internal class TabManager(
         }
     }
 
-    private fun ensureCompletionRegistry(): StandaloneCompletionRegistry? {
-        if (!settings.config.smartSuggestionsEnabled || shutdownStarted.get() || completionShutdown != null) return null
-        return completionRegistry ?: StandaloneCompletionRegistry
-            .create(
-                persistencePath = settings.commandCompletionStatsPath,
-                persistenceEnabled = settings.config.persistentSuggestionLearningEnabled,
-                onPersistenceLoadFailure = { LOGGER.log(Level.WARNING, "Completion learning could not be loaded", it) },
-            ).also { completionRegistry = it }
+    /** Clears learning across panes and on disk, including when suggestions are disabled. */
+    fun resetCompletionLearning(): Deferred<Unit> {
+        check(SwingUtilities.isEventDispatchThread()) { "Reset completion learning on the EDT" }
+        check(!shutdownStarted.get()) { "terminal window is closing" }
+        val previous = completionTransition
+        panes.forEach { it.setCompletionProvider(null) }
+        val reset =
+            completionLifecycle.async(start = CoroutineStart.LAZY) {
+                previous?.join()
+                val persisted =
+                    withContext(Dispatchers.Swing) {
+                        check(!shutdownStarted.get()) { "terminal window is closing" }
+                        val registry =
+                            completionRegistry ?: createCompletionRegistry(persistenceEnabled = false)
+                                .also { completionRegistry = it }
+                        registry.resetLearning()
+                    }
+                persisted.await()
+            }
+        startCompletionTransition(reset)
+        return reset
     }
 
-    private fun reconcileCompletion() {
+    private fun createCompletionRegistry(persistenceEnabled: Boolean): StandaloneCompletionRegistry =
+        StandaloneCompletionRegistry.create(
+            persistencePath = settings.commandCompletionStatsPath,
+            persistenceEnabled = persistenceEnabled,
+            onPersistenceLoadFailure = { LOGGER.log(Level.WARNING, "Completion learning could not be loaded", it) },
+        )
+
+    private fun ensureCompletionRegistry(): StandaloneCompletionRegistry? {
+        if (!settings.config.smartSuggestionsEnabled || shutdownStarted.get() || completionTransition != null) return null
+        return completionRegistry ?: createCompletionRegistry(settings.config.persistentSuggestionLearningEnabled)
+            .also { completionRegistry = it }
+    }
+
+    // A reset and retirement share the same barrier: only one owner may write the learning file.
+    private fun startCompletionTransition(transition: Job) {
+        completionTransition = transition
+        transition.invokeOnCompletion {
+            SwingUtilities.invokeLater {
+                if (completionTransition === transition) {
+                    completionTransition = null
+                    if (!shutdownStarted.get()) reconcileCompletion(refreshProviders = true)
+                }
+            }
+        }
+        transition.start()
+    }
+
+    private fun reconcileCompletion(refreshProviders: Boolean = false) {
+        if (completionTransition != null) return
         if (!settings.config.smartSuggestionsEnabled) {
             panes.forEach { it.setCompletionProvider(null) }
             val retiring = completionRegistry ?: return
             completionRegistry = null
-            completionShutdown =
-                completionLifecycle.launch(start = CoroutineStart.UNDISPATCHED) {
-                    try {
-                        retiring.closeWithoutFlush()
-                    } finally {
-                        SwingUtilities.invokeLater {
-                            completionShutdown = null
-                            if (!shutdownStarted.get()) reconcileCompletion()
-                        }
-                    }
-                }
+            startCompletionTransition(completionLifecycle.launch(start = CoroutineStart.LAZY) { retiring.closeWithoutFlush() })
             return
         }
-        if (panes.isEmpty()) return
+        if (panes.isEmpty()) {
+            completionRegistry?.setPersistenceEnabled(settings.config.persistentSuggestionLearningEnabled)
+            return
+        }
         val previous = completionRegistry
         val registry = ensureCompletionRegistry() ?: return
         registry.setPersistenceEnabled(settings.config.persistentSuggestionLearningEnabled)
-        if (previous === registry) return
+        if (previous === registry && !refreshProviders) return
         panes.forEach { pane ->
             pane.setCompletionProvider(
                 registry.createProvider(
+                    session = pane.tab.session,
                     profileId = pane.tab.profile.id,
                     workingDirectoryUriProvider = { pane.tab.currentWorkingDirectoryUri },
                     shellCapabilities =

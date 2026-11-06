@@ -92,6 +92,11 @@ internal class DefaultTerminalInputEncoder(
             bufferedOutput.flush()
             if (event.replacementText.isNotEmpty()) {
                 paste.encode(TerminalPasteEvent(event.replacementText), modeBits)
+                if (TerminalInputState.isBracketedPasteEnabled(modeBits)) {
+                    // Readline marks the last paste as active. An empty paste collapses
+                    // that region at the cursor without editing text or adding an undo step.
+                    paste.encode(EMPTY_PASTE, modeBits)
+                }
             }
         } finally {
             bufferedOutput.reset()
@@ -126,6 +131,7 @@ internal class DefaultTerminalInputEncoder(
     }
 
     private companion object {
+        private val EMPTY_PASTE = TerminalPasteEvent("")
         private val DELETE_EVENT = TerminalKeyEvent.key(TerminalKey.DELETE)
         private val BACKSPACE_EVENT = TerminalKeyEvent.key(TerminalKey.BACKSPACE)
     }

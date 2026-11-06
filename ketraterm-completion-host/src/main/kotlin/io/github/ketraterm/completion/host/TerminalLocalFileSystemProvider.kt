@@ -15,11 +15,13 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalFileSystemProvider
 
 /** Direct suspending local-filesystem provider used by path completion. */
+@ExperimentalTerminalCompletionApi
 public class TerminalLocalFileSystemProvider
     @JvmOverloads
     constructor(

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +59,19 @@ public interface TerminalShellIntegration {
     public fun activeCommandLine(): TerminalShellCommandLineSnapshot?
 
     /**
+     * Non-executing key sequence that removes the active editor's text before its cursor.
+     *
+     * The operation must preserve text after the cursor and leave the cursor at
+     * the beginning of the remaining text. An empty list means this capability
+     * is unavailable; a supported sequence contains at most four keys.
+     *
+     * Session reads this capability under [withCommandLine] and detaches it with
+     * the command snapshot. A mutable implementation must update it under that
+     * same guard; final edit admission rejects a changed sequence.
+     */
+    public val commandLinePrefixResetKeys: List<TerminalKeyEvent> get() = emptyList()
+
+    /**
      * Runs a short conditional-edit action under the producer's revision guard.
      * The revision must change for every authoritative editing update, including
      * changes away from and back to an equal snapshot. The callback must finish
@@ -90,4 +104,21 @@ public interface TerminalShellIntegration {
 
     /** Optional synchronous finalization after a parser batch, before startup submission. */
     public fun outputProcessed(): Unit = Unit
+
+    /**
+     * Releases session-scoped buffers after parser EOF, under session serialization.
+     * This does not dispose a borrowed host model. Must not block or mutate the session.
+     */
+    public fun sessionClosed(): Unit = Unit
+
+    /** Maximum complete custom OSC envelope collected for this producer. Ordinary built-in limits stay unchanged. */
+    public val customOscPayloadLimitBytes: Int get() = 4096
+
+    /** Borrows an unsupported OSC body synchronously under session serialization; never retain [payload]. */
+    public fun observeCustomOsc(
+        command: Int,
+        payload: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Unit = Unit
 }

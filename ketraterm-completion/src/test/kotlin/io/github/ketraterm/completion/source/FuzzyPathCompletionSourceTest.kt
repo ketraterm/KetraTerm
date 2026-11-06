@@ -16,13 +16,108 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** Tests context-aware completion from host-owned ready fuzzy path matches. */
 class FuzzyPathCompletionSourceTest {
+    @Test
+    fun `POSIX indexed filenames retain literal backslashes hidden-name semantics and match ranges`() =
+        runBlocking {
+            val path = "src\\literal/target\\.txt\\"
+            val start = path.indexOf("target")
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(start, start + 7))
+            val source =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry(path, false, matchedRanges = ranges))
+                })
+            val candidate = source.complete(request("cat 'target\\")).single()
+            assertEquals("'$path'", candidate.replacementText)
+            assertEquals(path, candidate.displayText)
+            assertEquals(ranges, candidate.matchedRanges)
+        }
+
+    @Test
+    fun `indexed directory suffix follows separator capability independently of quoting`() =
+        runBlocking {
+            val source =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry("src/target\\dir", true))
+                })
+            val literal = source.complete(request("cd 'target\\")).single()
+            assertEquals("'src/target\\dir/'", literal.replacementText)
+            assertEquals("src/target\\dir/", literal.displayText)
+
+            val windowsSource =
+                TerminalCompletionSources.fuzzyPath("project", { _, _ ->
+                    listOf(TerminalFuzzyPathEntry("src/target", true), TerminalFuzzyPathEntry("src/target\\literal", true))
+                })
+            for (capabilities in listOf(
+                TerminalShellCapabilities.POWERSHELL,
+                TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+            )) {
+                val candidate = windowsSource.complete(request("cd 'src\\ta", capabilities)).single()
+                assertEquals("'src\\target\\'", candidate.replacementText)
+                assertEquals("src/target/", candidate.displayText)
+            }
+        }
+
+    @Test
+    fun `file arguments retain indexed navigation directories and their fuzzy matches`() =
+        runBlocking {
+            val path = "settings/config"
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(9, 10, 12, 13, 14, 15))
+            val source =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "project-file",
+                    entriesProvider = { _, _ ->
+                        listOf(
+                            TerminalFuzzyPathEntry(path, isDirectory = true, matchedRanges = ranges),
+                            TerminalFuzzyPathEntry("settings/config.json", isDirectory = false),
+                        )
+                    },
+                )
+            for (line in listOf("curl --config cfg", "curl --config=cfg", "ssh -i cfg", "adb install cfg")) {
+                val request = request(line)
+                val context = TerminalCompletionContext.resolve(request, TerminalCommandSpecs.defaults())
+                assertEquals(TerminalPathArgumentKind.FILE, context.expectedPathKind, line)
+
+                val candidates = source.complete(request, context, 20)
+
+                assertEquals(listOf("settings/config/", "settings/config.json"), candidates.map { it.replacementText }, line)
+                assertEquals(listOf("project directory", "project file"), candidates.map { it.detail }, line)
+                assertEquals(ranges, candidates.first().matchedRanges, line)
+                assertTrue(candidates.all { it.replacementStartOffset == line.length - 3 && it.replacementEndOffset == line.length }, line)
+            }
+        }
+
+    @Test
+    fun `host matches survive shell quoting and directory suffixes without rematching`(): Unit =
+        runBlocking {
+            val path = "notes/My Folder"
+            val ranges = TerminalCompletionMatchRanges.fromPackedOffsets(path, intArrayOf(6, 8, 9, 10))
+            val source =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "project-file",
+                    entriesProvider =
+                        { _, _ ->
+                            listOf(TerminalFuzzyPathEntry(path, true, matchedRanges = ranges))
+                        },
+                )
+
+            val candidate = source.complete(request("cd MyF")).single()
+
+            assertEquals("notes/My\\ Folder/", candidate.replacementText)
+            assertEquals("notes/My Folder/", candidate.displayText)
+            assertEquals(ranges, candidate.matchedRanges)
+            assertFailsWith<IllegalArgumentException> { TerminalFuzzyPathEntry("short", false, matchedRanges = ranges) }
+        }
+
     private val entriesByPrefix =
         mapOf(
             "FzT" to

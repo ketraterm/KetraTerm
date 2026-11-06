@@ -15,22 +15,29 @@
  */
 package io.github.ketraterm.intellij.settings
 
+import com.intellij.CommonBundle
+import com.intellij.ide.setToolTipText
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.SearchableConfigurable
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.util.text.HtmlChunk
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.ketraterm.intellij.KetraTermBundle
+import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.services.intellijTerminalProfileRegistry
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
 import io.github.ketraterm.workspace.TerminalProfile
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DisposableHandle
 import java.awt.Component
 import java.util.*
 import javax.swing.*
@@ -45,12 +52,19 @@ private const val KETRATERM_SETTINGS_CONFIGURABLE_ID = "io.github.ketraterm.term
  */
 class KetraTermSettingsConfigurable internal constructor(
     shellProfiles: List<TerminalProfile>,
+    private val resetCompletionLearning: () -> Deferred<Unit> = { KetraTermCompletionService.getInstance().resetLearning() },
 ) : SearchableConfigurable {
     constructor() : this(intellijTerminalProfileRegistry().availableProfiles())
 
     private val settings: KetraTermIntellijSettings
         get() = KetraTermIntellijSettings.getInstance()
 
+    private var learningResetObserver: DisposableHandle? = null
+    private val resetLearningButton =
+        JButton(KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")).apply {
+            addActionListener { confirmLearningReset() }
+        }
+    private val learningResetStatus = JLabel()
     private val themeCombo = ComboBox(themeOptions())
     private val fontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
     private val fallbackFontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
@@ -113,14 +127,26 @@ class KetraTermSettingsConfigurable internal constructor(
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
 
-    // TODO(host/profile): SUGGESTION_SETTINGS: Uncomment all matching blocks here and in MyMessageBundle.properties
-    // together; see docs/terminal-feature-gap-map.md. Keep the master default off.
-    // private val smartSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
-    // private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
-    // private val acceptSelectedSuggestionWithEnterCheckBox =
-    //     JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
-    // private val completionLearningPersistenceCheckBox =
-    //     JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
+    private val smartSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
+    private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val automaticSuggestionsAlways = JRadioButton(KetraTermBundle.message("settings.ketraterm.shellSuggestions.always"))
+    private val automaticSuggestionsParameters = JRadioButton(KetraTermBundle.message("settings.ketraterm.shellSuggestions.parameters"))
+
+    init {
+        smartSuggestionsCheckBox.addActionListener { updateAutomaticSuggestionModes() }
+        shellSuggestionsCheckBox.addActionListener { updateAutomaticSuggestionModes() }
+    }
+
+    private fun updateAutomaticSuggestionModes() {
+        val enabled = smartSuggestionsCheckBox.isSelected && shellSuggestionsCheckBox.isSelected
+        automaticSuggestionsAlways.isEnabled = enabled
+        automaticSuggestionsParameters.isEnabled = enabled
+    }
+
+    private val acceptSelectedSuggestionWithEnterCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
+    private val completionLearningPersistenceCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
     private val showForegroundProcessNameCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.showForegroundProcessName"))
 
@@ -252,23 +278,31 @@ class KetraTermSettingsConfigurable internal constructor(
                     row {
                         cell(overrideIdeShortcutsCheckBox)
                     }
-                    // TODO(host/profile): SUGGESTION_SETTINGS: Restore rows with their fields and Apply/Reset bindings.
-                    // row {
-                    //     cell(smartSuggestionsCheckBox)
-                    // }
-                    // row {
-                    //     cell(shellSuggestionsCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
-                    // }
-                    // row {
-                    //     cell(acceptSelectedSuggestionWithEnterCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
-                    // }
-                    // row {
-                    //     cell(completionLearningPersistenceCheckBox)
-                    //         .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
-                    // }
-                    // TODO(host/profile): Reconnect the completion service's learning-reset action before restoring its button.
+                    row {
+                        cell(smartSuggestionsCheckBox)
+                    }
+                    row {
+                        cell(shellSuggestionsCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
+                    }
+                    buttonsGroup {
+                        indent {
+                            row { cell(automaticSuggestionsAlways) }
+                            row { cell(automaticSuggestionsParameters) }
+                        }
+                    }
+                    row {
+                        cell(acceptSelectedSuggestionWithEnterCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
+                    }
+                    row {
+                        cell(completionLearningPersistenceCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
+                    }
+                    row {
+                        cell(resetLearningButton)
+                        cell(learningResetStatus)
+                    }
                     row {
                         cell(scrollOnOutputCheckBox)
                     }
@@ -299,6 +333,9 @@ class KetraTermSettingsConfigurable internal constructor(
                 }
             }
         panel = created
+        resetLearningButton.isEnabled = true
+        learningResetStatus.text = ""
+        learningResetStatus.toolTipText = null
         reset()
         return created
     }
@@ -314,7 +351,50 @@ class KetraTermSettingsConfigurable internal constructor(
     }
 
     override fun disposeUIResources() {
+        learningResetObserver?.dispose()
+        learningResetObserver = null
         panel = null
+    }
+
+    private fun confirmLearningReset() {
+        val owner = panel ?: return
+        val choice =
+            Messages.showOkCancelDialog(
+                owner,
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmation"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmationTitle"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirm"),
+                CommonBundle.getCancelButtonText(),
+                Messages.getWarningIcon(),
+            )
+        if (choice != Messages.OK) return
+        resetLearningButton.isEnabled = false
+        learningResetStatus.text = KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.progress")
+        learningResetStatus.toolTipText = null
+        try {
+            learningResetObserver =
+                resetCompletionLearning().invokeOnCompletion { failure ->
+                    SwingUtilities.invokeLater { if (panel === owner) finishLearningReset(failure) }
+                }
+        } catch (failure: Exception) {
+            finishLearningReset(failure)
+        }
+    }
+
+    private fun finishLearningReset(failure: Throwable?) {
+        learningResetObserver = null
+        resetLearningButton.isEnabled = true
+        learningResetStatus.text =
+            KetraTermBundle.message(
+                if (failure ==
+                    null
+                ) {
+                    "settings.ketraterm.resetCompletionLearning.complete"
+                } else {
+                    "settings.ketraterm.resetCompletionLearning.error"
+                },
+            )
+        learningResetStatus.setToolTipText(failure?.message?.let(HtmlChunk::text))
     }
 
     private fun applyState(state: KetraTermIntellijSettings.State) {
@@ -342,11 +422,14 @@ class KetraTermSettingsConfigurable internal constructor(
         commandFinishedAlertThresholdSpinner.value = state.commandFinishedAlertThresholdSeconds
         pasteOnMiddleClickCheckBox.isSelected = state.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = state.overrideIdeShortcuts
-        // TODO(host/profile): SUGGESTION_SETTINGS: Restore state loading with the controls.
-        // smartSuggestionsCheckBox.isSelected = state.smartSuggestionsEnabled
-        // shellSuggestionsCheckBox.isSelected = state.shellSuggestionsEnabled
-        // acceptSelectedSuggestionWithEnterCheckBox.isSelected = state.acceptSelectedSuggestionWithEnter
-        // completionLearningPersistenceCheckBox.isSelected = state.completionLearningPersistenceEnabled
+        smartSuggestionsCheckBox.isSelected = state.smartSuggestionsEnabled
+        shellSuggestionsCheckBox.isSelected = state.shellSuggestionsEnabled
+        val selectedMode =
+            if (state.shellSuggestionAutomaticMode == "parameters_only") automaticSuggestionsParameters else automaticSuggestionsAlways
+        selectedMode.isSelected = true
+        updateAutomaticSuggestionModes()
+        acceptSelectedSuggestionWithEnterCheckBox.isSelected = state.acceptSelectedSuggestionWithEnter
+        completionLearningPersistenceCheckBox.isSelected = state.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = state.scrollOnOutput
         showForegroundProcessNameCheckBox.isSelected = state.showForegroundProcessName
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == state.pasteSanitization }
@@ -377,11 +460,11 @@ class KetraTermSettingsConfigurable internal constructor(
             commandFinishedAlertThresholdSeconds = spinnerValue(commandFinishedAlertThresholdSpinner),
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
-            // TODO(host/profile): SUGGESTION_SETTINGS: Restore with the controls; omitted fields preserve hidden preferences.
-            // smartSuggestionsEnabled = smartSuggestionsCheckBox.isSelected,
-            // shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
-            // acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
-            // completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
+            smartSuggestionsEnabled = smartSuggestionsCheckBox.isSelected,
+            shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
+            shellSuggestionAutomaticMode = if (automaticSuggestionsParameters.isSelected) "parameters_only" else "always",
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
+            completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
             shellPath = selectedShellPath(),

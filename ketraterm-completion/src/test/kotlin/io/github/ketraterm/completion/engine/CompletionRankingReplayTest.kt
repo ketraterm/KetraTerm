@@ -26,6 +26,27 @@ import kotlin.test.assertEquals
 /** Deterministic replay gate for representative interactive completion choices. */
 class CompletionRankingReplayTest {
     @Test
+    fun `maximum learning cannot displace exact or prefix matches with weaker matches`() =
+        runBlocking {
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for ((prefix, learned) in listOf("main" to "mainline/", "ma" to "feature-main/", "mai" to "feature-main/")) {
+                    val result =
+                        replayCase(
+                            commandLine = "cd $prefix",
+                            expectedCommand = "cd main/",
+                            domain = TerminalCompletionValueDomain.NONE,
+                            alternatives = listOf(learned, "main/"),
+                            learnedCommand = "cd $learned",
+                            kind = TerminalCompletionCandidateKind.PATH,
+                            learningCount = Int.MAX_VALUE,
+                            shell = shell,
+                        )
+                    assertEquals(1, result.acceptedRank(), "$shell: cd $prefix")
+                }
+            }
+        }
+
+    @Test
     fun `representative learned choices retain perfect top one replay`() =
         runBlocking {
             val cases =
@@ -70,6 +91,8 @@ class CompletionRankingReplayTest {
         alternatives: List<String>,
         learnedCommand: String,
         kind: TerminalCompletionCandidateKind = TerminalCompletionCandidateKind.ARGUMENT,
+        learningCount: Int = 12,
+        shell: TerminalShellCapabilities = TerminalShellCapabilities.POSIX,
     ): ReplayCase {
         val activeStart = commandLine.indexOfLast { it == ' ' } + 1
         val source =
@@ -94,9 +117,9 @@ class CompletionRankingReplayTest {
                             commandLine = learnedCommand,
                             profileId = PROFILE,
                             workingDirectoryUri = WORKING_DIRECTORY,
-                            useCount = 12,
-                            successCount = 12,
-                            acceptedCount = 6,
+                            useCount = learningCount,
+                            successCount = learningCount,
+                            acceptedCount = learningCount / 2,
                             lastUsedEpochMillis = NOW,
                         ),
                     ),
@@ -107,7 +130,7 @@ class CompletionRankingReplayTest {
                 cursorOffset = commandLine.length,
                 profileId = PROFILE,
                 workingDirectoryUri = WORKING_DIRECTORY,
-                shellCapabilities = TerminalShellCapabilities.POSIX,
+                shellCapabilities = shell,
             )
         val engine =
             MergedCompletionEngine(

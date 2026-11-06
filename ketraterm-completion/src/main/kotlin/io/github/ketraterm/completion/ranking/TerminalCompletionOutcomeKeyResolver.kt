@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenIdentity
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
@@ -39,53 +37,41 @@ internal class TerminalCompletionOutcomeKeyResolver {
             candidate.kind == TerminalCompletionCandidateKind.PATH ||
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
 
-        val lineContext = context.commandLineContext
-        val isSimpleSingleToken =
-            candidate.replacementStartOffset == lineContext.replacementStartOffset &&
-                candidate.replacementEndOffset == lineContext.replacementEndOffset &&
-                lineContext.activeTokenIndex in lineContext.tokens.indices &&
-                !hasSpecialSyntax(candidate.replacementText)
-
-        val (tokens, activeIndex) =
-            if (isSimpleSingleToken) {
-                val baseTokens = lineContext.tokens
-                val activeIdx = lineContext.activeTokenIndex
-                val projectedTokens = ArrayList<TerminalCommandLineToken>(baseTokens.size)
-                for (i in baseTokens.indices) {
-                    if (i == activeIdx) {
-                        projectedTokens +=
-                            TerminalCommandLineToken(
-                                text = candidate.replacementText,
-                                startOffset = candidate.replacementStartOffset,
-                                endOffset = candidate.replacementStartOffset + candidate.replacementText.length,
-                            )
-                    } else {
-                        projectedTokens += baseTokens[i]
-                    }
-                }
-                projectedTokens to activeIdx
-            } else {
-                val projectedCursorOffset =
-                    (candidate.replacementStartOffset + candidate.replacementText.length).coerceIn(0, commandLine.length)
-                val projectedContext =
-                    TerminalCommandLineTokenizer.parse(
-                        commandLine,
-                        projectedCursorOffset,
-                        request.shellCapabilities.syntax,
-                    )
-                projectedContext.tokens to projectedContext.activeTokenIndex
-            }
-
-        if (tokens.firstCommandTokenIndex() >= tokens.size) return null
-        val outcomeKey =
+        // Outcome identity describes the edited input, not alias-expanded semantic tokens.
+        val projectedContext =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                candidate.replacementStartOffset + candidate.replacementText.length,
+                request.shellCapabilities.syntax,
+            )
+        val tokens = projectedContext.tokens
+        val activeIndex = projectedContext.activeTokenIndex
+        // Whole-line history may append arguments; match the user's original word,
+        // not the last word inserted by that candidate or an alias-generated word.
+        val originalActiveIndex = context.originalActiveTokenIndex
+        if (projectedContext.canReplay && tokens.firstCommandTokenIndex() >= tokens.size) return null
+        val tokenIdentities =
             outcomeKey(
                 tokens = tokens,
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
-            ) ?: return null
+                attachedOptionValue = context.attachedOptionValue != null && activeIndex == originalActiveIndex,
+                shellCapabilities = request.shellCapabilities,
+            )
+        val groupKey =
+            if (projectedContext.canReplay) {
+                tokenIdentities ?: return null
+            } else {
+                // Complex shell syntax remains a valid host result, but only exact text proves equivalence.
+                listOf(TerminalCommandLineTokenIdentity(commandLine, rawText = commandLine))
+            }
         return ResolvedCompletionOutcome(
-            groupKey = outcomeKey,
+            groupKey = groupKey,
             exactCommandLine = commandLine,
+            activeValue =
+                tokenIdentities?.getOrNull(originalActiveIndex)?.text?.let { value ->
+                    if (context.attachedOptionValue == null) value else value.substringAfter('=')
+                } ?: candidate.displayText,
         )
     }
 
@@ -93,53 +79,67 @@ internal class TerminalCompletionOutcomeKeyResolver {
         tokens: List<TerminalCommandLineToken>,
         pathTokenIndex: Int,
         pathAware: Boolean,
-    ): List<String>? {
+        attachedOptionValue: Boolean,
+        shellCapabilities: TerminalShellCapabilities,
+    ): List<TerminalCommandLineTokenIdentity>? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
-        val resultTokens = ArrayList<String>(tokens.size)
+        val resultTokens = ArrayList<TerminalCommandLineTokenIdentity>(tokens.size)
         var index = 0
         while (index < tokens.size) {
-            val tokenText = tokens[index].text
-            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText) else tokenText
+            val token = tokens[index]
+            resultTokens +=
+                if (index == normalizedPathIndex && token.rawText == null) {
+                    TerminalCommandLineTokenIdentity(normalizePathToken(token.text, shellCapabilities, attachedOptionValue))
+                } else {
+                    token.identity
+                }
             index++
         }
         return resultTokens
     }
 
-    private fun hasSpecialSyntax(text: String): Boolean {
-        for (i in 0 until text.length) {
-            val c = text[i]
-            if (c.isWhitespace() || c == '\'' || c == '"' || c == '\\' || c == '|' || c == '&' || c == ';') {
-                return true
+    private fun normalizePathToken(
+        token: String,
+        shellCapabilities: TerminalShellCapabilities,
+        attachedOptionValue: Boolean,
+    ): String {
+        // An equals sign in a positional filename is literal, not an option/value boundary.
+        val separatorIndex = if (attachedOptionValue) token.indexOf('=') else -1
+        val windowsSeparators = shellCapabilities.backslashPathSeparator
+
+        fun path(value: String): String {
+            var normalized = shellCapabilities.normalizePathSeparators(value)
+            if (windowsSeparators && shellCapabilities.syntax == TerminalShellSyntax.POWERSHELL) {
+                while (normalized.length > 2 && normalized.startsWith("./")) normalized = normalized.substring(2)
             }
+            return stripRedundantTrailingSeparators(normalized, windowsSeparators)
         }
-        return false
-    }
-
-    private fun normalizePathToken(token: String): String {
-        val separatorIndex = token.indexOf('=')
         return if (separatorIndex > 0) {
-            token.substring(0, separatorIndex + 1) + stripRedundantTrailingSeparators(token.substring(separatorIndex + 1))
+            token.substring(0, separatorIndex + 1) + path(token.substring(separatorIndex + 1))
         } else {
-            stripRedundantTrailingSeparators(token)
+            path(token)
         }
     }
 
-    private fun stripRedundantTrailingSeparators(value: String): String {
+    private fun stripRedundantTrailingSeparators(
+        value: String,
+        windowsSeparators: Boolean,
+    ): String {
         var end = value.length
-        while (end > 1 && isPathSeparator(value[end - 1]) && !isRoot(value, end)) end--
+        // Path separators are normalized above; remaining backslashes are literal filename characters.
+        while (end > 1 && value[end - 1] == '/' && !isRoot(value, end, windowsSeparators)) end--
         return if (end == value.length) value else value.substring(0, end)
     }
 
     private fun isRoot(
         value: String,
         end: Int,
+        windowsSeparators: Boolean,
     ): Boolean =
         end == 1 ||
-            (end == WINDOWS_ROOT_LENGTH && value[1] == ':' && isPathSeparator(value[2])) ||
-            (end == UNC_ROOT_LENGTH && isPathSeparator(value[0]) && isPathSeparator(value[1]))
-
-    private fun isPathSeparator(value: Char): Boolean = value == '/' || value == '\\'
+            (windowsSeparators && end == WINDOWS_ROOT_LENGTH && value[1] == ':' && value[2] == '/') ||
+            (end == UNC_ROOT_LENGTH && value[0] == '/' && value[1] == '/')
 
     private companion object {
         private const val NO_PATH_TOKEN = -1
@@ -149,6 +149,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
 }
 
 internal data class ResolvedCompletionOutcome(
-    val groupKey: List<String>,
+    val groupKey: List<TerminalCommandLineTokenIdentity>,
     val exactCommandLine: String,
+    val activeValue: String?,
 )

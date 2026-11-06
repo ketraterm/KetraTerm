@@ -16,7 +16,9 @@
 package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.components.*
+import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBFont
+import com.intellij.util.ui.UIUtil
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Property
 import io.github.ketraterm.host.*
@@ -26,8 +28,11 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
+import io.github.ketraterm.workspace.TerminalProfileKind
 import kotlinx.collections.immutable.persistentListOf
 import java.awt.Font
 import java.util.*
@@ -60,7 +65,8 @@ class KetraTermIntellijSettings :
      *
      * @return immutable Swing terminal settings.
      */
-    fun current(): SwingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(state)
+    fun current(profileKind: TerminalProfileKind? = null): SwingSettings =
+        KetraTermIntellijSettingsMapper.toSwingSettings(state, profileKind)
 
     /**
      * Returns whether the IDE host should bind middle-click paste for terminal panes.
@@ -206,6 +212,7 @@ class KetraTermIntellijSettings :
      * @property addProjectJdkToPath whether new terminals use the project JDK for `JAVA_HOME` and prepend its `bin` to `PATH`.
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property smartSuggestionsEnabled master switch for completion resources and requests.
+     * @property shellSuggestionAutomaticMode persisted automatic popup scope (`always` or `parameters_only`).
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
      * may appear automatically. Explicit requests require only [smartSuggestionsEnabled].
      * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
@@ -267,6 +274,8 @@ class KetraTermIntellijSettings :
         @OptionTag
         @JvmField val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
         @OptionTag
+        @JvmField val shellSuggestionAutomaticMode: String = "always",
+        @OptionTag
         @JvmField val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @OptionTag
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
@@ -314,7 +323,7 @@ class KetraTermIntellijSettings :
             }
         internal const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         internal const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
-        internal const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
+        internal const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = true
         internal val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
         internal const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
         internal const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
@@ -370,6 +379,12 @@ internal object KetraTermIntellijSettingsNormalizer {
     fun normalize(state: KetraTermIntellijSettings.State): KetraTermIntellijSettings.State =
         state.copy(
             themeId = KetraTermIntellijSettings.normalizeThemeId(state.themeId),
+            shellSuggestionAutomaticMode =
+                SwingShellSuggestionAutomaticMode.entries
+                    .firstOrNull {
+                        it.name.equals(state.shellSuggestionAutomaticMode.trim(), ignoreCase = true)
+                    }?.name
+                    ?.lowercase(Locale.ROOT) ?: "always",
             fontFamily = normalizeFontFamily(state.fontFamily),
             fallbackFontFamily = normalizeFontFamily(state.fallbackFontFamily),
             fontSize =
@@ -501,12 +516,17 @@ internal object KetraTermIntellijSettingsMapper {
      * @param state normalized IntelliJ settings state.
      * @return immutable Swing terminal settings.
      */
-    fun toSwingSettings(state: KetraTermIntellijSettings.State): SwingSettings {
+    fun toSwingSettings(
+        state: KetraTermIntellijSettings.State,
+        profileKind: TerminalProfileKind? = null,
+    ): SwingSettings {
         val fontSize = state.fontSize
         val fontFamily = SwingSettings.resolveFontFamily(state.fontFamily)
         val fallbackFontFamily = SwingSettings.resolveFontFamily(state.fallbackFontFamily)
 
         val palette = paletteForThemeId(state.themeId)
+        val selectionForeground = UIUtil.getListSelectionForeground(true).rgb
+        val secondaryForeground = UIUtil.getContextHelpForeground().rgb
 
         return SwingSettings.create { draft ->
             draft.font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize))
@@ -525,8 +545,25 @@ internal object KetraTermIntellijSettingsMapper {
             draft.stickyCommandHeadersEnabled = state.stickyCommandHeadersEnabled
             draft.lineHeight = state.lineHeight
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
-            draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled
+            draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled && profileKind != TerminalProfileKind.POWERSHELL
+            draft.shellSuggestionAutomaticMode =
+                SwingShellSuggestionAutomaticMode.entries.first {
+                    it.name.equals(state.shellSuggestionAutomaticMode, ignoreCase = true)
+                }
             draft.acceptSelectedSuggestionWithEnter = state.acceptSelectedSuggestionWithEnter
+            draft.shellSuggestionStyle =
+                SwingShellSuggestionStyle(
+                    background = UIUtil.getListBackground().rgb,
+                    foreground = UIUtil.getListForeground().rgb,
+                    selectionBackground = UIUtil.getListSelectionBackground(true).rgb,
+                    selectionForeground = selectionForeground,
+                    matchForeground = JBColor.namedColor("CompletionPopup.matchForeground", JBColor(0x0B57D0, 0x78A9FF)).rgb,
+                    selectionMatchForeground = selectionForeground,
+                    border = JBColor.border().rgb,
+                    secondaryForeground = secondaryForeground,
+                    argumentHintForeground = secondaryForeground,
+                    selectionArgumentHintForeground = selectionForeground,
+                )
             draft.scrollOnOutput = state.scrollOnOutput
         }
     }

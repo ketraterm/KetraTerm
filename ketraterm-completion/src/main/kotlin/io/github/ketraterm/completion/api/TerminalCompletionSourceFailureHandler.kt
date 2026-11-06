@@ -24,6 +24,7 @@ package io.github.ketraterm.completion.api
  * Different source child coroutines may report concurrently while the merged
  * engine collects the remaining sources.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionSourceFailureHandler {
     /**
      * Reports one failed source evaluation.

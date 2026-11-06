@@ -23,6 +23,22 @@ import kotlin.test.assertEquals
 
 class StandaloneCompletionShellCapabilitiesTest {
     @Test
+    fun `Git Bash accepts Windows paths with POSIX quoting`() {
+        assertEquals(
+            TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+            TerminalProfileKind.GIT_BASH.completionShellCapabilities(),
+        )
+    }
+
+    @Test
+    fun `Command Prompt accepts Windows paths with conservative quoting`() {
+        assertEquals(
+            TerminalShellCapabilities.PLAIN.copy(backslashPathSeparator = true),
+            TerminalProfileKind.COMMAND_PROMPT.completionShellCapabilities(),
+        )
+    }
+
+    @Test
     fun `maps PowerShell profile to PowerShell completion capabilities`() =
         runBlocking {
             assertEquals(TerminalShellCapabilities.POWERSHELL, TerminalProfileKind.POWERSHELL.completionShellCapabilities())
@@ -33,7 +49,6 @@ class StandaloneCompletionShellCapabilitiesTest {
         runBlocking {
             val profiles =
                 listOf(
-                    TerminalProfileKind.GIT_BASH,
                     TerminalProfileKind.UBUNTU,
                     TerminalProfileKind.BASH,
                     TerminalProfileKind.ZSH,
@@ -49,7 +64,6 @@ class StandaloneCompletionShellCapabilitiesTest {
         runBlocking {
             val profiles =
                 listOf(
-                    TerminalProfileKind.COMMAND_PROMPT,
                     TerminalProfileKind.FISH,
                     TerminalProfileKind.NUSHELL,
                     TerminalProfileKind.DEFAULT,

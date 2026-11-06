@@ -506,7 +506,7 @@ public class SwingTerminal
                         shellSuggestionController?.handleKeyPressed(event) == true
 
                     override fun invalidateShellSuggestions() {
-                        invalidateShellSuggestionsOnEdt()
+                        invalidateShellSuggestionsOnEdt(retainPresentation = true)
                     }
 
                     override fun hideShellSuggestions() {
@@ -1584,6 +1584,9 @@ public class SwingTerminal
                         next.promptDecoration != previous.promptDecoration
                 if (geometryChanged) viewportController.finishScroll()
                 settings = next
+                if (next.shellSuggestionStyle != previous.shellSuggestionStyle || next.font != previous.font) {
+                    shellSuggestionController?.reloadAppearance()
+                }
                 if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                     next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
                 ) {
@@ -1613,6 +1616,15 @@ public class SwingTerminal
                 if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
                     preferredSize = preferredGridSize(next.columns, next.rows)
                     revalidate()
+                }
+                if (next.shellSuggestionAutomaticMode != previous.shellSuggestionAutomaticMode) {
+                    if (activeSuggestionInteraction == null ||
+                        activeSuggestionIsAutomatic ||
+                        shellSuggestionController?.isRefreshing == true
+                    ) {
+                        cancelAndHideShellSuggestionsOnEdt("Automatic suggestion mode changed")
+                        suggestionScheduler?.refresh()
+                    }
                 }
                 updateAutomaticSuggestionEligibilityOnEdt()
                 reconcileSuggestionSchedulerOnEdt()
@@ -1892,6 +1904,7 @@ public class SwingTerminal
          *
          * @throws IllegalStateException when called outside the EDT or after disposal.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionFailureHandler(handler: SwingShellSuggestionFailureHandler?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion diagnostics must be configured on the EDT" }
             check(!disposed) { "Swing terminal is disposed" }
@@ -2020,6 +2033,7 @@ public class SwingTerminal
         public val searchState: StateFlow<TerminalSearchState> get() = searchController.states
 
         /** Whether a configured suggestion provider is available. Read on the EDT. */
+        @ExperimentalShellSuggestionsApi
         public val hasShellSuggestionProvider: Boolean
             get() {
                 check(SwingUtilities.isEventDispatchThread()) { "suggestion configuration must be read on the EDT" }
@@ -2034,6 +2048,7 @@ public class SwingTerminal
          * Automatic observation runs only while a session, provider or custom target, and
          * the automatic-suggestion setting are available. Explicit custom interactions remain independent.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionProvider(provider: SwingShellSuggestionProvider?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion providers must be configured on the EDT" }
             if (disposed) return
@@ -2053,6 +2068,7 @@ public class SwingTerminal
          * Call on the EDT. Replacement cancels pending requests and hides the old surface.
          * The host owns target resources. Explicit interaction and presentation methods are unaffected.
          */
+        @ExperimentalShellSuggestionsApi
         public fun setShellSuggestionTarget(target: SwingShellSuggestionTarget?) {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion targets must be configured on the EDT" }
             if (disposed || shellSuggestionTarget === target) return
@@ -2069,12 +2085,17 @@ public class SwingTerminal
         }
 
         /**
-         * Invalidates automatic request deduplication after host ranking context changes.
-         * Call on the EDT. The next eligible automatic request runs after the normal debounce interval.
+         * Invalidates pending and displayed suggestions after host context changes, such as a new directory.
+         * Call on the EDT. The next eligible automatic request runs after the normal debounce interval;
+         * explicit suggestions must be requested again when automatic popups are disabled.
          */
+        @ExperimentalShellSuggestionsApi
         public fun refreshShellSuggestions() {
             check(SwingUtilities.isEventDispatchThread()) { "suggestions must refresh on the EDT" }
-            if (!disposed) suggestionScheduler?.refresh()
+            if (disposed) return
+            val revision = suggestionRevision + 1
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestion context refreshed")
+            if (!disposed && suggestionRevision == revision) suggestionScheduler?.refresh()
         }
 
         private fun reconcileSuggestionSchedulerOnEdt() {
@@ -2118,8 +2139,10 @@ public class SwingTerminal
                             }
                         }
                     },
-                    hideSuggestions = {
-                        if (activeSuggestionIsAutomatic) cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden")
+                    hideSuggestions = { refreshing ->
+                        if (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) {
+                            cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden", retainPresentation = refreshing)
+                        }
                     },
                 ).also { suggestionScheduler = it }
             scheduler.start(bound)
@@ -2130,13 +2153,21 @@ public class SwingTerminal
          *
          * Call on the EDT. The returned interaction is independent of popup mounting: hosts can
          * publish their own results or use [requestShellSuggestions] with any Swing/IntelliJ UI.
-         * A new request supersedes the previous interaction. Input, session rebinding, disposal,
-         * and ineligible viewport/settings close it. Null means the request or editing target is
-         * unavailable. Source completion does not invalidate a displayed final publication.
+         * A new request supersedes the previous interaction, except automatic requests cannot
+         * replace a valid explicit interaction. Input, session rebinding, disposal, and ineligible
+         * viewport/settings close it. Null means an explicit interaction takes priority or the
+         * request or editing target is unavailable. Source completion does not invalidate a
+         * displayed final publication.
          * By default editing is captured from the bound session; an unbound view is display-only.
          * Supply [editTarget] for a host editor, or [SwingShellSuggestionEditTarget.NONE] for display-only results.
+         * Hosts publishing results directly must first confirm a session snapshot marked
+         * [TerminalShellCommandLineSnapshot.requiresShellConfirmation] through
+         * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
+         * before collecting a provider; conditional session admission also rejects unconfirmed edits.
+         * Automatic interactions reject provisional session text instead of querying the shell to confirm it.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun beginShellSuggestionInteraction(
             request: SwingShellSuggestionRequest,
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
@@ -2145,27 +2176,46 @@ public class SwingTerminal
         ): SwingShellSuggestionInteraction? {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion capture must run on the EDT" }
             val automatic = trigger == SwingShellSuggestionTrigger.AUTOMATIC
+            val effectiveRequest =
+                if (automatic && settings.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY) {
+                    request.copy(includeCommandNames = false)
+                } else {
+                    request
+                }
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return null
+            if (automatic && !activeSuggestionIsAutomatic) {
+                val revision = suggestionRevision
+                if (activeSuggestionInteraction?.validateContext() == true || suggestionRevision != revision) return null
+            }
             val bound = session
             val observed =
                 bound?.activeShellCommandLine()?.takeIf {
-                    it.commandText == request.commandText && it.cursorOffset == request.cursorOffset
+                    it.commandText == effectiveRequest.commandText && it.cursorOffset == effectiveRequest.cursorOffset
                 }
+            if (automatic && observed?.requiresShellConfirmation == true) return null
             val revision = suggestionRevision + 1
-            cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced", SwingShellSuggestionCloseReason.SUPERSEDED)
+            cancelAndHideShellSuggestionsOnEdt(
+                "Shell suggestion request replaced",
+                SwingShellSuggestionCloseReason.SUPERSEDED,
+                retainPresentation = automatic,
+            )
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
             val captured =
                 when {
-                    editTarget != null -> editTarget.capture(request)
-                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, request)
+                    editTarget != null -> editTarget.capture(effectiveRequest)
+                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest)
                     else -> SwingShellSuggestionHandler.NONE
-                } ?: return null
+                } ?: run {
+                    if (suggestionRevision == revision) shellSuggestionController?.hide()
+                    return null
+                }
             if (disposed ||
                 suggestionRevision != revision ||
                 session !== bound ||
                 (observed != null && bound.activeShellCommandLine() != observed)
             ) {
                 captured.close()
+                if (suggestionRevision == revision) shellSuggestionController?.hide()
                 return null
             }
             val handler =
@@ -2179,7 +2229,7 @@ public class SwingTerminal
 
                     override fun close() = captured.close()
                 }
-            val interaction = SwingShellSuggestionInteraction(request, handler, feedbackHandler)
+            val interaction = SwingShellSuggestionInteraction(effectiveRequest, handler, feedbackHandler)
             if (bound != null && observed != null) {
                 interaction.contextIsCurrent = { !bound.isClosed && bound.activeShellCommandLine() == observed }
             }
@@ -2207,7 +2257,11 @@ public class SwingTerminal
                             { hideCapturedSuggestionTarget(presentationTarget, revision) },
                             {
                                 if (!interaction.isClosed || interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED) {
-                                    if (suggestionRevision == revision) suggestionScheduler?.onInvalidated()
+                                    if (suggestionRevision == revision) {
+                                        suggestionScheduler?.onInvalidated(
+                                            dismissed = interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED,
+                                        )
+                                    }
                                     for (listener in suggestionInvalidationListeners) {
                                         if (suggestionRevision != revision) break
                                         listener.onShellSuggestionsInvalidated()
@@ -2218,6 +2272,7 @@ public class SwingTerminal
                     }
                 },
             )
+            if (!automatic) suggestionScheduler?.onExplicitRequest()
             if (bound != null && observed != null) {
                 scope.launch {
                     combine(bound.activeShellCommandLineRevision, bound.state) { _, _ -> }
@@ -2228,6 +2283,7 @@ public class SwingTerminal
                                 cancelAndHideShellSuggestionsOnEdt(
                                     "Active shell command changed",
                                     SwingShellSuggestionCloseReason.INVALIDATED,
+                                    retainPresentation = automatic,
                                 )
                             }
                         }
@@ -2236,8 +2292,13 @@ public class SwingTerminal
             return interaction.takeIf { activeSuggestionInteraction === it && it.isActive }
         }
 
-        /** Captures the bound session's authoritative command line on the EDT, without mounting a popup. */
+        /**
+         * Captures the bound session's command line on the EDT, without mounting a popup.
+         * Provisional snapshots still require native confirmation before direct publication;
+         * [requestShellSuggestions] handles confirmation for provider-backed interactions.
+         */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun beginActiveShellSuggestionInteraction(
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
@@ -2268,6 +2329,7 @@ public class SwingTerminal
          * Placement belongs to this adapter and is independent of provider request data.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun presentShellSuggestions(
             interaction: SwingShellSuggestionInteraction,
             anchorColumn: Int = suggestionAnchorColumn,
@@ -2285,7 +2347,9 @@ public class SwingTerminal
          * This does not mount UI. Its request-specific observer is captured before collection.
          * Closing the interaction cancels collection; final visible results survive stream completion.
          * Each interaction accepts one provider collection. Combine independent sources in the provider.
+         * Provisional session input is confirmed by the shell before collecting provider results.
          */
+        @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
             interaction: SwingShellSuggestionInteraction,
             provider: SwingShellSuggestionProvider,
@@ -2293,6 +2357,12 @@ public class SwingTerminal
             check(SwingUtilities.isEventDispatchThread()) { "suggestion source capture must run on the EDT" }
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
             val scope = suggestionScope ?: return
+            val bound = session
+            val snapshot = bound?.activeShellCommandLine()
+            val requiresConfirmation =
+                snapshot?.requiresShellConfirmation == true &&
+                    snapshot.commandText == interaction.request.commandText &&
+                    snapshot.cursorOffset == interaction.request.cursorOffset
             interaction.beginSource()
             val source =
                 try {
@@ -2312,6 +2382,19 @@ public class SwingTerminal
             val publications = source.suggestions.flowOn(Dispatchers.Default).conflate()
             scope.launch {
                 try {
+                    if (requiresConfirmation &&
+                        bound.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset) == null
+                    ) {
+                        if (activeSuggestionInteraction === interaction) {
+                            cancelAndHideShellSuggestionsOnEdt(
+                                "Shell could not confirm suggestion input",
+                                SwingShellSuggestionCloseReason.INVALIDATED,
+                            )
+                        }
+                        return@launch
+                    }
+                    ensureActive()
+                    if (activeSuggestionInteraction !== interaction || !interaction.validateContext()) return@launch
                     publications.collect { suggestions ->
                         this@launch.ensureActive()
                         if (activeSuggestionInteraction === interaction && interaction.isActive) {
@@ -2339,6 +2422,7 @@ public class SwingTerminal
          * Automatic requests respect the automatic-popup setting; explicit requests respect the master switch.
          */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
             commandText: String,
             cursorOffset: Int,
@@ -2359,6 +2443,7 @@ public class SwingTerminal
 
         /** Queries and presents the bound session's active command line using the configured provider. */
         @JvmOverloads
+        @ExperimentalShellSuggestionsApi
         public fun requestActiveShellSuggestions(
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             editTarget: SwingShellSuggestionEditTarget? = null,
@@ -2377,6 +2462,7 @@ public class SwingTerminal
          * This method may be called from any thread; component state is updated
          * asynchronously on the EDT.
          */
+        @ExperimentalShellSuggestionsApi
         public fun hideShellSuggestions() {
             runOnEdt {
                 cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
@@ -2384,21 +2470,25 @@ public class SwingTerminal
         }
 
         /** Registers an EDT callback for shell-bound input invalidation. */
+        @ExperimentalShellSuggestionsApi
         public fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionInvalidationListener]. */
+        @ExperimentalShellSuggestionsApi
         public fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners -= listener
         }
 
         /** Registers an EDT callback for automatic-suggestion eligibility changes. */
+        @ExperimentalShellSuggestionsApi
         public fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionEligibilityListener]. */
+        @ExperimentalShellSuggestionsApi
         public fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners -= listener
         }
@@ -2409,6 +2499,7 @@ public class SwingTerminal
          * This method is safe to call from any thread and returns the last state
          * published by the EDT without blocking it.
          */
+        @ExperimentalShellSuggestionsApi
         public fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
 
         /**
@@ -2419,6 +2510,7 @@ public class SwingTerminal
          *
          * @return immutable shell suggestion state snapshot.
          */
+        @ExperimentalShellSuggestionsApi
         public fun currentShellSuggestionState(): SwingShellSuggestionState {
             check(SwingUtilities.isEventDispatchThread()) { "shell suggestion state must be read on the EDT" }
             return shellSuggestionController?.state() ?: SwingShellSuggestionState.EMPTY
@@ -2666,6 +2758,7 @@ public class SwingTerminal
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
                 hostServices.shellSuggestionViewFactory,
+                CoroutineScope(componentScope.coroutineContext + (suggestionDispatcher ?: uiCoroutineDispatcher)),
             ).also {
                 shellSuggestionController = it
                 it.popup.isVisible = false
@@ -2721,8 +2814,8 @@ public class SwingTerminal
             return true
         }
 
-        private fun invalidateShellSuggestionsOnEdt() {
-            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
+        private fun invalidateShellSuggestionsOnEdt(retainPresentation: Boolean = false) {
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input", retainPresentation = retainPresentation)
             suggestionScheduler?.onInvalidated()
             suggestionInvalidationListeners.forEach { listener ->
                 listener.onShellSuggestionsInvalidated()
@@ -3017,7 +3110,11 @@ public class SwingTerminal
             if (revision != automaticSuggestionEligibilityRevision) return
             val liveViewport = isLiveViewportOnEdt()
             var failure: Throwable? = null
-            if (!settings.smartSuggestionsEnabled || !liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
+            if (!settings.smartSuggestionsEnabled ||
+                !liveViewport ||
+                !settings.shellSuggestionsEnabled &&
+                (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true)
+            ) {
                 try {
                     cancelAndHideShellSuggestionsOnEdt(
                         if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
@@ -3050,11 +3147,20 @@ public class SwingTerminal
         private fun cancelAndHideShellSuggestionsOnEdt(
             reason: String,
             closeReason: SwingShellSuggestionCloseReason = SwingShellSuggestionCloseReason.CANCELLED,
+            retainPresentation: Boolean = false,
         ) {
             val revision = ++suggestionRevision
             val interaction = activeSuggestionInteraction
             val scope = suggestionScope
             val target = activeSuggestionTarget
+            val retain =
+                retainPresentation &&
+                    target == null &&
+                    shellSuggestionProvider != null &&
+                    (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) &&
+                    terminalFocused &&
+                    isAutomaticShellSuggestionEligible()
+            if (retain) shellSuggestionController?.retainPresentation()
             activeSuggestionInteraction = null
             suggestionScope = null
             activeSuggestionIsAutomatic = false
@@ -3062,7 +3168,7 @@ public class SwingTerminal
             scope?.cancel(CancellationException(reason))
             cleanupSwingResources(
                 { interaction?.close(closeReason) },
-                { if (suggestionRevision == revision) shellSuggestionController?.hide() },
+                { if (suggestionRevision == revision && !retain) shellSuggestionController?.hide() },
                 { hideCapturedSuggestionTarget(target, revision) },
             )
         }

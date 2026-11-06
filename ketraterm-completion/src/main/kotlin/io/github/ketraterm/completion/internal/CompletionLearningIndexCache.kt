@@ -55,6 +55,7 @@ internal class CompletionLearningIndexCache {
         for (replay in snapshot.replayCommands) {
             val stats = rankingByKey[replay.rowKey()] ?: continue
             val line = TerminalCommandLineTokenizer.parse(replay.commandLine, replay.commandLine.length, shellSyntax)
+            if (!line.canReplay) continue
             parsedRows += ParsedLearnedStatsRow(stats, replay, line)
         }
         return CompletionLearningIndexes(

@@ -39,6 +39,13 @@ the hooks and decides whether they are expected from startup. The standard
 adaptation for supported profiles. Direct PTY users pass the chosen factory
 through `PtyOptions.shellIntegration`.
 
+For independently transported PATH inventories, create one
+`ShellCommandInventoryInput` per session and pass it as `commandInventoryInput`
+to `OscShellIntegration.configured`. Deliver complete bounded snapshots through
+`accept(bytes)`; `false` means their live-shell epoch is not current yet. The host
+owns transport, retry, and cleanup. Workspace manages the private file mailbox
+automatically. Background workers must not write metadata to the live PTY.
+
 `OscShellIntegration` and `configured(false)` still accept later reports, such as
 hooks installed manually or by a nested shell. `configured(true)` sets the
 immutable launch expectation exposed by `session.promptMarkersExpected`; it
@@ -68,14 +75,27 @@ without removing their command metadata; a missing capture stays unavailable.
 The view chooses fonts and presentation, while the producer retains only terminal
 render data. Custom producers can pass the same snapshot to `recordCommandStart`.
 
-`session.activeShellCommandLine()` returns an immutable snapshot only when the
-prompt context is available and the cursor is at the visible command end. Use
+`session.activeShellCommandLine()` returns an immutable snapshot when the prompt
+context is available and the cursor is at the visible command end. With the native
+PowerShell bridge, a visible suffix instead produces a provisional prefix marked
+`requiresShellConfirmation`; follow the session's
+[conditional-edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+before using it for suggestions. Use
 `session.activeShellCommandLineRevision` to observe edits; session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session's conditional-edit APIs when admitting asynchronous suggestions.
 
 ## Readiness and trust
+
+With workspace PowerShell hooks and PSReadLine, this producer also decodes
+[native completion metadata](../docs/reference/protocol.md#private-powershell-completion-metadata).
+Call `session.requestShellCompletions(commandLine, cursorOffset)` from a caller-owned
+coroutine, or install `SessionShellCompletionProvider` from `ketraterm-ui-swing-host`
+in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
+return null; caller cancellation propagates. The native handler reads the current
+buffer and does not submit the command. Custom parser factories must explicitly
+forward the selected producer's custom OSC callback and collection limit.
 
 A prompt becomes ready after an ordered `A`/`B` pair in the primary screen.
 Command markers, alternate-screen output, and a local primary-buffer clear

@@ -159,6 +159,10 @@ Permissions and decoded-size limits are checked again before execution.
 
 ## Query allowlists
 
+The optional PowerShell completion exchange below is host-initiated semantic
+input. Receiving its OSC metadata never sends a terminal reply, executes command
+text, or requests completion by itself; it adds no terminal-response allowlist entry.
+
 | Query | Reply scope |
 | --- | --- |
 | DECRQSS | SGR (`m`), vertical margins (`r`), horizontal margins (`s`), cursor style (`SP q`). Unsupported selectors receive empty failure replies. |
@@ -407,6 +411,145 @@ This advertises grapheme processing, not complete conformance to the original
 [Unicode Core draft](https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex):
 KetraTerm retains its documented [VS15/VS16 width policy](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy)
 and [streaming placement](#streaming-grapheme-placement).
+
+## Private PowerShell completion metadata
+
+The same optional producer also accepts the bounded Bash command inventory
+[described below](#private-bash-command-inventory).
+
+The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;2;... BEL`
+(ST is also accepted) from the workspace's PSReadLine hook. All envelope fields
+are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+The session's default parser forwards unknown OSC bodies synchronously to the
+selected producer. Custom parser factories must forward `observeCustomOsc` and
+use `customOscPayloadLimitBytes` themselves.
+
+| Message body after `KetraTermCompletion;2;` | Meaning |
+| --- | --- |
+| `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
+| `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
+| `Result;epoch;id;Failed` | Correlated failure. |
+| `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
+
+The host admits at most one request per session, sending the semantic `F12,e`
+chord through ordinary ordered input. Host and hook increment their counters for
+each request. Replies must match the current prompt epoch and pending positive
+request ID. They must also match the captured command and cursor; wrong epochs
+or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
+metadata has no editing authority.
+
+`PrefixReset` lets acceptance clear the text before the real cursor through
+`PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same
+ordered input operation. Text after the cursor is preserved. This avoids relying
+on version-dependent Delete/Backspace behavior. The binding does not execute the
+command and preserves `LASTEXITCODE`. Its capability is cleared at each OSC 133
+prompt start and must be announced again for that prompt.
+
+Complete custom OSC collection is capped at 256 KiB with this producer installed;
+built-in command limits remain unchanged. Replies contain at most 128 candidates,
+a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
+tooltip per candidate. Ranges must contain the cursor and stay within the buffer
+on scalar boundaries. Command, application-name, and replacement controls are rejected. Application names are limited to 512 UTF-16 units. The hook
+bounds its serialized body below the collection limit and preserves `LASTEXITCODE`.
+
+Empty command buffers use bounded `Get-Command` discovery. The hook uses PowerShell's
+parser to quote command names that require explicit invocation. For simple executable
+names it removes an extension only after resolving the long and short invocation
+to the same application/script path and type. Shadowing functions and aliases do
+not authorize that normalization. The command authority and catalog enrichment
+policy belongs to the [completion engine](../../ketraterm-completion/docs/completion-architecture.md#internal-implementation).
+
+Waiting expires after ten seconds, allowing cold PowerShell module discovery.
+Callers can cancel earlier. Cancelled/timed-out requests retain the wire
+slot until their reply or a new prompt, so a late result cannot satisfy a newer
+request. A replacement request can wait for that slot within its own ten-second
+deadline, then revalidate the current command buffer before sending its query.
+Native completers run in the shell and may continue after host cancellation.
+Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for the validation required before suggestion acceptance.
+
+## Private Bash command inventory
+
+Bash and zsh share a versioned snapshot protocol. Each message uses
+`OSC 633;KetraTermCommands;3;... BEL` for PATH executables and
+`OSC 633;KetraTermShellCommands;3;... BEL` for shell-local commands (or ST).
+Each source has independent epochs, scan order, deadlines, and atomic snapshots:
+
+Workspace PATH workers write their `Begin`/`Chunk`/`End` or `Fail` envelopes to
+`path.pending` in a private session directory, then rename it to `path.ready`.
+They never write to the PTY: concurrent terminal writes can split and interleave
+OSC envelopes with Readline/ZLE redraws or prompt markers. `Ready` and shell-local
+metadata remain foreground output. The host supplies the mailbox through
+`KetraTerm_COMMAND_INVENTORY_DIRECTORY` (WSL receives a translated guest path).
+The optional `ShellCommandInventoryInput` accepts only complete BEL-terminated
+PATH envelopes, at most 8 MiB encoded and 258 frames, and checks the live epoch
+before passing records to the same inventory decoder. It cannot inject terminal
+text, prompt markers, native completion replies, or environment announcements.
+File arrival may precede `Ready`; the host retains one bounded pending file and
+retries, replacing it when a newer file arrives. Terminal bytes are never injected
+or replayed to deliver file metadata. Session closure detaches the input.
+
+| Suffix | Meaning |
+| --- | --- |
+| `Ready;epoch` | Announce the current shell environment. |
+| `Begin;epoch;scan` | Start a complete replacement snapshot. |
+| `Chunk;epoch;scan;sequence;data` | Append complete records; sequences start at zero. |
+| `End;epoch;scan;chunks;entries;bytes` | Verify exact totals and atomically publish. |
+| `Fail;epoch;scan;reason` | Abandon the scan (`Overflow` or `Unavailable` from workspace hooks). |
+
+Epochs have 32 lowercase hexadecimal characters; scan IDs are positive increasing
+integers within an epoch. A changed Ready epoch clears that source's old command authority and
+publishes `PENDING`. Same-environment refresh keeps the last complete snapshot,
+including when refresh fails. Without a complete snapshot, failure publishes
+`UNAVAILABLE`; it does not enable unverified catalog fallback. Other ready sources
+remain usable. Shell-local names override matching PATH entries. The merged
+snapshot enforces the same entry/text limits; combined overflow publishes
+unavailable rather than truncating. READY can contain one ready source while
+another is pending. Retained source snapshots share candidate strings with the
+merged index; at most two bounded source assemblies can exist. Null session inventory
+means no installed producer. Superseded epoch/scan messages cannot publish results.
+
+`data` is standard Base64 of UTF-8 NUL-terminated quadruples: display name,
+shell-escaped insertion, kind (`C` command or `A` alias), and literal alias definition.
+An empty insertion reuses the name. Command definitions must be empty; empty alias
+definitions also represent definitions exceeding the producer's 4096-byte bound.
+Definitions are never executed. Zero chunks/entries/bytes at End publishes a complete
+empty inventory. Duplicate names, controls in names/insertions, invalid UTF-8,
+unknown kinds, incomplete records, missing/repeated/out-of-order chunks, and
+incorrect totals reject the entire scan.
+
+Decoded chunks are at most 48 KiB, with at most 256 chunks, 4 MiB decoded bytes,
+32,768 entries, and 2,097,152 retained UTF-16 text units per snapshot. Names allow
+512 units and insertions/definitions 4096 each. Identical name/insertion strings
+share storage. Workspace hooks enforce conservative UTF-8 byte budgets for text.
+The existing 256 KiB custom OSC bound still applies independently. Overflow emits
+Fail, never a successful truncated End. Assemblies expire after 60 seconds when
+protocol/output activity next checks the deadline; idle partial buffers remain
+bounded and are released at session closure. Completed snapshots expose an immutable
+sorted list, binary prefix lookup, and a cached alias map.
+
+The workspace PATH collector streams immediate directory entries under separate
+scan budgets: 4,096 PATH components, 131,072 entries, and 16 MiB of entry bytes
+(including `./` and NUL delimiters). Components count even when empty, repeated,
+or inaccessible; entries count before duplicate, executable, or directory filtering.
+Emitted names remain limited to 32,768 unique executables and 2 MiB including
+NUL terminators. Exceeding any budget emits `Overflow`. The collector requires a
+compatible `find` from PATH or the shell's standard utility path. Missing tools
+and incomplete enumeration emit `Unavailable`. These budgets bound the collector's
+own storage and work, not the external utility's memory or filesystem call duration.
+
+Workspace hooks check shell-local state and PATH independently at each prompt,
+with at most one background PATH worker. Bounded shell-local state publishes
+at the prompt, independently of PATH I/O. Unchanged PATH discovery is eligible 60 seconds after a prompt observes its
+worker completing. Shell-local changes reuse executable authority; only PATH
+changes, or directory changes with relative/empty PATH entries, invalidate it.
+PATH changes during an active worker require a subsequent prompt after it finishes.
+This is one-way shell
+metadata, not a terminal query: it emits no host reply, installs no key binding,
+and grants no editing authority. Consumers retain ordinary conditional-edit checks.
+It supplies command availability and alias definitions for semantic argument analysis;
+it does not advertise native argument or remote filesystem completion.
+See [completion scope](../features/completion.md#sources-by-host).
 
 ## Streaming grapheme placement
 

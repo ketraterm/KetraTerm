@@ -123,6 +123,32 @@ class StandaloneCompletionRegistryPersistenceTest {
         assertFalse(learning.snapshot().replayCommands.any { it.commandLine == "late command" })
     }
 
+    @Test
+    fun `reset clears memory and saved learning while persistence is disabled`(
+        @TempDir directory: Path,
+    ) = runTest {
+        val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val seed = registry(TerminalCompletionLearningStore(), path, persistenceEnabled = true)
+        seed.recordFinishedCommand("git status", true, null, null, 1L)
+        seed.closeAndFlush()
+
+        val learning = TerminalCompletionLearningStore()
+        val current = registry(learning, path, persistenceEnabled = false)
+        current.recordFinishedCommand("npm test", true, null, null, 2L)
+        try {
+            current.resetLearning().await()
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
+            current.setPersistenceEnabled(true)
+            runCurrent()
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+        } finally {
+            current.closeAndFlush()
+        }
+        assertFailsWith<IllegalStateException> { current.resetLearning() }
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
+    }
+
     private fun TestScope.registry(
         learning: TerminalCompletionLearningStore,
         path: Path,

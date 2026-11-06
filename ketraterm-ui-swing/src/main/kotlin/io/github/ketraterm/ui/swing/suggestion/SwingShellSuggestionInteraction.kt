@@ -21,6 +21,7 @@ import java.util.*
 import javax.swing.SwingUtilities
 
 /** Why an interaction ended. Only explicit dismissal represents negative user preference. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionCloseReason {
     /** The complete edit was admitted or applied. */
     ACCEPTED,
@@ -48,6 +49,7 @@ public enum class SwingShellSuggestionCloseReason {
 }
 
 /** Synchronous EDT observation of publication, selection, acceptance, and closure. */
+@ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionInteractionListener {
     /** Reads authoritative state from [interaction]; callbacks may reenter it. */
     public fun onInteractionChanged(interaction: SwingShellSuggestionInteraction)
@@ -69,19 +71,20 @@ public fun interface SwingShellSuggestionInteractionListener {
  * @param handler original editing capability; owned and closed by this interaction.
  * @param feedbackHandler original request observer. Passive closure produces no preference feedback.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionInteraction(
     public val request: SwingShellSuggestionRequest,
     private val handler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
-    feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+    private var feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
 ) : AutoCloseable {
     private enum class Phase { ACTIVE, ACCEPTING, CLOSED }
 
     private var phase = Phase.ACTIVE
-    private var feedbackHandler = feedbackHandler
     private var listeners: List<SwingShellSuggestionInteractionListener> = emptyList()
     private var revision = 0L
     private var handlerClosed = false
     private var published = false
+    internal val hasPublication: Boolean get() = published
     private var sourceAttached = false
     internal var contextIsCurrent: (() -> Boolean)? = null
 
@@ -120,12 +123,11 @@ public class SwingShellSuggestionInteraction(
         val previous = snapshot.selectedSuggestion.takeIf { preserveSelection }
         val copied = Collections.unmodifiableList(ArrayList(suggestions))
         var selection = selectedIndex
-        if (previous != null) {
+        val previousOutcome = previous?.commandTextAfterReplacement(request)
+        if (previousOutcome != null) {
             val retained =
                 copied.indexOfFirst {
-                    it.replacementStartOffset == previous.replacementStartOffset &&
-                        it.replacementEndOffset == previous.replacementEndOffset &&
-                        it.replacementText == previous.replacementText
+                    it.commandTextAfterReplacement(request) == previousOutcome
                 }
             if (retained >= 0) selection = retained
         }

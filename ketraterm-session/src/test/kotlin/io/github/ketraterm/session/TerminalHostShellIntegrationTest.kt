@@ -40,6 +40,44 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHostShellIntegrationTest {
+    @Test
+    fun `session buffer cleanup runs once after connector cleanup and cannot retain a closed inventory`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            var closedCalls = 0
+            lateinit var channel: TerminalShellCompletionChannel
+            val failure = IllegalStateException("producer cleanup")
+            val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState())
+            val session =
+                TerminalSession.create(
+                    TerminalBuffers.create(8, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                    shellIntegration =
+                        TerminalShellIntegrationFactory { context ->
+                            channel = context.shellCompletion
+                            channel.publishCommands(TerminalShellCommandInventory(emptyList()))
+                            object : TerminalShellIntegration by host.create(context) {
+                                override fun sessionClosed() {
+                                    assertEquals(1, connector.closeCount)
+                                    closedCalls++
+                                    throw failure
+                                }
+                            }
+                        },
+                )
+            session.start()
+            assertSame(failure, assertThrows(IllegalStateException::class.java) { session.close() })
+            session.close()
+            assertEquals(1, closedCalls)
+            assertTrue(session.state.value is TerminalSessionState.Closed)
+            channel.publishCommands(TerminalShellCommandInventory(emptyList()))
+            assertNull(session.shellCommandInventory.value)
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `host prompt expectation is available before metadata and independent of readiness`(expected: Boolean) =

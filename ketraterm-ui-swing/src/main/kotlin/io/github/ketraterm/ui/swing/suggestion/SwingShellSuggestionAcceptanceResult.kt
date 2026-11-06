@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 /** Outcome at the configured editing boundary; acceptance never acknowledges transport or shell execution. */
+@ExperimentalShellSuggestionsApi
 public enum class SwingShellSuggestionAcceptanceResult {
     /** The editing authority admitted or applied the complete edit. */
     ACCEPTED,

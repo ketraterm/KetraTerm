@@ -20,6 +20,7 @@ import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -215,6 +216,10 @@ internal class KetraTermConfigManager(
                 commandFinishedAlertThresholdSeconds = commandFinishedAlertThresholdSeconds,
                 smartSuggestionsEnabled = behavior["smart_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.smartSuggestionsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
+                shellSuggestionAutomaticMode =
+                    SwingShellSuggestionAutomaticMode.entries.firstOrNull {
+                        it.name.equals(behavior["shell_suggestion_automatic_mode"]?.trim(), ignoreCase = true)
+                    } ?: default.shellSuggestionAutomaticMode,
                 acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
                 persistentSuggestionLearningEnabled = persistentSuggestionLearningEnabled,
                 clipboardWrite = clipboardWrite,
@@ -344,6 +349,7 @@ internal class KetraTermConfigManager(
         # Whether host-provided shell suggestions may appear in the terminal UI
         smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
+        shell_suggestion_automatic_mode = "${config.shellSuggestionAutomaticMode.name.lowercase(Locale.ROOT)}"
         # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
         accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}
         # Persist compact suggestion-learning metadata (never raw terminal output) across application restarts

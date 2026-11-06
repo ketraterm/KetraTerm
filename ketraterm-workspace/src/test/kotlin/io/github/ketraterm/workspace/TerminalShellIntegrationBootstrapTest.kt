@@ -17,8 +17,10 @@ package io.github.ketraterm.workspace
 
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
+import java.util.zip.GZIPInputStream
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.test.*
@@ -83,7 +85,7 @@ class TerminalShellIntegrationBootstrapTest {
         @TempDir directory: Path,
     ) {
         val occupied =
-            java.nio.file.Files
+            Files
                 .createFile(directory.resolve("occupied"))
         val launch =
             TerminalShellIntegrationBootstrap.apply(
@@ -110,6 +112,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue("-NoLogo" in integrated.command)
         assertTrue("-NoExit" in integrated.command)
         assertEquals("-EncodedCommand", integrated.command[integrated.command.lastIndex - 1])
+        assertTrue(integrated.command.joinToString(" ").length < 32_767, "Bootstrap must fit Windows' process command-line limit")
 
         val script = decodePowerShellScript(integrated.command.last())
         assertTrue(script.contains("function global:prompt"))
@@ -202,7 +205,9 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `Bash profile receives prompt command OSC 133 bootstrap environment`() {
+    fun `Bash profile installs prompt hooks after user startup`(
+        @TempDir tempDir: Path,
+    ) {
         val profile =
             TerminalProfile(
                 id = "bash",
@@ -211,21 +216,24 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("PROMPT_COMMAND" to "history -a"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
-        assertEquals(profile.command, integrated.command)
-        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        assertEquals(listOf("/bin/bash", "--rcfile", tempDir.resolve("bash/rcfile.bash").toString()), integrated.command)
+        assertEquals("1", integrated.environment["_KetraTerm_BASH_LOGIN_SHELL"])
+        val promptCommand = Files.readString(tempDir.resolve("bash/rcfile.bash"))
         assertTrue(promptCommand.contains("__ketraterm_prompt_command"))
         assertTrue(promptCommand.contains("]133;"))
         assertTrue(promptCommand.contains("__ketraterm_osc7"))
         assertTrue(promptCommand.contains("KetraTerm_OSC7_AUTHORITY"))
         assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertTrue(promptCommand.contains("'%%%02X'"))
-        assertTrue(promptCommand.endsWith("history -a"))
+        assertEquals("history -a", integrated.environment["PROMPT_COMMAND"])
     }
 
     @Test
-    fun `Git Bash profile receives Bash-compatible OSC 133 bootstrap environment`() {
+    fun `Git Bash profile receives Bash-compatible startup hooks`(
+        @TempDir tempDir: Path,
+    ) {
         val profile =
             TerminalProfile(
                 id = "git-bash",
@@ -233,10 +241,11 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("C:\\Program Files\\Git\\bin\\bash.exe", "--login", "-i"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
-        assertEquals(profile.command, integrated.command)
-        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("__ketraterm_preexec"))
+        assertEquals(listOf(profile.command.first(), "--rcfile", tempDir.resolve("bash/rcfile.bash").toString(), "-i"), integrated.command)
+        assertEquals("1", integrated.environment["_KetraTerm_BASH_LOGIN_SHELL"])
+        assertTrue(Files.readString(tempDir.resolve("bash/rcfile.bash")).contains("__ketraterm_preexec"))
     }
 
     @Test
@@ -278,6 +287,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_preexec"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("]133;"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_osc7"))
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_completion_ready"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("'%%%02X'"))
         assertTrue(zshDirectory.resolve(".zlogin").exists())
         assertTrue(zshDirectory.resolve(".zlogout").exists())
@@ -365,6 +375,9 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(profile.command, integrated.command)
         assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("]133;"))
         assertEquals("EXISTING/u:PROMPT_COMMAND/u", integrated.environment["WSLENV"])
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("__ketraterm_collect_path_commands"))
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("633;%s;3;Begin;"))
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("declare -p BASH_ALIASES"))
         assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
     }
 
@@ -427,7 +440,7 @@ class TerminalShellIntegrationBootstrapTest {
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
-        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        val promptCommand = Files.readString(tempDir.resolve("bash/rcfile.bash"))
         assertTrue(promptCommand.contains("]133;"))
         assertTrue(promptCommand.contains("]7;"))
         assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
@@ -465,10 +478,10 @@ class TerminalShellIntegrationBootstrapTest {
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
-        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        val promptCommand = Files.readString(tempDir.resolve("bash/rcfile.bash"))
         assertTrue(promptCommand.contains("]133;"))
         assertTrue(promptCommand.contains("]7;"))
-        assertTrue(promptCommand.endsWith("history -a"))
+        assertEquals("history -a", integrated.environment["PROMPT_COMMAND"])
         assertAll(
             { assertEquals(hostConfig, integrated.environment["KetraTerm_CONFIG_PATH"]) },
             { assertEquals(mapOf("PATH" to hostPath), integrated.environment.filterKeys { it.equals("PATH", ignoreCase = true) }) },
@@ -557,8 +570,6 @@ class TerminalShellIntegrationBootstrapTest {
         }
     }
 
-    private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
-
     private fun integratedPowerShellScript(): String {
         val profile =
             TerminalProfile(
@@ -573,4 +584,11 @@ class TerminalShellIntegrationBootstrapTest {
                 .last(),
         )
     }
+}
+
+/** Reads the generated hook source for launch-contract assertions shared by the bootstrap tests. */
+internal fun decodePowerShellScript(encoded: String): String {
+    val bootstrap = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
+    val payload = bootstrap.substringAfter("FromBase64String('").substringBefore("')")
+    return GZIPInputStream(Base64.getDecoder().decode(payload).inputStream()).bufferedReader(Charsets.UTF_8).use { it.readText() }
 }

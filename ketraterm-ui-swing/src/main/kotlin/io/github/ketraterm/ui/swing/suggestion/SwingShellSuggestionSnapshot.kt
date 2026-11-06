@@ -22,6 +22,7 @@ package io.github.ketraterm.ui.swing.suggestion
  * @property suggestions immutable ordered candidates, shared by all presentations.
  * @property selectedIndex selected global index, or -1 for passive presentation.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionSnapshot internal constructor(
     internal val owner: SwingShellSuggestionInteraction,
     public val suggestions: List<SwingShellSuggestion>,

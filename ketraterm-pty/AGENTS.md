@@ -41,7 +41,7 @@ Run `./gradlew :ketraterm-pty:test` for ordinary tests. Native process tests are
 opt-in:
 
 ```text
-./gradlew :ketraterm-pty:test --tests "io.github.ketraterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
+./gradlew :ketraterm-pty:nativeTest
 ```
 
 See [native prerequisites](docs/pty4j-process-lifecycle.md#native-validation).

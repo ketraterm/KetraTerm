@@ -1,27 +1,27 @@
 format=1
 basis=reviewed-working-tree
-baseRevision=6712fc6d403ebab13334b327303fff4df8f08550
-libraryVersion=0.4.0-SNAPSHOT
+baseRevision=0518af0fc38ddd8016b36204d330d51196a80a9c
+libraryVersion=0.5.0-SNAPSHOT
 kotlinVersion=2.4.20
 jvmTarget=25
 jdkVersion=25.0.3+9-LTS
 jdkVendor=Eclipse Temurin
-clientSha256=d633b8c9b95bf689832def28d932da8488e1aa3bcf08f86876ef0b1175f1100c
-artifact=io.github.ketraterm:ketraterm-completion:0.4.0-SNAPSHOT:20261012.183648-1 sha256=9f046cec9c0e7bcb6a43d53d5c695f2ac5759b05fdb5f31be44806e60a2ba545
-artifact=io.github.ketraterm:ketraterm-core:0.4.0-SNAPSHOT:20261012.183648-1 sha256=eaa2fa6c5d6f0d4bf1a03e6d2113a4a6a8b8ca5730f4a98413c9f324b592cc2c
-artifact=io.github.ketraterm:ketraterm-host:0.4.0-SNAPSHOT:20261012.183648-1 sha256=e3b5a531a1a1c4549c032d01f736d5ed3faa5c18c015c44781fb78f1a57ed3ed
-artifact=io.github.ketraterm:ketraterm-input:0.4.0-SNAPSHOT:20261012.183648-1 sha256=27bef56f4f32467d93f9a671b6625e3e972b2a1427f6a3e901c014c12b2af85d
-artifact=io.github.ketraterm:ketraterm-parser:0.4.0-SNAPSHOT:20261012.183648-1 sha256=8e50407ce8de77d6d4447d6448c599cfe42dabcaa909ad189476b31d8ceafef9
-artifact=io.github.ketraterm:ketraterm-protocol:0.4.0-SNAPSHOT:20261012.183648-1 sha256=be454bd1ca7b118abb06923687e4a78a905ab986ad9cee3c3fa93d967776a751
-artifact=io.github.ketraterm:ketraterm-render-api:0.4.0-SNAPSHOT:20261012.183648-1 sha256=601514c5a1b336178496b28c18d8e1b407ff39caf42a703aa06d4df772b268b7
-artifact=io.github.ketraterm:ketraterm-render-cache:0.4.0-SNAPSHOT:20261012.183648-1 sha256=a4f37368d6ba8d17a41d56ab0f5cbe5496e4a4da19bc8096c5b37cd434af8f20
-artifact=io.github.ketraterm:ketraterm-session:0.4.0-SNAPSHOT:20261012.183648-1 sha256=e05406de042e0939cf00b12def520c7bf4452ea6a05d16505248d83e1a61d766
-artifact=io.github.ketraterm:ketraterm-transport-api:0.4.0-SNAPSHOT:20261012.183648-1 sha256=cecabaff6d9f6b0c86ee8738e174f95c83f0407e99c14dd4c69b0fe32865090f
-artifact=io.github.ketraterm:ketraterm-ui-swing-host:0.4.0-SNAPSHOT:20261012.183648-1 sha256=5f7965fa0308c3518fe31ce9d0651ab76e48266abd2c631269f56190849cba63
-artifact=io.github.ketraterm:ketraterm-ui-swing:0.4.0-SNAPSHOT:20261012.183648-1 sha256=0f9f85279faa453942d6a045e568bf6f16e1751e24df0ee45dfcce480b42ef2f
+clientSha256=2b40e48403580433057599a33e6162946ff71e6eeedbecda5c9663a9c6f68ce5
+artifact=io.github.ketraterm:ketraterm-completion:0.5.0-SNAPSHOT:20261104.120940-1 sha256=cdcb0c0a510b4560d3f3bed08590946a4126f56e90a6fc1bba755296e244535f
+artifact=io.github.ketraterm:ketraterm-core:0.5.0-SNAPSHOT:20261104.120940-1 sha256=fb33a901da58b308adc50718c4076579716c12a2056512b6cbc3600a4c3f51f2
+artifact=io.github.ketraterm:ketraterm-host:0.5.0-SNAPSHOT:20261104.120940-1 sha256=323bb1fdf511107d65ab9bb13a8f77c8a88a7626c80b1c360ac0973b94f70655
+artifact=io.github.ketraterm:ketraterm-input:0.5.0-SNAPSHOT:20261104.120940-1 sha256=2bc851e4e60c726dee0329e6a042397d25dfa346bd6d066be2711ad9ae3eaed5
+artifact=io.github.ketraterm:ketraterm-parser:0.5.0-SNAPSHOT:20261104.120940-1 sha256=fae4c30428a7cbf02d1a3b8870815c90a4e7276184cb4262a0ea3b88d3fc4a8e
+artifact=io.github.ketraterm:ketraterm-protocol:0.5.0-SNAPSHOT:20261104.120940-1 sha256=b5c9012324c9db20b23eb5d0074dff99a3a939fd252060a27c55bb61ef78bd46
+artifact=io.github.ketraterm:ketraterm-render-api:0.5.0-SNAPSHOT:20261104.120940-1 sha256=672b968c17f888eafb3c27e55b5ca9fe96c54aa3f8cb982cee9e84e0efe95039
+artifact=io.github.ketraterm:ketraterm-render-cache:0.5.0-SNAPSHOT:20261104.120940-1 sha256=dbd8633f30de64ac382b8e64f72c378e1648517bbaa2effe42e58b2af28e805d
+artifact=io.github.ketraterm:ketraterm-session:0.5.0-SNAPSHOT:20261104.120940-1 sha256=ad93b31e4cde5e2b2692dd316fcfd7e13605c88221313fccdff5ca7ed5b77a8c
+artifact=io.github.ketraterm:ketraterm-transport-api:0.5.0-SNAPSHOT:20261104.120940-1 sha256=4ea0c309d1ff60042ec56d9a94dce1e7b53787d16c468d8601b04ee866acbf06
+artifact=io.github.ketraterm:ketraterm-ui-swing-host:0.5.0-SNAPSHOT:20261104.120940-1 sha256=1c1e54d2d1fe48d5fbec2ae237ee4713bbb750bda8b8acbb414355cdfbb9bcb4
+artifact=io.github.ketraterm:ketraterm-ui-swing:0.5.0-SNAPSHOT:20261104.120940-1 sha256=e08c33223d0a49c84f1df4f1aeca05e0ca84d8b7efafa92f279eeccb41fe8973
 artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
 artifact=org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:0.5.2 sha256=6d7f84d544644fa857bba83292820cdb1e0dae408fa41d2dced903d290286463
 artifact=org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2 sha256=5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd
 artifact=org.jetbrains:annotations:23.0.0 sha256=7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05
-source=src/main/java/consumer/JavaConsumer.java sha256=d844ff092256181e70210ff59fa515709985afd11f8c782d8bc2ee0ec1fa74f5
-source=src/main/kotlin/consumer/KotlinConsumer.kt sha256=97a8c8fddbfd3178aaa574266b57fdcb26c6a9cc522dee9d4cd8fe1ecfed4d0c
+source=src/main/java/consumer/JavaConsumer.java sha256=b8109b1fa7c3fd3b34391069202fb435283c222b93ae5ec02d2df8ae9a103533
+source=src/main/kotlin/consumer/KotlinConsumer.kt sha256=fa02cd17ebf41876fb24c70ba119c8c50b2fb8029975304f7e6c5bc6133c6adc

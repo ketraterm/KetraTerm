@@ -106,6 +106,8 @@ Tests assert terminal semantics, not implementation quirks. For behavior changes
 - Run `./gradlew spotlessApply`, then the narrowest relevant tests. Use
   `./gradlew :<module>:test` or `./gradlew test` when broad verification is
   warranted.
+- Use the shared `nativeTest` and `desktopTest` suites for external-tool and real-window
+  tests. Follow [test organization](docs/development/testing.md) for tags, fixtures, and CI.
 - Update feature/gap maps when capability or scope changes.
 - Leave no silent no-ops, unrelated formatting churn, or architecture drift.
 
@@ -113,6 +115,11 @@ Useful entry points: `ketraterm-core/docs/terminal-core-contract.md`,
 `.agents/skills/`, and the touched module's `AGENTS.md`.
 
 ## Documentation
+
+For documentation work and changes that affect documented behavior, APIs, setup,
+or defaults, follow the [documentation skill](.agents/skills/terminal-documentation/SKILL.md).
+Check affected READMEs and linked instructions before finishing; update them when
+they no longer describe the implementation.
 
 Use `docs/README.md` as the documentation index. Root `docs/features/` contains
 capability catalogs, `docs/library/` cross-module embedding guides,

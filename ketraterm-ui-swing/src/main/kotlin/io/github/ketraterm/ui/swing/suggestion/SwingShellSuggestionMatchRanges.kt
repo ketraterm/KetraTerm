@@ -22,6 +22,7 @@ package io.github.ketraterm.ui.swing.suggestion
  * Public factories defensively copy input, while indexed access lets the popup
  * paint ranges without allocating on each frame.
  */
+@ExperimentalShellSuggestionsApi
 public class SwingShellSuggestionMatchRanges private constructor(
     private val packedOffsets: IntArray,
 ) {

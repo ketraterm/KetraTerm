@@ -7,6 +7,8 @@ Local filesystem support for host-composed completion sources. The package
   local path resolver and scanner.
 - `TerminalCompletionPathResolver` and `TerminalLocalFileUriResolver`: lexical
   path and local working-directory URI resolution without filesystem access.
+- `TerminalCompletionSourceEnvironment`: shared source-request directory selection,
+  including completed Git `-C` options and preservation of remote authority.
 - `TerminalDirectoryScanner` and `TerminalBoundedDirectoryScanner`: the scan
   boundary and its interruptible NIO implementation.
 - `TerminalDirectoryEntrySnapshot`: deterministic ordering and prefix projection

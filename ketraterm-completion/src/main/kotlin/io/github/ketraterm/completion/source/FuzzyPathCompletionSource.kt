@@ -48,18 +48,20 @@ internal class FuzzyPathCompletionSource(
             return emptyList()
         }
         val prefix = context.activePrefix
-        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix) ||
+        val normalizedPrefix = request.shellCapabilities.normalizePathSeparators(prefix)
+        if (!allowsPathCompletion(context, normalizedPrefix) ||
             (requiresNonEmptyPrefix && prefix.isEmpty())
         ) {
             return emptyList()
         }
 
-        val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
+        val pathSeparator = request.shellCapabilities.pathSeparator(prefix)
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
-        for ((path, isDirectory, detail) in entriesProvider(request, context)) {
+        for ((path, isDirectory, detail, matchedRanges) in entriesProvider(request, context)) {
+            if (!request.shellCapabilities.canRepresentPath(path)) continue
             if (!context.expectedPathKind.acceptsPathEntry(isDirectory)) continue
-            if (!context.expectedHiddenPathPolicy.acceptsPath(path, prefix)) continue
+            if (!context.expectedHiddenPathPolicy.acceptsPath(path, normalizedPrefix)) continue
             val rawPath = if (pathSeparator == '\\') path.replace('/', '\\') else path
             val rawReplacement = if (isDirectory) rawPath + pathSeparator else rawPath
             if (!ShellReplacementText.canEncode(rawReplacement, context.activeTokenQuote, request.shellCapabilities.quoting)) {
@@ -83,6 +85,7 @@ internal class FuzzyPathCompletionSource(
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.PATH,
                     score = candidateScore,
+                    matchedRanges = matchedRanges,
                 ),
             )
         }

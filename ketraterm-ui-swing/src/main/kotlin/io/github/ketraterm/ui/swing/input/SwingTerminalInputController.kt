@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.input
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.session.TerminalInputAdmission
 import java.awt.event.*
 
@@ -76,7 +77,6 @@ internal class SwingTerminalInputController(
                 host.resetCursorBlink()
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
-                host.invalidateShellSuggestions()
                 submitKey(keyEvent)
                 event.consume()
             }
@@ -99,30 +99,41 @@ internal class SwingTerminalInputController(
                     return
                 }
                 val keyEvent = keyMapper.keyTyped(event) ?: return
-                host.invalidateShellSuggestions()
                 submitKey(keyEvent)
                 event.consume()
             }
         }
 
     private fun submitKey(event: TerminalKeyEvent) {
-        if (host.session?.submitInput(event) != TerminalInputAdmission.ACCEPTED) return
-        // Admission also accepts suppressed events; modifier and system keys do not request editing/navigation.
+        // Modifier and system keys can be reported to the shell without editing
+        // the command line. Keep popup invalidation and viewport following aligned.
         val key = event.key
-        if (key != null &&
-            (
-                key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal ||
-                    key == TerminalKey.CAPS_LOCK ||
-                    key == TerminalKey.NUM_LOCK ||
-                    key == TerminalKey.SCROLL_LOCK ||
-                    key == TerminalKey.PRINT_SCREEN ||
-                    key == TerminalKey.PAUSE ||
-                    key == TerminalKey.MENU
-            )
-        ) {
-            return
+        val preservesCommandLine =
+            key != null &&
+                (
+                    key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal ||
+                        key == TerminalKey.CAPS_LOCK ||
+                        key == TerminalKey.NUM_LOCK ||
+                        key == TerminalKey.SCROLL_LOCK ||
+                        key == TerminalKey.PRINT_SCREEN ||
+                        key == TerminalKey.PAUSE ||
+                        key == TerminalKey.MENU
+                )
+        if (!preservesCommandLine) {
+            val textEdit =
+                (key == null || key == TerminalKey.BACKSPACE || key == TerminalKey.DELETE) &&
+                    !TerminalModifiers.hasCtrl(event.modifiers) &&
+                    !TerminalModifiers.hasAlt(event.modifiers) &&
+                    !TerminalModifiers.hasMeta(event.modifiers)
+            if (!textEdit) host.hideShellSuggestions()
+            host.invalidateShellSuggestions()
         }
-        host.scrollToLiveViewport()
+        val admitted = host.session?.submitInput(event) == TerminalInputAdmission.ACCEPTED
+        if (admitted && !preservesCommandLine) {
+            host.scrollToLiveViewport()
+        } else if (!admitted && !preservesCommandLine) {
+            host.hideShellSuggestions()
+        }
     }
 
     val focusListener =

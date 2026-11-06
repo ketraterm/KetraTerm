@@ -15,11 +15,13 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.completion.api.TerminalCompletionShellProvider
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import java.nio.file.Path
 
 /**
  * Host context used to create one testable IntelliJ completion provider.
@@ -29,7 +31,9 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionContext
  * constructing immutable completion request metadata.
  * @property shellCapabilities shell syntax and quoting capabilities.
  * @property additionalSources project-aware completion sources for this session.
+ * @property shellProvider optional live shell command authority and argument completer.
  * @property directoryScanner suspending bounded directory scanner.
+ * @property projectDirectory captured local fallback for Git directory changes when shell metadata is absent.
  * @throws IllegalArgumentException if [profileId] is blank.
  */
 internal data class IntellijCompletionContext(
@@ -38,6 +42,8 @@ internal data class IntellijCompletionContext(
     val shellCapabilities: TerminalShellCapabilities,
     val additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
     val directoryScanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
+    val projectDirectory: Path? = null,
+    val shellProvider: TerminalCompletionShellProvider? = null,
 ) {
     init {
         require(profileId.isNotBlank()) { "profileId must not be blank" }

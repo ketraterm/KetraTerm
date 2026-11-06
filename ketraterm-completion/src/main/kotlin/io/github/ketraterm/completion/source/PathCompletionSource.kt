@@ -27,7 +27,8 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
  * directory. Known path-taking commands may request file, directory, or
  * directory-only completion from an empty argument prefix; otherwise callers
  * must type an explicitly path-like prefix such as `./`, `/`, `~`, or a token
- * containing a path separator.
+ * containing a path separator. Explicit non-path value domains take
+ * precedence over this lexical fallback.
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
@@ -44,11 +45,11 @@ internal class PathCompletionSource(
         require(limit > 0) { "limit must be > 0, was $limit" }
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val prefix = context.activePrefix
-        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix)) {
+        val normalizedPrefix = request.shellCapabilities.normalizePathSeparators(prefix)
+        if (!allowsPathCompletion(context, normalizedPrefix)) {
             return emptyList()
         }
 
-        val normalizedPrefix = prefix.replace('\\', '/')
         val pathParts = splitPathPrefix(normalizedPrefix) ?: return emptyList()
         val directoryPortion = pathParts.directoryPrefix
         val filePrefix = pathParts.entryNamePrefix
@@ -61,7 +62,7 @@ internal class PathCompletionSource(
                 ),
             )
 
-        val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
+        val pathSeparator = request.shellCapabilities.pathSeparator(prefix)
         val expandHome =
             directoryPortion.startsWith("~/") &&
                 pathSeparator == '/' &&
@@ -73,6 +74,7 @@ internal class PathCompletionSource(
         var orderIndex = 0
 
         for ((name, isDirectory) in entries) {
+            if (!request.shellCapabilities.canRepresentPath(name)) continue
             if (!context.expectedPathKind.acceptsPathEntry(isDirectory)) continue
             if (!context.expectedHiddenPathPolicy.acceptsPath(name, filePrefix)) continue
             val match = CompletionMatcher.match(name, filePrefix) ?: continue

@@ -14,6 +14,13 @@ public final class io/github/ketraterm/completion/host/TerminalCompletionPathRes
 	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalDirectoryListingRequest;)Ljava/nio/file/Path;
 }
 
+public final class io/github/ketraterm/completion/host/TerminalCompletionSourceEnvironment {
+	public static final field INSTANCE Lio/github/ketraterm/completion/host/TerminalCompletionSourceEnvironment;
+	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;Ljava/nio/file/Path;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public static synthetic fun resolve$default (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;Ljava/nio/file/Path;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+}
+
 public final class io/github/ketraterm/completion/host/TerminalDirectoryEntrySnapshot {
 	public fun <init> (Ljava/util/Collection;)V
 	public final fun getSize ()I

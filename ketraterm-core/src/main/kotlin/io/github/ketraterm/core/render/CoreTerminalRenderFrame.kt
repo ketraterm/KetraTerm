@@ -173,6 +173,12 @@ internal class CoreTerminalRenderFrame(
             )
         }
 
+    override val cursorPendingWrap: Boolean
+        get() {
+            checkValid()
+            return state.cursor.pendingWrap
+        }
+
     override fun copyCursor(sink: io.github.ketraterm.render.api.TerminalRenderCursorSink) {
         checkValid()
         val row = state.cursor.row + resolvedScrollbackOffset

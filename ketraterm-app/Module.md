@@ -25,9 +25,32 @@ a pane releases those UI resources; closing its workspace tab closes the session
 `KetraTermConfigManager` loads and replaces settings files.
 `KetraTermSettings` publishes saved immutable preferences to EDT consumers.
 `StandaloneCompletionRegistry` composes the completion modules for a window.
+Its local path and Git reference/remote sources use shared source-directory resolution.
+`StandaloneGitCompletionLoader` owns bounded Git process queries and request-linked
+cancellation, returning a `TerminalGitCompletionSnapshot`. The shared Git source
+owns mode selection, reference eligibility, matching, and refspec edits.
 
 ## Configuration
 
 The [configuration reference](docs/profile-config-toml.md) describes the persisted
 format. Settings are saved before publication to open panes; process launch
 options apply to new sessions.
+
+## Desktop suggestion scenarios
+
+`StandaloneSuggestionDesktopTest` covers editing/cancellation, live aliases, and
+directory context as independent real-shell scenarios. `StandaloneSuggestionShell`
+owns launch variants and prerequisite checks. `StandaloneSuggestionFixture` owns
+window/session lifetime, component input, event waits, and popup recording.
+Behavior assertions remain in the tests.
+
+Run `./gradlew :ketraterm-app:desktopTest` for all application window tests, or add
+`--tests '*StandaloneSuggestionDesktopTest'` for these scenarios alone. See the
+[shared test guide](../docs/development/testing.md) for environment tags, CI,
+required shell coverage, reports, and the WSL command.
+
+Direct shells check directory-only filtering, acceptance followed immediately by
+Enter, and completion in the resulting working directory. Guest filesystem sources
+are checked as unavailable under the documented [filesystem boundary](../docs/features/completion.md#sources-by-host).
+Popup renders are written to `build/test-artifacts/desktopTest/suggestions`. Component-driven
+input does not verify OS keyboard injection or packaged application installation.

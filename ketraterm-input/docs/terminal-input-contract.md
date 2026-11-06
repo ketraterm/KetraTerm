@@ -72,6 +72,11 @@ Backspace, and paste phases. Custom state implementations must return one
 coherent mode word. Interpret it with `TerminalInputState` helpers, not raw bit
 positions.
 
+A nonempty text replacement in bracketed-paste mode ends with an empty bracketed
+paste. This collapses Readline's active paste region at the insertion cursor
+without changing text or adding an undo step. Ordinary clipboard paste retains
+its normal highlighting. Deletion-only replacements emit no paste frames.
+
 This word includes cursor/keypad modes, newline mode, DECBKM, bracketed paste,
 focus reporting, mouse tracking/encoding, xterm key resources, and Kitty flags.
 A coherent mode read does not synchronize grid reads or terminal mutation.

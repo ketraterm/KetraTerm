@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
  * Shell-specific quoting policy for replacement text produced by completion
  * sources.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalShellQuotingPolicy {
     /**
      * Preserve only replacements that are safe without dialect-specific
@@ -44,6 +45,7 @@ public enum class TerminalShellQuotingPolicy {
  * operator semantics. Hosts should derive it from authoritative shell profile
  * metadata rather than terminal text or process output.
  */
+@ExperimentalTerminalCompletionApi
 public enum class TerminalShellSyntax {
     /**
      * Conservative whitespace-and-quote tokenization with no command operator
@@ -70,13 +72,28 @@ public enum class TerminalShellSyntax {
  *
  * @property syntax lexical rules used to resolve the cursor's command segment.
  * @property quoting replacement escaping policy used by candidate sources.
+ * @property backslashPathSeparator whether a decoded backslash separates path components.
+ * Defaults to true for PowerShell and false otherwise. Hosts must set it for
+ * their shell environment: Git Bash accepts Windows separators despite POSIX quoting.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalShellCapabilities
     @JvmOverloads
     constructor(
         val syntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
         val quoting: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.CONSERVATIVE,
+        val backslashPathSeparator: Boolean = syntax == TerminalShellSyntax.POWERSHELL,
     ) {
+        /**
+         * Converts decoded path separators to the host-provider convention of `/`.
+         * Literal backslashes are preserved when [backslashPathSeparator] is false.
+         * This performs no expansion, filesystem access, or shell unescaping.
+         *
+         * @param path decoded path text, after shell tokenization.
+         * @return path with canonical separators and unchanged filename characters.
+         */
+        public fun normalizePathSeparators(path: String): String = if (backslashPathSeparator) path.replace('\\', '/') else path
+
         public companion object {
             /** Conservative capabilities for unknown or unsupported shells. */
             @JvmField
@@ -113,9 +130,13 @@ public data class TerminalShellCapabilities
  * @property workingDirectoryUri optional current working directory URI.
  * @property profileId optional host profile id used by host-owned ranking data.
  * @property shellCapabilities resolved shell lexical and replacement policy.
+ * @property includeCommandNames whether executable-name positions are eligible. When false,
+ * engines return an empty snapshot at a command name, including after a shell operator.
+ * Subcommands, options, and positional arguments remain eligible.
  * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
  * or splits a UTF-16 surrogate pair.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalCompletionRequest
     @JvmOverloads
     constructor(
@@ -124,6 +145,7 @@ public data class TerminalCompletionRequest
         val workingDirectoryUri: String? = null,
         val profileId: String? = null,
         val shellCapabilities: TerminalShellCapabilities = PLAIN,
+        val includeCommandNames: Boolean = true,
     ) {
         init {
             require(cursorOffset in 0..commandLine.length) {

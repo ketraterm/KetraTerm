@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import java.nio.file.FileSystems
 import java.nio.file.Path
@@ -25,6 +26,7 @@ import java.nio.file.Path
  * @param homeDirectory explicit local home used for tilde expansion.
  * @param windows whether Windows drive and UNC syntax is accepted.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalCompletionPathResolver
     @JvmOverloads
     constructor(
@@ -34,12 +36,16 @@ public class TerminalCompletionPathResolver
         /**
          * Resolves [request] into a normalized absolute local directory.
          *
+         * Backslashes in canonical prefixes are literal filename characters;
+         * filesystems that interpret them as separators cannot represent these requests.
+         *
          * @param request lexical directory request produced by the completion engine.
          * @return local path, or `null` for malformed, remote, or unsupported input.
          */
         public fun resolve(request: TerminalDirectoryListingRequest): Path? {
             val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
             val prefix = request.directoryPrefix
+            if (workingDirectory.fileSystem.separator == "\\" && prefix.contains('\\')) return null
             return try {
                 val resolved =
                     when {

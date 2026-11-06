@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenIdentity
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
 import io.github.ketraterm.completion.model.TerminalCommandReplay
@@ -26,12 +27,12 @@ import java.util.*
 internal class LearnedHistoryCandidateIndex private constructor(
     private val buckets: Map<HistoryBucketKey, List<IndexedLearnedCommand>>,
 ) {
-    /** Returns rows whose exact host context, prior tokens, and active-token prefix match the request. */
+    /** Matches completed token semantics exactly, then the active decoded prefix ignoring case. */
     fun matching(
         requestLine: TerminalCommandLineContext,
         requestContext: CompletionLearningContextKey,
     ): List<IndexedLearnedCommand> {
-        val priorTokens = requestLine.tokens.subList(0, requestLine.activeTokenIndex).map { it.text.lowercase(Locale.ROOT) }
+        val priorTokens = requestLine.tokens.subList(0, requestLine.activeTokenIndex).map { it.identity }
         val key = HistoryBucketKey(requestContext, priorTokens)
         val bucket = buckets[key] ?: return emptyList()
         val prefix = requestLine.activePrefix.lowercase(Locale.ROOT)
@@ -66,10 +67,10 @@ internal class LearnedHistoryCandidateIndex private constructor(
                 if (!stats.hasSuccessfulExecution()) continue
                 val line = parsedRow.lineContext
                 val learningContext = CompletionLearningContextKey.of(stats.profileId, stats.workingDirectoryUri)
-                val normalizedTokens = line.tokens.map { it.text.lowercase(Locale.ROOT) }
+                val tokens = line.tokens.map { it.identity }
                 val indexedTokenCount = minOf(line.tokens.size, MAX_INDEXED_TOKEN_POSITIONS)
                 for (activeIndex in 0 until indexedTokenCount) {
-                    val key = HistoryBucketKey(learningContext, normalizedTokens.subList(0, activeIndex))
+                    val key = HistoryBucketKey(learningContext, tokens.subList(0, activeIndex))
                     mutableBuckets
                         .getOrPut(key, ::ArrayList)
                         .add(
@@ -77,7 +78,7 @@ internal class LearnedHistoryCandidateIndex private constructor(
                                 stats = stats,
                                 replay = parsedRow.replay,
                                 lineContext = line,
-                                normalizedActiveToken = normalizedTokens[activeIndex],
+                                normalizedActiveToken = tokens[activeIndex].text.lowercase(Locale.ROOT),
                                 snapshotRank = snapshotRank,
                             ),
                         )
@@ -97,7 +98,7 @@ internal class LearnedHistoryCandidateIndex private constructor(
 
 private data class HistoryBucketKey(
     val context: CompletionLearningContextKey,
-    val priorTokens: List<String>,
+    val priorTokens: List<TerminalCommandLineTokenIdentity>,
 )
 
 /** Pre-tokenized positive command row retained by [LearnedHistoryCandidateIndex]. */

@@ -17,12 +17,59 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IntellijGitCompletionSourceTest {
+    @Test
+    fun `remotes and references follow the active argument and selected remote`() =
+        runBlocking {
+            val source =
+                engine { _ ->
+                    snapshot().copy(
+                        localBranches = listOf(TerminalCompletionDomainValue("main"), TerminalCompletionDomainValue("local-only")),
+                        remoteBranches =
+                            listOf(
+                                TerminalCompletionDomainValue("origin/feature/one"),
+                                TerminalCompletionDomainValue("upstream/other"),
+                            ),
+                        remotes = listOf(TerminalCompletionDomainValue("origin"), TerminalCompletionDomainValue("upstream")),
+                        currentBranchName = "main",
+                    )
+                }
+            for (command in listOf("push", "pull", "fetch")) {
+                assertEquals(setOf("origin", "upstream"), source.complete(request("git $command ")).map { it.replacementText }.toSet())
+            }
+            assertEquals(
+                setOf("main", "local-only", "v1.0"),
+                source.complete(request("git push origin ")).map { it.replacementText }.toSet(),
+            )
+            assertEquals(listOf("local-only"), source.complete(request("git switch ")).map { it.replacementText })
+            for (command in listOf("fetch", "pull")) {
+                assertEquals(listOf("feature/one"), source.complete(request("git $command origin fe")).map { it.replacementText })
+                assertEquals(listOf("other"), source.complete(request("git $command upstream ")).map { it.replacementText })
+                assertTrue(source.complete(request("git $command unknown ")).isEmpty())
+            }
+        }
+
+    @Test
+    fun `path arguments after checkout and reset separators do not load references`() =
+        runBlocking {
+            var loads = 0
+            val source =
+                engine { _ ->
+                    loads++
+                    snapshot()
+                }
+            for (command in listOf("checkout", "checkout main", "reset", "reset HEAD")) {
+                assertTrue(source.complete(request("git $command -- feature/")).isEmpty())
+            }
+            assertEquals(0, loads)
+        }
+
     @Test
     fun `checkout loads one composite snapshot and exposes all reference groups`() =
         runBlocking {
@@ -40,8 +87,8 @@ class IntellijGitCompletionSourceTest {
             assertEquals(1, loads)
             assertEquals("file:///repo", requestedDirectory)
             assertEquals(
-                setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
-                candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
+                setOf("feature/local", "origin/feature", "v1.0"),
+                candidates.mapTo(HashSet(), TerminalCompletionCandidate::replacementText),
             )
         }
 
@@ -50,7 +97,7 @@ class IntellijGitCompletionSourceTest {
         runBlocking {
             val candidates = engine { _ -> snapshot() }.complete(request("git switch "))
 
-            assertEquals(listOf("intellij-git-branch"), candidates.map { it.source }.distinct())
+            assertEquals(listOf("intellij-git-reference"), candidates.map { it.source }.distinct())
             assertEquals(listOf("feature/local"), candidates.map { it.replacementText })
         }
 
@@ -61,8 +108,8 @@ class IntellijGitCompletionSourceTest {
                 val candidates = engine { _ -> snapshot() }.complete(request("git $subcommand "))
 
                 assertEquals(
-                    setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
-                    candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
+                    setOf("feature/local", "origin/feature", "v1.0"),
+                    candidates.mapTo(HashSet(), TerminalCompletionCandidate::replacementText),
                 )
             }
         }
@@ -93,19 +140,22 @@ class IntellijGitCompletionSourceTest {
             assertEquals(3, candidates.size)
         }
 
-    private fun engine(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionEngine =
+    private fun engine(loader: suspend (String?) -> TerminalGitCompletionSnapshot): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(
             sources =
                 listOf(
                     TerminalCompletionSourceEntry(
-                        source = intellijGitCompletionSource(loader),
+                        source =
+                            TerminalCompletionSources.git(
+                                "intellij-git-reference",
+                            ) { request, _ -> loader(request.workingDirectoryUri) },
                         priority = TerminalCompletionSourcePrior.GIT_REFERENCE,
                     ),
                 ),
         )
 
     private fun snapshot() =
-        IntellijGitCompletionSnapshot(
+        TerminalGitCompletionSnapshot(
             localBranches = listOf(TerminalCompletionDomainValue("feature/local", detail = "local branch")),
             remoteBranches = listOf(TerminalCompletionDomainValue("origin/feature", detail = "remote branch")),
             tags = listOf(TerminalCompletionDomainValue("v1.0", detail = "tag")),

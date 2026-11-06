@@ -40,6 +40,8 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.20")
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":ketraterm-shell-integration"))
+    testImplementation(project(":ketraterm-testkit"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }

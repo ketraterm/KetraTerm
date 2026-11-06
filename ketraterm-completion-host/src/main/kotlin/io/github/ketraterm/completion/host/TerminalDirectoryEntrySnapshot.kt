@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalFileEntry
 
 /**
@@ -22,6 +23,7 @@ import io.github.ketraterm.completion.api.TerminalFileEntry
  *
  * @param entries bounded direct entries captured by a scanner.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalDirectoryEntrySnapshot(
     entries: Collection<TerminalFileEntry>,
 ) {

@@ -51,14 +51,19 @@ internal class GradleTaskCompletionSource(
         }
 
         val prefix = context.activePrefix
-        val projectDirectory = projectDirectoryBeforeActiveToken(context)
+        val capabilities = request.shellCapabilities
+        val projectDirectory =
+            normalizeProjectDirectory(
+                context.precedingOptionValues(GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_LONG).lastOrNull(),
+                capabilities,
+            )
         val tasks = tasksProvider(request, context)
         if (tasks.isEmpty()) return emptyList()
 
         val candidates = BoundedCompletionCandidateCollector(limit)
         val emitted = HashSet<String>()
         for ((index, task) in tasks.withIndex()) {
-            val replacement = replacementFor(task, prefix, projectDirectory) ?: continue
+            val replacement = replacementFor(task, prefix, projectDirectory, capabilities) ?: continue
             if (prefix.isNotEmpty() && replacement.equals(prefix, ignoreCase = true)) continue
             val match = CompletionMatcher.match(replacement, prefix) ?: continue
             if (!emitted.add(replacement)) continue
@@ -102,39 +107,23 @@ internal class GradleTaskCompletionSource(
         task: TerminalGradleTask,
         prefix: String,
         projectDirectory: String?,
+        capabilities: TerminalShellCapabilities,
     ): String? =
         when {
-            projectDirectory != null ->
-                task.takeIf { normalizeProjectDirectory(it.projectDirectory) == projectDirectory }?.shortName
-
             prefix.startsWith(':') -> task.path
+            projectDirectory != null ->
+                task.takeIf { normalizeProjectDirectory(it.projectDirectory, capabilities) == projectDirectory }?.shortName
+
+            task.projectDirectory != null -> task.takeIf { normalizeProjectDirectory(it.projectDirectory, capabilities) == "." }?.shortName
             task.isRootProjectTask -> task.shortName
             else -> null
         }
 
-    private fun projectDirectoryBeforeActiveToken(context: TerminalCompletionContext): String? {
-        var selectedDirectory: String? = null
-        val tokens = context.commandLineContext.tokens
-        var index = context.commandTokenIndex + 1
-        while (index < context.commandLineContext.activeTokenIndex) {
-            val token = tokens[index].text
-            when {
-                token in GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES -> {
-                    val value = tokens.getOrNull(++index)?.text ?: return selectedDirectory
-                    selectedDirectory = normalizeProjectDirectory(value)
-                }
-
-                token.startsWith("${GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_LONG}=") -> {
-                    selectedDirectory = normalizeProjectDirectory(token.substringAfter('='))
-                }
-            }
-            index++
-        }
-        return selectedDirectory
-    }
-
-    private fun normalizeProjectDirectory(value: String?): String? {
-        var normalized = value?.replace('\\', '/') ?: return null
+    private fun normalizeProjectDirectory(
+        value: String?,
+        capabilities: TerminalShellCapabilities,
+    ): String? {
+        var normalized = capabilities.normalizePathSeparators(value ?: return null)
         while (normalized.startsWith("./")) normalized = normalized.removePrefix("./")
         if (normalized.length > 1) normalized = normalized.removeSuffix("/")
         return normalized.ifBlank { "." }

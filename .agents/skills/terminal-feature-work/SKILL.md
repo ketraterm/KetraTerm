@@ -18,6 +18,9 @@ in the canonical feature and gap maps.
 5. Implement the smallest complete slice without compatibility shims or fake
    degradation.
 6. Update the canonical feature/gap entry when support or scope changes.
+7. Check affected consumer instructions and release notes with the
+   [documentation skill](../terminal-documentation/SKILL.md). Update them for the
+   final behavior rather than recording the implementation sequence.
 
 For query/response behavior, follow the root security rule and update the owning
 allowlist. Do not copy capability status, TODO taxonomies, or module boundaries

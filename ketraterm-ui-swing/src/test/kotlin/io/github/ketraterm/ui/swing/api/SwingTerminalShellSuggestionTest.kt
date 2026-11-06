@@ -25,6 +25,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -35,6 +36,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.awt.Font
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
@@ -48,7 +51,122 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalShellSuggestionTest {
+    @Test
+    fun `automatic scope follows settings reload while explicit capture stays unrestricted`() {
+        var settings = SwingSettings.create { it.smartSuggestionsEnabled = true }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                fun capture(trigger: SwingShellSuggestionTrigger) =
+                    requireNotNull(
+                        terminal.beginShellSuggestionInteraction(
+                            request(),
+                            trigger,
+                            editTarget = SwingShellSuggestionEditTarget.NONE,
+                        ),
+                    )
+                val initial = capture(SwingShellSuggestionTrigger.AUTOMATIC)
+                assertTrue(initial.request.includeCommandNames)
+                settings = settings.copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY }
+                terminal.reloadSettings()
+                assertFalse(initial.isActive)
+                val parameters = capture(SwingShellSuggestionTrigger.AUTOMATIC)
+                assertFalse(parameters.request.includeCommandNames)
+                val explicit = capture(SwingShellSuggestionTrigger.EXPLICIT)
+                assertTrue(explicit.request.includeCommandNames)
+                settings = settings.copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.ALWAYS }
+                terminal.reloadSettings()
+                assertTrue(explicit.isActive)
+                assertNull(terminal.beginShellSuggestionInteraction(request(), SwingShellSuggestionTrigger.AUTOMATIC))
+                assertTrue(explicit.isActive)
+                explicit.close()
+                assertTrue(capture(SwingShellSuggestionTrigger.AUTOMATIC).request.includeCommandNames)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
     private val mutationDispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `font-only settings reload updates a mounted popup without replacing selection or rows`() {
+        var settings =
+            SwingSettings.create {
+                it.smartSuggestionsEnabled = true
+                it.font = Font(Font.MONOSPACED, Font.PLAIN, 13)
+            }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                val interaction =
+                    terminal.beginShellSuggestionInteraction(request(), editTarget = SwingShellSuggestionEditTarget.NONE)
+                        ?: error("Display capture failed")
+                terminal.presentShellSuggestions(interaction)
+                interaction.publish(suggestions(), selectedIndex = 1)
+                val publication = interaction.snapshot
+                val popup = terminal.components.filterIsInstance<SwingCompletionPopupView>().single()
+                val model = popup.list.model
+                assertEquals(settings.font, popup.list.font)
+                settings = settings.copy { it.font = it.font.deriveFont(26f) }
+
+                terminal.reloadSettings()
+
+                assertEquals(settings.font, popup.list.font)
+                assertSame(model, popup.list.model)
+                assertSame(publication, interaction.snapshot)
+                assertEquals(1, popup.list.selectedIndex)
+                assertTrue(interaction.isActive)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun `popup color settings apply initially and reload without replacing the interaction`() {
+        var settings =
+            SwingSettings.create {
+                it.smartSuggestionsEnabled = true
+                it.shellSuggestionStyle = SwingShellSuggestionStyle(background = 0xFF102030.toInt())
+            }
+        SwingUtilities.invokeAndWait {
+            val terminal = newTerminal(settingsProvider = { settings })
+            try {
+                val interaction =
+                    terminal.beginShellSuggestionInteraction(request(), editTarget = SwingShellSuggestionEditTarget.NONE)
+                        ?: error("Display capture failed")
+                terminal.presentShellSuggestions(interaction)
+                interaction.publish(suggestions(), selectedIndex = 1)
+                val publication = interaction.snapshot
+                val popup = terminal.components.filterIsInstance<SwingCompletionPopupView>().single()
+                assertEquals(0xFF102030.toInt(), popup.background.rgb)
+
+                settings =
+                    settings.copy {
+                        it.shellSuggestionStyle =
+                            SwingShellSuggestionStyle(
+                                background = 0xFF304050.toInt(),
+                                foreground = 0xFFABCDEF.toInt(),
+                                selectionBackground = 0xFF506070.toInt(),
+                            )
+                    }
+                terminal.reloadSettings()
+                assertEquals(settings.shellSuggestionStyle.background, popup.background.rgb)
+                assertEquals(settings.shellSuggestionStyle.foreground, popup.list.foreground.rgb)
+                assertEquals(settings.shellSuggestionStyle.selectionBackground, popup.list.selectionBackground.rgb)
+                assertSame(publication, interaction.snapshot)
+                assertTrue(interaction.isActive)
+                assertTrue(terminal.currentShellSuggestionState().visible)
+
+                settings = settings.copy { it.shellSuggestionStyle = SwingShellSuggestionStyle() }
+                terminal.reloadSettings()
+                assertEquals(SwingShellSuggestionStyle().foreground, popup.list.foreground.rgb)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
 
     private fun newTerminal(
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
@@ -481,6 +599,73 @@ class SwingTerminalShellSuggestionTest {
             assertTrue(component.currentShellSuggestionState().visible)
             assertEquals(2, component.currentShellSuggestionState().count)
             component.dispose()
+        }
+    }
+
+    @Test
+    fun `shift keeps popup selection and forwards key events until text is typed`() {
+        val encoders = ArrayList<RecordingInputEncoder>()
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(30, 4),
+                connector = RecordingConnector(),
+                inputEncoderFactory = { _, _, _ -> RecordingInputEncoder().also(encoders::add) },
+                workerDispatcher = mutationDispatcher,
+                ioDispatcher = mutationDispatcher,
+            )
+        SwingUtilities.invokeAndWait {
+            val component = newTerminal(settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } })
+            try {
+                session.start(columns = 30, rows = 4)
+                component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
+                component.size = component.preferredGridSize(12, 4)
+                component.showSuggestions(request(), suggestions(), selectedIndex = 1)
+                val selected = component.currentShellSuggestionState().selectedSuggestion
+                val invalidations = ArrayList<Boolean>()
+                component.addShellSuggestionInvalidationListener { invalidations += component.currentShellSuggestionState().visible }
+
+                val press =
+                    KeyEvent(
+                        component,
+                        KeyEvent.KEY_PRESSED,
+                        0L,
+                        InputEvent.SHIFT_DOWN_MASK,
+                        KeyEvent.VK_SHIFT,
+                        KeyEvent.CHAR_UNDEFINED,
+                        KeyEvent.KEY_LOCATION_LEFT,
+                    )
+                component.keyListeners.forEach { it.keyPressed(press) }
+                assertTrue(component.currentShellSuggestionState().visible)
+                val release =
+                    KeyEvent(
+                        component,
+                        KeyEvent.KEY_RELEASED,
+                        0L,
+                        0,
+                        KeyEvent.VK_SHIFT,
+                        KeyEvent.CHAR_UNDEFINED,
+                        KeyEvent.KEY_LOCATION_LEFT,
+                    )
+                component.keyListeners.forEach { it.keyReleased(release) }
+                mutationDispatcher.scheduler.runCurrent()
+
+                assertTrue(component.currentShellSuggestionState().visible)
+                assertEquals(selected, component.currentShellSuggestionState().selectedSuggestion)
+                assertTrue(invalidations.isEmpty())
+                val encodedKeys = encoders.flatMap { it.keys }
+                assertEquals(listOf(TerminalKey.LEFT_SHIFT, TerminalKey.LEFT_SHIFT), encodedKeys.map { it.key })
+                assertEquals(listOf(TerminalKeyEventType.PRESS, TerminalKeyEventType.RELEASE), encodedKeys.map { it.type })
+
+                val typed = KeyEvent(component, KeyEvent.KEY_TYPED, 0L, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_UNDEFINED, 'A')
+                component.keyListeners.forEach { it.keyTyped(typed) }
+                assertFalse(component.currentShellSuggestionState().visible)
+                assertEquals(listOf(false), invalidations)
+            } finally {
+                component.dispose()
+                session.close()
+                mutationDispatcher.scheduler.runCurrent()
+            }
         }
     }
 
@@ -1099,8 +1284,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(5, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("git status", session.pastes[0].text)
+        assertEquals(listOf("git status", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1118,8 +1302,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(2, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("$commandText b", session.pastes[0].text)
+        assertEquals(listOf("$commandText b", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1137,8 +1320,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(1, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
-        assertEquals(1, session.pastes.size)
-        assertEquals("$commandText test", session.pastes[0].text)
+        assertEquals(listOf("$commandText test", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1195,8 +1377,7 @@ class SwingTerminalShellSuggestionTest {
 
         assertEquals(1, session.keys.size)
         assertEquals(TerminalKey.BACKSPACE, session.keys[0].key)
-        assertEquals(1, session.pastes.size)
-        assertEquals("status", session.pastes[0].text)
+        assertEquals(listOf("status", ""), session.pastes.map { it.text })
     }
 
     @Test
@@ -1218,8 +1399,7 @@ class SwingTerminalShellSuggestionTest {
             listOf(TerminalKey.DELETE, TerminalKey.BACKSPACE, TerminalKey.BACKSPACE),
             session.keys.map { it.key },
         )
-        assertEquals(1, session.pastes.size)
-        assertEquals("checkout", session.pastes[0].text)
+        assertEquals(listOf("checkout", ""), session.pastes.map { it.text })
         assertEquals(
             TerminalTextReplacementEvent(
                 deleteAfterCursorCount = 1,

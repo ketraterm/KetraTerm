@@ -23,6 +23,8 @@ import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkActivation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import java.awt.Font
@@ -107,6 +109,7 @@ import java.util.*
  * @property cursorShape default cursor shape configured for the session.
  * @property lineHeight finite positive vertical line height scaling factor.
  * @property smartSuggestionsEnabled master switch for all shell suggestion requests and presentation.
+ * @property shellSuggestionAutomaticMode automatic popup scope; explicit requests ignore this setting.
  * @property shellSuggestionsEnabled whether hosts may request shell suggestion
  * popups automatically. Explicit requests require only [smartSuggestionsEnabled].
  * @property acceptSelectedSuggestionWithEnter whether an unmodified Enter key
@@ -301,9 +304,23 @@ public class SwingSettings private constructor(
      * Keyboard, menu, and programmatic clipboard paste continue using the ordinary clipboard.
      */
     public val middleClickPasteSource: SwingPasteSource = builder.middleClickPasteSource
+
+    @ExperimentalShellSuggestionsApi
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
+
+    @ExperimentalShellSuggestionsApi
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
+
+    /** Scope of automatic completion requests; explicit requests remain unrestricted. */
+    @ExperimentalShellSuggestionsApi
+    public val shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode = builder.shellSuggestionAutomaticMode
+
+    @ExperimentalShellSuggestionsApi
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
+
+    /** Colors for the built-in suggestion popup; custom views retain their own presentation policy. */
+    @ExperimentalShellSuggestionsApi
+    public val shellSuggestionStyle: SwingShellSuggestionStyle = builder.shellSuggestionStyle
 
     /**
      * Returns to live output when new rows enter history. Disabled by default so reading
@@ -522,13 +539,25 @@ public class SwingSettings private constructor(
         public var columnSpacing: Int = source?.columnSpacing ?: 0
 
         /** Draft value for [SwingSettings.smartSuggestionsEnabled]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var smartSuggestionsEnabled: Boolean = source?.smartSuggestionsEnabled ?: false
 
         /** Draft value for [SwingSettings.shellSuggestionsEnabled]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var shellSuggestionsEnabled: Boolean = source?.shellSuggestionsEnabled ?: true
 
+        /** Draft value for [SwingSettings.shellSuggestionAutomaticMode]. */
+        @ExperimentalShellSuggestionsApi
+        public var shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode =
+            source?.shellSuggestionAutomaticMode ?: SwingShellSuggestionAutomaticMode.ALWAYS
+
         /** Draft value for [SwingSettings.acceptSelectedSuggestionWithEnter]; validated when [build] is called. */
+        @ExperimentalShellSuggestionsApi
         public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
+
+        /** Draft value for [SwingSettings.shellSuggestionStyle]; defaults to the built-in dark palette. */
+        @ExperimentalShellSuggestionsApi
+        public var shellSuggestionStyle: SwingShellSuggestionStyle = source?.shellSuggestionStyle ?: SwingShellSuggestionStyle()
 
         /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */
         public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: false
@@ -598,7 +627,9 @@ public class SwingSettings private constructor(
             middleClickPasteSource == other.middleClickPasteSource &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
+            shellSuggestionAutomaticMode == other.shellSuggestionAutomaticMode &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
+            shellSuggestionStyle == other.shellSuggestionStyle &&
             scrollOnOutput == other.scrollOnOutput &&
             osc8HyperlinkPresentation == other.osc8HyperlinkPresentation &&
             osc8HyperlinkActivation == other.osc8HyperlinkActivation
@@ -657,7 +688,9 @@ public class SwingSettings private constructor(
         result = 31 * result + middleClickPasteSource.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
+        result = 31 * result + shellSuggestionAutomaticMode.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
+        result = 31 * result + shellSuggestionStyle.hashCode()
         result = 31 * result + scrollOnOutput.hashCode()
         result = 31 * result + osc8HyperlinkPresentation.hashCode()
         result = 31 * result + osc8HyperlinkActivation.hashCode()

@@ -90,6 +90,33 @@ class DefaultTerminalInputEncoderTest {
     }
 
     @Test
+    fun `bracketed text replacement collapses paste region without editing keys`() {
+        val inputState = RecordingInputState(TerminalModeBits.BRACKETED_PASTE)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(inputState, output)
+
+        encoder.encodeTextReplacement(TerminalTextReplacementEvent(1, 2, "'café directory/'"))
+
+        assertEquals(1, inputState.reads)
+        assertArrayEquals(
+            esc("[3~") + byteArrayOf(0x7f, 0x7f) +
+                esc("[200~") + "'café directory/'".encodeToByteArray() + esc("[201~") +
+                esc("[200~") + esc("[201~"),
+            output.bytes,
+        )
+    }
+
+    @Test
+    fun `deletion-only replacement does not open a paste region`() {
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(RecordingInputState(TerminalModeBits.BRACKETED_PASTE), output)
+
+        encoder.encodeTextReplacement(TerminalTextReplacementEvent(0, 1, ""))
+
+        assertArrayEquals(byteArrayOf(0x7f), output.bytes)
+    }
+
+    @Test
     fun `long text replacement coalesces deletion sequences into bounded writes`() {
         val inputState = RecordingInputState(0L)
         val output = RecordingHostOutput()

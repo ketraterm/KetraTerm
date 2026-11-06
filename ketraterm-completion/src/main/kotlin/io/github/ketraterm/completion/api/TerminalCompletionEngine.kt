@@ -20,11 +20,15 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Pure completion engine contract.
  *
+ * **Experimental:** suggestions may be incomplete, rank poorly, or behave unexpectedly in edge cases.
+ * This status applies to the engine, source and model contracts, learning, and host integrations.
+ *
  * Engines merge and rank one or more [TerminalCompletionSource] instances for a
  * host request. The engine owns no shell, UI, disk, or network infrastructure;
  * host-backed sources may perform bounded suspending work inside the request
  * scope.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionEngine {
     /**
      * Returns a cold progressive stream of best-first rankings for [request].
@@ -32,6 +36,8 @@ public fun interface TerminalCompletionEngine {
      * Each emission contains the globally reranked union of every source that
      * has completed so far. Implementations must not mutate terminal state or
      * perform UI work. Cancelling collection must cancel all source work.
+     * Implementations must honor [TerminalCompletionRequest.includeCommandNames] using the
+     * resolved command position before querying sources.
      *
      * @param request command-line completion context.
      * @return cold stream of ordered completion snapshots.

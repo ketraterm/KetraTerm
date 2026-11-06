@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeUnit
  * @param ioDispatcher dispatcher used only for blocking filesystem access.
  * @throws IllegalArgumentException if a capacity or the scan budget is not positive.
  */
+@ExperimentalTerminalCompletionApi
 public class TerminalBoundedDirectoryScanner
     internal constructor(
         private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,

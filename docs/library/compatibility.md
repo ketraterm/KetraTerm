@@ -85,6 +85,20 @@ ABI checks do not establish threading, lifecycle, coordinate, or protocol
 correctness. Those require semantic tests and the module contracts. Product
 release verification remains separate; see the [gap map](../terminal-feature-gap-map.md#product-and-release-work).
 
+### Experimental completion models
+
+The 0.x completion request, candidate, and specification models and the Swing
+suggestion models remain experimental. New data-class fields preserve existing
+Java constructor overloads but change Kotlin default-constructor and `copy`
+signatures. Recompile consumers of these experimental models when upgrading.
+Custom engines and providers must honor the request's `includeCommandNames` flag
+for parameter-only completion.
+
+The parameter-only request change deliberately refreshes only the retained
+`completion` client, with reviewed sources, ABI snapshots, artifacts, and provenance.
+Other baselines remain unchanged. These clients verify subsequent upgrades;
+they do not establish binary compatibility with earlier experimental models.
+
 ### Color-reset and change-report baseline decision
 
 The 0.x color-reset and mode 2031/2048 migration deliberately establishes a new

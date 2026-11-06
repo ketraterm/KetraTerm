@@ -20,9 +20,33 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
 /**
- * Factories for production completion engines.
+ * Factories for built-in completion engines.
+ *
+ * **Experimental:** follows the stability contract of [TerminalCompletionEngine].
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionEngines {
+    /** Creates an engine without native shell completion, preserving the original Kotlin default-argument ABI. */
+    @JvmStatic
+    @JvmOverloads
+    public fun fromSources(
+        sources: List<TerminalCompletionSourceEntry>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        learningStore: TerminalCompletionLearningStore? = null,
+        sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+    ): TerminalCompletionEngine = fromSources(sources, commandSpecs, learningStore, sourceFailureHandler, shellProvider = null)
+
+    /** Creates a localized engine without native shell completion; retains the original Kotlin default-argument ABI. */
+    @JvmStatic
+    @JvmOverloads
+    public fun fromSources(
+        messages: TerminalCompletionMessages,
+        sources: List<TerminalCompletionSourceEntry>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        learningStore: TerminalCompletionLearningStore? = null,
+        sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+    ): TerminalCompletionEngine = fromSources(messages, sources, commandSpecs, learningStore, sourceFailureHandler, shellProvider = null)
+
     /**
      * Creates a deterministic merged engine from prioritized completion sources.
      *
@@ -39,17 +63,18 @@ public object TerminalCompletionEngines {
      * @param learningStore optional shared in-memory learning store. The engine
      * reads its immutable published snapshot and performs no host I/O.
      * @param sourceFailureHandler diagnostic sink for non-cancellation source failures.
+     * @param shellProvider optional live authority for available commands and native argument completion.
      * @return merged completion engine.
      */
     @JvmStatic
-    @JvmOverloads
     public fun fromSources(
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,
         sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+        shellProvider: TerminalCompletionShellProvider?,
     ): TerminalCompletionEngine =
-        fromSources(TerminalCompletionMessages.forLocale(), sources, commandSpecs, learningStore, sourceFailureHandler)
+        fromSources(TerminalCompletionMessages.forLocale(), sources, commandSpecs, learningStore, sourceFailureHandler, shellProvider)
 
     /**
      * Creates a merged engine with localized learned and observed descriptions.
@@ -59,13 +84,13 @@ public object TerminalCompletionEngines {
      * All token, range, source identity, and ranking behavior follows [fromSources].
      */
     @JvmStatic
-    @JvmOverloads
     public fun fromSources(
         messages: TerminalCompletionMessages,
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,
         sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+        shellProvider: TerminalCompletionShellProvider?,
     ): TerminalCompletionEngine =
         MergedCompletionEngine(
             sources = sources,
@@ -73,5 +98,6 @@ public object TerminalCompletionEngines {
             learningStore = learningStore,
             sourceFailureHandler = sourceFailureHandler,
             messages = messages,
+            shellProvider = shellProvider,
         )
 }

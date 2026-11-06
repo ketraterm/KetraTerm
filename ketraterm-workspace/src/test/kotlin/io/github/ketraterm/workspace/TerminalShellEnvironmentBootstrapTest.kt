@@ -17,7 +17,6 @@ package io.github.ketraterm.workspace
 
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
-import java.util.*
 import kotlin.io.path.readText
 import kotlin.test.*
 
@@ -27,6 +26,29 @@ class TerminalShellEnvironmentBootstrapTest {
         val profile = profile().copy(shellEnvironment = TerminalShellEnvironment.Empty)
         assertSame(profile, TerminalShellEnvironmentBootstrap.applyInitial(profile))
         assertSame(profile, TerminalShellEnvironmentBootstrap.withMarkers(profile))
+    }
+
+    @Test
+    fun `explicit Windows path replaces inherited path without a selected toolchain`() {
+        val inherited = mapOf("Path" to "system", "KEEP" to "inherited")
+        val overrides = linkedMapOf("path" to "first", "PATH" to "selected")
+
+        val environment = TerminalShellEnvironmentBootstrap.inheritEnvironment(overrides, inherited, windows = true)
+
+        assertEquals(mapOf("Path" to "selected", "KEEP" to "inherited"), environment)
+        assertEquals(linkedMapOf("path" to "first", "PATH" to "selected"), overrides)
+    }
+
+    @Test
+    fun `POSIX profile overrides preserve distinct environment names`() {
+        val environment =
+            TerminalShellEnvironmentBootstrap.inheritEnvironment(
+                mapOf("PATH" to "selected"),
+                mapOf("PATH" to "system", "Path" to "distinct"),
+                windows = false,
+            )
+
+        assertEquals(mapOf("PATH" to "selected", "Path" to "distinct"), environment)
     }
 
     @Test
@@ -194,7 +216,7 @@ class TerminalShellEnvironmentBootstrapTest {
                     enabled = true,
                     scriptDirectory = directory,
                 ).profile
-        val script = String(Base64.getDecoder().decode(powerShell.command.last()), Charsets.UTF_16LE)
+        val script = decodePowerShellScript(powerShell.command.last())
         assertTrue(script.indexOf("_KetraTerm_FORCE_SET_") < script.indexOf("function global:prompt"))
         assertFalse(script.contains("/project/jdk"))
         val fish =

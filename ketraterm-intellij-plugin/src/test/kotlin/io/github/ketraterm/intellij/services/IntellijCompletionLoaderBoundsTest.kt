@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.completion.model.TerminalGitCompletionSnapshot
 import kotlinx.coroutines.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,6 +32,7 @@ class IntellijCompletionLoaderBoundsTest {
     fun `Git reference loader owns an input budget independent of popup results`() =
         runBlocking {
             val localBranches = CountingStringIterable(valueAt = { index -> "local-$index" })
+            val remotes = CountingStringIterable(valueAt = { index -> "remote-$index" })
             val loader =
                 IntellijGitCompletionLoader(
                     GitReferenceReadPort { _, collector ->
@@ -40,6 +42,7 @@ class IntellijCompletionLoaderBoundsTest {
                                 localBranchNames = localBranches,
                                 remoteBranchNames = emptyList(),
                                 tagNames = emptyList(),
+                                remoteNames = remotes,
                             ),
                         )
                     },
@@ -49,12 +52,14 @@ class IntellijCompletionLoaderBoundsTest {
 
             assertEquals(8_192, snapshot.localBranches.size)
             assertEquals(8_192, localBranches.nextCalls)
+            assertEquals(8_192, snapshot.remotes.size)
+            assertEquals(8_192, remotes.nextCalls)
         }
 
     @Test
     fun `Git reference loader stops discovery when its request is cancelled`() =
         runBlocking {
-            lateinit var loading: Deferred<IntellijGitCompletionSnapshot>
+            lateinit var loading: Deferred<TerminalGitCompletionSnapshot>
             val localBranches =
                 CountingStringIterable(
                     valueAt = { index -> "local-$index" },
@@ -209,7 +214,7 @@ class IntellijCompletionLoaderBoundsTest {
         runBlocking {
             val projectDirectory = temporaryFolder.newFolder("gradle-loader").toPath()
             val tasks = CountingGradleTaskNodes(projectDirectory.toString())
-            val root = TestGradleModelNode(moduleId = "root", children = tasks)
+            val root = TestGradleModelNode(projectDirectory = projectDirectory, moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
 
             val entries = loader.load(projectDirectory.toUri().toString())
@@ -230,7 +235,7 @@ class IntellijCompletionLoaderBoundsTest {
                         if (count == 4) loading.cancel(CancellationException("obsolete Gradle completion"))
                     },
                 )
-            val root = TestGradleModelNode(moduleId = "root", children = tasks)
+            val root = TestGradleModelNode(projectDirectory = projectDirectory, moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
             loading = async(start = CoroutineStart.LAZY) { loader.load(projectDirectory.toUri().toString()) }
 
@@ -307,6 +312,7 @@ class IntellijCompletionLoaderBoundsTest {
     }
 
     private data class TestGradleModelNode(
+        override val projectDirectory: java.nio.file.Path? = null,
         override val moduleId: String? = null,
         override val task: GradleTaskReadModel? = null,
         override val children: Iterable<GradleModelNode> = emptyList(),

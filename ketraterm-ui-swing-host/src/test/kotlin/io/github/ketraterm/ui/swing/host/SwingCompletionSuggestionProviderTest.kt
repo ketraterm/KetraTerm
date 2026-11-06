@@ -32,6 +32,20 @@ import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
     @Test
+    fun `command name eligibility reaches custom completion engines`() =
+        runBlocking {
+            val flags = ArrayList<Boolean>()
+            val provider =
+                SwingCompletionSuggestionProvider(engine = { request ->
+                    flags += request.includeCommandNames
+                    flowOf(emptyList())
+                })
+            provider.suggestions(SwingShellSuggestionRequest("git", 3, includeCommandNames = false)).last()
+            provider.suggestions(SwingShellSuggestionRequest("git", 3)).last()
+            assertEquals(listOf(false, true), flags)
+        }
+
+    @Test
     fun `opening captures context and feedback before deferred engine work`() =
         runBlocking {
             val initial = SwingCompletionContext(profileId = "bash", workingDirectoryUri = "file:///first")
@@ -82,6 +96,7 @@ class SwingCompletionSuggestionProviderTest {
                                     "custom-source",
                                     TerminalCompletionCandidateKind.SUBCOMMAND,
                                     feedbackToken = token,
+                                    argumentHint = "<message>",
                                 ),
                             ),
                         )
@@ -90,6 +105,7 @@ class SwingCompletionSuggestionProviderTest {
                 )
             val suggestion = provider.suggestions(request("git s", 5)).last().single()
             assertSame(token, suggestion.feedbackToken)
+            assertEquals("<message>", suggestion.argumentHint)
             assertSame(context, suggestion.interactionContext)
         }
 
@@ -191,6 +207,44 @@ class SwingCompletionSuggestionProviderTest {
             assertEquals("Built-in", suggestions.single().sourceDisplayText)
             assertSame(requestContext, suggestions.single().interactionContext)
             assertContentEquals(intArrayOf(0, 2), suggestions.single().matchedRanges.copyPackedOffsets())
+        }
+
+    @Test
+    fun `path presentation carries the captured separator policy without rewriting labels or matches`() =
+        runBlocking {
+            val path = "dir/foo\\bar"
+            val offsets = intArrayOf(4, 7)
+            for (capabilities in listOf(
+                TerminalShellCapabilities.POSIX,
+                TerminalShellCapabilities.POSIX.copy(backslashPathSeparator = true),
+                TerminalShellCapabilities.POWERSHELL,
+            )) {
+                val provider =
+                    SwingCompletionSuggestionProvider(
+                        engine = {
+                            flowOf(
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        path,
+                                        4,
+                                        7,
+                                        "path",
+                                        TerminalCompletionCandidateKind.PATH,
+                                        matchedRanges = TerminalCompletionMatchRanges.fromPackedOffsets(path, offsets),
+                                    ),
+                                ),
+                            )
+                        },
+                        contextProvider = { SwingCompletionContext(shellCapabilities = capabilities) },
+                    )
+
+                val suggestion = provider.suggestions(request("cat foo", 7)).last().single()
+
+                assertEquals(capabilities.backslashPathSeparator, suggestion.backslashPathSeparator)
+                assertEquals(path, suggestion.displayText)
+                assertEquals(path, suggestion.replacementText)
+                assertContentEquals(offsets, suggestion.matchedRanges.copyPackedOffsets())
+            }
         }
 
     @Test

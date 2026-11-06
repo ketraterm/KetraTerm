@@ -23,6 +23,26 @@ import org.junit.jupiter.params.provider.EnumSource
 import javax.swing.SwingUtilities
 
 class SwingShellSuggestionInteractionTest {
+    @Test
+    fun `late equivalent edit retains selection and accepts the latest candidate`() =
+        onEdt {
+            val handler = RecordingHandler(SwingShellSuggestionAcceptanceResult.ACCEPTED)
+            val feedback = ArrayList<SwingShellSuggestionFeedback>()
+            val request = SwingShellSuggestionRequest("git st", 6)
+            val interaction = SwingShellSuggestionInteraction(request, handler, { feedback += it })
+            val history = suggestion("git status").copy(replacementStartOffset = 0, replacementEndOffset = 6)
+            val live = suggestion("status").copy(replacementStartOffset = 4, replacementEndOffset = 6, feedbackToken = Any())
+            interaction.publish(listOf(history), selectedIndex = 0)
+            val obsolete = interaction.snapshot
+            interaction.publish(listOf(live.copy(replacementText = "stash"), live))
+            assertEquals(1, interaction.snapshot.selectedIndex)
+            assertSame(live, interaction.snapshot.selectedSuggestion)
+            assertEquals(SwingShellSuggestionAcceptanceResult.STALE_CONTEXT, interaction.tryAccept(obsolete, 0))
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, interaction.tryAccept(interaction.snapshot, 1))
+            assertSame(live, feedback.single().suggestion)
+            assertEquals(1, handler.attempts)
+        }
+
     @ParameterizedTest
     @EnumSource(SwingShellSuggestionAcceptanceResult::class)
     fun `detached acceptance reports the actual result exactly once`(result: SwingShellSuggestionAcceptanceResult) =

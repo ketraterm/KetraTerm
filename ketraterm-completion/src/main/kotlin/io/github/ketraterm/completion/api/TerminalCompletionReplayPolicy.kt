@@ -26,6 +26,7 @@ import java.util.*
  * in-memory replay index or a persistence file. Approval is not proof that a
  * command contains no credential or other sensitive value.
  */
+@ExperimentalTerminalCompletionApi
 public object TerminalCompletionReplayPolicy {
     /**
      * Returns whether [command] may be retained as plaintext replay data.

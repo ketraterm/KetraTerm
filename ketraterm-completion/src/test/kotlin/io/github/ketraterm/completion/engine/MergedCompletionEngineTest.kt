@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.testing.shellProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -27,6 +28,141 @@ import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 class MergedCompletionEngineTest {
+    @Test
+    fun `parameter only requests reject command positions before source or native completion`() =
+        runTest {
+            var queries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, _, _ ->
+                                queries++
+                                emptyList()
+                            }),
+                        ),
+                    shellProvider =
+                        shellProvider { _, _, _ ->
+                            queries++
+                            emptyList()
+                        },
+                )
+            for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for (line in listOf("", "gi", "git | ca", "git && ca")) {
+                    val request = TerminalCompletionRequest(line, line.length, shellCapabilities = shell, includeCommandNames = false)
+                    assertEquals(listOf(emptyList()), engine.completions(request).toList(), line)
+                }
+            }
+            assertEquals(0, queries)
+        }
+
+    @Test
+    fun `parameter only requests keep subcommands options and arguments while defaults keep commands`() =
+        runTest {
+            var queries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry({ _, context, _ ->
+                                queries++
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        "candidate",
+                                        context.replacementStartOffset,
+                                        context.replacementEndOffset,
+                                        "custom",
+                                        TerminalCompletionCandidateKind.ARGUMENT,
+                                    ),
+                                )
+                            }),
+                        ),
+                )
+            for (line in listOf("git ", "git sw", "git --v", "cat fi")) {
+                val request = TerminalCompletionRequest(line, line.length, includeCommandNames = false)
+                assertTrue(
+                    engine
+                        .completions(request)
+                        .toList()
+                        .last()
+                        .isNotEmpty(),
+                    line,
+                )
+            }
+            assertEquals(4, queries)
+            assertTrue(
+                engine
+                    .completions(TerminalCompletionRequest("gi", 2))
+                    .toList()
+                    .last()
+                    .isNotEmpty(),
+            )
+            assertEquals(5, queries)
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `late empty source does not clear or republish useful results`() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry({ _, _, _ -> listOf(candidate("useful", source = "fast")) }, priority = 0),
+                        entry({ _, _, _ ->
+                            release.await()
+                            emptyList()
+                        }, priority = 0),
+                    ),
+                    commandSpecs = emptyList(),
+                )
+            val emissions = mutableListOf<List<TerminalCompletionCandidate>>()
+            val collection = launch { engine.completions(request()).toList(emissions) }
+            runCurrent()
+            assertEquals(listOf("useful"), emissions.single().map { it.replacementText })
+            release.complete(Unit)
+            collection.join()
+            assertEquals(1, emissions.size)
+        }
+
+    @Test
+    fun `no-op host candidates do not suppress useful native argument fallback`() =
+        runTest {
+            var nativeQueries = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        TerminalCompletionSourceEntry({ _, context, _ ->
+                            listOf(
+                                TerminalCompletionCandidate(
+                                    "main",
+                                    context.replacementStartOffset,
+                                    context.replacementEndOffset,
+                                    "host",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
+                            )
+                        }),
+                    ),
+                    shellProvider =
+                        shellProvider { _, context, _ ->
+                            nativeQueries++
+                            listOf(
+                                TerminalCompletionCandidate(
+                                    "main-next",
+                                    context.replacementStartOffset,
+                                    context.replacementEndOffset,
+                                    "shell",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
+                            )
+                        },
+                )
+            val result = engine.complete(TerminalCompletionRequest("git switch main", 15))
+            assertEquals(listOf("main-next"), result.map { it.replacementText })
+            assertEquals(1, nativeQueries)
+        }
+
     @Test
     fun `option values do not activate positional providers but retain explicit path completion`() =
         runBlocking {
@@ -520,6 +656,7 @@ class MergedCompletionEngineTest {
                         entry(source(candidate("status", source = "spec", score = 900)), priority = 0),
                         entry(source(candidate("switch", source = "learned", score = 1)), priority = 100),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -537,6 +674,7 @@ class MergedCompletionEngineTest {
                         entry(source(candidate("status", detail = "static", source = "spec", score = 900)), priority = 0),
                         entry(source(candidate("status", detail = "recent", source = "learned", score = 1)), priority = 100),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -580,6 +718,7 @@ class MergedCompletionEngineTest {
                         ),
                         entry(source(candidate("bravo", score = 20)), priority = 0),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())
@@ -721,6 +860,7 @@ class MergedCompletionEngineTest {
             val engine =
                 TerminalCompletionEngines.fromSources(
                     listOf(entry({ _, _, _ -> candidates }, priority = 0)),
+                    commandSpecs = emptyList(),
                 )
 
             val actual = engine.complete(request())
@@ -751,6 +891,7 @@ class MergedCompletionEngineTest {
                             priority = 0,
                         ),
                     ),
+                    commandSpecs = emptyList(),
                 )
 
             val candidates = engine.complete(request())

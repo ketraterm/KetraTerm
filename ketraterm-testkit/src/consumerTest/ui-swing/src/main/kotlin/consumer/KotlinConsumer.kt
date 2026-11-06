@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:OptIn(io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class)
+
 package consumer
 
 import consumer.documentation.createTerminalView
@@ -42,8 +44,11 @@ import io.github.ketraterm.ui.swing.settings.SwingSearchMatchStyle
 import io.github.ketraterm.ui.swing.settings.SwingSelectionStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
@@ -81,6 +86,15 @@ fun main() =
                 it.copyOnSelection = true
                 it.middleClickPaste = true
                 it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
+                it.shellSuggestionStyle =
+                    SwingShellSuggestionStyle(
+                        background = 0xFF202124.toInt(),
+                        foreground = 0xFFE8EAED.toInt(),
+                        matchForeground = 0xFF82AFFC.toInt(),
+                        selectionMatchForeground = 0xFFBBDDFF.toInt(),
+                        argumentHintForeground = 0xFFABCDEF.toInt(),
+                        selectionArgumentHintForeground = 0xFFFEDCBA.toInt(),
+                    )
                 it.columnSpacing = -1
                 it.selectionStyle = SwingSelectionStyle(background = 0x804B6EAF.toInt(), foreground = 0xFFFFFFFF.toInt())
                 it.inactiveSelectionStyle = SwingSelectionStyle(reverseVideo = true)
@@ -103,6 +117,21 @@ fun main() =
         check(interactionSettings == interactionSettings.copy {})
         check(interactionSettings.minimumContrastRatio == 4.5 && interactionSettings.faintOpacity == 0.75)
         check(SwingSettings().minimumContrastRatio == 3.0)
+        check(interactionSettings.copy {}.shellSuggestionStyle.matchForeground == 0xFF82AFFC.toInt())
+        check(interactionSettings.copy {}.shellSuggestionStyle.argumentHintForeground == 0xFFABCDEF.toInt())
+        check(interactionSettings.copy {}.shellSuggestionStyle.selectionArgumentHintForeground == 0xFFFEDCBA.toInt())
+        val hinted =
+            io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion(
+                "switch",
+                4,
+                6,
+                "spec",
+                "SUBCOMMAND",
+                argumentHint = "<branch>",
+                backslashPathSeparator = false,
+            )
+        check(hinted.copy().argumentHint == "<branch>" && hinted.replacementText == "switch")
+        check(!hinted.copy().backslashPathSeparator)
         check(interactionSettings.copy { it.resetSelectionStyle() } != interactionSettings)
         check(interactionSettings.inactiveSelectionStyle?.reverseVideo == true)
         check(interactionSettings.selectionBackground == interactionSettings.selectionStyle.background)
@@ -122,6 +151,13 @@ fun main() =
         check(promptColors.shellIntegrationPromptDividerHoverColor == 0xFF4B6EAF.toInt())
         check(promptColors.copy { it.shellIntegrationPromptDividerColor = null }.shellIntegrationPromptDividerColor == null)
         check(promptColors.copy { it.shellIntegrationPromptDotHoverHaloColor = 0 }.shellIntegrationPromptDotHoverHaloColor == 0)
+        val parameterSettings =
+            interactionSettings.copy {
+                it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+            }
+        check(parameterSettings != interactionSettings)
+        check(parameterSettings.toBuilder().build().shellSuggestionAutomaticMode == parameterSettings.shellSuggestionAutomaticMode)
+        check(!SwingShellSuggestionRequest("git", 3, includeCommandNames = false).includeCommandNames)
         check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)
         val arrowSettings = interactionSettings.copy { it.alternateScreenWheelToArrowEnabled = true }
@@ -210,7 +246,7 @@ fun main() =
                     documentedView.dispose()
                 }
                 val provider = SwingShellSuggestionProvider { flowOf(emptyList()) }
-                val componentFirst = createUnboundTerminalView(provider)
+                val componentFirst = createUnboundTerminalView().apply { setShellSuggestionProvider(provider) }
                 try {
                     check(componentFirst.hasShellSuggestionProvider)
                     componentFirst.bind(session)

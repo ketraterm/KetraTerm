@@ -39,7 +39,7 @@ class TerminalCompletionLearningStoreReplayFilterTest {
         assertEquals(1, stats.failureCount)
         assertEquals(1, stats.acceptedCount)
         assertEquals(1, stats.dismissedCount)
-        assertEquals(4L, stats.lastUsedEpochMillis)
+        assertEquals(3L, stats.lastUsedEpochMillis)
         assertTrue(snapshot.replayCommands.isEmpty())
         assertFalse("git status" in snapshot.toString())
         assertSame(snapshot, store.snapshot())

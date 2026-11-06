@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.spec.findCommandSpec
 
 internal data class AttachedOptionValue(
     val option: TerminalOptionSpec,
@@ -33,17 +34,20 @@ internal object TerminalCompletionContextResolver {
         cursorOffset: Int,
         commandSpecs: List<TerminalCommandSpec>,
         shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+        commandAliases: Map<String, String> = emptyMap(),
     ): TerminalCompletionContext =
         resolve(
             commandLine = commandLine,
             lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellSyntax),
             commandSpecs = commandSpecs,
+            commandAliases = if (shellSyntax == TerminalShellSyntax.POSIX) commandAliases else emptyMap(),
         )
 
     fun resolve(
         commandLine: String,
         lineContext: TerminalCommandLineContext,
         commandSpecs: List<TerminalCommandSpec>,
+        commandAliases: Map<String, String> = emptyMap(),
     ): TerminalCompletionContext {
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) {
             return TerminalCompletionContext(
@@ -64,10 +68,11 @@ internal object TerminalCompletionContextResolver {
             )
         }
 
-        val commandToken = lineContext.tokens.getOrNull(commandTokenIndex)
+        val semanticLine = expandCommandAlias(commandLine, lineContext, commandTokenIndex, commandAliases)
+        val commandToken = semanticLine?.tokens?.getOrNull(commandTokenIndex)
         val root =
             commandToken
-                ?.let { findSpec(commandSpecs, normalizeTerminalCommandToken(it.text)) }
+                ?.let { findCommandSpec(commandSpecs, normalizeTerminalCommandToken(it.text)) }
         if (root == null) {
             return TerminalCompletionContext(
                 commandLineContext = lineContext,
@@ -84,9 +89,9 @@ internal object TerminalCompletionContextResolver {
 
         val analysis =
             analyzeCommandTokens(
-                tokens = lineContext.tokens,
+                tokens = semanticLine.tokens,
                 startIndex = commandTokenIndex + 1,
-                endIndexExclusive = lineContext.activeTokenIndex,
+                endIndexExclusive = semanticLine.activeTokenIndex,
                 rootSpec = root,
             )
         val optionsTerminated = analysis.optionsTerminated
@@ -101,7 +106,9 @@ internal object TerminalCompletionContextResolver {
             attachedOptionValue?.option ?: if (optionsTerminated) null else analysis.pendingOptionValue
         val activePositionalArgument =
             if (activeOption == null) {
-                commandPath.last().positionalArgumentAt(analysis.positionalArguments.size)
+                val command = commandPath.last()
+                command.positionalArgumentAfterDoubleDash?.takeIf { optionsTerminated }
+                    ?: command.positionalArgumentAt(analysis.positionalArguments.size)
             } else {
                 null
             }
@@ -117,12 +124,24 @@ internal object TerminalCompletionContextResolver {
                 lastCommand = lastCommand,
                 subcommandCandidateSource = subcommandCandidateSource,
             )
-        val expectedPathKind = determineExpectedPathKind(activeOption, activePositionalArgument, lastCommand)
-        val expectedValueDomain = determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
+        val completingOptionName = activePosition == TerminalCompletionActivePosition.OPTION_NAME
+        val expectedPathKind =
+            if (completingOptionName) {
+                TerminalPathArgumentKind.NONE
+            } else {
+                determineExpectedPathKind(activeOption, activePositionalArgument, lastCommand)
+            }
+        val expectedValueDomain =
+            if (completingOptionName) {
+                TerminalCompletionValueDomain.NONE
+            } else {
+                determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
+            }
         val expectedHiddenPathPolicy = determineExpectedHiddenPathPolicy(activeOption, activePositionalArgument, lastCommand)
+        val gitCompletion = resolveGitCompletion(analysis, activePosition, expectedValueDomain, semanticLine)
 
         return TerminalCompletionContext(
-            commandLineContext = lineContext,
+            commandLineContext = semanticLine,
             commandTokenIndex = commandTokenIndex,
             command = root,
             commandPath = commandPath,
@@ -131,15 +150,28 @@ internal object TerminalCompletionContextResolver {
             activePositionalArgument = activePositionalArgument,
             usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
             optionsTerminated = optionsTerminated,
-            expectedPathKind = expectedPathKind,
+            expectedPathKind =
+                when (gitCompletion?.target) {
+                    GitCompletionTarget.NONE -> TerminalPathArgumentKind.NONE
+                    GitCompletionTarget.REMOTES -> TerminalPathArgumentKind.DIRECTORY
+                    else -> expectedPathKind
+                },
             expectedHiddenPathPolicy = expectedHiddenPathPolicy,
-            expectedValueDomain = expectedValueDomain,
+            expectedValueDomain =
+                when (gitCompletion?.target) {
+                    GitCompletionTarget.NONE -> TerminalCompletionValueDomain.NONE
+                    GitCompletionTarget.REMOTES -> TerminalCompletionValueDomain.GIT_REMOTE
+                    else -> expectedValueDomain
+                },
             subcommandCandidateSource = subcommandCandidateSource,
             staticValueCandidates = activeOption?.valueCandidates ?: activePositionalArgument?.valueCandidates ?: emptyList(),
             activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
             attachedOptionValue = attachedOptionValue,
-            optionValuesBeforeCursor = analysis.optionValues,
+            optionsBeforeCursor = analysis.options,
             precedingPositionalArguments = analysis.positionalArguments,
+            gitCompletion = gitCompletion,
+            hasUnrecognizedOptions = analysis.hasUnrecognizedOptions,
+            originalActiveTokenIndex = lineContext.activeTokenIndex,
         )
     }
 
@@ -225,15 +257,6 @@ internal object TerminalCompletionContextResolver {
             quote = if (quote == SINGLE_QUOTE || quote == DOUBLE_QUOTE) quote else NO_QUOTE,
         )
     }
-
-    private fun findSpec(
-        specs: List<TerminalCommandSpec>,
-        normalizedToken: String,
-    ): TerminalCommandSpec? =
-        specs.firstOrNull { spec ->
-            normalizeTerminalCommandToken(spec.name) == normalizedToken ||
-                spec.aliases.any { normalizeTerminalCommandToken(it) == normalizedToken }
-        }
 
     private fun activeTokenQuote(
         commandLine: String,

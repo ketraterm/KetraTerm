@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.toNioPathOrNull
@@ -31,7 +32,6 @@ import com.intellij.util.indexing.FindSymbolParameters
 import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -41,8 +41,8 @@ import java.nio.file.Path
  * Queries IntelliJ's Go to File engine for bounded fuzzy paths.
  *
  * IntelliJ owns project discovery, fuzzy matching, path qualification, and result
- * ordering. This adapter only converts PSI items into shell-facing paths relative
- * to the terminal working directory. Shared completion still owns hidden-file
+ * ordering. This adapter requires a matching target name and converts PSI items
+ * into shell-facing paths relative to the terminal working directory. Shared completion still owns hidden-file
  * policy, replacement ranges, and shell quoting.
  *
  * @property project project whose Go to File provider is queried.
@@ -56,10 +56,11 @@ internal class IntellijProjectFileLoader(
      * Returns IntelliJ-ranked project paths matching [prefix].
      *
      * @param workingDirectoryUri local `file` URI used to relativize project entries.
-     * @param prefix decoded active terminal path token.
+     * @param prefix decoded active terminal path token with separators normalized to `/`;
+     * literal filename backslashes remain unchanged.
      * @return ready project paths within this loader's independent query and
-     * visit budgets, or an empty list for disposed projects and unsupported
-     * working-directory URIs.
+     * visit budgets, or an empty list for disposed projects, unsupported
+     * working-directory URIs, and directories outside this project's content roots.
      */
     suspend fun load(
         workingDirectoryUri: String?,
@@ -68,16 +69,26 @@ internal class IntellijProjectFileLoader(
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
-        val normalizedPrefix = prefix.replace('\\', '/')
-        if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
+        if (prefix.substringAfterLast('/').isEmpty()) return emptyList()
+        // IntelliJ's VFS excludes literal backslash names even on POSIX. The
+        // ordinary filesystem source handles them without changing the query.
+        if ('\\' in prefix) return emptyList()
         val workingDirectory =
-            TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
-                ?: project.guessProjectDir()?.toNioPath()
-                ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+            resolveIntellijCompletionWorkingDirectory(workingDirectoryUri) {
+                project.guessProjectDir()?.toNioPath()
+                    ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+            }
                 ?: return emptyList()
         return readAction {
             ProgressManager.checkCanceled()
             if (project.isDisposed) return@readAction emptyList()
+            val rootManager = ProjectRootManager.getInstance(project)
+            val roots =
+                rootManager.contentRoots.mapNotNull { it.toNioPathOrNull() }.ifEmpty {
+                    listOfNotNull(project.basePath?.let { Path.of(it) })
+                }
+            if (findContainingCompletionRoot(workingDirectory, roots) { it } == null) return@readAction emptyList()
+            val pathMatcher = IntellijCompletionPathMatcher(prefix)
             val model = GotoFileModel(project)
             try {
                 val itemProvider = model.getItemProvider(null)
@@ -88,7 +99,7 @@ internal class IntellijProjectFileLoader(
                 val paths = HashSet<String>(initialCapacity)
                 var visited = 0
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
-                val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
+                val parameters = FindSymbolParameters.wrap(prefix, GlobalSearchScope.projectScope(project))
                 itemProvider.filterElementsWithWeights(
                     viewModel,
                     parameters,
@@ -99,10 +110,17 @@ internal class IntellijProjectFileLoader(
                         if (visited == MAX_VISITED_ENTRIES) return@Processor false
                         visited++
                         val file = (descriptor.item as? PsiFileSystemItem)?.virtualFile ?: return@Processor true
+                        if (!pathMatcher.matchesName(file.name)) return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
                         if (paths.add(path)) {
-                            results.add(TerminalFuzzyPathEntry(path, file.isDirectory))
+                            results.add(
+                                TerminalFuzzyPathEntry(
+                                    path,
+                                    file.isDirectory,
+                                    matchedRanges = pathMatcher.ranges(path),
+                                ),
+                            )
                         }
                         results.size < MAX_QUERY_RESULTS
                     },
@@ -151,6 +169,6 @@ internal fun intellijProjectFileCompletionSource(loader: suspend (String?, Strin
         messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-project-file",
         entriesProvider = { request, context ->
-            loader(request.workingDirectoryUri, context.activePrefix)
+            loader(request.workingDirectoryUri, request.shellCapabilities.normalizePathSeparators(context.activePrefix))
         },
     )

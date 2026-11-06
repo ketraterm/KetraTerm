@@ -27,6 +27,7 @@ import java.util.*
  * implementations must be thread-safe because requests may run concurrently.
  * Provider-owned descriptions and canonical insertion tokens are unchanged.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalCompletionMessages {
     /** Returns [key], formatting its complete pattern with [arguments] when supplied. */
     public fun message(

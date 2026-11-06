@@ -19,17 +19,21 @@ package io.github.ketraterm.completion.api
  * One imported Gradle task returned by a host completion loader.
  *
  * [path] is the canonical Gradle task path, including its leading colon. Hosts
- * may provide [projectDirectory] relative to the terminal working directory so
- * the shared source can scope `-p` and `--project-dir` task completion without
- * accessing the filesystem.
+ * provide [projectDirectory] so the shared source can select short task names
+ * without accessing the filesystem. Hosts resolve directory aliases and build
+ * ownership; for the selected project they preserve the completed `-p` or
+ * `--project-dir` spelling, or use `.` when no override was supplied.
+ * Fully qualified task paths remain available throughout the selected build.
  *
  * @property path canonical Gradle task path, such as `:app:run`.
  * @property description optional task documentation from the imported Gradle model.
- * @property projectDirectory optional normalized project directory relative to
- * the terminal working directory; the root project is represented by `.`.
+ * @property projectDirectory optional directory-selector spelling for this task's project;
+ * `.` identifies the current project without an override. Other projects may use paths
+ * relative to the terminal directory. When absent, only root tasks receive short names.
  * @throws IllegalArgumentException if [path] is not a canonical non-root Gradle
  * task path or [projectDirectory] is present but blank.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalGradleTask
     @JvmOverloads
     constructor(

@@ -16,17 +16,21 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
-import java.awt.BorderLayout
-import java.awt.Component
-import java.awt.Dimension
+import io.github.ketraterm.ui.swing.render.SwingColors
+import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
+import java.awt.*
 import java.awt.event.*
+import java.awt.geom.RoundRectangle2D
+import java.beans.PropertyChangeListener
 import java.util.regex.Pattern
 import javax.swing.*
+import kotlin.math.roundToInt
 
 /** Standard Swing list presentation; the controller retains selection and acceptance ownership. */
 internal class SwingCompletionPopupView(
     private val listener: SwingShellSuggestionViewListener,
     private val messages: SwingTerminalMessages = SwingTerminalMessages.forLocale(),
+    initialStyle: SwingShellSuggestionStyle = SwingShellSuggestionStyle(),
 ) : JPanel(BorderLayout()),
     SwingShellSuggestionView {
     override val component: JComponent get() = this
@@ -34,9 +38,12 @@ internal class SwingCompletionPopupView(
     private var updating = false
     private var closed = false
     internal val list = JList<SwingShellSuggestion>()
-    private val renderer = CompletionRenderer(messages)
+    private val renderer = CompletionRenderer(messages, initialStyle)
     private val scrollPane = JScrollPane(list)
     private val position = JLabel()
+    private var contentScale = 1f
+    private val fontListener = PropertyChangeListener { event -> (event.newValue as? Font)?.let(::applyTypography) }
+    private var borderColor = Color(initialStyle.border, true)
     private val selectionListener =
         javax.swing.event.ListSelectionListener {
             if (!updating && !closed && !it.valueIsAdjusting && list.selectedIndex >= 0) {
@@ -65,7 +72,13 @@ internal class SwingCompletionPopupView(
 
     init {
         isFocusable = false
+        isOpaque = false
+        border = BorderFactory.createEmptyBorder(6, 6, 6, 6)
         list.isFocusable = false
+        list.font = list.font.deriveFont(Font.PLAIN)
+        list.background = background
+        scrollPane.border = BorderFactory.createEmptyBorder()
+        scrollPane.viewport.background = background
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.cellRenderer = renderer
         list.visibleRowCount = maximumVisibleSuggestions
@@ -85,8 +98,65 @@ internal class SwingCompletionPopupView(
             },
         )
         position.border = BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        position.font = list.font.deriveFont((list.font.size2D - 1f).coerceAtLeast(10f))
         add(scrollPane, BorderLayout.CENTER)
         add(position, BorderLayout.SOUTH)
+        addPropertyChangeListener("font", fontListener)
+        applyTypography(list.font)
+        applyStyle(initialStyle)
+    }
+
+    private fun applyTypography(font: Font) {
+        contentScale = (font.size2D / COMPLETION_DESIGN_FONT_SIZE).coerceAtLeast(1f / COMPLETION_DESIGN_FONT_SIZE)
+        list.font = font
+        position.font = font.deriveFont(font.size2D * 12f / COMPLETION_DESIGN_FONT_SIZE)
+        val outerInset = (6 * contentScale).roundToInt()
+        val footerInset = (2 * contentScale).roundToInt()
+        border = BorderFactory.createEmptyBorder(outerInset, outerInset, outerInset, outerInset)
+        position.border = BorderFactory.createEmptyBorder(footerInset, outerInset, footerInset, outerInset)
+        renderer.applyScale(contentScale)
+        revalidate()
+        repaint()
+    }
+
+    /**
+     * Applies built-in colors without changing candidates, selection, or request lifetime.
+     *
+     * @param style complete immutable palette; each color is applied exactly.
+     * @throws IllegalStateException if called outside the EDT.
+     */
+    fun applyStyle(style: SwingShellSuggestionStyle) {
+        check(SwingUtilities.isEventDispatchThread()) { "completion style must update on the EDT" }
+        background = Color(style.background, true)
+        foreground = Color(style.foreground, true)
+        list.background = background
+        list.foreground = foreground
+        list.selectionBackground = Color(style.selectionBackground, true)
+        list.selectionForeground = Color(style.selectionForeground, true)
+        scrollPane.background = background
+        scrollPane.viewport.background = background
+        position.foreground = Color(style.secondaryForeground, true)
+        borderColor = Color(style.border, true)
+        renderer.style = style
+        repaint()
+    }
+
+    override fun paintComponent(graphics: Graphics) {
+        val canvas = graphics.create() as Graphics2D
+        try {
+            canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            canvas.color = background
+            val arc = (12 * contentScale).roundToInt()
+            canvas.fillRoundRect(0, 0, width, height, arc, arc)
+            canvas.color = borderColor
+            // Keep the entire centered stroke inside the component, including at fractional display scales.
+            canvas.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
+            canvas.stroke = BasicStroke(contentScale)
+            val inset = contentScale / 2f
+            canvas.draw(RoundRectangle2D.Float(inset, inset, width - contentScale, height - contentScale, arc.toFloat(), arc.toFloat()))
+        } finally {
+            canvas.dispose()
+        }
     }
 
     override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
@@ -123,7 +193,9 @@ internal class SwingCompletionPopupView(
         if (snapshot.visibleSuggestions.isEmpty()) {
             Dimension(0, 0)
         } else {
-            super.getPreferredSize().apply { width = width.coerceIn(320, 640) }
+            super.getPreferredSize().apply {
+                width = width.coerceIn((260 * contentScale).roundToInt(), (480 * contentScale).roundToInt())
+            }
         }
 
     override fun doLayout() {
@@ -146,6 +218,7 @@ internal class SwingCompletionPopupView(
         check(SwingUtilities.isEventDispatchThread()) { "completion view must close on the EDT" }
         if (closed) return
         closed = true
+        removePropertyChangeListener("font", fontListener)
         list.removeListSelectionListener(selectionListener)
         list.removeMouseListener(pointerHandler)
         list.removeMouseMotionListener(pointerHandler)
@@ -160,10 +233,14 @@ internal class SwingCompletionPopupView(
 
 private class CompletionRenderer(
     private val messages: SwingTerminalMessages,
+    var style: SwingShellSuggestionStyle,
 ) : DefaultListCellRenderer() {
     private var suggestions = emptyList<SwingShellSuggestion>()
     private var rows = emptyArray<CompletionRow>()
-    private val rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+    private var rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+    private var icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it, COMPLETION_ICON_SIZE) }
+    private var cornerArc = 8
+    private var selected = false
     private val fallbackAccessibleName = messages.message("completion.suggestionAccessibleName")
     private val roles =
         Array(SwingShellSuggestionAccentRole.entries.size) {
@@ -175,6 +252,16 @@ private class CompletionRenderer(
                 SwingShellSuggestionAccentRole.OTHER -> messages.message("completion.role.other")
             }
         }
+
+    fun applyScale(scale: Float) {
+        val horizontalInset = (6 * scale).roundToInt()
+        val verticalInset = (4 * scale).roundToInt()
+        rowBorder = BorderFactory.createEmptyBorder(verticalInset, horizontalInset, verticalInset, horizontalInset)
+        iconTextGap = (8 * scale).roundToInt()
+        cornerArc = (8 * scale).roundToInt()
+        val iconSize = (COMPLETION_ICON_SIZE * scale).roundToInt().coerceAtLeast(1)
+        icons = SwingShellSuggestionAccentRole.entries.map { CompletionIcon(it, iconSize) }
+    }
 
     fun update(suggestions: List<SwingShellSuggestion>) {
         val preparedRows = Array(suggestions.size) { presentation(suggestions[it]) }
@@ -192,15 +279,14 @@ private class CompletionRenderer(
         super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus)
         val suggestion = value as? SwingShellSuggestion ?: return this
         val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
-        text = row.html
-        icon =
-            UIManager.getIcon(
-                when (suggestion.accentRole) {
-                    SwingShellSuggestionAccentRole.PATH -> "FileView.directoryIcon"
-                    SwingShellSuggestionAccentRole.COMMAND -> "FileView.computerIcon"
-                    else -> "Tree.leafIcon"
-                },
-            )
+        val metrics = getFontMetrics(font.deriveFont(Font.BOLD))
+        val availableWidth =
+            (list?.width?.takeIf { it > 0 } ?: (480f * font.size2D / COMPLETION_DESIGN_FONT_SIZE).roundToInt()) -
+                rowBorder.getBorderInsets(this).let { it.left + it.right } - icons[suggestion.accentRole.ordinal].iconWidth - iconTextGap
+        text = row.html(style, isSelected, availableWidth.coerceAtLeast(1), metrics)
+        selected = isSelected
+        isOpaque = false
+        icon = icons[suggestion.accentRole.ordinal]
         border = rowBorder
         toolTipText = row.tooltip
         getAccessibleContext().accessibleName = row.accessibleName
@@ -208,32 +294,36 @@ private class CompletionRenderer(
         return this
     }
 
+    override fun paintComponent(graphics: Graphics) {
+        if (selected) {
+            val canvas = graphics.create() as Graphics2D
+            try {
+                canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                canvas.color = background
+                canvas.fillRoundRect(0, 0, width, height, cornerArc, cornerArc)
+            } finally {
+                canvas.dispose()
+            }
+        }
+        super.paintComponent(graphics)
+    }
+
     private fun presentation(suggestion: SwingShellSuggestion): CompletionRow {
-        val primary = displayText(suggestion.displayText, 4096)
+        val primaryLimit = 4096
+        val primary = displayText(suggestion.displayText, primaryLimit)
+        val matches =
+            if (suggestion.displayText.length > primaryLimit) {
+                suggestion.matchedRanges.truncatedTo(suggestion.displayText, primary.length - 1)
+            } else {
+                suggestion.matchedRanges
+            }
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
-        val html =
-            buildString {
-                append("<html>")
-                var offset = 0
-                for (range in 0 until suggestion.matchedRanges.rangeCount) {
-                    val start = suggestion.matchedRanges.startOffset(range)
-                    if (start >= primary.length) break
-                    val end = suggestion.matchedRanges.endOffset(range).coerceAtMost(primary.length)
-                    append(escapeHtml(primary.substring(offset, start)))
-                    append("<b>").append(escapeHtml(primary.substring(start, end))).append("</b>")
-                    offset = end
-                }
-                append(escapeHtml(primary.substring(offset)))
-                if (detail.isNotEmpty()) append(" &nbsp; ").append(escapeHtml(detail))
-                append(" &nbsp; <small>").append(escapeHtml(source)).append("</small></html>")
-            }
-        val tooltip =
-            if (detail.isEmpty()) {
-                messages.message("completion.row.tooltipWithoutDetail", displayText(primary, 1024), source)
-            } else {
-                messages.message("completion.row.tooltip", displayText(primary, 1024), detail, source)
-            }
+        val hint = displayText(suggestion.argumentHint, 512)
+        val separators = if (suggestion.backslashPathSeparator) charArrayOf('/', '\\') else charArrayOf('/')
+        val nameEnd = primary.trimEnd(*separators).length
+        val nameStart = primary.lastIndexOfAny(separators, nameEnd - 1) + 1
+        val pathNameStart = nameStart.takeIf { suggestion.kind == "PATH" && it > 0 && nameEnd > it }
         val role = roles[suggestion.accentRole.ordinal]
         val accessibleDescription =
             if (detail.isEmpty()) {
@@ -242,20 +332,296 @@ private class CompletionRenderer(
                 messages.message("completion.row.description", detail, source, role)
             }
         return CompletionRow(
-            html = html,
-            tooltip = "<html>" + escapeHtml(tooltip) + "</html>",
-            accessibleName = primary.ifEmpty { fallbackAccessibleName },
+            primary = primary,
+            matches = matches,
+            hint = hint,
+            pathNameStart = pathNameStart,
+            tooltip =
+                when {
+                    pathNameStart != null ->
+                        "<html>" + escapeHtml(primary) +
+                            (if (detail.isEmpty()) "" else "<br>" + escapeHtml(detail)) + "</html>"
+                    detail.isNotEmpty() -> "<html>" + escapeHtml(detail) + "</html>"
+                    else -> null
+                },
+            accessibleName = (primary + if (hint.isEmpty()) "" else " $hint").ifEmpty { fallbackAccessibleName },
             accessibleDescription = accessibleDescription,
         )
     }
 }
 
+/** Distinct shapes and contrast-aware accents identify categories without relying on color alone. */
+private class CompletionIcon(
+    private val role: SwingShellSuggestionAccentRole,
+    private val size: Int,
+) : Icon {
+    override fun getIconWidth(): Int = size
+
+    override fun getIconHeight(): Int = size
+
+    override fun paintIcon(
+        component: Component,
+        graphics: Graphics,
+        x: Int,
+        y: Int,
+    ) {
+        val canvas = graphics.create() as Graphics2D
+        try {
+            canvas.translate(x, y)
+            val scale = size.toDouble() / COMPLETION_ICON_SIZE
+            canvas.scale(scale, scale)
+            canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val light = LIGHT_SURFACE_COLORS[role.ordinal]
+            val dark = DARK_SURFACE_COLORS[role.ordinal]
+            val background = component.background.rgb
+            val accent =
+                if (SwingColors.contrastRatio(light.rgb, background) >=
+                    SwingColors.contrastRatio(dark.rgb, background)
+                ) {
+                    light
+                } else {
+                    dark
+                }
+            canvas.color = if (SwingColors.contrastRatio(accent.rgb, background) >= 3.0) accent else component.foreground
+            canvas.stroke = STROKE
+            when (role) {
+                SwingShellSuggestionAccentRole.COMMAND -> {
+                    val composite = canvas.composite
+                    canvas.composite = TINT
+                    canvas.fillRoundRect(1, 2, 13, 11, 3, 3)
+                    canvas.composite = composite
+                    canvas.drawRoundRect(1, 2, 13, 11, 3, 3)
+                    canvas.drawLine(4, 5, 6, 7)
+                    canvas.drawLine(6, 7, 4, 9)
+                    canvas.drawLine(8, 10, 11, 10)
+                }
+                SwingShellSuggestionAccentRole.PATH -> {
+                    val composite = canvas.composite
+                    canvas.composite = TINT
+                    canvas.fillRoundRect(1, 6, 13, 7, 2, 2)
+                    canvas.composite = composite
+                    canvas.drawLine(1, 4, 6, 4)
+                    canvas.drawLine(6, 4, 8, 6)
+                    canvas.drawLine(8, 6, 14, 6)
+                    canvas.drawLine(14, 6, 14, 13)
+                    canvas.drawLine(14, 13, 1, 13)
+                    canvas.drawLine(1, 13, 1, 4)
+                }
+                SwingShellSuggestionAccentRole.HISTORY -> {
+                    canvas.drawArc(2, 2, 12, 12, 135, -300)
+                    canvas.drawLine(1, 2, 1, 6)
+                    canvas.drawLine(1, 6, 5, 6)
+                    canvas.drawLine(8, 5, 8, 8)
+                    canvas.drawLine(8, 8, 11, 9)
+                }
+                SwingShellSuggestionAccentRole.OPTION -> {
+                    canvas.drawLine(2, 5, 5, 5)
+                    canvas.drawOval(5, 3, 4, 4)
+                    canvas.drawLine(9, 5, 14, 5)
+                    canvas.drawLine(2, 11, 8, 11)
+                    canvas.drawOval(8, 9, 4, 4)
+                    canvas.drawLine(12, 11, 14, 11)
+                }
+                SwingShellSuggestionAccentRole.OTHER -> {
+                    canvas.drawLine(2, 3, 8, 3)
+                    canvas.drawLine(8, 3, 14, 9)
+                    canvas.drawLine(14, 9, 9, 14)
+                    canvas.drawLine(9, 14, 2, 7)
+                    canvas.drawLine(2, 7, 2, 3)
+                    canvas.fillOval(4, 5, 2, 2)
+                }
+            }
+        } finally {
+            canvas.dispose()
+        }
+    }
+
+    private companion object {
+        val STROKE = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        val TINT: AlphaComposite = AlphaComposite.SrcOver.derive(0.14f)
+        val LIGHT_SURFACE_COLORS = arrayOf(Color(0x2E62AE), Color(0x8A6200), Color(0x7549AF), Color(0x18796E), Color(0x526479))
+        val DARK_SURFACE_COLORS = arrayOf(Color(0x82AFFC), Color(0xE6B95A), Color(0xBD9AF7), Color(0x6FCFC0), Color(0xAEBBCF))
+    }
+}
+
 private class CompletionRow(
-    val html: String,
-    val tooltip: String,
+    private val primary: String,
+    private val matches: SwingShellSuggestionMatchRanges,
+    private val hint: String,
+    private val pathNameStart: Int?,
+    val tooltip: String?,
     val accessibleName: String,
     val accessibleDescription: String,
-)
+) {
+    private val matchColors = IntArray(2)
+    private val hintColors = IntArray(2)
+    private val parentColors = IntArray(2)
+    private val matchBackgrounds = IntArray(2)
+    private val coloredHtml = arrayOfNulls<String>(2)
+    private var layoutWidth = -1
+    private var layoutFont: Font? = null
+    private var labelHtml = ""
+
+    /**
+     * Colors prepared match spans without reprocessing provider text or matching again.
+     * Selected and ordinary markup have separate cache entries; theme changes replace them.
+     *
+     * @param style immutable popup palette.
+     * @param selected whether this markup is for the selected row.
+     * @param width available label width after the icon and row insets.
+     * @param metrics conservative bold metrics used to fit highlighted path text.
+     * @return escaped label markup, retaining the ordinary foreground outside matched spans.
+     */
+    fun html(
+        style: SwingShellSuggestionStyle,
+        selected: Boolean,
+        width: Int,
+        metrics: FontMetrics,
+    ): String {
+        val matchColor = if (selected) style.selectionMatchForeground else style.matchForeground
+        val matchBackground = if (selected) style.selectionMatchBackground else style.matchBackground
+        val hintColor = if (selected) style.selectionArgumentHintForeground else style.argumentHintForeground
+        val parentColor = if (selected) style.selectionForeground else style.secondaryForeground
+        if (labelHtml.isEmpty() || (pathNameStart != null && (layoutWidth != width || layoutFont != metrics.font))) {
+            labelHtml =
+                buildString {
+                    append("<html>")
+                    if (pathNameStart == null) {
+                        appendMatched(primary, matches, 0, primary.length)
+                    } else {
+                        val parentEnd =
+                            when (pathNameStart) {
+                                1 -> 1
+                                3 -> if (primary[1] == ':') 3 else 2
+                                else -> pathNameStart - 1
+                            }
+                        val gap = metrics.stringWidth("  ")
+                        val parentReserve = minOf(metrics.stringWidth(primary.substring(0, parentEnd)), width / 4)
+                        val nameWidth = appendElided(primary, matches, pathNameStart, primary.length, width - parentReserve - gap, metrics)
+                        val parentWidth = width - nameWidth - gap
+                        if (parentWidth >= metrics.stringWidth("\u2026")) {
+                            append("&nbsp;&nbsp;<span class=\"parent\">")
+                            appendElided(primary, matches, 0, parentEnd, parentWidth, metrics)
+                            append("</span>")
+                        }
+                    }
+                    if (hint.isNotEmpty()) append("&nbsp;&nbsp;<span>").append(escapeHtml(hint)).append("</span>")
+                    append("</html>")
+                }
+            layoutWidth = width
+            layoutFont = metrics.font
+            coloredHtml.fill(null)
+        }
+        val index = if (selected) 1 else 0
+        val cached = coloredHtml[index]
+        if (cached != null &&
+            matchColors[index] == matchColor &&
+            matchBackgrounds[index] == matchBackground &&
+            hintColors[index] == hintColor &&
+            parentColors[index] == parentColor
+        ) {
+            return cached
+        }
+        val css =
+            buildString {
+                append("color:").append(matchColor.toHtmlColor())
+                append(";background-color:").append(matchBackground.toHtmlColor())
+            }
+        val colored =
+            labelHtml
+                .replace("<b>", "<b style=\"$css\">")
+                .replace("<span>", "<span style=\"color:${hintColor.toHtmlColor()}\">")
+                .replace("<span class=\"parent\">", "<span style=\"color:${parentColor.toHtmlColor()}\">")
+        hintColors[index] = hintColor
+        parentColors[index] = parentColor
+        matchColors[index] = matchColor
+        matchBackgrounds[index] = matchBackground
+        coloredHtml[index] = colored
+        return colored
+    }
+}
+
+/** Emits slices of the original label, so moving or shortening paths never changes match offsets. */
+private fun StringBuilder.appendMatched(
+    text: String,
+    matches: SwingShellSuggestionMatchRanges,
+    start: Int,
+    end: Int,
+) {
+    var offset = start
+    for (range in 0 until matches.rangeCount) {
+        val from = maxOf(start, matches.startOffset(range))
+        val until = minOf(end, matches.endOffset(range))
+        if (from >= until) continue
+        append(escapeHtml(text.substring(offset, from)))
+        append("<b>").append(escapeHtml(text.substring(from, until))).append("</b>")
+        offset = until
+    }
+    append(escapeHtml(text.substring(offset, end)))
+}
+
+/** Fits path text at grapheme boundaries, preserving matched islands whenever they fit. */
+private fun StringBuilder.appendElided(
+    text: String,
+    matches: SwingShellSuggestionMatchRanges,
+    start: Int,
+    end: Int,
+    width: Int,
+    metrics: FontMetrics,
+): Int {
+    val fullWidth = metrics.stringWidth(text.substring(start, end))
+    if (fullWidth <= width) {
+        appendMatched(text, matches, start, end)
+        return fullWidth
+    }
+    val boundaries = ArrayList<Int>()
+    boundaries.add(start)
+    val matcher = GRAPHEME.matcher(text).region(start, end)
+    while (matcher.find()) boundaries.add(matcher.end())
+    val count = boundaries.lastIndex
+    val ellipsisWidth = metrics.stringWidth("\u2026")
+    var range = 0
+    val matchedClusters =
+        BooleanArray(count) { cluster ->
+            while (range < matches.rangeCount && matches.endOffset(range) <= boundaries[cluster]) range++
+            range < matches.rangeCount && matches.startOffset(range) < boundaries[cluster + 1]
+        }
+    var preserveMatches = true
+
+    fun visible(
+        cluster: Int,
+        kept: Int,
+    ): Boolean = cluster < (kept + 1) / 2 || cluster >= count - kept / 2 || (preserveMatches && matchedClusters[cluster])
+
+    fun measured(kept: Int): Int {
+        var result = 0
+        var cluster = 0
+        while (cluster < count) {
+            val from = cluster
+            val shown = visible(cluster, kept)
+            while (cluster < count && visible(cluster, kept) == shown) cluster++
+            result += if (shown) metrics.stringWidth(text.substring(boundaries[from], boundaries[cluster])) else ellipsisWidth
+        }
+        return result
+    }
+    if (measured(0) > width) preserveMatches = false
+    var low = 0
+    var high = count
+    while (low < high) {
+        val middle = (low + high + 1) / 2
+        if (measured(middle) <= width) low = middle else high = middle - 1
+    }
+    var cluster = 0
+    while (cluster < count) {
+        val from = cluster
+        val shown = visible(cluster, low)
+        while (cluster < count && visible(cluster, low) == shown) cluster++
+        if (shown) appendMatched(text, matches, boundaries[from], boundaries[cluster]) else append('\u2026')
+    }
+    return measured(low)
+}
+
+private fun Int.toHtmlColor(): String = "#" + (this and 0xFFFFFF).toString(16).padStart(6, '0')
 
 /** Bound hostile provider text without splitting an extended grapheme or exposing display controls. */
 private fun displayText(
@@ -297,3 +663,5 @@ private fun escapeHtml(text: String): String =
         .replace("\"", "&quot;")
 
 private val GRAPHEME = Pattern.compile("\\X")
+private const val COMPLETION_DESIGN_FONT_SIZE = 13f
+private const val COMPLETION_ICON_SIZE = 16

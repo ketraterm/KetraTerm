@@ -17,9 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -39,6 +37,156 @@ import javax.swing.SwingUtilities
 
 class IntellijCompletionRegistryTest {
     @Test
+    fun `live shell authority filters catalog commands through the IntelliJ provider`() =
+        runBlocking {
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val native =
+                    context().copy(
+                        shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                        shellProvider =
+                            TerminalCompletionShellProvider { request, _, _ ->
+                                TerminalCompletionShellResult(
+                                    if (request.commandLine == "dock") {
+                                        listOf(
+                                            TerminalCompletionCandidate(
+                                                "docker",
+                                                0,
+                                                4,
+                                                "powershell",
+                                                TerminalCompletionCandidateKind.COMMAND,
+                                            ),
+                                        )
+                                    } else {
+                                        emptyList()
+                                    },
+                                )
+                            },
+                    )
+                val provider = registry.createProvider(native)
+                assertEquals(listOf("docker"), provider.suggestions(request("dock")).last().map { it.replacementText })
+                assertTrue(provider.suggestions(request("car")).last().isEmpty())
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
+    fun `Git directory changes select the same environment for every host source`() =
+        runBlocking {
+            val originalDirectory = Path.of("completion-workspace").toAbsolutePath().normalize()
+            val selectedDirectory = originalDirectory.resolve("other repo")
+            val selectedUri = selectedDirectory.toUri().toString()
+            val referenceDirectories = mutableListOf<String?>()
+            val commitDirectories = mutableListOf<String?>()
+            val statusDirectories = mutableListOf<String?>()
+            val projectDirectories = mutableListOf<String?>()
+            val scannedDirectories = mutableListOf<Path>()
+            val sources =
+                listOf(
+                    TerminalCompletionSources.git("intellij-git-reference") { request, _ ->
+                        referenceDirectories += request.workingDirectoryUri
+                        TerminalGitCompletionSnapshot(
+                            listOf(TerminalCompletionDomainValue("feature/selected")),
+                            emptyList(),
+                            emptyList(),
+                        )
+                    },
+                    intellijGitCommitCompletionSource { uri ->
+                        commitDirectories += uri
+                        listOf(TerminalCompletionDomainValue("abc123"))
+                    },
+                    intellijGitStatusPathCompletionSource { uri, _ ->
+                        statusDirectories += uri
+                        listOf(TerminalFuzzyPathEntry("Changed.kt", false))
+                    },
+                    intellijProjectFileCompletionSource { uri, _ ->
+                        projectDirectories += uri
+                        listOf(TerminalFuzzyPathEntry("Changed.kt", false))
+                    },
+                )
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val provider =
+                    registry.createProvider(
+                        context(
+                            additionalSources = sources.map { TerminalCompletionSourceEntry(it) },
+                            workingDirectoryUriProvider = { originalDirectory.toUri().toString() },
+                            scanner =
+                                TerminalDirectoryScanner { directory, _ ->
+                                    scannedDirectories.add(directory)
+                                    listOf(TerminalFileEntry("Changed.kt", false))
+                                },
+                        ),
+                    )
+                for ((line, expected) in listOf(
+                    "git -C 'other repo' switch fe" to "feature/selected",
+                    "git -C 'other repo' cherry-pick ab" to "abc123",
+                    "git -C 'other repo' add Cha" to "Changed.kt",
+                )) {
+                    assertTrue(provider.suggestions(request(line)).last().any { it.replacementText == expected })
+                }
+
+                assertEquals(listOf(selectedUri), referenceDirectories)
+                assertEquals(listOf(selectedUri), commitDirectories)
+                assertEquals(listOf(selectedUri), statusDirectories)
+                assertEquals(listOf(selectedUri), projectDirectories)
+                assertEquals(listOf(selectedDirectory), scannedDirectories)
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
+    fun `explicit remote environments never invoke local host sources`() =
+        runBlocking {
+            var loads = 0
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                val provider =
+                    registry.createProvider(
+                        context(
+                            additionalSources =
+                                listOf(
+                                    TerminalCompletionSourceEntry(
+                                        { _, _, _ ->
+                                            loads++
+                                            emptyList()
+                                        },
+                                    ),
+                                ),
+                            workingDirectoryUriProvider = { "file://remote.example/repo" },
+                            scanner =
+                                TerminalDirectoryScanner { _, _ ->
+                                    loads++
+                                    emptyList()
+                                },
+                        ),
+                    )
+
+                assertTrue(provider.suggestions(request("git add Cha")).last().isEmpty())
+                assertEquals(0, loads)
+            } finally {
+                registry.closeAndFlush()
+            }
+        }
+
+    @Test
     fun `reset removes shared completion learning`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
@@ -51,7 +199,7 @@ class IntellijCompletionRegistryTest {
                     coroutineScope = this,
                 )
 
-            registry.resetLearning()
+            registry.resetLearning().await()
 
             assertTrue(learningStore.snapshot().rankingStats.isEmpty())
             assertTrue(learningStore.snapshot().replayCommands.isEmpty())
@@ -92,7 +240,7 @@ class IntellijCompletionRegistryTest {
             var loads = 0
             val source =
                 TerminalCompletionSources.valueDomain(
-                    sourceId = "intellij-git-branch",
+                    sourceId = "intellij-git-reference",
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     valuesProvider = { _, _ ->
                         loads++
@@ -109,7 +257,7 @@ class IntellijCompletionRegistryTest {
                 registry.createProvider(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
             val suggestions = resources.suggestions(request("git switch m")).last()
-            assertEquals("Git", suggestions.first { it.source == "intellij-git-branch" }.sourceDisplayText)
+            assertEquals("Git", suggestions.first { it.source == "intellij-git-reference" }.sourceDisplayText)
 
             assertEquals(1, loads)
             registry.closeAndFlush()
@@ -256,6 +404,60 @@ class IntellijCompletionRegistryTest {
 
             assertEquals(listOf("git status"), learningStore.snapshot().replayCommands.map { it.commandLine })
             assertEquals(listOf("git status"), persistedSnapshot(path).replayCommands.map { it.commandLine })
+        }
+
+    @Test
+    fun `reset clears saved and session learning while persistence is disabled`() =
+        runBlocking {
+            val path = memoryOnlyPath()
+            val seedLearning = TerminalCompletionLearningStore()
+            val seed =
+                IntellijCompletionRegistry(
+                    learningStore = seedLearning,
+                    persistencePath = path,
+                    persistenceEnabled = true,
+                    coroutineScope = this,
+                )
+            seed.recordFinishedCommand(
+                profileId = "bash",
+                metadata =
+                    TerminalShellIntegrationCommandMetadata(
+                        recordId = 1,
+                        commandText = "git status",
+                        lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                        workingDirectoryUri = null,
+                        exitCode = 0,
+                        startedAtEpochMillis = 1L,
+                        finishedAtEpochMillis = 2L,
+                    ),
+            )
+            seed.closeAndFlush()
+            assertFalse(persistedSnapshot(path).replayCommands.isEmpty())
+
+            val learning =
+                TerminalCompletionLearningStore().apply {
+                    recordCommandResult("npm test", true, null, null, 2L)
+                }
+            val registry =
+                IntellijCompletionRegistry(
+                    learningStore = learning,
+                    persistencePath = path,
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            try {
+                registry.resetLearning().await()
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
+                registry.setPersistenceEnabled(true)
+            } finally {
+                registry.closeAndFlush()
+            }
+            assertThrows(IllegalStateException::class.java) {
+                val unexpectedReset = registry.resetLearning()
+                unexpectedReset.cancel()
+            }
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(path))
         }
 
     private suspend fun persistedSnapshot(path: Path) =

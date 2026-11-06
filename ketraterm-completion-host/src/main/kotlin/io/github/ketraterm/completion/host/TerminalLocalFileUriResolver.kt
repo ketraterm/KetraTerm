@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.FileSystemNotFoundException
@@ -22,6 +23,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 /** Safe resolver for authoritative local `file` working-directory URIs. */
+@ExperimentalTerminalCompletionApi
 public object TerminalLocalFileUriResolver {
     /**
      * Resolves [value] without reinterpreting remote file authorities locally.

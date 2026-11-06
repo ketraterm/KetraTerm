@@ -32,6 +32,30 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
+    @Test
+    fun `frame distinguishes delayed wrap from the same visible cursor cell`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        buffer.writeText("abc")
+        buffer.readRenderFrame { frame ->
+            assertEquals(3, frame.cursor.column)
+            assertFalse(frame.cursorPendingWrap)
+        }
+
+        buffer.writeText("d")
+        buffer.readRenderFrame { frame ->
+            assertEquals(3, frame.cursor.column)
+            assertEquals(0, frame.cursor.row)
+            assertTrue(frame.cursorPendingWrap)
+        }
+
+        buffer.carriageReturn()
+        buffer.readRenderFrame { frame ->
+            assertEquals(0, frame.cursor.column)
+            assertEquals(0, frame.cursor.row)
+            assertFalse(frame.cursorPendingWrap)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [0, 1, 2, 3, 4, 5, 6])
     fun `text copy keeps source neighbor geometry at every prefix boundary`(width: Int) {

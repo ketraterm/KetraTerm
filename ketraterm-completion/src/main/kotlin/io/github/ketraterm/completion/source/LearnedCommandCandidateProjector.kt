@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.commandEndOffset
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
-/** Projects a learned full command into the request's active completion range. */
+/** Projects a row already matched by [LearnedHistoryCandidateIndex] into the request's active completion range. */
 internal fun projectLearnedCommandCandidate(
     request: TerminalCompletionRequest,
     requestLine: TerminalCommandLineContext,
@@ -35,10 +35,12 @@ internal fun projectLearnedCommandCandidate(
 ): TerminalCompletionCandidate? {
     val activeIndex = requestLine.activeTokenIndex
     val learnedToken = learnedLine.tokens.getOrNull(activeIndex) ?: return null
-    if (!matchingPrefixTokens(requestLine, learnedLine, activeIndex)) return null
-    if (!learnedToken.text.startsWith(requestLine.activePrefix, ignoreCase = true)) return null
 
-    val replacementStartInLearned = replacementStartInLearnedCommand(requestLine, completionContext, learnedToken.startOffset)
+    val requestTokenStart = requestLine.tokens.getOrNull(activeIndex)?.startOffset ?: requestLine.cursorOffset
+    val prefixLength = (completionContext.replacementStartOffset - requestTokenStart).coerceAtLeast(0)
+    // A value-only edit must preserve the same raw option prefix, including quoting and escapes.
+    if (!learnedCommand.regionMatches(learnedToken.startOffset, request.commandLine, requestTokenStart, prefixLength)) return null
+    val replacementStartInLearned = learnedToken.startOffset + prefixLength
     if (replacementStartInLearned !in learnedToken.startOffset..learnedLine.commandEndOffset) return null
     val preserveFollowingText = requestLine.hasFollowingCommandText(request.commandLine)
     val learnedReplacementEnd = if (preserveFollowingText) learnedToken.endOffset else learnedLine.commandEndOffset
@@ -72,34 +74,24 @@ internal fun projectLearnedCommandCandidate(
         kind = kind,
         score = score,
         valueDomain = completionContext.expectedValueDomain,
+        matchedRanges = literalPrefixRanges(replacementText, completionContext.activePrefix),
     )
+}
+
+/** Projects only literal prefix evidence; shell escape syntax must not be mistaken for matching text. */
+private fun literalPrefixRanges(
+    displayText: String,
+    prefix: String,
+): TerminalCompletionMatchRanges {
+    if (prefix.isEmpty()) return TerminalCompletionMatchRanges.EMPTY
+    val start = if (displayText.firstOrNull() == '\'' || displayText.firstOrNull() == '"') 1 else 0
+    if (!displayText.regionMatches(start, prefix, 0, prefix.length, ignoreCase = true)) return TerminalCompletionMatchRanges.EMPTY
+    return TerminalCompletionMatchRanges.fromOwnedPackedOffsets(displayText, intArrayOf(start, start + prefix.length))
 }
 
 private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {
     val activeToken = tokens.getOrNull(activeTokenIndex) ?: return false
     return activeToken.endOffset < commandEndOffset && commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
-}
-
-private fun matchingPrefixTokens(
-    requestLine: TerminalCommandLineContext,
-    learnedLine: TerminalCommandLineContext,
-    activeIndex: Int,
-): Boolean {
-    if (activeIndex > learnedLine.tokens.size || activeIndex > requestLine.tokens.size) return false
-    for (index in 0 until activeIndex) {
-        if (!requestLine.tokens[index].text.equals(learnedLine.tokens[index].text, ignoreCase = true)) return false
-    }
-    return true
-}
-
-private fun replacementStartInLearnedCommand(
-    requestLine: TerminalCommandLineContext,
-    completionContext: TerminalCompletionContext,
-    learnedTokenStart: Int,
-): Int {
-    val requestTokenStart = requestLine.tokens.getOrNull(requestLine.activeTokenIndex)?.startOffset ?: requestLine.cursorOffset
-    val offsetWithinToken = (completionContext.replacementStartOffset - requestTokenStart).coerceAtLeast(0)
-    return learnedTokenStart + offsetWithinToken
 }
 
 private fun semanticKind(context: TerminalCompletionContext): TerminalCompletionCandidateKind? =

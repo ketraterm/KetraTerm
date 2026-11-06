@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -29,6 +31,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import java.awt.event.FocusEvent
+import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -38,6 +41,277 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCompletionLifecycleTest {
+    @Test
+    fun `only an explicit request confirms a provisional prefix before provider collection and acceptance`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            val requests = ArrayList<SwingShellSuggestionRequest>()
+            var opened = 0
+            val confirmed = TerminalShellCompletionResult("git s", 5, 4, 5, emptyList())
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            requests += request
+                            assertSame(confirmed, fixture.session.requestShellCompletions(request.commandText, request.cursorOffset))
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        opened++
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
+                }
+            try {
+                terminal.setShellSuggestionProvider(provider)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertNull(terminal.beginActiveShellSuggestionInteraction(SwingShellSuggestionTrigger.AUTOMATIC))
+                assertNull(terminal.beginShellSuggestionInteraction(request, SwingShellSuggestionTrigger.AUTOMATIC))
+                runCurrent()
+                assertEquals(0, opened)
+                assertTrue(requests.isEmpty())
+                assertEquals("", fixture.connector.output.toString(Charsets.UTF_8))
+                val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.presentShellSuggestions(interaction)
+                terminal.requestShellSuggestions(interaction, provider)
+                runCurrent()
+
+                assertTrue(requests.isEmpty())
+                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+
+                fixture.respond(confirmed)
+                runCurrent()
+
+                assertEquals(listOf(request), requests)
+                assertEquals(1, opened)
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                assertEquals(
+                    "\u001b[24~",
+                    fixture.connector.output.toString(Charsets.UTF_8),
+                    "Confirmation must not run the completer twice",
+                )
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, interaction.tryAccept(interaction.snapshot, 0))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `real editable suffix rejects a provisional prefix without collecting suggestions`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            try {
+                terminal.bind(fixture.session)
+                runCurrent()
+                val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.presentShellSuggestions(interaction)
+                terminal.requestShellSuggestions(interaction, provider)
+                runCurrent()
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                assertEquals(0, collections)
+
+                fixture.respond(TerminalShellCompletionResult("git status", 5, 4, 10, emptyList()))
+                runCurrent()
+
+                assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, interaction.closeReason)
+                assertEquals(0, collections)
+                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                assertFalse(interaction.publish(listOf(suggestion)))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `cancelling a pending shell confirmation ignores its late reply`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            try {
+                terminal.bind(fixture.session)
+                runCurrent()
+                val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.presentShellSuggestions(interaction)
+                terminal.requestShellSuggestions(interaction, provider)
+                runCurrent()
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                assertEquals(0, collections)
+
+                terminal.hideShellSuggestions()
+                runCurrent()
+                fixture.respond(TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))
+                runCurrent()
+
+                assertTrue(interaction.isClosed)
+                assertEquals(0, collections)
+                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                assertFalse(interaction.publish(listOf(suggestion)))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `explicit command suggestions survive pending automatic refresh and settings changes until input changes`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "gi")
+            val view = RecordingView()
+            var settings = settings().copy { it.shellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY }
+            val terminal = terminal(testScheduler, view) { settings }
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                runCurrent()
+                focus(terminal, true)
+                advanceTimeBy(50.milliseconds)
+
+                val explicit = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                assertTrue(explicit.request.includeCommandNames)
+                val command = SwingShellSuggestion("git", 0, 2, "git", "COMMAND")
+                terminal.presentShellSuggestions(explicit)
+                explicit.publish(listOf(command))
+
+                advanceTimeBy(25.milliseconds)
+                runCurrent()
+                assertTrue(explicit.isActive)
+                assertEquals(listOf(command), view.snapshot.visibleSuggestions)
+                assertTrue(target.interactions.isEmpty())
+
+                settings = settings.copy { it.shellSuggestionsEnabled = false }
+                terminal.reloadSettings()
+                settings = settings.copy { it.shellSuggestionsEnabled = true }
+                terminal.reloadSettings()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertTrue(explicit.isActive)
+                assertTrue(target.interactions.isEmpty())
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git ", 4, 4, 0)
+                runCurrent()
+                assertFalse(explicit.isActive)
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val automatic = target.interactions.single()
+                assertEquals("git ", automatic.request.commandText)
+                assertFalse(automatic.request.includeCommandNames)
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `explicit empty results retire a pending automatic refresh`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "gi")
+            val terminal = terminal(testScheduler)
+            val requests = ArrayList<SwingShellSuggestionRequest>()
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flowOf(emptyList<SwingShellSuggestion>()).flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        requests += request
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
+                }
+            try {
+                terminal.setShellSuggestionProvider(provider)
+                terminal.bind(fixture.session)
+                runCurrent()
+                focus(terminal, true)
+                advanceTimeBy(50.milliseconds)
+
+                val explicit = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(explicit, provider)
+                runCurrent()
+                assertTrue(explicit.isClosed)
+
+                advanceTimeBy(25.milliseconds)
+                runCurrent()
+                assertEquals(listOf("gi"), requests.map { it.commandText })
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git", 3, 3, 0)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf("gi", "git"), requests.map { it.commandText })
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `releasing backspace after refreshed suggestions still permits acceptance`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "git st")
+            val terminal = terminal(testScheduler)
+            try {
+                terminal.bind(fixture.session)
+                runCurrent()
+                val press = KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_BACK_SPACE, '\b')
+                terminal.keyListeners.forEach { it.keyPressed(press) }
+                runCurrent()
+                fixture.model.value = snapshot
+                runCurrent()
+                val interaction = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                interaction.publish(listOf(suggestion), selectedIndex = 0)
+                val release = KeyEvent(terminal, KeyEvent.KEY_RELEASED, 0L, 0, KeyEvent.VK_BACK_SPACE, '\b')
+                terminal.keyListeners.forEach { it.keyReleased(release) }
+                runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, interaction.tryAccept(interaction.snapshot, 0))
+                runCurrent()
+                assertEquals("\u007f".repeat(6) + "replacement", fixture.connector.output.toString(Charsets.UTF_8))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
     @Test
     fun `default command editing follows the bound session even when both commands are equal`() =
         onEdtTest {
@@ -65,6 +339,63 @@ class SwingTerminalCompletionLifecycleTest {
                 terminal.dispose()
                 first.close()
                 second.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `shortening the shell command cancels its pending source before refreshed acceptance`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), command = "git sta")
+            val terminal = terminal(testScheduler)
+            val entered = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            val status = SwingShellSuggestion("status", 4, 6, "test", "ARGUMENT")
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        if (request.commandText ==
+                            "git sta"
+                        ) {
+                            flow {
+                                entered.complete(Unit)
+                                try {
+                                    awaitCancellation()
+                                } finally {
+                                    cancelled.complete(Unit)
+                                }
+                            }
+                        } else {
+                            flowOf(listOf(status))
+                        }
+
+                    override fun open(request: SwingShellSuggestionRequest) =
+                        SwingShellSuggestionSource(suggestions(request).flowOn(StandardTestDispatcher(testScheduler)))
+                }
+            try {
+                terminal.bind(fixture.session)
+                terminal.setShellSuggestionProvider(provider)
+                runCurrent()
+                val old = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(old, provider)
+                entered.await()
+
+                fixture.model.value = TerminalShellCommandLineSnapshot("git st", 6, 6, 0)
+                runCurrent()
+                cancelled.await()
+                assertTrue(old.isClosed)
+                assertFalse(old.publish(listOf(status)))
+
+                val refreshed = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                terminal.requestShellSuggestions(refreshed, provider)
+                runCurrent()
+                assertEquals(listOf(status), refreshed.snapshot.suggestions)
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
+                runCurrent()
+                assertEquals("\u007f\u007fstatus", fixture.connector.output.toString(Charsets.UTF_8))
+            } finally {
+                terminal.dispose()
+                fixture.close()
                 runCurrent()
             }
         }
@@ -506,7 +837,14 @@ class SwingTerminalCompletionLifecycleTest {
                     runCurrent()
                     assertEquals(1, target.interactions.size)
 
-                    session.model.value = snapshot
+                    if (!accept) {
+                        session.model.value = snapshot.copy(cursorOffset = 4, cursorColumn = 4)
+                        runCurrent()
+                        advanceTimeBy(75.milliseconds)
+                        runCurrent()
+                        assertEquals(1, target.interactions.size, "Cursor movement must retain explicit dismissal")
+                    }
+                    session.model.value = snapshot.copy(commandText = "git st", cursorOffset = 6, cursorColumn = 6)
                     runCurrent()
                     advanceTimeBy(75.milliseconds)
                     runCurrent()
@@ -519,13 +857,87 @@ class SwingTerminalCompletionLifecycleTest {
             }
         }
 
+    @Test
+    fun `context refresh closes automatic suggestions immediately and requests again after debounce`() =
+        onEdtTest {
+            val session = SessionFixture(StandardTestDispatcher(testScheduler))
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(session.session)
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val old = target.interactions.single()
+
+                terminal.refreshShellSuggestions()
+
+                assertTrue(old.isClosed)
+                assertFalse(target.visible)
+                advanceTimeBy(74.milliseconds)
+                runCurrent()
+                assertEquals(1, target.interactions.size)
+                advanceTimeBy(1.milliseconds)
+                runCurrent()
+                assertEquals(2, target.interactions.size)
+                assertTrue(target.interactions.last().isActive)
+            } finally {
+                terminal.dispose()
+                session.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `context refresh preserves a replacement request opened by the hide callback`() =
+        onEdtTest {
+            val session = SessionFixture(StandardTestDispatcher(testScheduler))
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(session.session)
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val old = target.interactions.single()
+                target.onHide = {
+                    target.onHide = null
+                    startAutomatic(terminal, target)
+                }
+
+                terminal.refreshShellSuggestions()
+                advanceTimeBy(100.milliseconds)
+                runCurrent()
+
+                assertTrue(old.isClosed)
+                assertEquals(2, target.interactions.size)
+                assertTrue(target.interactions.last().isActive)
+                assertTrue(target.visible)
+            } finally {
+                terminal.dispose()
+                session.close()
+                runCurrent()
+            }
+        }
+
     private class SessionFixture(
         dispatcher: CoroutineDispatcher,
         legacySource: MutableStateFlow<TerminalShellCommandLineSnapshot?>? = null,
         command: String = "git s",
+        nativeCompletion: Boolean = false,
     ) : AutoCloseable {
         val connector = RecordingConnector()
-        val model = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot(command, command.length, command.length, 0))
+        val model =
+            TerminalShellCommandLineState(
+                TerminalShellCommandLineSnapshot(command, command.length, command.length, 0, requiresShellConfirmation = nativeCompletion),
+            )
+        private lateinit var completion: TerminalShellCompletionChannel
         val session =
             TerminalSession.create(
                 TerminalBuffers.create(30, 4),
@@ -534,15 +946,27 @@ class SwingTerminalCompletionLifecycleTest {
                 ioDispatcher = dispatcher,
                 cleanupDispatcher = dispatcher,
                 shellIntegration =
-                    if (legacySource == null) {
-                        TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
-                    } else {
-                        TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), legacySource)
+                    TerminalShellIntegrationFactory { context ->
+                        completion = context.shellCompletion
+                        if (nativeCompletion) completion.ready("test", listOf(TerminalKeyEvent.key(TerminalKey.F12)))
+                        val host =
+                            if (legacySource == null) {
+                                TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
+                            } else {
+                                TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), legacySource)
+                            }
+                        host.create(context)
                     },
             )
 
         init {
             session.start(30, 4)
+        }
+
+        fun respond(result: TerminalShellCompletionResult) {
+            completion.respond("test", 1, result)
+            val bytes = "\u001b]999;reply\u0007".toByteArray()
+            connector.listener.onBytes(bytes, 0, bytes.size)
         }
 
         override fun close() = session.close()

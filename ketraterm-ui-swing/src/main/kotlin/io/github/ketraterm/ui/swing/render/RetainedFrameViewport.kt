@@ -127,6 +127,8 @@ internal class RetainedFrameViewport(
     override val structureGeneration get() = frame.structureGeneration
     override val activeBuffer get() = frame.activeBuffer
     override val palette get() = frame.palette
+    override val cursorPendingWrap get() = frame.cursorPendingWrap
+
     override val cursor: TerminalRenderCursor
         get() {
             val cursor = frame.cursor

@@ -19,21 +19,167 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.colors.EditorColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.colors.EditorColorsScheme
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.TestDialog
+import com.intellij.openapi.ui.TestDialogManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfile
+import kotlinx.coroutines.CompletableDeferred
 import java.awt.Color
 import java.awt.Component
 import java.awt.Container
+import java.io.IOException
 import javax.swing.AbstractButton
 import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testAutomaticPopupModePersistsAndFollowsEnablement() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.replaceState(
+                original.copy(
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = true,
+                    shellSuggestionAutomaticMode = "parameters_only",
+                ),
+            )
+            val component = configurable.createComponent()
+
+            fun button(key: String) =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message(key)
+                }
+            val always = button("settings.ketraterm.shellSuggestions.always")
+            val parameters = button("settings.ketraterm.shellSuggestions.parameters")
+            val automatic = button("settings.ketraterm.shellSuggestions")
+            val master = button("settings.ketraterm.smartSuggestions")
+            assertTrue(parameters.isSelected)
+            assertFalse(configurable.isModified)
+            always.doClick()
+            assertTrue(configurable.isModified)
+            configurable.apply()
+            assertEquals("always", settings.state.shellSuggestionAutomaticMode)
+            parameters.doClick()
+            configurable.reset()
+            assertTrue(always.isSelected)
+            assertFalse(parameters.isSelected)
+            assertFalse(configurable.isModified)
+            parameters.doClick()
+            configurable.apply()
+            assertEquals("parameters_only", settings.state.shellSuggestionAutomaticMode)
+            assertEquals(
+                SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY,
+                settings.current().shellSuggestionAutomaticMode,
+            )
+            automatic.doClick()
+            assertFalse(always.isEnabled)
+            assertFalse(parameters.isEnabled)
+            automatic.doClick()
+            assertTrue(parameters.isEnabled)
+            assertTrue(parameters.isSelected)
+            master.doClick()
+            assertFalse(parameters.isEnabled)
+            configurable.reset()
+            assertTrue(parameters.isEnabled)
+            assertTrue(parameters.isSelected)
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
+    fun testLearningResetConfirmsAndWaitsForSavedDataWhenSuggestionsAreDisabled() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        var calls = 0
+        val reset = CompletableDeferred<Unit>()
+        val configurable =
+            KetraTermSettingsConfigurable(emptyList()) {
+                calls++
+                reset
+            }
+        val previousDialog = TestDialogManager.setTestDialog(TestDialog { Messages.CANCEL })
+        try {
+            settings.replaceState(original.copy(smartSuggestionsEnabled = false, completionLearningPersistenceEnabled = false))
+            val component = configurable.createComponent()
+            val button =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")
+                }
+            assertTrue(button.isEnabled)
+            button.doClick()
+            assertEquals(0, calls)
+            TestDialogManager.setTestDialog(TestDialog { Messages.OK })
+            button.doClick()
+            assertEquals(1, calls)
+            assertFalse(button.isEnabled)
+            assertTrue(
+                descendants(component).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.progress")
+                },
+            )
+            reset.complete(Unit)
+            UIUtil.dispatchAllInvocationEvents()
+            assertTrue(button.isEnabled)
+            assertTrue(
+                descendants(component).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.complete")
+                },
+            )
+            assertFalse(configurable.isModified())
+        } finally {
+            TestDialogManager.setTestDialog(previousDialog)
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
+    fun testFailedLearningResetOffersRetryAndDisposingSettingsLeavesResetRunning() {
+        var reset = CompletableDeferred<Unit>()
+        val configurable = KetraTermSettingsConfigurable(emptyList()) { reset }
+        val previousDialog = TestDialogManager.setTestDialog(TestDialog { Messages.OK })
+        try {
+            val component = configurable.createComponent()
+            val button =
+                descendants(component).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")
+                }
+            button.doClick()
+            reset.completeExceptionally(IOException("Read-only destination"))
+            UIUtil.dispatchAllInvocationEvents()
+            assertTrue(button.isEnabled)
+            val status =
+                descendants(component).filterIsInstance<JLabel>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.error")
+                }
+            assertTrue(status.toolTipText.contains("Read-only destination"))
+            reset = CompletableDeferred()
+            button.doClick()
+            configurable.disposeUIResources()
+            assertFalse(reset.isCancelled)
+            val replacement = configurable.createComponent()
+            reset.complete(Unit)
+            UIUtil.dispatchAllInvocationEvents()
+            assertFalse(
+                descendants(replacement).filterIsInstance<JLabel>().any {
+                    it.text == KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.complete")
+                },
+            )
+        } finally {
+            TestDialogManager.setTestDialog(previousDialog)
+            configurable.disposeUIResources()
+        }
+    }
+
     fun testStickyCommandHeadersApplyAndReset() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state
@@ -272,7 +418,7 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
         }
     }
 
-    fun testHiddenSuggestionPreferencesSurviveApply() {
+    fun testSuggestionControlsApplyIndependentlyAndResetUnsavedChanges() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state
         val configurable = KetraTermSettingsConfigurable()
@@ -287,20 +433,36 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
             )
             val component = configurable.createComponent()
             configurable.reset()
-            val texts =
-                descendants(component).mapNotNull {
-                    when (it) {
-                        is AbstractButton -> it.text
-                        is JLabel -> it.text
-                        else -> null
-                    }
-                }
-            assertFalse(texts.any { it.contains("suggest", ignoreCase = true) || it.contains("learning", ignoreCase = true) })
+            val buttons = descendants(component).filterIsInstance<AbstractButton>().associateBy { it.text }
+            val smart = buttons.getValue(KetraTermBundle.message("settings.ketraterm.smartSuggestions"))
+            val automatic = buttons.getValue(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+            val enter = buttons.getValue(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
+            val persistence = buttons.getValue(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
+            assertTrue(smart.isSelected)
+            assertFalse(automatic.isSelected)
+            assertFalse(enter.isSelected)
+            assertTrue(persistence.isSelected)
+            assertFalse(configurable.isModified())
             configurable.apply()
             assertTrue(settings.state.smartSuggestionsEnabled)
             assertFalse(settings.state.shellSuggestionsEnabled)
             assertFalse(settings.state.acceptSelectedSuggestionWithEnter)
             assertTrue(settings.state.completionLearningPersistenceEnabled)
+            for (button in listOf(smart, automatic, enter, persistence)) button.isSelected = !button.isSelected
+            assertTrue(configurable.isModified())
+            configurable.reset()
+            assertFalse(configurable.isModified())
+            assertTrue(smart.isSelected)
+            assertFalse(automatic.isSelected)
+            assertFalse(enter.isSelected)
+            assertTrue(persistence.isSelected)
+            for (button in listOf(smart, automatic, enter, persistence)) button.isSelected = !button.isSelected
+            configurable.apply()
+            assertFalse(configurable.isModified())
+            assertFalse(settings.state.smartSuggestionsEnabled)
+            assertTrue(settings.state.shellSuggestionsEnabled)
+            assertTrue(settings.state.acceptSelectedSuggestionWithEnter)
+            assertFalse(settings.state.completionLearningPersistenceEnabled)
         } finally {
             configurable.disposeUIResources()
             settings.replaceState(original)

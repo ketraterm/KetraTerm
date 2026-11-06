@@ -22,6 +22,7 @@ package io.github.ketraterm.completion.api
  * @property isDirectory `true` if the entry represents a directory.
  * @throws IllegalArgumentException if [name] is empty, `.` or `..`.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalFileEntry(
     val name: String,
     val isDirectory: Boolean,
@@ -42,12 +43,13 @@ public data class TerminalFileEntry(
  *
  * @property workingDirectoryUri absolute host-reported working-directory URI.
  * @property directoryPrefix typed path portion ending at the final separator;
- * forward slashes are used as a transport-neutral separator. An empty value
+ * only forward slashes are separators; backslashes are literal filename characters. An empty value
  * addresses the working directory and `~/` addresses the host user's home.
  * @property entryNamePrefix typed base-name prefix after the final separator.
  * @throws IllegalArgumentException if the URI is blank, the directory prefix is
  * not empty and separator-terminated, or the entry prefix contains a separator.
  */
+@ExperimentalTerminalCompletionApi
 public data class TerminalDirectoryListingRequest(
     val workingDirectoryUri: String,
     val directoryPrefix: String,
@@ -59,7 +61,6 @@ public data class TerminalDirectoryListingRequest(
             "directoryPrefix must be empty or end with '/', was $directoryPrefix"
         }
         require(!entryNamePrefix.contains('/')) { "entryNamePrefix must not contain '/'" }
-        require(!entryNamePrefix.contains('\\')) { "entryNamePrefix must not contain '\\'" }
     }
 }
 
@@ -71,6 +72,7 @@ public data class TerminalDirectoryListingRequest(
  * reject working-directory authorities it cannot prove are local rather than
  * silently converting remote OSC 7 locations into local paths.
  */
+@ExperimentalTerminalCompletionApi
 public fun interface TerminalFileSystemProvider {
     /**
      * Returns matching children for [request].

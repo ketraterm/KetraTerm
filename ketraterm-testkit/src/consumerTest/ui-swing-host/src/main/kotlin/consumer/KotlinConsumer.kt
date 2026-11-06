@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:OptIn(
+    io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi::class,
+    io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi::class,
+)
+
 package consumer
 
 import io.github.ketraterm.completion.api.*

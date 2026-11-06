@@ -17,6 +17,7 @@ public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/git
 	public final fun getCursorChangedOnLastUpdate ()Z
 	public final fun getCursorColumn ()I
 	public final fun getCursorGeneration ()J
+	public final fun getCursorPendingWrap ()Z
 	public final fun getCursorRow ()I
 	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
 	public final fun getCursorVisible ()Z
@@ -102,6 +103,7 @@ public final class io/github/ketraterm/render/cache/TerminalRenderRowSnapshot : 
 	public fun getColumns ()I
 	public fun getContentGeneration ()J
 	public fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public fun getCursorPendingWrap ()Z
 	public fun getDiscardedCount ()J
 	public fun getFrameGeneration ()J
 	public fun getGraphicsGeneration ()J
