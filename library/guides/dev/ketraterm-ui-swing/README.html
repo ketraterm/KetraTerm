@@ -135,14 +135,17 @@ opaque overlay repeats the captured physical prompt/input row, including the pro
 prefix, directory, command, original cell colors and attributes. It uses the same
 terminal font, metrics, spacing, shaping, and fallback as ordinary output. Long rows
 clip to the available width; they are never shortened, scaled, or given a separate font.</p>
-<p>This applies to live running commands, scrollback, and retained closed-session output.
+<p>This applies to live running commands, scrollback, and retained closed-session output,
+provided the original prompt row remains in the screen or scrollback. A saved prompt
+image does not keep the header visible after that row is erased or trimmed.
 Alternate-screen content, prompts still visible at the top, untouched trailing rows,
-and commands without a captured prompt have no overlay. The overlay reserves no grid
-space and does not resize the terminal. A soft ten-pixel shadow fades below the
-header; only its opaque row intercepts pointer actions. Primary click reveals the original command;
-if its grid anchor has been evicted, the retained header remains and the click does
-nothing. Wheel gestures over the overlay scroll local history. Covered cells receive
-no new selection, hyperlink, context-menu, paste, or application-mouse gestures.</p>
+commands without a captured prompt, and output that would be entirely covered by the
+header have no overlay. The overlay reserves no grid space and does not resize the
+terminal. A soft ten-pixel shadow fades below the header, with a subtle contact edge
+on dark themes; only its opaque row intercepts pointer actions. Primary click reveals
+the original command. Wheel gestures over the overlay scroll local history. Covered
+cells receive no new selection, hyperlink, context-menu, paste, or application-mouse
+gestures.</p>
 <p>The standard OSC integration captures the row before command output. Custom shell
 views implement <code>commandOutputRecordIdAtLine</code> and <code>commandPrompt</code> to supply this
 presentation; a host using <code>TerminalShellIntegrationState</code> can pass an immutable
@@ -188,7 +191,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/2bc109d7b5785e657e10c2d294a3f92892859d55/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -339,7 +342,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/2bc109d7b5785e657e10c2d294a3f92892859d55/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5112afc098be9f6043c91e400685329e1249183e/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
