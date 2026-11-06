@@ -41,9 +41,17 @@ import javax.swing.Timer
 internal class SwingViewportController(
     private val listener: TerminalViewportListener,
     private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
+    smoothScrolling: Boolean = true,
     private val onScroll: (renderMappingChanged: Boolean, scrollComplete: Boolean) -> Unit,
 ) {
     private val scrollModel = SwingScrollModel()
+    var smoothScrolling: Boolean = smoothScrolling
+        set(value) {
+            if (field == value) return
+            field = value
+            if (!value) finishScroll()
+        }
+
     private val dividerLayout = PromptDividerLayout()
     private var dividersEnabled = false
     private var resizeAnchorRow = Long.MIN_VALUE
@@ -163,7 +171,7 @@ internal class SwingViewportController(
         dividerLayout.reset()
     }
 
-    /** Accumulates precise device input into whole-row animation destinations. */
+    /** Accumulates precise device input into whole-row destinations. */
     fun scrollByPreciseRows(deltaRows: Double): Boolean {
         require(deltaRows.isFinite()) { "deltaRows must be finite, was $deltaRows" }
         if (deltaRows == 0.0) return false
@@ -179,13 +187,13 @@ internal class SwingViewportController(
         return changed
     }
 
-    /** Animates a signed whole-row delta from the current destination. */
+    /** Moves a signed whole-row delta from the current destination, animating when enabled. */
     fun scrollByRows(deltaRows: Int): Boolean {
         accumulator.reset()
         return deltaRows != 0 && animateBy(deltaRows)
     }
 
-    /** Animates to an absolute integer row; repeated targets keep their deadline. */
+    /** Moves to an absolute integer row; repeated animated targets keep their deadline. */
     fun scrollToRow(targetRow: Int): Boolean {
         accumulator.reset()
         val changed = updateScroll(notifyUnchanged = true) { scrollModel.animateTo(targetRow, System.nanoTime()) }
@@ -237,6 +245,7 @@ internal class SwingViewportController(
         val previousOverscan = scrollModel.needsOverscan
         val wasAnimating = scrollModel.isAnimating
         update()
+        if (!smoothScrolling) scrollModel.finish()
         val complete = !scrollModel.isAnimating
         if (complete) {
             scrollTimer.stop()

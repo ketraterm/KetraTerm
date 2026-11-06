@@ -654,6 +654,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
+	public final fun getSmoothScrolling ()Z
 	public final fun getStickyCommandHeadersEnabled ()Z
 	public final fun getTextAntialiasing ()Ljava/lang/Object;
 	public final fun getTreatAmbiguousAsWide ()Z
@@ -720,6 +721,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
+	public final fun getSmoothScrolling ()Z
 	public final fun getStickyCommandHeadersEnabled ()Z
 	public final fun getTextAntialiasing ()Ljava/lang/Object;
 	public final fun getTreatAmbiguousAsWide ()Z
@@ -780,6 +782,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellSuggestionStyle (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V
+	public final fun setSmoothScrolling (Z)V
 	public final fun setStickyCommandHeadersEnabled (Z)V
 	public final fun setTextAntialiasing (Ljava/lang/Object;)V
 	public final fun setTreatAmbiguousAsWide (Z)V

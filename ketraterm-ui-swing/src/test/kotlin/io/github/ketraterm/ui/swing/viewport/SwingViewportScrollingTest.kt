@@ -24,6 +24,85 @@ import kotlin.test.assertTrue
 
 class SwingViewportScrollingTest {
     @Test
+    fun `disabled smooth scrolling applies row and absolute destinations immediately within bounds`() =
+        withViewport { fixture ->
+            val controller = fixture.controller
+            controller.smoothScrolling = false
+
+            assertTrue(controller.scrollByRows(4))
+            assertEquals(4.0, controller.preciseOffset)
+            assertEquals(24, controller.requestedRows(24))
+            assertEquals(listOf(true to true), fixture.notifications)
+
+            assertTrue(controller.scrollToRow(7))
+            assertEquals(7.0, controller.preciseOffset)
+            assertTrue(controller.scrollByRows(Int.MAX_VALUE))
+            assertEquals(10.0, controller.preciseOffset)
+            assertFalse(controller.scrollByRows(1))
+            assertTrue(controller.scrollByRows(Int.MIN_VALUE))
+            assertEquals(0.0, controller.preciseOffset)
+            fixture.notifications.clear()
+            controller.advanceScroll(System.nanoTime() + 1_000_000_000L)
+            assertTrue(fixture.notifications.isEmpty())
+        }
+
+    @Test
+    fun `disabled smooth scrolling retains precise input fractions between immediate steps`() =
+        withViewport { fixture ->
+            val controller = fixture.controller
+            controller.smoothScrolling = false
+            repeat(3) { assertTrue(controller.scrollByPreciseRows(0.25)) }
+            assertEquals(0.0, controller.preciseOffset)
+            assertTrue(fixture.notifications.isEmpty())
+
+            assertTrue(controller.scrollByPreciseRows(1.5))
+            assertEquals(2.0, controller.preciseOffset)
+            assertTrue(controller.scrollByPreciseRows(0.75))
+            assertEquals(3.0, controller.preciseOffset)
+            assertEquals(listOf(true to true, true to true), fixture.notifications)
+        }
+
+    @Test
+    fun `disabling smooth scrolling settles the pending target and enabling resumes animation`() =
+        withViewport { fixture ->
+            val controller = fixture.controller
+            assertTrue(controller.scrollByRows(4))
+            assertEquals(0.0, controller.preciseOffset)
+
+            controller.smoothScrolling = false
+
+            assertEquals(4.0, controller.preciseOffset)
+            assertEquals(listOf(true to true), fixture.notifications)
+            controller.advanceScroll(System.nanoTime() + 1_000_000_000L)
+            assertEquals(1, fixture.notifications.size)
+            controller.smoothScrolling = true
+            assertTrue(controller.scrollToRow(6))
+            assertEquals(4.0, controller.preciseOffset)
+            controller.finishScroll()
+            assertEquals(6.0, controller.preciseOffset)
+        }
+
+    @Test
+    fun `disabling smooth scrolling removes fractional overscan even when the render anchor stays unchanged`() =
+        withViewport { fixture ->
+            val controller = fixture.controller
+            controller.scrollTo(2.5, historySize = 10)
+            assertEquals(3, controller.requestedOffset)
+            assertEquals(25, controller.requestedRows(24))
+            assertTrue(controller.scrollToRow(3))
+            fixture.notifications.clear()
+
+            controller.smoothScrolling = false
+
+            assertEquals(3.0, controller.preciseOffset)
+            assertEquals(3, controller.requestedOffset)
+            assertEquals(24, controller.requestedRows(24))
+            assertEquals(listOf(true to true), fixture.notifications)
+            controller.advanceScroll(System.nanoTime() + 1_000_000_000L)
+            assertEquals(1, fixture.notifications.size)
+        }
+
+    @Test
     fun `unchanged programmatic scrolling does not repaint but scrollbar release publishes completion`() =
         withViewport { fixture ->
             val controller = fixture.controller

@@ -121,6 +121,7 @@ public final class JavaConsumer {
         if (!new SwingSettings().getAlternateScreenWheelToArrowEnabled())
             throw new AssertionError("Java alternate-screen wheel input must be enabled by default");
         var interactionSettings = SwingSettings.create(draft -> {
+            draft.setSmoothScrolling(false);
             draft.setMouseReportingEnabled(false);
             draft.setAlternateScreenWheelToArrowEnabled(false);
             draft.setCopyOnSelection(true);
@@ -145,6 +146,8 @@ public final class JavaConsumer {
             draft.setShellIntegrationPromptDividerHoverColor(0xFF4B6EAF);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
+        if (!new SwingSettings().getSmoothScrolling() || copiedSettings.getSmoothScrolling())
+            throw new AssertionError("Java smooth scrolling settings did not preserve defaults or copying");
         if (copiedSettings.getShellSuggestionStyle().getArgumentHintForeground() != 0xFFABCDEF
             || copiedSettings.getShellSuggestionStyle().getSelectionArgumentHintForeground() != 0xFFFEDCBA
             || copiedSettings.getShellSuggestionStyle().getMatchForeground() != 0xFF82AFFC)
