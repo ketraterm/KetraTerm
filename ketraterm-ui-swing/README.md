@@ -127,14 +127,17 @@ prefix, directory, command, original cell colors and attributes. It uses the sam
 terminal font, metrics, spacing, shaping, and fallback as ordinary output. Long rows
 clip to the available width; they are never shortened, scaled, or given a separate font.
 
-This applies to live running commands, scrollback, and retained closed-session output.
+This applies to live running commands, scrollback, and retained closed-session output,
+provided the original prompt row remains in the screen or scrollback. A saved prompt
+image does not keep the header visible after that row is erased or trimmed.
 Alternate-screen content, prompts still visible at the top, untouched trailing rows,
-and commands without a captured prompt have no overlay. The overlay reserves no grid
-space and does not resize the terminal. A soft ten-pixel shadow fades below the
-header; only its opaque row intercepts pointer actions. Primary click reveals the original command;
-if its grid anchor has been evicted, the retained header remains and the click does
-nothing. Wheel gestures over the overlay scroll local history. Covered cells receive
-no new selection, hyperlink, context-menu, paste, or application-mouse gestures.
+commands without a captured prompt, and output that would be entirely covered by the
+header have no overlay. The overlay reserves no grid space and does not resize the
+terminal. A soft ten-pixel shadow fades below the header, with a subtle contact edge
+on dark themes; only its opaque row intercepts pointer actions. Primary click reveals
+the original command. Wheel gestures over the overlay scroll local history. Covered
+cells receive no new selection, hyperlink, context-menu, paste, or application-mouse
+gestures.
 
 The standard OSC integration captures the row before command output. Custom shell
 views implement `commandOutputRecordIdAtLine` and `commandPrompt` to supply this

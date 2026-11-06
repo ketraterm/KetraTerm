@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
@@ -95,7 +96,7 @@ class StickyCommandHeaderTest {
     fun `fractional scrolling waits until input leaves and never covers a divider band`() =
         onEdt {
             val fixture = Fixture()
-            fixture.install(firstLine = 10)
+            fixture.install(firstLine = 10, rows = 3)
             fixture.geometry.updateContentOrigin(-19.5)
             fixture.update()
             assertFalse(fixture.header.visible)
@@ -154,11 +155,11 @@ class StickyCommandHeaderTest {
                 fixture.geometry.updateContentOrigin(-tick / 100.0)
                 assertFalse(fixture.update())
             }
-            assertEquals(1, ownershipReads)
+            assertEquals(2, ownershipReads)
             assertEquals(1, textReads)
             fixture.state.recordCommandFinished(12, 0)
             fixture.update()
-            assertEquals(2, ownershipReads)
+            assertEquals(4, ownershipReads)
             assertEquals(2, textReads)
         }
 
@@ -255,7 +256,7 @@ class StickyCommandHeaderTest {
             val configuration = ScaledConfiguration(scale)
             val pixelWidth = (360 * scale).toInt()
             val pixelHeight = (60 * scale).toInt()
-            val comparedHeight = (20 * scale).toInt()
+            val comparedHeight = (19 * scale).toInt()
             val text = "PS C:\\Users\\gagik> cat".padEnd(40)
             val attrs =
                 LongArray(40) { index ->
@@ -427,7 +428,17 @@ class StickyCommandHeaderTest {
                 }
             fixture.update(configuration = configuration)
             val full = paint()
-            fixture.header.update(fixture.view, fixture.cache, fixture.geometry, fixture.settings, METRICS, 360, 22, configuration)
+            fixture.header.update(
+                fixture.view,
+                fixture.cache,
+                fixture.geometry,
+                fixture.settings,
+                METRICS,
+                360,
+                22,
+                configuration,
+                fixture.retainedFrame,
+            )
             val clipped = paint()
             val x = (200 * scale).toInt()
             for (y in (20 * scale).toInt() until (22 * scale).toInt()) {
@@ -435,6 +446,163 @@ class StickyCommandHeaderTest {
             }
             assertNotEquals(Color.WHITE.rgb, clipped.getRGB(x, (20 * scale).toInt()))
             assertEquals(Color.WHITE.rgb, clipped.getRGB(x, ceil(22 * scale).toInt()))
+        }
+
+    @Test
+    fun `last output row is uncovered when the following row belongs to a prompt or untouched tail`() =
+        onEdt {
+            val fixture = Fixture()
+            fixture.state.recordCommandFinished(11, 0)
+            fixture.state.recordPromptStart(12)
+            fixture.update()
+            assertFalse(fixture.header.visible)
+            fixture.state.clear()
+            fixture.start("running")
+            fixture.install(outputEnd = 1)
+            fixture.update()
+            assertFalse(fixture.header.visible)
+            fixture.install(outputEnd = 2)
+            fixture.update()
+            assertTrue(fixture.header.visible)
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x000000, 0x101010, 0x303030])
+    fun `dark themes retain a visible contact edge`(background: Int) =
+        onEdt {
+            val fixture = Fixture()
+            fixture.install(colors = TerminalColorPalette(defaultBackground = background or 0xff000000.toInt()))
+            fixture.update()
+            val image = BufferedImage(360, 60, BufferedImage.TYPE_INT_RGB)
+            image.createGraphics().let { g ->
+                try {
+                    fixture.header.paint(g)
+                } finally {
+                    g.dispose()
+                }
+            }
+            assertNotEquals(image.getRGB(300, 18), image.getRGB(300, 19))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["screen", "history", "eviction", "retained"])
+    fun `prompt retention controls saved headers without changing shell metadata`(removal: String) =
+        onEdt {
+            val fixture = Fixture()
+            fixture.state.clear()
+            val source = TerminalBuffers.create(40, if (removal == "screen") 3 else 2, 1)
+            source.writeText("PS > wsl")
+            var captured: TerminalRenderRowSnapshot? = null
+            source.readRenderFrame { frame ->
+                captured = TerminalRenderRowSnapshot.copyOf(frame, 0)
+                fixture.state.recordPromptStart(frame.lineId(0))
+                fixture.state.recordPromptEnd(frame.lineId(0))
+            }
+            source.newLine()
+            source.readRenderFrame { frame ->
+                fixture.state.recordCommandStart(frame.lineId(1), true, "wsl", null, captured)
+            }
+            source.writeText("first output")
+            source.newLine()
+            source.writeText("second output")
+            val record = fixture.state.latestCommandRecordId()
+            val revision = fixture.state.revision.value
+
+            fun refresh(): Boolean {
+                fixture.cache.updateFrom(source)
+                fixture.geometry.updateLayout(METRICS, fixture.cache.rows, 60)
+                fixture.geometry.updateContentOrigin(if (removal == "screen") -20.0 else 0.0)
+                return fixture.header.update(
+                    fixture.view,
+                    fixture.cache,
+                    fixture.geometry,
+                    fixture.settings,
+                    METRICS,
+                    360,
+                    60,
+                    null,
+                    source,
+                )
+            }
+            refresh()
+            assertTrue(fixture.header.visible, "A prompt retained above the viewport can stick")
+            when (removal) {
+                "screen" -> {
+                    source.clearScreen()
+                    source.writeText("linux> command")
+                    source.newLine()
+                    source.writeText("first nested output")
+                    source.newLine()
+                    source.writeText("second nested output")
+                }
+                "retained" -> {
+                    source.clearScreen()
+                    source.writeText("first nested output")
+                    source.newLine()
+                    source.writeText("second nested output")
+                }
+                "history" -> source.eraseScreenAndHistory()
+                "eviction" -> {
+                    source.newLine()
+                    source.writeText("third output")
+                }
+            }
+            val changed = refresh()
+            if (removal == "retained") {
+                assertTrue(fixture.header.visible, "Erasing the viewport must not hide a prompt still retained in history")
+            } else {
+                assertTrue(changed, "Removing the prompt must invalidate the visible overlay")
+                assertFalse(fixture.header.visible)
+                assertFalse(fixture.header.contains(100, 2))
+            }
+            assertEquals(revision, fixture.state.revision.value)
+            assertTrue(fixture.state.hasRunningCommand())
+            assertSame(captured, fixture.state.commandPrompt(record), "The saved image does not prove the prompt is retained")
+        }
+
+    @Test
+    fun `fractional scrolling reuses prompt retention checks`() =
+        onEdt {
+            val fixture = Fixture()
+            fixture.update()
+            val reads = fixture.retainedLineReads
+            assertTrue(reads > 0)
+            for (tick in 1..30) {
+                fixture.geometry.updateContentOrigin(-tick / 100.0)
+                fixture.update()
+            }
+            assertEquals(reads, fixture.retainedLineReads)
+            fixture.install(retainedFirstLine = 2)
+            fixture.update()
+            assertFalse(fixture.header.visible)
+        }
+
+    @Test
+    fun `history remapping resolves the prompt before applying old eviction bounds`() =
+        onEdt {
+            val fixture = Fixture()
+            var generation = 1L
+            var discarded = 0L
+            val retained =
+                object : TestRenderFrame(Array(12) { Array(40) { TestCell() } }) {
+                    override val frameGeneration: Long get() = generation
+                    override val discardedCount: Long get() = discarded
+                }
+            fixture.retainedFrame = retained
+            fixture.update()
+            assertTrue(fixture.header.visible)
+            // A replacement history layout can move the same identity beyond the old absolute position.
+            generation++
+            discarded = 5
+            fixture.cache.accept(
+                object : TestRenderFrame(Array(2) { Array(40) { TestCell() } }) {
+                    override val frameGeneration: Long get() = generation
+
+                    override fun lineId(row: Int): Long = row + 11L
+                },
+            )
+            fixture.update()
+            assertTrue(fixture.header.visible, "A surviving prompt must not be treated as evicted using its old position")
         }
 
     private class Fixture {
@@ -454,6 +622,8 @@ class StickyCommandHeaderTest {
         val geometry = TerminalVisualViewportGeometry()
         val cache = TerminalRenderCache(40, 2)
         val header = StickyCommandHeader(SwingTerminalChrome())
+        var retainedFrame = TestRenderFrame(Array(12) { Array(40) { TestCell() } })
+        var retainedLineReads = 0
 
         init {
             install()
@@ -461,13 +631,22 @@ class StickyCommandHeaderTest {
 
         fun install(
             firstLine: Long = 11,
+            rows: Int = 2,
             outputEnd: Long = Long.MAX_VALUE,
             buffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
             colors: TerminalColorPalette = TerminalColorPalette(),
+            retainedFirstLine: Long = 1,
         ) {
+            retainedFrame =
+                object : TestRenderFrame(Array(12) { Array(40) { TestCell() } }) {
+                    override fun lineId(row: Int): Long {
+                        retainedLineReads++
+                        return retainedFirstLine + row
+                    }
+                }
             cache.reset()
             cache.accept(
-                object : TestRenderFrame(Array(2) { Array(40) { TestCell() } }) {
+                object : TestRenderFrame(Array(rows) { Array(40) { TestCell() } }) {
                     override val activeBuffer = buffer
                     override val palette = colors
                     override val outputEndAbsoluteRow = outputEnd
@@ -487,7 +666,7 @@ class StickyCommandHeaderTest {
         fun update(
             width: Int = 360,
             configuration: GraphicsConfiguration? = null,
-        ): Boolean = header.update(view, cache, geometry, settings, METRICS, width, 60, configuration)
+        ): Boolean = header.update(view, cache, geometry, settings, METRICS, width, 60, configuration, retainedFrame)
     }
 
     private class ScaledConfiguration(

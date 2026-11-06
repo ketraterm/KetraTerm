@@ -3548,6 +3548,7 @@ public class SwingTerminal
                         width,
                         height,
                         graphicsConfiguration,
+                        it,
                     )
                 } ?: false
             refreshHyperlinkHover()
