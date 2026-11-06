@@ -11,6 +11,26 @@ cursor, or query is dispatched. Numeric saturation is independent of this limit.
 CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
 state. Ordinary C0 handling continues during rejection.
 
+## Relative cursor aliases
+
+Plain CSI movement aliases route to the existing cursor operations:
+
+| Sequence | Name | Equivalent operation |
+| --- | --- | --- |
+| `CSI Ps a` | HPR | Forward by `Ps` columns (`CSI Ps C`). |
+| `CSI Ps e` | VPR | Down by `Ps` rows (`CSI Ps B`). |
+| `CSI Ps j` | HPB | Backward by `Ps` columns (`CSI Ps D`). |
+| `CSI Ps k` | VPB | Up by `Ps` rows (`CSI Ps A`). |
+
+Omitted and zero counts mean one. Decimal overflow saturates to `Int.MAX_VALUE`,
+as with the equivalent cursor commands; core bounds the movement to the active
+screen and margins. Origin mode, pending wrap, and enabled reverse wrapping
+follow those same operations. Private markers and intermediates do not select
+these aliases. The shared [CSI parameter limits](#csi-parameters) and cancellation
+rules apply.
+
+These names and encodings follow [ECMA-48, sections 8.3.58–59 and 8.3.159–160](https://www.ecma-international.org/wp-content/uploads/ECMA-48_5th_edition_june_1991.pdf).
+
 ## OSC encoding
 
 Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw

@@ -46,11 +46,15 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.SD, lookup('T'))
             assertEquals(CsiCommand.ECH, lookup('X'))
             assertEquals(CsiCommand.CBT, lookup('Z'))
+            assertEquals(CsiCommand.CUF, lookup('a'))
             assertEquals(CsiCommand.DA_PRIMARY, lookup('c'))
             assertEquals(CsiCommand.VPA, lookup('d'))
+            assertEquals(CsiCommand.CUD, lookup('e'))
             assertEquals(CsiCommand.CUP, lookup('f'))
             assertEquals(CsiCommand.TBC, lookup('g'))
             assertEquals(CsiCommand.SM_ANSI, lookup('h'))
+            assertEquals(CsiCommand.CUB, lookup('j'))
+            assertEquals(CsiCommand.CUU, lookup('k'))
             assertEquals(CsiCommand.RM_ANSI, lookup('l'))
             assertEquals(CsiCommand.SGR, lookup('m'))
             assertEquals(CsiCommand.DSR, lookup('n'))
@@ -58,6 +62,18 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.SCOSC_OR_DECSLRM, lookup('s'))
             assertEquals(CsiCommand.WINDOW_OP, lookup('t'))
             assertEquals(CsiCommand.SCORC, lookup('u'))
+        }
+
+        @Test
+        fun `relative movement aliases require a plain CSI signature`() {
+            for (finalByte in charArrayOf('a', 'e', 'j', 'k')) {
+                for (marker in charArrayOf('<', '=', '>', '?')) {
+                    assertEquals(CsiCommand.UNKNOWN, lookup(finalByte, privateMarker = marker.code))
+                }
+                for (intermediate in charArrayOf(' ', '!', '$')) {
+                    assertEquals(CsiCommand.UNKNOWN, lookup(finalByte, intermediates = intermediate.code, intermediateCount = 1))
+                }
+            }
         }
 
         @Test

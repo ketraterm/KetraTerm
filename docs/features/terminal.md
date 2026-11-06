@@ -7,7 +7,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 
 | Feature | Support |
 | --- | --- |
-| Cursor movement | Absolute/relative positioning, origin mode, DEC and ANSI/SCO save/restore, and configurable forward/backward tab stops. |
+| Cursor movement | Absolute/relative positioning, including [relative cursor aliases](../reference/protocol.md#relative-cursor-aliases), origin mode, DEC and ANSI/SCO save/restore, and configurable forward/backward tab stops. |
 | Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. |
 | Cell editing | Character and column insertion/deletion, erase, protected cells, and selective erase. |
 | Writing modes | Insert/replace, autowrap, and automatic newline modes. |

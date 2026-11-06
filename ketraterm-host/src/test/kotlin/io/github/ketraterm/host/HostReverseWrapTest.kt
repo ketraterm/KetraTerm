@@ -26,8 +26,8 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostReverseWrapTest {
     @ParameterizedTest
-    @ValueSource(strings = ["\u0008", "\u001B[D", "\u001B[0D"])
-    fun `BS and default or zero CUB cross a soft wrap identically`(motion: String) {
+    @ValueSource(strings = ["\u0008", "\u001B[D", "\u001B[0D", "\u001B[j", "\u001B[0j"])
+    fun `BS and default or zero backward cursor commands cross a soft wrap identically`(motion: String) {
         val bytes = ("ABCDX\u001B[?45h" + motion + motion + "Y").encodeToByteArray()
         assertAllByteSplits(bytes) { split ->
             val terminal = TerminalBuffers.create(4, 3)
