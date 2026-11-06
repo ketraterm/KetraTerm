@@ -23,11 +23,15 @@ __ketraterm_collect_path_commands() (
     find_options=()
     if [[ -n ${ZSH_VERSION-} ]]; then
         builtin emulate -L zsh
+        builtin zmodload -F zsh/system b:sysread || {
+            builtin printf '__ketraterm_inventory_unavailable'
+            return
+        }
         # Even builtin cd invokes user chpwd hooks unless explicitly suppressed.
         cd_options=(-q)
     fi
     builtin local LC_ALL=C origin="$PWD" remaining="$PATH:" directory name count=0 size=0 enumerated=0
-    builtin local path_count=0 scanned_count=0 scanned_size=0
+    builtin local path_count=0 scanned_count=0 scanned_size=0 buffer= chunk=
     # Validate before locating find, since that lookup also traverses PATH.
     while [[ -n $remaining ]]; do
         ((path_count+=1))
@@ -76,10 +80,21 @@ __ketraterm_collect_path_commands() (
         # before filtering so sparse executable directories cannot evade limits.
         # An empty record is the success marker; filenames can never be empty.
         enumerated=0
+        buffer=
         while :; do
             if [[ -n ${ZSH_VERSION-} ]]; then
-                IFS= builtin read -r -d '' name || break
-                files=("$name")
+                # Zsh read -d changes the controlling tty even when stdin is a
+                # pipe. Its restoration races the interactive editor's raw mode.
+                builtin sysread -i 0 -s 8192 chunk || break
+                buffer+=$chunk
+                if ((${#buffer} > 16777216)); then
+                    builtin printf '__ketraterm_inventory_overflow'
+                    return
+                fi
+                files=("${(@0)buffer}")
+                # Retain the unfinished record across reads, including an empty tail.
+                buffer=${files[-1]}
+                files[-1]=()
             else
                 # Use Bash's array reader without retaining a whole directory.
                 builtin mapfile -d '' -n 256 -t files || break

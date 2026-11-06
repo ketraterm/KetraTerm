@@ -278,8 +278,9 @@ class PowerShellNativeCompletionTest {
             val fixture = Fixture(StandardTestDispatcher(testScheduler))
             val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
             runCurrent()
-            advanceTimeBy(2_000.milliseconds)
+            advanceTimeBy(10_000.milliseconds)
             runCurrent()
+            assertTrue(query.isCompleted)
             assertNull(query.await())
             assertNull(fixture.session.requestShellCompletions("Get-Chi", 7))
             fixture.close()

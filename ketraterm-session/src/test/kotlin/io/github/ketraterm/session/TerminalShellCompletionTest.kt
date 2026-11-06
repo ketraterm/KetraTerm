@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
@@ -183,19 +184,37 @@ class TerminalShellCompletionTest {
                 old.cancelAndJoin()
                 val latest = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
-                advanceTimeBy(1_500)
+                advanceTimeBy(9_500)
                 fixture.reply()
                 runCurrent()
                 assertEquals("qq", fixture.writtenText())
                 assertFalse(latest.isCompleted)
 
-                advanceTimeBy(500)
+                advanceTimeBy(500.milliseconds)
                 runCurrent()
                 assertNull(latest.await())
                 fixture.reply(requestId = 2)
                 runCurrent()
                 val fresh = checkNotNull(fixture.session.captureCommandEdit())
                 assertEquals(STALE_CONTEXT, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("never"))))
+            }
+        }
+
+    @Test
+    fun `cold native completion can finish after module discovery without repeating the query`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val query = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                advanceTimeBy(3_500.milliseconds)
+                runCurrent()
+                assertFalse(query.isCompleted)
+                assertEquals("q", fixture.writtenText())
+
+                fixture.reply()
+                runCurrent()
+                assertNotNull(query.await())
+                assertEquals("q", fixture.writtenText())
             }
         }
 

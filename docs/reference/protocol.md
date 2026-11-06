@@ -459,9 +459,10 @@ to the same application/script path and type. Shadowing functions and aliases do
 not authorize that normalization. The command authority and catalog enrichment
 policy belongs to the [completion engine](../../ketraterm-completion/docs/completion-architecture.md#internal-implementation).
 
-Waiting expires after two seconds. Cancelled/timed-out requests retain the wire
+Waiting expires after ten seconds, allowing cold PowerShell module discovery.
+Callers can cancel earlier. Cancelled/timed-out requests retain the wire
 slot until their reply or a new prompt, so a late result cannot satisfy a newer
-request. A replacement request can wait for that slot within its own two-second
+request. A replacement request can wait for that slot within its own ten-second
 deadline, then revalidate the current command buffer before sending its query.
 Native completers run in the shell and may continue after host cancellation.
 Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)

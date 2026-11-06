@@ -206,6 +206,33 @@ class ShellCommandCollectorNativeTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
+    fun `filename records survive read boundaries and an unterminated failed stream stays unavailable`(shell: String) {
+        val output =
+            runCollector(
+                shell,
+                """
+                printf '#!/bin/sh\n' > command
+                command chmod +x command
+                export KETRA_TEST_CAT=${'$'}(command -v cat) KETRA_TEST_STREAM="${'$'}PWD/raw-stream"
+                # The next record starts before, and ends after, an 8192-byte read boundary.
+                printf '%08186d' 0 > raw-stream
+                printf '\0./command\0./unfinished' >> raw-stream
+                command cat > find <<'FINDER'
+                #!/bin/sh
+                [ "${'$'}5" != 0 ] || exit 0
+                "${'$'}KETRA_TEST_CAT" "${'$'}KETRA_TEST_STREAM"
+                exit 1
+                FINDER
+                command chmod +x find
+                PATH="${'$'}PWD"
+                __ketraterm_collect_path_commands
+                """.trimIndent(),
+            )
+        assertEquals("command\u0000__ketraterm_inventory_unavailable", output)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bash", "zsh", "wsl-bash", "wsl-zsh"])
     fun `raw filename bytes are bounded independently of executable and entry counts`(shell: String) {
         val output =
             runCollector(

@@ -700,13 +700,14 @@ public class TerminalSession private constructor(
      * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
      * Provisional snapshots reuse that verified result while their exact context remains current,
      * so confirmation and candidate collection do not invoke the native completer twice.
+     * The ten-second deadline allows cold native module discovery; callers can cancel earlier.
      */
     public suspend fun requestShellCompletions(
         commandLine: String,
         cursorOffset: Int,
     ): TerminalShellCompletionResult? {
         currentCoroutineContext().ensureActive()
-        return withTimeoutOrNull(2_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
+        return withTimeoutOrNull(10_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
     }
 
     private suspend fun awaitShellCompletions(

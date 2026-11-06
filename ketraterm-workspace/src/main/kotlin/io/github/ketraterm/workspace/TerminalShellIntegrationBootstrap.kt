@@ -607,14 +607,12 @@ internal object TerminalShellIntegrationBootstrap {
             function __ketraterm_fish_prompt --on-event fish_prompt
                 set -l code ${'$'}status
                 if test "${'$'}__ketraterm_fish_native_markers" = 1
-                    __ketraterm_osc7
                     return
                 end
                 if test "${'$'}__ketraterm_fish_command_started" = 1
                     __ketraterm_osc133 "D;${'$'}code"
                     set -g __ketraterm_fish_command_started 0
                 end
-                __ketraterm_osc7
                 __ketraterm_osc133 A
             end
             function __ketraterm_fish_preexec --on-event fish_preexec
@@ -634,11 +632,13 @@ internal object TerminalShellIntegrationBootstrap {
                     set -g __ketraterm_fish_command_started 0
                 end
             end
-            # Native mark-prompt emits A/C/D, but not the command-line boundary B.
-            # Append B to the actual prompt; older Fish ignores SHELL_PROMPT_SUFFIX.
+            # Prompt events (including Fish's own OSC 7 handler) finish before this
+            # output is rendered. Keep the launcher's filesystem authority last.
+            # Older Fish lacks native B and ignores SHELL_PROMPT_SUFFIX.
             functions --copy fish_prompt __ketraterm_original_fish_prompt
             function fish_prompt
                 __ketraterm_original_fish_prompt
+                __ketraterm_osc7
                 __ketraterm_osc133 B
             end
         end

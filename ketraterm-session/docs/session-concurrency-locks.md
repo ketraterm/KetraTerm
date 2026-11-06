@@ -114,7 +114,8 @@ that permission. Changed-away-and-back rendered text cannot renew an old context
 Results complete outside session locks. Cancellation retains the pending wire
 slot until a reply/new prompt. A replacement request can await that retirement,
 then recapture and revalidate its buffer before sending a new query. Waiting and
-query execution share the same two-second deadline; cancelling a waiting caller
+query execution share the same [native completion deadline](../../docs/reference/protocol.md#private-powershell-completion-metadata);
+cancelling a waiting caller
 does not release another caller's wire slot. Closure cancels both response and
 retirement waiters. A concurrent query whose consumer is still active remains busy.
 

@@ -115,6 +115,9 @@ internal class ShellIntegrationCommandTextExtractor(
             val fromColumn = if (row == startRow) startColumn else 0
             val toColumn =
                 when {
+                    // A full-width prompt can end in spaces and move the empty editor
+                    // to the next row with CRLF. Those prompt cells are outside the command.
+                    cursorAtNextLineStart && row == endRow && fromColumn == frame.columns -> fromColumn
                     row < endRow || cursorAtNextLineStart -> lastTextColumnExclusive(frame.columns, preserveWrapColumns = wrapped)
                     else -> cursorColumn.coerceIn(0, frame.columns)
                 }
@@ -240,6 +243,7 @@ internal class ShellIntegrationCommandTextExtractor(
             val fromColumn = if (row == startRow) startColumn else 0
             val toColumn =
                 when {
+                    cursorAtNextLineStart && row == endRow && fromColumn == columns -> fromColumn
                     row < endRow || cursorAtNextLineStart -> lastTextColumnExclusive(columns, preserveWrapColumns = wrapped)
                     else -> cursorColumn.coerceIn(0, columns)
                 }

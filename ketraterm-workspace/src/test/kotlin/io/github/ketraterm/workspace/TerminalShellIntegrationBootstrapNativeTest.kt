@@ -442,6 +442,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         assertTrue(workers.size > 1, "The finder must run in the background inventory process tree")
                         session.awaitLine("")
                         if (completeInventory) {
+                            session.submitInput(TerminalPasteEvent("echo inventory-readyX"))
+                            session.awaitLine("echo inventory-readyX")
                             assertEquals(
                                 0,
                                 runProcess(
@@ -453,6 +455,16 @@ class TerminalShellIntegrationBootstrapNativeTest {
                                     inventory?.commands?.any { it.displayText == "ketra_path_marker" } == true
                                 }
                                 workers.forEach { it.onExit().await() }
+                            }
+                            session.submitInput(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                            session.awaitLine("echo inventory-ready")
+                            session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
+                            withTimeout(15.seconds) {
+                                session.shellIntegrationState.revision.first {
+                                    val state = session.shellIntegrationState
+                                    val command = state.commandMetadata(state.latestCommandRecordId())
+                                    command?.commandText == "echo inventory-ready" && command.exitCode == 0
+                                }
                             }
                             session.awaitLine("")
                         }
@@ -466,7 +478,17 @@ class TerminalShellIntegrationBootstrapNativeTest {
                                         .trimEnd()
                                         .takeIf(String::isNotEmpty)
                                 }
-                            assertEquals(listOf("ketra>"), lines, "Inventory work must not print job-control messages in the terminal")
+                            val expected =
+                                if (completeInventory) {
+                                    listOf(
+                                        "ketra> echo inventory-ready",
+                                        "inventory-ready",
+                                        "ketra>",
+                                    )
+                                } else {
+                                    listOf("ketra>")
+                                }
+                            assertEquals(expected, lines, "Inventory work must preserve editing and never print job-control messages")
                         }
                         session.close()
                         withTimeout(15.seconds) { workers.forEach { it.onExit().await() } }
@@ -643,22 +665,19 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         session.renderGeneration.first {
                             val command = session.activeShellCommandLine()
                             if (command?.commandText != line) return@first false
-                            var matches = false
-                            session.readRenderFrame { frame ->
-                                val attrs = LongArray(frame.columns)
-                                frame.copyLine(
-                                    command.cursorRow,
-                                    IntArray(frame.columns),
-                                    attrWords = attrs,
-                                    flags = IntArray(frame.columns),
-                                )
-                                val start = command.cursorColumn - line.length
-                                matches = start >= 0 &&
-                                    (start until command.cursorColumn).all { column ->
-                                        TerminalRenderAttrs.isInverse(attrs[column]) == highlighted
+                            // Live cells can run ahead of this render notification. Await the
+                            // published text before undoing it, or that state may be conflated away.
+                            session.readPublishedFrame { frame ->
+                                val start = frame.cursorColumn - line.length
+                                frame.cursorRow == command.cursorRow &&
+                                    frame.cursorColumn == command.cursorColumn &&
+                                    start >= 0 &&
+                                    line.indices.all { index ->
+                                        val cell = frame.cursorRow * frame.columns + start + index
+                                        frame.codeWords[cell] == line[index].code &&
+                                            TerminalRenderAttrs.isInverse(frame.attrWords[cell]) == highlighted
                                     }
-                            }
-                            matches
+                            } == true
                         }
                     }
                 }
@@ -682,7 +701,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 awaitRenderedLine("printf123", highlighted = false)
                 // An empty closing paste must not create another undo step.
                 session.submitInput(TerminalKeyEvent.codepoint('_'.code, TerminalModifiers.CTRL))
-                session.awaitLine("printf")
+                session.awaitLine("printf", "undoing the inserted suffix")
                 for (definition in listOf("git switch", "git checkout")) {
                     session.submitInput(
                         listOf(
@@ -1478,15 +1497,15 @@ class TerminalShellIntegrationBootstrapNativeTest {
     }
 
     @ParameterizedTest(name = "Fish initial command boundary with {0}-column prompt")
-    @ValueSource(ints = [12, 19, 20])
+    @ValueSource(ints = [12, 19, 20, 21, 40])
     fun `fish initial prompt at the right margin leaves an empty command line`(promptWidth: Int): Unit =
         runBlocking {
             val fish = installedExecutable("fish", "fish.exe")
             assumeTrue(fish != null, "fish is not installed")
-            val prompt = "p".repeat(promptWidth)
+            val prompt = "p".repeat(promptWidth - 1) + " "
             val setup =
                 "set -g fish_greeting; set -g fish_history ''; set -g fish_autosuggestion_enabled 0; " +
-                    "function fish_prompt; printf '%s' '$prompt'; end; function fish_right_prompt; end"
+                    "function fish_prompt; set_color green; printf '%s' '$prompt'; set_color normal; end; function fish_right_prompt; end"
             TerminalWorkspace().use { workspace ->
                 val session =
                     workspace
@@ -1496,6 +1515,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ).session
                 session.awaitLine("", "rendering the $promptWidth-column prompt")
                 assertEquals(0, session.activeShellCommandLine()?.cursorOffset)
+                session.submitInput(TerminalPasteEvent("echo marker"))
+                session.awaitLine("echo marker", "typing after the $promptWidth-column prompt")
             }
         }
 
@@ -1727,8 +1748,10 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     listOf(
                         "--no-config",
                         "-c",
-                        "emit fish_prompt; fish_prompt; emit fish_preexec false; false; emit fish_postexec false; emit fish_prompt; fish_prompt",
+                        "function later_directory_event --on-event fish_prompt; printf '\\e]7;file://other-host/tmp\\a'; end; " +
+                            "emit fish_prompt; fish_prompt; emit fish_preexec false; false; emit fish_postexec false; emit fish_prompt; fish_prompt",
                     ),
+                environment = integrated.environment,
             )
 
         assertEquals(0, result.exitCode)
@@ -1738,9 +1761,12 @@ class TerminalShellIntegrationBootstrapNativeTest {
             assertFalse(Regex("\u001b]133;[ACD]").containsMatchIn(result.stdout), visibleEscapes(result.stdout))
         } else {
             assertMarkerOrder(result.stdout, "A", "B", "C", "D;1", "A", "B")
-            assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
         }
-        assertEquals(2, Regex("prompt> \u001b]133;B\u0007").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+        assertEquals(
+            2,
+            Regex("prompt> \u001b]7;file://localhost/[^\u0007]+\u0007\u001b]133;B\u0007").findAll(result.stdout).count(),
+            visibleEscapes(result.stdout),
+        )
     }
 
     private fun commandInventories(output: String): List<List<List<String>>> {

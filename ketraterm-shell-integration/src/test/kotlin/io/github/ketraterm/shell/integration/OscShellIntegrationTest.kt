@@ -422,6 +422,38 @@ class OscShellIntegrationTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = ["prompt> ", "prompt  "])
+    fun `a full-width prompt ending in spaces followed by CRLF has an empty editable line`(prompt: String) {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            val output = "\u001B]133;A\u0007\u001B[32m$prompt\u001B[0m\u001B]133;B\u0007\r\n"
+            for (byte in output.ascii()) connector.feedFromHost(byteArrayOf(byte))
+            val active = requireNotNull(session.activeShellCommandLine())
+            assertEquals("", active.commandText)
+            assertEquals(0, active.cursorOffset)
+            assertEquals(1, active.cursorRow)
+            assertEquals(0, active.cursorColumn)
+
+            val extractor = ShellIntegrationCommandTextExtractor()
+            val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            session.readRenderFrame { frame ->
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.COMPLETE,
+                    extractor.fingerprint(frame, frame.lineId(0), 8, 1, 0, frameFingerprint),
+                )
+            }
+            val cache = TerminalRenderCache(8, 4).also { it.updateFrom(session) }
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.COMPLETE,
+                extractor.fingerprint(cache, cache.lineIds[0], 8, 1, 0, cacheFingerprint),
+            )
+            assertEquals(0L, frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+            assertArrayEquals(frameFingerprint, cacheFingerprint)
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [19, 20])
     fun `Fish cross-row redraw without a fresh prompt boundary leaves editing context unavailable`(promptWidth: Int) {
         val connector = MockConnector()
