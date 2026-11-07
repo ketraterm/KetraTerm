@@ -12,7 +12,7 @@ are internal; hosts configure fonts through `SwingSettings` and `SwingHostServic
 | --- | --- |
 | Compatible LTR ASCII | `drawChars` when font advances match the grid; otherwise a cached vector with explicit cell positions |
 | Contextual scripts / ordinary text in RTL runs | Contextually shaped vectors positioned by terminal-cell ownership |
-| Supported box, block, geometric, and Braille characters | Programmatic cell primitives |
+| Supported box, block, geometric, Braille, and Powerline characters | Programmatic cell primitives |
 | Emoji presentation sequences | Available platform rasterizer, then Java2D fallback |
 | Emoji bases with VS15 | Text font selection and bounded `TextLayout` with proportional cell fitting, including in RTL runs |
 | Other scalars and clusters | Bounded cached `TextLayout` fallback |
@@ -39,6 +39,19 @@ nominal cell dimensions so neighboring cells retain equal dot weight at
 fractional display scales. Positions follow the actual cell bounds, including
 line height and column spacing. Painting uses the existing foreground, composite,
 and cell clip; font fallback and the text baseline do not affect the dots.
+
+Powerline separators (`U+E0B0–U+E0BF`) use cell-fitted paths for filled arrows,
+open chevrons, rounded caps, and diagonal half-cells/lines. Outline weight uses
+nominal device-cell width so neighboring cells keep a consistent stroke at
+fractional scales. Separator colors bypass minimum-contrast adjustment to match
+adjoining segment backgrounds; faint intensity, selection, and cursor foreground
+still apply. Other Powerline private-use characters use ordinary font fallback.
+
+The [extended UTF-8 corpus](../../utf8-extended.txt) includes all Braille patterns,
+repeated graph rows, and all 16 geometric Powerline separators for manual checks
+with different fonts, line heights, column spacing, and display scales. Colored
+segment joins, clipping, bidi placement, and cursor repainting also have automated
+rendering tests.
 
 ## Native emoji image caching
 

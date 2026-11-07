@@ -1442,6 +1442,41 @@ class TerminalTextPainterTest {
         }
 
         @Test
+        fun `powerline uses the same geometry in bidi rows and block cursor repaint`() {
+            val ltr = fixture().copy(metrics = SwingMetrics(12, 24, 18, 20, 12, 0, 1))
+            val rtl = fixture().copy(metrics = ltr.metrics)
+            try {
+                for (codePoint in 0xE0B0..0xE0BF) {
+                    val text = codePoint.toChar().toString()
+                    ltr.clearCell(0)
+                    rtl.clearCell(0)
+                    rtl.clearCell(1)
+                    val ltrCache = renderCache(TestRenderFrame.text(text))
+                    val rtlCache = renderCache(TestRenderFrame.text("\u05D0$text"))
+                    ltr.paintRow(ltrCache)
+                    rtl.paintRow(rtlCache)
+                    val expected = ltr.image.getRGB(0, 0, 12, 24, null, 0, 12)
+                    assertTrue(expected.any { it ushr 24 != 0 })
+                    assertContentEquals(expected, rtl.image.getRGB(0, 0, 12, 24, null, 0, 12))
+                    ltr.clearCell(0)
+                    ltr.painter.paintCellForeground(
+                        ltr.g,
+                        ltrCache,
+                        ltr.metrics,
+                        column = 0,
+                        row = 0,
+                        foreground = TEST_RED,
+                        fontRenderContext = ltr.g.fontRenderContext,
+                    )
+                    assertContentEquals(expected, ltr.image.getRGB(0, 0, 12, 24, null, 0, 12))
+                }
+            } finally {
+                ltr.g.dispose()
+                rtl.g.dispose()
+            }
+        }
+
+        @Test
         fun `geometric square meter glyphs are painted as contiguous terminal primitives`() {
             val fixture = fixture()
             val cache = renderCache(TestRenderFrame.text("\u25A0\u25A0"))

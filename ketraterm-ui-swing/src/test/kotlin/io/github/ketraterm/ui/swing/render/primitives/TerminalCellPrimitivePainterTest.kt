@@ -200,6 +200,69 @@ class TerminalCellPrimitivePainterTest {
         kotlin.test.assertTrue(painted > 0)
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
+    fun `powerline joins a solid segment without a seam at fractional scales`(scale: Double) {
+        for (codePoint in intArrayOf(0xE0B0, 0xE0B2, 0xE0B4, 0xE0B6)) {
+            val image = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB)
+            val g = image.createGraphics()
+            val metrics = SwingMetrics(9, 18, 14, 15, 9, 0, 1)
+            val facesLeft = codePoint and 2 != 0
+            try {
+                g.translate(0.4, 0.6)
+                g.scale(scale, scale)
+                g.color = Color.BLUE
+                g.fillRect(0, 0, 36, 36)
+                g.color = Color.RED
+                val transform = g.transform
+                g.clip = Rectangle(0, 0, 27, 18)
+                val clip = g.clip.bounds2D
+                val router = TerminalCellPrimitivePainter()
+                router.paint(g, codePoint, 1, 0, metrics)
+                router.paint(g, 0x2588, if (facesLeft) 2 else 0, 0, metrics)
+                assertEquals(transform, g.transform)
+                // Transform round trips can shift a clip edge by floating-point epsilon.
+                val afterClip = g.clip.bounds2D
+                assertEquals(clip.x, afterClip.x, 1e-9)
+                assertEquals(clip.y, afterClip.y, 1e-9)
+                assertEquals(clip.width, afterClip.width, 1e-9)
+                assertEquals(clip.height, afterClip.height, 1e-9)
+            } finally {
+                g.dispose()
+            }
+            val boundary = kotlin.math.round((if (facesLeft) 18 else 9) * scale + 0.4).toInt()
+            val top = kotlin.math.round(0.6).toInt()
+            val bottom = kotlin.math.round(18 * scale + 0.6).toInt()
+            for (y in top + 2 until bottom - 2) {
+                assertEquals(Color.RED.rgb, image.getRGB(boundary - 1, y), "Before join, scale $scale")
+                assertEquals(Color.RED.rgb, image.getRGB(boundary, y), "After join, scale $scale")
+            }
+        }
+    }
+
+    @Test
+    fun `powerline outlines respect a partial device clip`() {
+        val image = BufferedImage(64, 80, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.color = Color.RED
+            g.scale(1.5, 1.5)
+            g.clip = Rectangle(0, 0, 6, 24)
+            TerminalCellPrimitivePainter().paint(g, 0xE0B1, 0, 0, SwingMetrics(12, 24, 18, 20, 12, 0, 1))
+        } finally {
+            g.dispose()
+        }
+        var painted = 0
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                if (image.getRGB(x, y) == 0) continue
+                kotlin.test.assertTrue(x < 9 && y < 36)
+                painted++
+            }
+        }
+        kotlin.test.assertTrue(painted > 0)
+    }
+
     private fun firstPaintedY(
         image: BufferedImage,
         xStart: Int,

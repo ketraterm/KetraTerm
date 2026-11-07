@@ -29,6 +29,7 @@ internal class TerminalCellPrimitivePainter {
     private val boxDrawingPainter = TerminalBoxDrawingPainter()
     private val blockElementPainter = TerminalBlockElementPainter()
     private val geometricShapePainter = TerminalGeometricShapePainter()
+    private val powerlinePainter = TerminalPowerlinePainter()
     private val clipScratch = Rectangle()
 
     /**
@@ -38,7 +39,8 @@ internal class TerminalCellPrimitivePainter {
         TerminalBoxDrawingGlyphs.canPaint(codePoint) ||
             TerminalBlockElementGlyphs.canPaint(codePoint) ||
             TerminalGeometricShapeGlyphs.canPaint(codePoint) ||
-            TerminalBraillePainter.canPaint(codePoint)
+            TerminalBraillePainter.canPaint(codePoint) ||
+            TerminalPowerlinePainter.canPaint(codePoint)
 
     /**
      * Paints one supported cell-native glyph.
@@ -94,6 +96,10 @@ internal class TerminalCellPrimitivePainter {
 
                 TerminalBraillePainter.canPaint(codePoint) -> {
                     TerminalBraillePainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1, nominalCellWidth, nominalCellHeight)
+                }
+
+                TerminalPowerlinePainter.canPaint(codePoint) -> {
+                    powerlinePainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1, nominalCellWidth)
                 }
 
                 TerminalGeometricShapeGlyphs.canPaint(codePoint) -> {
