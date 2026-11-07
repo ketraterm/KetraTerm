@@ -19,6 +19,21 @@ import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import java.io.StringReader
+import java.util.Properties
+
+val environmentOwners =
+    Properties()
+        .apply {
+            load(StringReader(providers.fileContents(layout.projectDirectory.file("gradle/test-environments.properties")).asText.get()))
+        }.let { properties ->
+            check(properties.stringPropertyNames() == setOf("native", "desktop")) { "Declare native and desktop module owners" }
+            properties.stringPropertyNames().associateWith { suite ->
+                properties.getProperty(suite).split(',').toSet().also { owners ->
+                    check(owners.all { findProject(":$it") != null }) { "Unknown $suite test module owner" }
+                }
+            }
+        }
 
 // Modules share a display; serialize their real-window suites even under --parallel.
 abstract class DesktopTestDisplay : BuildService<BuildServiceParameters.None>
@@ -46,6 +61,7 @@ subprojects {
             systemProperty("java.awt.headless", "true")
         }
         for (suite in listOf("native", "desktop")) {
+            val ownsSuite = project.name in environmentOwners.getValue(suite)
             val suiteTask =
                 tasks.register<Test>("${suite}Test") {
                     group = "verification"
@@ -56,6 +72,7 @@ subprojects {
                     testLogging { exceptionFormat = TestExceptionFormat.FULL }
                     // Many modules legitimately have no tests in one of the environment-dependent suites.
                     failOnNoDiscoveredTests.set(false)
+                    onlyIf("Module declares $suite tests") { ownsSuite }
                     // Installed tools, shell state, and the desktop are not reproducible Gradle inputs.
                     outputs.upToDateWhen { false }
                     outputs.doNotCacheIf("Tests depend on the host environment") { true }
@@ -74,9 +91,9 @@ subprojects {
                     shouldRunAfter(tasks.named("test"))
                     if (suite == "desktop") usesService(desktopDisplay)
                 }
-            if (suite == "native") {
+            if (ownsSuite && suite == "native") {
                 nativeTests.configure { dependsOn(suiteTask) }
-            } else {
+            } else if (ownsSuite) {
                 desktopTests.configure { dependsOn(suiteTask) }
             }
         }

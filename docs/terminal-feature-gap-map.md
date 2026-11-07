@@ -14,7 +14,7 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | `TODO(host/profile)` | A standalone quick/drop-down terminal with platform-appropriate activation and focus handling. Ordinary terminal windows do not provide this workflow. |
 | `TODO(host/profile)` | A product read-only session toggle that blocks outbound user input while retaining output, selection, and search. Read-only render frames and closed-session presentation are different capabilities. |
 | `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
-| `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: JVM, native PTY and desktop suites, package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. [Standard CI](development/testing.md#ci) runs all three test suites and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
+| `TODO(host/profile)` | Add supported-IDE Plugin Verifier runs and installed-product smoke tests to release verification. [Full CI](development/testing.md#ci) gates publication on the exact release revision's JVM, native PTY, desktop, ABI, consumer, package-metadata, and IDE test checks; those checks do not verify installed products or the supported IDE compatibility range. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
 
 ## Completion and suggestions
@@ -81,7 +81,6 @@ they are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(parser)` | **High priority:** Add the HPR (`CSI Ps a`), VPR (`CSI Ps e`), CUB (`CSI Ps j`), and CUU (`CSI Ps k`) aliases. Applications using these aliases otherwise lose cursor movement and may place output incorrectly. |
 | `TODO(parser/core/host)` | **High priority:** Implement REP (`CSI Ps b`) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement Kitty ED 22 (`CSI 22 J`) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
