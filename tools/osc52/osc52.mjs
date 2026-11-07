@@ -68,11 +68,12 @@ export async function probe({ input, output, expected, selections = ['c'], termi
   const onEnd = () => fail(new Error('Terminal input closed before completion.'));
   const onError = () => fail(new Error('Terminal I/O failed.'));
   const onAbort = () => fail(new Error('Check interrupted.'));
-  const exchange = (request, reply) => new Promise((resolve, reject) => {
+  const exchange = (request, reply, description = '') => new Promise((resolve, reject) => {
     if (failure) return reject(failure);
+    const context = description ? ` during ${description}` : '';
     pending = {
       bytes: Buffer.from(reply, 'ascii'), offset: 0, resolve, reject,
-      timer: setTimeout(() => fail(new Error('Response timed out or was incomplete. No retry was sent.')), timeoutMs),
+      timer: setTimeout(() => fail(new Error(`Response timed out or was incomplete${context}. No retry was sent.`)), timeoutMs),
     };
     try {
       output.write(request, 'ascii', error => { if (error) onError(); });
@@ -92,16 +93,16 @@ export async function probe({ input, output, expected, selections = ['c'], termi
     if (signal?.aborted) onAbort();
     input.resume();
     // Proves the return path works before interpreting an empty clipboard reply.
-    await exchange(`${ESC}[5n`, `${ESC}[0n`);
+    await exchange(`${ESC}[5n`, `${ESC}[0n`, 'initial DSR framing check');
     const base64 = expected.toString('base64');
     for (const selection of selections) {
       for (const terminator of terminators) {
         const normalized = [...new Set(selection || 'c')].join('');
         const start = performance.now();
-        await exchange(`${ESC}]52;${selection};?${terminator === 'bel' ? '\x07' : ST}`, `${ESC}]52;${normalized};${base64}${ST}`);
+        await exchange(`${ESC}]52;${selection};?${terminator === 'bel' ? '\x07' : ST}`, `${ESC}]52;${normalized};${base64}${ST}`, `selection='${selection || '(omitted)'}' terminator=${terminator}`);
         const elapsedMs = Math.round(performance.now() - start);
         // Catch extra bytes already emitted and re-establish framing before the next query.
-        await exchange(`${ESC}[5n`, `${ESC}[0n`);
+        await exchange(`${ESC}[5n`, `${ESC}[0n`, `post-query DSR framing check (selection='${selection || '(omitted)'}' terminator=${terminator})`);
         results.push({ selection, terminator, bytes: expected.length, elapsedMs });
       }
     }
