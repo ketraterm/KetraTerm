@@ -85,6 +85,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         line: String,
         stage: String = "input",
         requireShellCompletion: Boolean = false,
+        cursorOffset: Int = line.length,
     ): TerminalCommandEditContext {
         try {
             var captured: TerminalCommandEditContext? = null
@@ -94,7 +95,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     if (requireShellCompletion && (!shellCompletionAvailable || edit.prefixResetKeys.isEmpty())) {
                         return@first false
                     }
-                    if (edit.commandLine.commandText == line) {
+                    val snapshot = edit.commandLine
+                    if (snapshot.commandText == line && snapshot.cursorOffset == cursorOffset) {
                         captured = edit
                         true
                     } else {
@@ -118,7 +120,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     }
                 }
             throw AssertionError(
-                "Expected editable line '$line' after $stage (completionAvailable=$shellCompletionAvailable), observed ${activeShellCommandLine()}, session ${state.value}\n$screen",
+                "Expected editable line '$line' (cursor=$cursorOffset) after $stage (completionAvailable=$shellCompletionAvailable), observed ${activeShellCommandLine()}, session ${state.value}\n$screen",
                 failure,
             )
         }
@@ -1004,6 +1006,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
                 session.awaitLine("Get-ChildItem", "first acceptance")
+                var lastAcceptedEdit: TerminalCommandEditContext? = null
                 repeat(3) { iteration ->
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
@@ -1028,13 +1031,16 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(afterDeletion, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
                     )
-                    session.awaitLine("Get-ChildItem", "acceptance cycle $iteration")
+                    val accepted = session.awaitLine("Get-ChildItem", "acceptance cycle $iteration")
+                    if (iteration == 2) {
+                        lastAcceptedEdit = accepted
+                    }
                 }
                 val command = "Write-Output 'ketra-accepted'"
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(
-                        assertNotNull(session.captureCommandEdit()),
+                        checkNotNull(lastAcceptedEdit),
                         listOf(TerminalTextReplacementEvent(0, "Get-ChildItem".length, command), TerminalKeyEvent.key(TerminalKey.ENTER)),
                     ),
                 )
@@ -1071,7 +1077,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     ),
                 )
                 var currentLine = encodingLine.dropLast(1) + utf8.replacementText
-                session.awaitLine(currentLine, "accepting encoding argument")
+                var currentEdit = session.awaitLine(currentLine, "accepting encoding argument")
                 for ((line, expectedText) in listOf(
                     "Get-Content -Enc u" to "UTF8",
                     "Get-Content -Encoding:u" to "UTF8",
@@ -1080,7 +1086,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(
-                            assertNotNull(session.captureCommandEdit()),
+                            currentEdit,
                             listOf(TerminalTextReplacementEvent(0, currentLine.length, line)),
                         ),
                     )
@@ -1096,7 +1102,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     )
                     currentLine = line.take(answer.replacementStartOffset) + candidate.replacementText
-                    session.awaitLine(currentLine, "accepting parameter case '$line'")
+                    currentEdit = session.awaitLine(currentLine, "accepting parameter case '$line'")
                 }
             }
         }
