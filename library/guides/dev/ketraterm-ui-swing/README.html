@@ -186,7 +186,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/4e70b251eeac44972c3a68cebec6738d3a2f6290/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/b855651aee3424078027f0c90311e5fe7cd056b4/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -365,6 +365,14 @@ painters or input controllers.</p>
 numeric typing in application keypad mode. Unsupported or headless toolkits
 retain existing keypad behavior without inferring lock state or repeatedly
 querying an unavailable facility.</p>
+<p>Smooth scrolling is enabled by default. Library hosts can disable animation:</p>
+<pre><code class="language-kotlin">val settings = SwingSettings.create { it.smoothScrolling = false }
+</code></pre>
+<p>Wheel, paging, and row scrolling then apply their destinations immediately while
+precise wheel input still accumulates into whole rows. Supply an updated settings
+snapshot and call <code>reloadSettings()</code> to change this at runtime; disabling animation
+settles any pending scroll at its destination. Direct scrollbar dragging and
+<code>scrollToScrollbackOffset</code> always apply immediately.</p>
 <p>Admitted typing, editing keys, and paste immediately return to the live viewport
 and cancel pending scroll animation. Local shortcuts, modifier and lock keys,
 focus changes, and key releases preserve the scrollback position. New output
@@ -401,7 +409,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/4e70b251eeac44972c3a68cebec6738d3a2f6290/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b855651aee3424078027f0c90311e5fe7cd056b4/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
