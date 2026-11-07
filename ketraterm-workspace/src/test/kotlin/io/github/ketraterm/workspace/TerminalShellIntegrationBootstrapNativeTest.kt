@@ -17,6 +17,7 @@ package io.github.ketraterm.workspace
 
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.session.TerminalCommandEditContext
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
@@ -72,7 +73,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assumeBashCommandInventory(bash!!)
         val hook = checkNotNull(javaClass.getResourceAsStream("bash-completion.bash")).use { it.readBytes().toString(Charsets.UTF_8) }
         for ((output, reason) in listOf("git\\0" to "Unavailable", "__ketraterm_inventory_overflow" to "Overflow")) {
-            val script = hook + "\n__ketraterm_collect_path_commands() { printf '$output'; }\n__ketraterm_publish_commands test 1 Path\n"
+            val script =
+                "$hook\n__ketraterm_collect_path_commands() { printf '$output'; }\n__ketraterm_publish_commands test 1 Path\n"
             val result = runProcess(listOf(bash, "--noprofile", "--norc"), standardInput = script)
             assertTrue(result.stdout.contains("KetraTermCommands;3;Fail;test;1;$reason"))
             assertTrue(!result.stdout.contains("KetraTermCommands;3;End;"))
@@ -82,11 +84,21 @@ class TerminalShellIntegrationBootstrapNativeTest {
     private suspend fun TerminalSession.awaitLine(
         line: String,
         stage: String = "input",
-    ) {
+    ): TerminalCommandEditContext {
         try {
+            var captured: TerminalCommandEditContext? = null
             withTimeout(15.seconds) {
-                activeShellCommandLineRevision.first { activeShellCommandLine()?.commandText == line }
+                renderGeneration.first {
+                    val edit = captureCommandEdit() ?: return@first false
+                    if (edit.commandLine.commandText == line) {
+                        captured = edit
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
+            return checkNotNull(captured)
         } catch (failure: TimeoutCancellationException) {
             val screen =
                 buildString {
@@ -977,14 +989,15 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 }
                 val historyRecord = session.shellIntegrationState.latestCommandRecordId()
                 assertEquals(0, session.shellIntegrationState.commandMetadata(historyRecord)?.exitCode, "History setup failed")
-                session.awaitLine("", "test history setup")
-                val emptyContext = assertNotNull(session.captureCommandEdit())
+                val emptyContext = session.awaitLine("", "test history setup")
+                withTimeout(15.seconds) {
+                    session.renderGeneration.first { session.shellCompletionAvailable }
+                }
                 val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
-                session.awaitLine("Get-Chi", "typing after empty-buffer completion")
-                val expected = assertNotNull(session.captureCommandEdit())
+                val expected = session.awaitLine("Get-Chi", "typing after empty-buffer completion")
                 val result = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                 assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
@@ -1003,8 +1016,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             ),
                         ),
                     )
-                    session.awaitLine("Get-Chi", "deletion in acceptance cycle $iteration")
-                    val afterDeletion = assertNotNull(session.captureCommandEdit())
+                    val afterDeletion = session.awaitLine("Get-Chi", "deletion in acceptance cycle $iteration")
                     val refreshed = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
                     assertTrue(refreshed.candidates.any { it.replacementText == "Get-ChildItem" })
                     assertEquals(
@@ -1037,8 +1049,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(assertNotNull(session.captureCommandEdit()), listOf(TerminalPasteEvent(encodingLine))),
                 )
-                session.awaitLine(encodingLine, "typing encoding argument")
-                val encodingEdit = assertNotNull(session.captureCommandEdit())
+                val encodingEdit = session.awaitLine(encodingLine, "typing encoding argument")
                 val encodings = assertNotNull(session.requestShellCompletions(encodingLine, encodingLine.length))
                 assertTrue(encodings.candidates.any { it.replacementText.equals("Unicode", ignoreCase = true) })
                 val utf8 = encodings.candidates.first { it.replacementText.equals("UTF8", ignoreCase = true) }
@@ -1072,8 +1083,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                             listOf(TerminalTextReplacementEvent(0, currentLine.length, line)),
                         ),
                     )
-                    session.awaitLine(line, "typing parameter case '$line'")
-                    val edit = assertNotNull(session.captureCommandEdit())
+                    val edit = session.awaitLine(line, "typing parameter case '$line'")
                     val answer = assertNotNull(session.requestShellCompletions(line, line.length))
                     assertNull(answer.externalCommandName)
                     val candidate = answer.candidates.first { it.replacementText.equals(expectedText, ignoreCase = true) }

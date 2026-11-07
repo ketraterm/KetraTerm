@@ -78,6 +78,31 @@ class TerminalSessionClipboardReadTest {
         }
 
     @Test
+    fun `consecutive successful OSC queries release the slot as soon as each reply is emitted without reporting busy`() =
+        runTest {
+            var reads = 0
+            Fixture(
+                this,
+                reader = TerminalClipboardReader { TerminalClipboardReadResult.Text("query-$reads").also { reads++ } },
+            ).use { f ->
+                repeat(3) {
+                    f.query()
+                    runCurrent()
+                }
+                assertEquals(3, reads)
+                assertEquals(
+                    listOf(
+                        TerminalClipboardReadOutcome.SENT,
+                        TerminalClipboardReadOutcome.SENT,
+                        TerminalClipboardReadOutcome.SENT,
+                    ),
+                    f.outcomes,
+                )
+                assertNull(f.session.failure)
+            }
+        }
+
+    @Test
     fun `failed denied and unavailable providers release the slot for the next successful read`() =
         runTest {
             var reads = 0
