@@ -327,6 +327,14 @@ public class SwingSettings private constructor(
      * scrollback keeps its content anchored; admitted typing and paste still reveal live input.
      */
     public val scrollOnOutput: Boolean = builder.scrollOnOutput
+
+    /**
+     * Animates local wheel, paging, and row scrolling. Enabled by default. When disabled,
+     * destinations apply immediately; precise wheel input still accumulates into whole rows.
+     * Reloading with this disabled settles any active animation at its pending destination.
+     * Direct scrollbar dragging and explicit scrollback-offset assignments always apply immediately.
+     */
+    public val smoothScrolling: Boolean = builder.smoothScrolling
     public val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = builder.osc8HyperlinkPresentation
     public val osc8HyperlinkActivation: SwingHyperlinkActivation = builder.osc8HyperlinkActivation
 
@@ -562,6 +570,9 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */
         public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: false
 
+        /** Draft value for [SwingSettings.smoothScrolling]; defaults to true. */
+        public var smoothScrolling: Boolean = source?.smoothScrolling ?: true
+
         /** Draft value for [SwingSettings.osc8HyperlinkPresentation]; validated when [build] is called. */
         public var osc8HyperlinkPresentation: SwingHyperlinkPresentation? = source?.osc8HyperlinkPresentation
 
@@ -631,6 +642,7 @@ public class SwingSettings private constructor(
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
             shellSuggestionStyle == other.shellSuggestionStyle &&
             scrollOnOutput == other.scrollOnOutput &&
+            smoothScrolling == other.smoothScrolling &&
             osc8HyperlinkPresentation == other.osc8HyperlinkPresentation &&
             osc8HyperlinkActivation == other.osc8HyperlinkActivation
 
@@ -692,6 +704,7 @@ public class SwingSettings private constructor(
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
         result = 31 * result + shellSuggestionStyle.hashCode()
         result = 31 * result + scrollOnOutput.hashCode()
+        result = 31 * result + smoothScrolling.hashCode()
         result = 31 * result + osc8HyperlinkPresentation.hashCode()
         result = 31 * result + osc8HyperlinkActivation.hashCode()
         return result

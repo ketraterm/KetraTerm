@@ -349,6 +349,18 @@ numeric typing in application keypad mode. Unsupported or headless toolkits
 retain existing keypad behavior without inferring lock state or repeatedly
 querying an unavailable facility.
 
+Smooth scrolling is enabled by default. Library hosts can disable animation:
+
+```kotlin
+val settings = SwingSettings.create { it.smoothScrolling = false }
+```
+
+Wheel, paging, and row scrolling then apply their destinations immediately while
+precise wheel input still accumulates into whole rows. Supply an updated settings
+snapshot and call `reloadSettings()` to change this at runtime; disabling animation
+settles any pending scroll at its destination. Direct scrollbar dragging and
+`scrollToScrollbackOffset` always apply immediately.
+
 Admitted typing, editing keys, and paste immediately return to the live viewport
 and cancel pending scroll animation. Local shortcuts, modifier and lock keys,
 focus changes, and key releases preserve the scrollback position. New output

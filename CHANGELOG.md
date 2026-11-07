@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## Unreleased
 
+- Added `SwingSettings.smoothScrolling`, enabled by default. Library hosts can disable scroll animation while retaining precise wheel accumulation; disabling it during a settings reload settles pending motion at its destination.
 - Added HPR (`CSI Ps a`), VPR (`CSI Ps e`), HPB (`CSI Ps j`), and VPB (`CSI Ps k`) as aliases of existing cursor movement, preserving count defaults, bounds, margins, origin mode, and wrap behavior. See the [cursor alias contract](docs/reference/protocol.md#relative-cursor-aliases).
 - Render frames and caches expose `cursorPendingWrap` without changing visible cursor coordinates. Shell command extraction distinguishes the prompt's final cell from command text at a delayed-wrap boundary and preserves intentional leading spaces.
 - Added experimental command completion with progressive results, contextual ranking, bounded learning, and argument hints. The shared Swing popup supports match highlighting, configurable colors and shortcuts, and custom providers or UI. PowerShell completion requires an explicit request; automatic popups use unambiguous command contexts without native shell confirmation. Zsh command discovery no longer stalls when interactive job control is enabled. Completion APIs use warning-level Kotlin opt-in. See the [completion guide](docs/features/completion.md) for customization and supported sources.
