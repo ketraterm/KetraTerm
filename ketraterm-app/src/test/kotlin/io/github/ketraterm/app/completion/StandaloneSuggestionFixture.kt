@@ -62,6 +62,8 @@ internal class StandaloneSuggestionFixture private constructor(
     private val focused = CompletableDeferred<Unit>()
     private var popup: JComponent? = null
     private var window: JFrame? = null
+    private var invalidationRevision = 0L
+    private var activeSnapshotRevision = -1L
     private val terminal =
         SwingTerminal(
             settingsProvider = { settings.current(tab.profile.kind) },
@@ -74,6 +76,11 @@ internal class StandaloneSuggestionFixture private constructor(
                             object : SwingShellSuggestionView by view {
                                 override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
                                     view.update(snapshot)
+                                    if (snapshot.visibleSuggestions.isNotEmpty()) {
+                                        activeSnapshotRevision = invalidationRevision
+                                    } else {
+                                        activeSnapshotRevision = -1L
+                                    }
                                     publications.trySend(session.activeShellCommandLine()?.commandText to snapshot).getOrThrow()
                                 }
                             }
@@ -85,6 +92,9 @@ internal class StandaloneSuggestionFixture private constructor(
         withContext(Dispatchers.Swing) {
             terminal.preferredSize = terminal.preferredGridSize(COLUMNS, ROWS)
             terminal.setShellSuggestionProvider(decorateProvider(provider))
+            terminal.addShellSuggestionInvalidationListener {
+                invalidationRevision++
+            }
             terminal.bind(session) { failure ->
                 if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
             }
@@ -194,16 +204,28 @@ internal class StandaloneSuggestionFixture private constructor(
     suspend fun selectAndAccept(
         replacement: String,
         execute: Boolean = false,
-    ) = withContext(Dispatchers.Swing) {
-        val count = terminal.currentShellSuggestionState().count
-        assertTrue(count > 0)
-        var remaining = count
-        while (terminal.currentShellSuggestionState().selectedSuggestion?.replacementText != replacement && remaining-- > 0) {
-            press(KeyEvent.VK_DOWN)
+    ) = withTimeout(15.seconds) {
+        while (withContext(Dispatchers.Swing) {
+                invalidationRevision > activeSnapshotRevision ||
+                    terminal.currentShellSuggestionState().count == 0
+            }
+        ) {
+            val update = publications.receive()
+            if (update.second.visibleSuggestions.any { it.replacementText == replacement }) {
+                break
+            }
         }
-        assertEquals(replacement, terminal.currentShellSuggestionState().selectedSuggestion?.replacementText)
-        press(KeyEvent.VK_TAB)
-        if (execute) press(KeyEvent.VK_ENTER)
+        withContext(Dispatchers.Swing) {
+            val count = terminal.currentShellSuggestionState().count
+            assertTrue(count > 0)
+            var remaining = count
+            while (terminal.currentShellSuggestionState().selectedSuggestion?.replacementText != replacement && remaining-- > 0) {
+                press(KeyEvent.VK_DOWN)
+            }
+            assertEquals(replacement, terminal.currentShellSuggestionState().selectedSuggestion?.replacementText)
+            press(KeyEvent.VK_TAB)
+            if (execute) press(KeyEvent.VK_ENTER)
+        }
     }
 
     suspend fun capturePopup(output: Path) {
