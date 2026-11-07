@@ -45,7 +45,7 @@ are internal; hosts configure fonts through <code>SwingSettings</code> and <code
 <td>Contextually shaped vectors positioned by terminal-cell ownership</td>
 </tr>
 <tr>
-<td>Supported box, block, and geometric characters</td>
+<td>Supported box, block, geometric, Braille, and Powerline characters</td>
 <td>Programmatic cell primitives</td>
 </tr>
 <tr>
@@ -74,6 +74,23 @@ intersects and restores the exact clip, including nonrectangular shapes.</p>
 <p>Ordinary cells and block-cursor foreground share primitive, emoji, and fallback
 dispatch. A directional character elsewhere in a row does not disable primitives
 or emoji. Classification precedes access to the lazy emoji rasterizer.</p>
+<p>Braille patterns (<code>U+2800–U+28FF</code>) use a two-column, four-row grid of square
+dots, including the empty <code>U+2800</code> pattern. Device-pixel dot size comes from
+nominal cell dimensions so neighboring cells retain equal dot weight at
+fractional display scales. Positions follow the actual cell bounds, including
+line height and column spacing. Painting uses the existing foreground, composite,
+and cell clip; font fallback and the text baseline do not affect the dots.</p>
+<p>Powerline separators (<code>U+E0B0–U+E0BF</code>) use cell-fitted paths for filled arrows,
+open chevrons, rounded caps, and diagonal half-cells/lines. Outline weight uses
+nominal device-cell width so neighboring cells keep a consistent stroke at
+fractional scales. Separator colors bypass minimum-contrast adjustment to match
+adjoining segment backgrounds; faint intensity, selection, and cursor foreground
+still apply. Other Powerline private-use characters use ordinary font fallback.</p>
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/utf8-extended.txt">extended UTF-8 corpus</a> includes all Braille patterns,
+repeated graph rows, and all 16 geometric Powerline separators for manual checks
+with different fonts, line heights, column spacing, and display scales. Colored
+segment joins, clipping, bidi placement, and cursor repainting also have automated
+rendering tests.</p>
 <h2 id="native-emoji-image-caching">Native emoji image caching</h2>
 <p><code>TerminalEmojiImageCache</code> retains up to 1,024 images or unsupported results for one
 rasterizer. Identity is code point content plus raster pixel size; equivalent
@@ -197,7 +214,7 @@ Erase the old cursor region before comparing a repaint; repeated <code>SrcOver</
 drawing is not idempotent. Keep joiners in Arabic reference text: removing a ZWJ
 can change ligature formation. Compare caches with direct shaping of the same
 text and painter output with the complete contextual input.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/8f4587e1edb6af05a6993157d9f86953b7916d0a/ketraterm-ui-swing/docs/bifurcated-text-rendering.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-ui-swing/docs/bifurcated-text-rendering.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
