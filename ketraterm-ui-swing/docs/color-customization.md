@@ -212,7 +212,7 @@ val exactColors = settings.copy { it.minimumContrastRatio = 1.0 }
 Configured selection/search colors and permitted terminal selection overrides are inputs
 to the same contrast policy. Disable contrast adjustment when their exact
 foreground colors must be retained. Concealed/blink-hidden text remains hidden.
-Box drawing, block elements, geometric shading, and braille retain their color
+Box drawing, block elements, geometric shading, Braille, and geometric Powerline separators retain their color
 relationships; intrinsic color emoji and image pixels are not recolored. Cursor
 colors and explicit underline colors retain their separate presentation rules.
 Contrast uses the terminal cell background and UI fills. It does not sample image

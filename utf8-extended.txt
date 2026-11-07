@@ -338,8 +338,30 @@ Math Symbols:
 ∑ ∏ ∫ ∮ ∂ ∇ √ ∞ ≈ ≠ ≤ ≥ ≡ ≅ ∝ ℕ ℤ ℚ ℝ ℂ
 x² y³ z⁴  /  a₀ a₁ a₂ aₙ  /  H₂O CO₂
 
-Braille patterns:
-⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏ ⣿ ⣀ ⣤ ⣶ ⣷ ⣾
+Braille patterns (U+2800..U+28FF; each glyph occupies one cell):
+2800: ⠀ ⠁ ⠂ ⠃ ⠄ ⠅ ⠆ ⠇ ⠈ ⠉ ⠊ ⠋ ⠌ ⠍ ⠎ ⠏
+2810: ⠐ ⠑ ⠒ ⠓ ⠔ ⠕ ⠖ ⠗ ⠘ ⠙ ⠚ ⠛ ⠜ ⠝ ⠞ ⠟
+2820: ⠠ ⠡ ⠢ ⠣ ⠤ ⠥ ⠦ ⠧ ⠨ ⠩ ⠪ ⠫ ⠬ ⠭ ⠮ ⠯
+2830: ⠰ ⠱ ⠲ ⠳ ⠴ ⠵ ⠶ ⠷ ⠸ ⠹ ⠺ ⠻ ⠼ ⠽ ⠾ ⠿
+2840: ⡀ ⡁ ⡂ ⡃ ⡄ ⡅ ⡆ ⡇ ⡈ ⡉ ⡊ ⡋ ⡌ ⡍ ⡎ ⡏
+2850: ⡐ ⡑ ⡒ ⡓ ⡔ ⡕ ⡖ ⡗ ⡘ ⡙ ⡚ ⡛ ⡜ ⡝ ⡞ ⡟
+2860: ⡠ ⡡ ⡢ ⡣ ⡤ ⡥ ⡦ ⡧ ⡨ ⡩ ⡪ ⡫ ⡬ ⡭ ⡮ ⡯
+2870: ⡰ ⡱ ⡲ ⡳ ⡴ ⡵ ⡶ ⡷ ⡸ ⡹ ⡺ ⡻ ⡼ ⡽ ⡾ ⡿
+2880: ⢀ ⢁ ⢂ ⢃ ⢄ ⢅ ⢆ ⢇ ⢈ ⢉ ⢊ ⢋ ⢌ ⢍ ⢎ ⢏
+2890: ⢐ ⢑ ⢒ ⢓ ⢔ ⢕ ⢖ ⢗ ⢘ ⢙ ⢚ ⢛ ⢜ ⢝ ⢞ ⢟
+28A0: ⢠ ⢡ ⢢ ⢣ ⢤ ⢥ ⢦ ⢧ ⢨ ⢩ ⢪ ⢫ ⢬ ⢭ ⢮ ⢯
+28B0: ⢰ ⢱ ⢲ ⢳ ⢴ ⢵ ⢶ ⢷ ⢸ ⢹ ⢺ ⢻ ⢼ ⢽ ⢾ ⢿
+28C0: ⣀ ⣁ ⣂ ⣃ ⣄ ⣅ ⣆ ⣇ ⣈ ⣉ ⣊ ⣋ ⣌ ⣍ ⣎ ⣏
+28D0: ⣐ ⣑ ⣒ ⣓ ⣔ ⣕ ⣖ ⣗ ⣘ ⣙ ⣚ ⣛ ⣜ ⣝ ⣞ ⣟
+28E0: ⣠ ⣡ ⣢ ⣣ ⣤ ⣥ ⣦ ⣧ ⣨ ⣩ ⣪ ⣫ ⣬ ⣭ ⣮ ⣯
+28F0: ⣰ ⣱ ⣲ ⣳ ⣴ ⣵ ⣶ ⣷ ⣸ ⣹ ⣺ ⣻ ⣼ ⣽ ⣾ ⣿
+
+Single dots (1,2,3,4,5,6,7,8): ⠁ ⠂ ⠄ ⠈ ⠐ ⠠ ⡀ ⢀
+Blank Braille is between the bars: |⠀|
+Repeated graph rows (uniform dots within and across adjacent cells):
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀
+⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤
 
 Block elements (Gradients and shading):
 █ ▉ ▊ ▋ ▌ ▍ ▎ ▏ (Vertical)
@@ -348,6 +370,25 @@ Block elements (Gradients and shading):
 
 Geometric Shapes:
 ■ □ ▢ ▣ ▤ ▥ ▦ ▧ ▨ ▩ ● ○ ◉ ◎ ◌ ◍ ▲ △ ▼ ▽ ◆ ◇
+
+================================================================================
+SECTION 17 — POWERLINE SEPARATORS
+================================================================================
+
+Geometric separators (U+E0B0..U+E0BF; one cell per glyph):
+E0B0–E0B3 arrows/chevrons:     
+E0B4–E0B7 rounded caps:        
+E0B8–E0BF diagonals:               
+
+Cell alignment (each pair of bars encloses exactly one separator):
+|||||||||||||||||
+|0|1|2|3|4|5|6|7|8|9|A|B|C|D|E|F|
+
+Repeated separators and solid segment joins:
+████████████   ████████████
+████████████   ████████████
+      
+  
 
 ================================================================================
 SECTION 18 — LINE WRAPPING & BOUNDARY STRESS TESTS

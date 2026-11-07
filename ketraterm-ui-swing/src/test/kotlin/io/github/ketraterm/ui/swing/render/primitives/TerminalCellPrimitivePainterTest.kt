@@ -17,6 +17,8 @@ package io.github.ketraterm.ui.swing.render.primitives
 
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Color
 import java.awt.Rectangle
 import java.awt.image.BufferedImage
@@ -123,6 +125,142 @@ class TerminalCellPrimitivePainterTest {
         g.dispose()
 
         assertPaintedOnlyInside(image, maxXExclusive = 20, maxYExclusive = 20)
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
+    fun `braille dots keep equal size across adjacent fractional device cells`(scale: Double) {
+        val image = BufferedImage(160, 100, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val metrics = SwingMetrics(9, 18, 14, 15, 9, 0, 1)
+        val painter = TerminalCellPrimitivePainter()
+        try {
+            g.color = Color.RED
+            g.translate(0.4, 0.6)
+            g.scale(scale, scale)
+            val transform = g.transform
+            for (row in 0..1) {
+                for (column in 0..3) painter.paint(g, 0x28FF, column, row, metrics)
+            }
+            assertEquals(transform, g.transform, "Primitive painting must restore the caller's transform")
+        } finally {
+            g.dispose()
+        }
+        var firstCellPixels = -1
+        var total = 0
+        for (row in 0..1) {
+            for (column in 0..3) {
+                val left = kotlin.math.round(column * 9 * scale + 0.4).toInt()
+                val right = kotlin.math.round((column + 1) * 9 * scale + 0.4).toInt()
+                val top = kotlin.math.round(row * 18 * scale + 0.6).toInt()
+                val bottom = kotlin.math.round((row + 1) * 18 * scale + 0.6).toInt()
+                var painted = 0
+                for (y in top until bottom) {
+                    for (x in left until right) if (image.getRGB(x, y) != 0) painted++
+                }
+                if (firstCellPixels < 0) firstCellPixels = painted
+                assertEquals(firstCellPixels, painted, "Dot weight changed at cell ($column,$row), scale $scale")
+                total += painted
+            }
+        }
+        kotlin.test.assertTrue(firstCellPixels >= 8, "Each of the eight dots must remain visible")
+        var allPainted = 0
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) if (image.getRGB(x, y) != 0) allPainted++
+        }
+        assertEquals(total, allPainted, "Braille painted outside its device cells")
+    }
+
+    @Test
+    fun `braille honors partial clips and restores graphics state`() {
+        val image = BufferedImage(40, 60, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val metrics = SwingMetrics(12, 24, 18, 20, 12, 0, 1)
+        try {
+            g.color = Color.RED
+            g.scale(1.25, 1.25)
+            g.clip = Rectangle(0, 0, 6, 24)
+            val transform = g.transform
+            val clip = g.clipBounds
+            TerminalCellPrimitivePainter().paint(g, 0x28FF, 0, 0, metrics)
+            assertEquals(transform, g.transform)
+            assertEquals(clip, g.clipBounds)
+        } finally {
+            g.dispose()
+        }
+        var painted = 0
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                if (image.getRGB(x, y) != 0) {
+                    kotlin.test.assertTrue(x < 8 && y < 30, "Braille escaped the scaled clip at ($x,$y)")
+                    painted++
+                }
+            }
+        }
+        kotlin.test.assertTrue(painted > 0)
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
+    fun `powerline joins a solid segment without a seam at fractional scales`(scale: Double) {
+        for (codePoint in intArrayOf(0xE0B0, 0xE0B2, 0xE0B4, 0xE0B6)) {
+            val image = BufferedImage(80, 80, BufferedImage.TYPE_INT_ARGB)
+            val g = image.createGraphics()
+            val metrics = SwingMetrics(9, 18, 14, 15, 9, 0, 1)
+            val facesLeft = codePoint and 2 != 0
+            try {
+                g.translate(0.4, 0.6)
+                g.scale(scale, scale)
+                g.color = Color.BLUE
+                g.fillRect(0, 0, 36, 36)
+                g.color = Color.RED
+                val transform = g.transform
+                g.clip = Rectangle(0, 0, 27, 18)
+                val clip = g.clip.bounds2D
+                val router = TerminalCellPrimitivePainter()
+                router.paint(g, codePoint, 1, 0, metrics)
+                router.paint(g, 0x2588, if (facesLeft) 2 else 0, 0, metrics)
+                assertEquals(transform, g.transform)
+                // Transform round trips can shift a clip edge by floating-point epsilon.
+                val afterClip = g.clip.bounds2D
+                assertEquals(clip.x, afterClip.x, 1e-9)
+                assertEquals(clip.y, afterClip.y, 1e-9)
+                assertEquals(clip.width, afterClip.width, 1e-9)
+                assertEquals(clip.height, afterClip.height, 1e-9)
+            } finally {
+                g.dispose()
+            }
+            val boundary = kotlin.math.round((if (facesLeft) 18 else 9) * scale + 0.4).toInt()
+            val top = kotlin.math.round(0.6).toInt()
+            val bottom = kotlin.math.round(18 * scale + 0.6).toInt()
+            for (y in top + 2 until bottom - 2) {
+                assertEquals(Color.RED.rgb, image.getRGB(boundary - 1, y), "Before join, scale $scale")
+                assertEquals(Color.RED.rgb, image.getRGB(boundary, y), "After join, scale $scale")
+            }
+        }
+    }
+
+    @Test
+    fun `powerline outlines respect a partial device clip`() {
+        val image = BufferedImage(64, 80, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.color = Color.RED
+            g.scale(1.5, 1.5)
+            g.clip = Rectangle(0, 0, 6, 24)
+            TerminalCellPrimitivePainter().paint(g, 0xE0B1, 0, 0, SwingMetrics(12, 24, 18, 20, 12, 0, 1))
+        } finally {
+            g.dispose()
+        }
+        var painted = 0
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                if (image.getRGB(x, y) == 0) continue
+                kotlin.test.assertTrue(x < 9 && y < 36)
+                painted++
+            }
+        }
+        kotlin.test.assertTrue(painted > 0)
     }
 
     private fun firstPaintedY(

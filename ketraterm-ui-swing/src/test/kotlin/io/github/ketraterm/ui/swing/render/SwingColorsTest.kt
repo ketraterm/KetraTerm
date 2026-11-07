@@ -140,6 +140,33 @@ class SwingColorsTest {
     }
 
     @Test
+    fun powerlinePreservesSegmentColorsWithContrastAdjustmentEnabled() {
+        val foreground = 0xFF220000.toInt()
+        val palette = TerminalColorPalette(defaultForeground = foreground, defaultBackground = 0xFF000000.toInt())
+        for (codePoint in 0xE0B0..0xE0BF) {
+            assertEquals(
+                foreground,
+                SwingColors.foreground(
+                    palette,
+                    TerminalRenderAttrs.pack(),
+                    codePoint,
+                    minimumContrastRatio = 3.0,
+                ),
+            )
+            assertEquals(
+                SwingColors.blend(foreground, palette.defaultBackground, 0.5),
+                SwingColors.foreground(
+                    palette,
+                    TerminalRenderAttrs.pack(faint = true),
+                    codePoint,
+                    minimumContrastRatio = 3.0,
+                    faintOpacity = 0.5,
+                ),
+            )
+        }
+    }
+
+    @Test
     fun foregroundBypassesContrastEnforcementForGraphicGlyphs() {
         val attrs = TerminalRenderAttrs.pack()
 
