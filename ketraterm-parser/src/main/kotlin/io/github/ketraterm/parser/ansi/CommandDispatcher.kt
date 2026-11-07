@@ -110,6 +110,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             'c'.code -> {
                 sink.resetTerminal()
                 state.resetCharsetState()
+                state.lastGraphicLength = 0
             }
             'D'.code -> sink.lineFeed()
             'E'.code -> sink.nextLine()
@@ -138,6 +139,13 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
 
         when (GeneratedCsiDispatchTable.lookup(signature)) {
             CsiCommand.UNKNOWN -> Unit
+            CsiCommand.REP -> {
+                if (state.paramCount <= 1 && state.subParameterMask == 0 &&
+                    !state.parameterValueSaturated && state.lastGraphicLength > 0
+                ) {
+                    sink.writeRepeatedCluster(state.clusterBuffer, state.lastGraphicLength, countParam(state, 0))
+                }
+            }
             CsiCommand.DECRQM_ANSI -> dispatchModeStatus(sink, state, decPrivate = false)
             CsiCommand.DECRQM_DEC -> dispatchModeStatus(sink, state, decPrivate = true)
 
@@ -248,6 +256,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DECSTR -> {
                 sink.softReset()
                 state.resetCharsetState()
+                state.lastGraphicLength = 0
             }
             CsiCommand.DECSCUSR -> sink.setCursorStyle(modeParam(state, 0))
             CsiCommand.SGR -> SgrDispatcher.dispatch(sink, state)

@@ -55,8 +55,11 @@ callbacks, with the same normalized counts as their equivalent cursor commands.
 
 Its contracts matter beyond individual commands:
 
-- `writeCluster` and `updatePreviousCluster` borrow an `IntArray` for the callback
+- `writeCluster`, `writeRepeatedCluster`, and `updatePreviousCluster` borrow an `IntArray` for the callback
   only. Consume or copy the used prefix before returning.
+- `writeRepeatedCluster` receives REP as one batch, including a single-codepoint
+  source. Apply each copy with the current pen and ordinary write semantics;
+  see the [REP contract](../docs/reference/protocol.md#repeat-character).
 - `updatePreviousCluster` supplies the complete retained grapheme, including its
   previously published prefix. The sink updates the same text target and owns
   attributes, width, cursor movement, and wrapping.

@@ -253,6 +253,23 @@ internal class Line(
         length: Int,
         attr: Long,
         extendedAttr: Long,
+    ): Int = writeIntoSimpleCells(col, length, attr, extendedAttr) { bytes[offset + it].toInt() }
+
+    /** Fills a scalar run, stopping before an occupant requiring full overwrite physics. */
+    fun writeRepeatedIntoSimpleCells(
+        col: Int,
+        codepoint: Int,
+        length: Int,
+        attr: Long,
+        extendedAttr: Long,
+    ): Int = writeIntoSimpleCells(col, length, attr, extendedAttr) { codepoint }
+
+    private inline fun writeIntoSimpleCells(
+        col: Int,
+        length: Int,
+        attr: Long,
+        extendedAttr: Long,
+        codepointAt: (Int) -> Int,
     ): Int {
         var written = 0
         while (written < length) {
@@ -262,7 +279,7 @@ internal class Line(
             ) {
                 break
             }
-            codepoints[target] = bytes[offset + written].toInt()
+            codepoints[target] = codepointAt(written)
             attrs[target] = attr
             written++
         }

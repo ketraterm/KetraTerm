@@ -81,7 +81,6 @@ they are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(parser/core/host)` | **High priority:** Implement REP (`CSI Ps b`) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement Kitty ED 22 (`CSI 22 J`) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
 | `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |

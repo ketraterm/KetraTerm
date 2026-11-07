@@ -94,6 +94,10 @@ internal class ParserState(
     var clusterLength: Int = 0
     var clusterEmittedLength: Int = 0
 
+    // The last published grapheme remains in clusterBuffer after structural flushes.
+    // New text replaces it before the next REP can dispatch, so no second buffer is needed.
+    var lastGraphicLength: Int = 0
+
     var prevGraphemeBreakClass: Int = 0
     var prevWasZwj: Boolean = false
     var regionalIndicatorParity: Int = 0
@@ -220,6 +224,7 @@ internal class ParserState(
         clearSequenceState()
         clearPayloadState()
         clearActiveClusterAfterFlush()
+        lastGraphicLength = 0
         resetCharsetState()
     }
 

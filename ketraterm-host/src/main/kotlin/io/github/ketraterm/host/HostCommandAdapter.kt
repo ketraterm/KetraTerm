@@ -205,6 +205,14 @@ public class HostCommandAdapter
             terminal.writeCodepoint(codepoint)
         }
 
+        override fun writeRepeatedCluster(
+            codepoints: IntArray,
+            length: Int,
+            count: Int,
+        ) {
+            terminal.writeRepeatedCluster(codepoints, length, count)
+        }
+
         override fun writeAscii(
             bytes: ByteArray,
             offset: Int,

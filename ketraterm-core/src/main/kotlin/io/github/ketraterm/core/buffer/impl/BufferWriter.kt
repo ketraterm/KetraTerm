@@ -36,6 +36,26 @@ internal class BufferWriter(
         mutationEngine.printCodepoint(codepoint, charWidth)
     }
 
+    override fun writeRepeatedCluster(
+        codepoints: IntArray,
+        length: Int,
+        count: Int,
+    ) {
+        require(length in 1..minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)) {
+            "length must be in 1..${minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)}, was $length"
+        }
+        val charWidth = UnicodeWidth.calculateCluster(codepoints, length, state.modes.treatAmbiguousAsWide)
+        if (length == 1) {
+            mutationEngine.printRepeatedCodepoint(codepoints[0], charWidth, count)
+        } else {
+            var remaining = count
+            while (remaining > 0) {
+                mutationEngine.printCluster(codepoints, length, charWidth)
+                remaining--
+            }
+        }
+    }
+
     override fun writeAscii(
         bytes: ByteArray,
         offset: Int,

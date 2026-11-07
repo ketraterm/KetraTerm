@@ -83,6 +83,7 @@ internal class GraphemeAssembler(
                 )
         }
         state.clusterEmittedLength = state.clusterLength
+        state.lastGraphicLength = state.clusterLength
     }
 
     fun reset(state: ParserState) {

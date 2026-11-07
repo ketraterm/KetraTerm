@@ -168,6 +168,7 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSi
 	public abstract fun updatePreviousCluster ([II)V
 	public abstract fun writeCluster ([II)V
 	public abstract fun writeCodepoint (I)V
+	public abstract fun writeRepeatedCluster ([III)V
 }
 
 public final class io/github/ketraterm/parser/spi/TerminalCommandSink$DefaultImpls {

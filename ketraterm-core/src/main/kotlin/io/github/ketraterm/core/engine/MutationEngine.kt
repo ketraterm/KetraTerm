@@ -609,10 +609,50 @@ internal class MutationEngine(
         offset: Int,
         end: Int,
     ) {
-        var index = offset
+        printScalarRun(
+            end - offset,
+            charWidth = 1,
+            codepointAt = { bytes[offset + it].toInt() },
+            writeSpan = { line, col, index, length, attr, extendedAttr ->
+                line.writeAsciiIntoSimpleCells(col, bytes, offset + index, length, attr, extendedAttr)
+            },
+        )
+    }
+
+    /** Repeats a validated scalar without rechecking its width or allocating a text buffer. */
+    fun printRepeatedCodepoint(
+        codepoint: Int,
+        charWidth: Int,
+        count: Int,
+    ) {
+        if (charWidth == 2) {
+            var remaining = count
+            while (remaining > 0) {
+                printCodepoint(codepoint, charWidth)
+                remaining--
+            }
+            return
+        }
+        printScalarRun(
+            count,
+            charWidth,
+            codepointAt = { codepoint },
+            writeSpan = { line, col, _, length, attr, extendedAttr ->
+                line.writeRepeatedIntoSimpleCells(col, codepoint, length, attr, extendedAttr)
+            },
+        )
+    }
+
+    private inline fun printScalarRun(
+        count: Int,
+        charWidth: Int,
+        codepointAt: (Int) -> Int,
+        writeSpan: (Line, Int, Int, Int, Long, Long) -> Int,
+    ) {
+        var index = 0
         if (state.modes.isInsertMode || !state.modes.isAutoWrap || leftMargin != 0 || rightMargin != width - 1) {
-            while (index < end) {
-                printCodepoint(bytes[index].toInt(), 1)
+            while (index < count) {
+                printCodepoint(codepointAt(index), charWidth)
                 index++
             }
             return
@@ -621,26 +661,26 @@ internal class MutationEngine(
         val attr = state.pen.currentAttr
         val extendedAttr = state.pen.currentExtendedAttr
         val columns = width
-        while (index < end) {
+        while (index < count) {
             val col = state.cursor.col
             val row = state.cursor.row
             if (!state.cursor.pendingWrap && row in 0 until height && col in 0 until columns) {
                 val line = getLine(row)
-                val count = line.writeAsciiIntoSimpleCells(col, bytes, index, minOf(end - index, columns - col), attr, extendedAttr)
-                if (count > 0) {
+                val written = writeSpan(line, col, index, minOf(count - index, columns - col), attr, extendedAttr)
+                if (written > 0) {
                     line.hasOutput = true
                     state.markLineChanged(line)
-                    state.rememberPrintableCell(row, col + count - 1)
-                    val nextCol = col + count
+                    state.rememberPrintableCell(row, col + written - 1)
+                    val nextCol = col + written
                     state.cursor.col = minOf(nextCol, columns - 1)
                     state.cursor.pendingWrap = nextCol == columns
                     markCursorIfMoved(col, row)
-                    index += count
+                    index += written
                     continue
                 }
             }
             // Existing scalar physics owns pending wraps, scrolling, and wide or clustered spans.
-            printCodepoint(bytes[index].toInt(), 1)
+            printCodepoint(codepointAt(index), charWidth)
             index++
         }
     }
