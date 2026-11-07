@@ -139,6 +139,7 @@ internal class ClipboardReadHandler(
         try {
             current.ensureActive()
             synchronized(lock) {
+                read.providerFinished = true
                 if (read.retired || !eligible(read)) return
                 if (read.started.elapsedNow() >= DEADLINE) {
                     expire(read)
