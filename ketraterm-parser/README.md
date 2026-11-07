@@ -47,7 +47,13 @@ longer agree.
 ## How to Implement: Custom Command Sink
 
 Implement [TerminalCommandSink](src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt)
-to receive semantic operations. Its contracts matter beyond individual commands:
+to receive semantic operations.
+
+The [relative cursor aliases](../docs/reference/protocol.md#relative-cursor-aliases)
+use the existing `cursorForward`, `cursorDown`, `cursorBackward`, and `cursorUp`
+callbacks, with the same normalized counts as their equivalent cursor commands.
+
+Its contracts matter beyond individual commands:
 
 - `writeCluster` and `updatePreviousCluster` borrow an `IntArray` for the callback
   only. Consume or copy the used prefix before returning.

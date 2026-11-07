@@ -48,11 +48,15 @@ internal object GeneratedCsiDispatchTable {
             84L, // CSI T  SD
             88L, // CSI X  ECH
             90L, // CSI Z  CBT
+            97L, // CSI a  HPR -> CUF
             99L, // CSI c  DA
             100L, // CSI d  VPA
+            101L, // CSI e  VPR -> CUD
             102L, // CSI f  HVP -> CUP
             103L, // CSI g  TBC
             104L, // CSI h  SM ANSI
+            106L, // CSI j  HPB -> CUB
+            107L, // CSI k  VPB -> CUU
             108L, // CSI l  RM ANSI
             109L, // CSI m  SGR
             110L, // CSI n  DSR
@@ -116,11 +120,15 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.SD,
             CsiCommand.ECH,
             CsiCommand.CBT,
+            CsiCommand.CUF,
             CsiCommand.DA_PRIMARY,
             CsiCommand.VPA,
+            CsiCommand.CUD,
             CsiCommand.CUP,
             CsiCommand.TBC,
             CsiCommand.SM_ANSI,
+            CsiCommand.CUB,
+            CsiCommand.CUU,
             CsiCommand.RM_ANSI,
             CsiCommand.SGR,
             CsiCommand.DSR,

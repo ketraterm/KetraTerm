@@ -81,7 +81,6 @@ they are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(parser)` | **High priority:** Add the HPR (`CSI Ps a`), VPR (`CSI Ps e`), CUB (`CSI Ps j`), and CUU (`CSI Ps k`) aliases. Applications using these aliases otherwise lose cursor movement and may place output incorrectly. |
 | `TODO(parser/core/host)` | **High priority:** Implement REP (`CSI Ps b`) to repeat the preceding printed character. Applications using it to compress repeated output currently lose that output. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement Kitty ED 22 (`CSI 22 J`) to move the screen into history and clear it. Applications using this clear operation currently retain the visible screen. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
