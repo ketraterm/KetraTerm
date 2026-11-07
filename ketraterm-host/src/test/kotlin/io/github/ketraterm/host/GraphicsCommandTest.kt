@@ -431,6 +431,56 @@ class GraphicsCommandTest {
         assertEquals(1, f.terminal.cursorCol)
     }
 
+    @Test fun `ED22 retains image-only rows and existing history without copying resources`() {
+        val f = Fixture(height = 4)
+        f.feed("old\r\n\u001b[S\u001b[3;2H")
+        f.upload(action = 'T', more = ",C=1,c=2,r=1")
+        val before = f.placements().single()
+        f.feed("\u001b[22J")
+        assertEquals(4, f.terminal.historySize)
+        assertTrue(f.placements().isEmpty())
+        val retained = f.placements(3).single()
+        assertEquals(before, retained)
+        assertSame(before.image, retained.image)
+        f.feed("\u001b[22J")
+        assertEquals(4, f.terminal.historySize)
+        assertSame(before.image, f.placements(3).single().image)
+        f.feed("\u001b[3J")
+        assertTrue(f.placements(3).isEmpty())
+    }
+
+    @Test fun `ED22 crops oversized images to retained visible content and evicts with history`() {
+        val f = Fixture(height = 4, history = 4)
+        f.command("a=T,i=7,f=24,s=1,v=8,C=1,c=1,r=8", Base64.getEncoder().encodeToString(ByteArray(24)))
+        val image = f.placements().single().image
+        f.feed("\u001b[22J")
+        assertEquals(4, f.terminal.historySize)
+        assertTrue(f.placements().isEmpty())
+        val retained = f.placements(4).single()
+        assertSame(image, retained.image)
+        assertEquals(4.0, retained.height)
+        assertEquals(4, retained.sh)
+        f.feed("\u001b[4S")
+        assertTrue(f.placements(4).isEmpty())
+    }
+
+    @Test fun `ED22 on alternate or partial-height region clears without admitting images to history`() {
+        for (setup in listOf("\u001b[?1049h", "\u001b[2;4r")) {
+            val f = Fixture(height = 4)
+            f.upload(action = 'T', more = ",C=1,c=1,r=1")
+            val primary = f.placements().single().image
+            f.feed(setup)
+            f.upload(id = 8, action = 'T', more = ",C=1,c=1,r=1")
+            f.feed("\u001b[22J")
+            assertEquals(0, f.terminal.historySize, setup)
+            assertTrue(f.placements().isEmpty(), setup)
+            if (setup.contains("1049")) {
+                f.feed("\u001b[?1049l")
+                assertSame(primary, f.placements().single().image)
+            }
+        }
+    }
+
     @Test fun `scrollback retains immutable resources and ED2 preserves history`() {
         val f = Fixture()
         f.upload(action = 'T', more = ",C=1,c=1,r=1")

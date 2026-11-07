@@ -605,3 +605,27 @@ Whole-input and split-input placement can therefore differ at margins, over
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See [grapheme retention](../../ketraterm-parser/docs/grapheme-segmentation.md#bounded-retention)
 and [verification](../development/conformance-testing.md#streaming-placement).
+
+## Screen-to-history clear
+
+Kitty ED 22 (`CSI 22 J`) retains the primary display in bounded scrollback, then
+clears the viewport like ED 2. Text rows move with their attributes, grapheme
+payloads, line identities, and soft-wrap provenance. Images retain their immutable
+pixel resources; off-bottom image portions are cropped before retention, and
+history eviction clips or removes placements normally.
+
+Trailing rows without stored text or visible images are omitted. Explicit spaces
+count as text; blank rows between occupied rows remain. An empty display does
+not add history. Existing history is preserved up to the configured capacity;
+zero capacity still clears the display.
+
+Retention requires the primary screen and a full-height vertical scroll region.
+On alternate screens or with partial-height regions, ED 22 only clears. Horizontal
+margins do not restrict the operation. Cursor position, pen, modes, margins, tabs,
+saved cursor, and inactive screen survive; pending wrap is cancelled. Cleared
+cells use the current erase attributes and fresh line identities, as for ED 2.
+Protection does not prevent this ordinary erase. The selective form `CSI ? 22 J`
+is unsupported and ignored. Colon subparameters and extra parameters on ED 22
+are rejected without erasing or admitting history.
+
+Reference: [Kitty's screen-to-scrollback extension](https://sw.kovidgoyal.net/kitty/misc-protocol/#an-escape-code-to-move-the-contents-of-the-screen-into-the-scrollback).

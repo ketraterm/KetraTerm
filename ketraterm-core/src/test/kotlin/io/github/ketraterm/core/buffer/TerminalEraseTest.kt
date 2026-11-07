@@ -81,6 +81,99 @@ class TerminalEraseTest {
         )
     }
 
+    @Test
+    fun `ed22 retains occupied rows including interior blanks but omits trailing empty rows`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 4, maxHistory = 8)
+        buffer.writeText("old")
+        buffer.newLine()
+        buffer.writeText("A")
+        buffer.positionCursor(0, 3)
+        buffer.writeText("B")
+        buffer.newLine()
+        val before = lineIds(buffer as TerminalRenderFrameReader)
+        val cursor = buffer.cursorCol to buffer.cursorRow
+
+        buffer.moveScreenToHistory()
+
+        assertEquals(4, buffer.historySize)
+        assertEquals("old\n   A\n\nB\n\n\n\n", buffer.getAllAsString())
+        assertEquals(cursor, buffer.cursorCol to buffer.cursorRow)
+        assertTrue(lineIds(buffer).all { it > before.max() })
+        buffer.moveScreenToHistory()
+        assertEquals(4, buffer.historySize, "An empty clear must not evict history")
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = [0, 1, 2, 5])
+    fun `ed22 respects history capacity and preserves wide clusters through row reuse`(maxHistory: Int) {
+        val buffer = TerminalBuffers.create(width = 4, height = 2, maxHistory = maxHistory)
+        val cluster = intArrayOf(0x1f469, 0x200d, 0x1f4bb)
+        repeat(4) {
+            buffer.positionCursor(0, 0)
+            buffer.writeCluster(cluster)
+            buffer.writeText("abX")
+            buffer.moveScreenToHistory()
+            assertEquals(minOf(maxHistory, (it + 1) * 2), buffer.historySize)
+            assertEquals("\n", buffer.getScreenAsString())
+            if (maxHistory >= 2) {
+                (buffer as TerminalRenderFrameReader).readRenderFrame(2) { frame ->
+                    val codes = IntArray(4)
+                    val flags = IntArray(4)
+                    var clusters = 0
+                    frame.copyLine(
+                        0,
+                        codes,
+                        attrWords = LongArray(4),
+                        flags = flags,
+                        clusterDataSink = { col, source, offset, length ->
+                            assertEquals(0, col)
+                            assertArrayEquals(cluster, source.copyOfRange(offset, offset + length))
+                            clusters++
+                        },
+                    )
+                    assertEquals(1, clusters)
+                    assertTrue(frame.lineWrapped(0))
+                    frame.copyLine(1, codes, attrWords = LongArray(4), flags = flags)
+                    assertEquals('X'.code, codes[0])
+                }
+            }
+        }
+        if (maxHistory >= 2) {
+            buffer.resize(8, 2)
+            assertTrue(buffer.getAllAsString().contains("👩‍💻abX"))
+        }
+    }
+
+    @Test
+    fun `ed22 matches ed2 state effects and preserves primary on alternate`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 3, maxHistory = 8)
+        buffer.writeText("keep")
+        buffer.newLine()
+        buffer.setScrollRegion(2, 3)
+        buffer.positionCursor(3, 2)
+        buffer.saveCursor()
+        buffer.setSelectiveEraseProtection(true)
+        buffer.writeText("X")
+        buffer.moveScreenToHistory()
+        assertEquals(0, buffer.historySize, "Partial-height regions only clear")
+        assertEquals("\n\n", buffer.getScreenAsString())
+        assertEquals(3 to 2, buffer.cursorCol to buffer.cursorRow)
+        buffer.writeText("Y")
+        assertEquals('Y'.code, buffer.getCodepointAt(3, 2), "ED 22 cancels pending wrap")
+        buffer.restoreCursor()
+        assertEquals(3 to 2, buffer.cursorCol to buffer.cursorRow)
+        buffer.resetScrollRegion()
+        buffer.moveScreenToHistory()
+        val primary = buffer.getAllAsString()
+        buffer.enterAltBuffer()
+        buffer.writeText("alt")
+        buffer.moveScreenToHistory()
+        assertEquals(0, buffer.historySize)
+        assertEquals("\n\n", buffer.getScreenAsString())
+        buffer.exitAltBuffer()
+        assertEquals(primary, buffer.getAllAsString())
+    }
+
     private fun lineIds(reader: TerminalRenderFrameReader): LongArray {
         var ids = LongArray(0)
         reader.readRenderFrame { frame ->

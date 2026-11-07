@@ -409,6 +409,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalWriter {
 	public abstract fun insertBlankCharacters (I)V
 	public abstract fun insertColumns (I)V
 	public abstract fun insertLines (I)V
+	public abstract fun moveScreenToHistory ()V
 	public abstract fun newLine ()V
 	public abstract fun resetPen ()V
 	public abstract fun resetScrollRegion ()V

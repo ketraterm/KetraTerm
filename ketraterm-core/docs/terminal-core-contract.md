@@ -164,6 +164,7 @@ protection. Clearing operations have different state effects:
 | Operation | Effect |
 | --- | --- |
 | `eraseEntireScreen` | Erases visible cells, preserving cursor and history |
+| `moveScreenToHistory` | Retains occupied primary rows and images in bounded history, then applies ED 2; see [ED 22](../../docs/reference/protocol.md#screen-to-history-clear) |
 | `eraseScreenAndHistory` | Erases history, preserving visible cells |
 | `eraseBuffer` | Erases active screen and history with current erase attributes; preserves cursor, pen, modes, margins, tabs, saved cursor, and inactive screen |
 | `clearScreen` | Clears visible cells and homes the cursor; preserves history |

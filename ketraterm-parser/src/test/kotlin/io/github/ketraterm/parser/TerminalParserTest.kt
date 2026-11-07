@@ -1139,6 +1139,24 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `Kitty ED22 dispatches at every byte split and rejects malformed extensions`() {
+            val sequences =
+                listOf("\u001B[22J", "\u001B[22:1J", "\u001B[22;1J", "\u001B[>22J", "\u001B[22 J", "\u001B[999999999999999999999J")
+            for (sequence in sequences) {
+                val bytes = sequence.encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = TerminalParserFixture()
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.acceptAscii("X")
+                    val erase = f.sink.events.filter { it == "eraseInDisplay:22:false" }
+                    assertEquals(if (sequence == "\u001B[22J") 1 else 0, erase.size, "$sequence at $split")
+                    assertEquals(writeCodepoint('X'.code), f.sink.events.last())
+                }
+            }
+        }
+
+        @Test
         fun `DEC selective erase and protection commands dispatch through the full parser`() {
             val eraseDisplay = TerminalParserFixture()
             val eraseLine = TerminalParserFixture()

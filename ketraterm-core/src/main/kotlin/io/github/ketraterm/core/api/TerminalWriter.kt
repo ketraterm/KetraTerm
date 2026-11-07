@@ -465,6 +465,17 @@ public interface TerminalWriter {
     public fun eraseEntireScreen()
 
     /**
+     * Moves visible text and images into bounded primary scrollback, then erases the
+     * display with the current erase attributes (Kitty ED 22, `CSI 22 J`).
+     * Trailing rows without text or images are omitted; intervening blank rows remain.
+     * On the alternate screen or with a partial-height scroll region, only erases.
+     * Horizontal margins do not restrict this whole-display operation.
+     * Preserves cursor position, pen, modes, margins, tabs, saved cursor, and inactive
+     * screen. Cancels pending wrap and assigns fresh identities to the cleared rows.
+     */
+    public fun moveScreenToHistory()
+
+    /**
      * Erases all scrollback history while preserving the visible viewport
      * (xterm/VTE ED 3, `CSI 3 J`).
      */

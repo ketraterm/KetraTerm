@@ -514,6 +514,63 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `Kitty ED22 preserves styled history and clears with BCE at every byte split`() {
+            val bytes = "\u001B[22J".encodeToByteArray()
+            for (split in 0..bytes.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 3, maxHistory = 8))
+                f.acceptAscii("\u001B[31;44m\u001B[1\"qABCD\u001B[3;2HX\u001B[32;45m")
+
+                fun firstRowAttributes(offset: Int): Pair<List<Long>, List<Long>> {
+                    val attrs = LongArray(4)
+                    val extras = LongArray(4)
+                    (f.terminal as TerminalRenderFrameReader).readRenderFrame(offset) { frame ->
+                        frame.copyLine(0, IntArray(4), attrWords = attrs, flags = IntArray(4), extraAttrWords = extras)
+                    }
+                    return attrs.toList() to extras.toList()
+                }
+                val oldAttributes = firstRowAttributes(0)
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+                val reference = Fixture(terminal = TerminalBuffers.create(width = 4, height = 3))
+                reference.acceptAscii("\u001B[1\"q\u001B[32;45m\u001B[2J")
+                for (row in 0 until 3) {
+                    for (col in 0 until 4) {
+                        assertEquals(reference.terminal.getAttrAt(col, row), f.terminal.getAttrAt(col, row))
+                    }
+                }
+                assertEquals(3, f.terminal.historySize)
+                assertEquals("ABCD\n\n X\n\n\n", f.terminal.getAllAsString())
+                assertEquals(oldAttributes, firstRowAttributes(3))
+                assertEquals(2 to 2, f.terminal.cursorCol to f.terminal.cursorRow)
+                f.acceptAscii("Y")
+                assertEquals('Y'.code, f.terminal.getCodepointAt(2, 2))
+            }
+        }
+
+        @Test
+        fun `ED22 ignores horizontal margins and selective or malformed variants do not archive`() {
+            for (sequence in listOf(
+                "\u001B[?22J",
+                "\u001B[22:1J",
+                "\u001B[22;1J",
+                "\u001B[>22J",
+                "\u001B[999999999999999999999J",
+                "\u001B[22\u0018J",
+            )) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 3, maxHistory = 8))
+                f.acceptAscii("AB")
+                f.acceptAscii(sequence)
+                assertEquals(0, f.terminal.historySize, sequence)
+                assertTrue(f.terminal.getLineAsString(0).startsWith("AB"), sequence)
+            }
+            val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 3, maxHistory = 8))
+            f.acceptAscii("ABCD\u001B[?69h\u001B[2;3s\u001B[22J")
+            assertEquals(1, f.terminal.historySize)
+            assertEquals("ABCD\n\n\n", f.terminal.getAllAsString())
+            assertEquals("\n\n", f.terminal.getScreenAsString())
+        }
+
+        @Test
         fun `ED 3 clears retained history while preserving the visible viewport`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 2, maxHistory = 8))
             f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[2;1H\r\n")
