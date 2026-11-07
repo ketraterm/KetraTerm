@@ -41,6 +41,9 @@ validation before creating the release commit.</li>
 <li>Commits the changelogs to <code>master</code> and creates <code>v{version}</code> on that commit
 in one atomic push. If <code>master</code> advances during verification, the push
 fails; rerun against the updated branch. Existing tags are never moved.</li>
+<li>Runs the full <a href="testing.html#ci">CI validation set</a> on the exact tagged revision,
+including native/desktop suites, three-platform consumers, and IDE tests.
+Publication waits for this verification to succeed.</li>
 <li>Publishes Maven artifacts, builds application binaries, and creates the
 GitHub release with notes from all three versioned changelog sections.
 Relative links in those notes point to the tagged source.</li>
@@ -91,7 +94,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a6db6f4fed4cfa83e99e441ed0c2cf9b7f964edc/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/7f9a0c34393ef22325f9b539e6a22fce17e450d5/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
