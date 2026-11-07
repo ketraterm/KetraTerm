@@ -140,8 +140,10 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         when (GeneratedCsiDispatchTable.lookup(signature)) {
             CsiCommand.UNKNOWN -> Unit
             CsiCommand.REP -> {
-                if (state.paramCount <= 1 && state.subParameterMask == 0 &&
-                    !state.parameterValueSaturated && state.lastGraphicLength > 0
+                if (state.paramCount <= 1 &&
+                    state.subParameterMask == 0 &&
+                    !state.parameterValueSaturated &&
+                    state.lastGraphicLength > 0
                 ) {
                     sink.writeRepeatedCluster(state.clusterBuffer, state.lastGraphicLength, countParam(state, 0))
                 }

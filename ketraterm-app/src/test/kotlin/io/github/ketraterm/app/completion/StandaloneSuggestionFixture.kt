@@ -139,7 +139,7 @@ internal class StandaloneSuggestionFixture private constructor(
         }
         withTimeout(15.seconds) { bound.await() }
         withTimeout(15.seconds) { focused.await() }
-        awaitLine("")
+        awaitLine("", requireShellCompletion = tab.profile.kind == TerminalProfileKind.POWERSHELL)
     }
 
     suspend fun awaitPopup(
@@ -170,10 +170,13 @@ internal class StandaloneSuggestionFixture private constructor(
         }
     }
 
-    suspend fun awaitLine(line: String) {
+    suspend fun awaitLine(
+        line: String,
+        requireShellCompletion: Boolean = false,
+    ) {
         try {
             withTimeout(15.seconds) {
-                awaitEditableLine(session, line)
+                awaitEditableLine(session, line, requireShellCompletion)
             }
         } catch (failure: TimeoutCancellationException) {
             throw AssertionError(
@@ -281,12 +284,15 @@ internal class StandaloneSuggestionFixture private constructor(
         internal suspend fun awaitEditableLine(
             session: TerminalSession,
             line: String,
+            requireShellCompletion: Boolean = false,
         ) {
             session.renderGeneration.first {
                 val edit = session.captureCommandEdit() ?: return@first false
                 val snapshot = edit.commandLine
+                val ready =
+                    !requireShellCompletion || (session.shellCompletionAvailable && edit.prefixResetKeys.isNotEmpty())
                 edit.cancel()
-                snapshot.commandText == line && snapshot.cursorOffset == line.length && !snapshot.requiresShellConfirmation
+                ready && snapshot.commandText == line && snapshot.cursorOffset == line.length && !snapshot.requiresShellConfirmation
             }
         }
 
@@ -334,18 +340,7 @@ internal class StandaloneSuggestionFixture private constructor(
                 created.start(decorateProvider)
                 if (setup != null) {
                     created.awaitExecution(setup)
-                    created.awaitLine("")
-                    if (profile.kind == TerminalProfileKind.POWERSHELL) {
-                        withTimeout(15.seconds) {
-                            tab.session.renderGeneration.first {
-                                if (!tab.session.shellCompletionAvailable) return@first false
-                                val edit = tab.session.captureCommandEdit() ?: return@first false
-                                val ready = edit.prefixResetKeys.isNotEmpty()
-                                edit.cancel()
-                                ready
-                            }
-                        }
-                    }
+                    created.awaitLine("", requireShellCompletion = profile.kind == TerminalProfileKind.POWERSHELL)
                 }
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.

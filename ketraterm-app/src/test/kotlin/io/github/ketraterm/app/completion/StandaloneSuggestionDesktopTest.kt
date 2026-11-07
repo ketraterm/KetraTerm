@@ -115,7 +115,7 @@ class StandaloneSuggestionDesktopTest {
                     session.submitInput(listOf(TerminalPasteEvent(definition), TerminalKeyEvent.key(TerminalKey.ENTER))),
                 )
                 awaitExecution(definition)
-                awaitLine("")
+                awaitLine("", requireShellCompletion = shell.isPowerShell)
                 type("ketra_smoke_e")
                 awaitLine("ketra_smoke_e")
                 if (shell.isPowerShell) requestSuggestions()
@@ -125,7 +125,7 @@ class StandaloneSuggestionDesktopTest {
                 type(" 'SMOKE_OK'")
                 key(KeyEvent.VK_ENTER)
                 awaitExecution("ketra_smoke_echo 'SMOKE_OK'")
-                awaitLine("")
+                awaitLine("", requireShellCompletion = shell.isPowerShell)
             }
         }
 
@@ -155,7 +155,7 @@ class StandaloneSuggestionDesktopTest {
                     capturePopup(artifacts.resolve("suggestions").resolve("$shell.png"))
                     selectAndAccept("alpha/", execute = true)
                     awaitExecution("cd alpha/")
-                    awaitLine("")
+                    awaitLine("", requireShellCompletion = shell.isPowerShell)
                     assertTrue(
                         tab.currentWorkingDirectoryUri
                             .orEmpty()
