@@ -1408,6 +1408,40 @@ class TerminalTextPainterTest {
         }
 
         @Test
+        fun `braille paints font independent dots and the same coverage under the cursor`() {
+            val fixture = fixture().copy(metrics = SwingMetrics(12, 24, 18, 20, 12, 0, 1))
+            val cache = renderCache(TestRenderFrame.text("\u2800\u2801\u28FF"))
+            try {
+                fixture.paintRow(cache)
+                val counts = IntArray(3)
+                for (y in 0 until 24) {
+                    for (x in 0 until 36) {
+                        if (fixture.image.getRGB(x, y) != 0) {
+                            assertEquals(TEST_RED, fixture.image.getRGB(x, y))
+                            counts[x / 12]++
+                        }
+                    }
+                }
+                assertContentEquals(intArrayOf(0, 9, 72), counts)
+                val before = fixture.image.getRGB(24, 0, 12, 24, null, 0, 12)
+                fixture.clearCell(2)
+                fixture.painter.paintCellForeground(
+                    fixture.g,
+                    cache,
+                    fixture.metrics,
+                    column = 2,
+                    row = 0,
+                    foreground = TEST_GREEN,
+                    fontRenderContext = fixture.g.fontRenderContext,
+                )
+                val after = fixture.image.getRGB(24, 0, 12, 24, null, 0, 12)
+                for (i in before.indices) assertEquals(if (before[i] == 0) 0 else TEST_GREEN, after[i])
+            } finally {
+                fixture.g.dispose()
+            }
+        }
+
+        @Test
         fun `geometric square meter glyphs are painted as contiguous terminal primitives`() {
             val fixture = fixture()
             val cache = renderCache(TestRenderFrame.text("\u25A0\u25A0"))

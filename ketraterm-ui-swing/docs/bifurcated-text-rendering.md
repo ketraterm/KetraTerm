@@ -12,7 +12,7 @@ are internal; hosts configure fonts through `SwingSettings` and `SwingHostServic
 | --- | --- |
 | Compatible LTR ASCII | `drawChars` when font advances match the grid; otherwise a cached vector with explicit cell positions |
 | Contextual scripts / ordinary text in RTL runs | Contextually shaped vectors positioned by terminal-cell ownership |
-| Supported box, block, and geometric characters | Programmatic cell primitives |
+| Supported box, block, geometric, and Braille characters | Programmatic cell primitives |
 | Emoji presentation sequences | Available platform rasterizer, then Java2D fallback |
 | Emoji bases with VS15 | Text font selection and bounded `TextLayout` with proportional cell fitting, including in RTL runs |
 | Other scalars and clusters | Bounded cached `TextLayout` fallback |
@@ -32,6 +32,13 @@ intersects and restores the exact clip, including nonrectangular shapes.
 Ordinary cells and block-cursor foreground share primitive, emoji, and fallback
 dispatch. A directional character elsewhere in a row does not disable primitives
 or emoji. Classification precedes access to the lazy emoji rasterizer.
+
+Braille patterns (`U+2800–U+28FF`) use a two-column, four-row grid of square
+dots, including the empty `U+2800` pattern. Device-pixel dot size comes from
+nominal cell dimensions so neighboring cells retain equal dot weight at
+fractional display scales. Positions follow the actual cell bounds, including
+line height and column spacing. Painting uses the existing foreground, composite,
+and cell clip; font fallback and the text baseline do not affect the dots.
 
 ## Native emoji image caching
 

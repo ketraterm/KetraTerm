@@ -37,7 +37,8 @@ internal class TerminalCellPrimitivePainter {
     fun canPaint(codePoint: Int): Boolean =
         TerminalBoxDrawingGlyphs.canPaint(codePoint) ||
             TerminalBlockElementGlyphs.canPaint(codePoint) ||
-            TerminalGeometricShapeGlyphs.canPaint(codePoint)
+            TerminalGeometricShapeGlyphs.canPaint(codePoint) ||
+            TerminalBraillePainter.canPaint(codePoint)
 
     /**
      * Paints one supported cell-native glyph.
@@ -89,6 +90,10 @@ internal class TerminalCellPrimitivePainter {
 
                 TerminalBlockElementGlyphs.canPaint(codePoint) -> {
                     blockElementPainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1)
+                }
+
+                TerminalBraillePainter.canPaint(codePoint) -> {
+                    TerminalBraillePainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1, nominalCellWidth, nominalCellHeight)
                 }
 
                 TerminalGeometricShapeGlyphs.canPaint(codePoint) -> {
