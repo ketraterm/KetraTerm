@@ -50,6 +50,10 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 <td>Insert/replace, autowrap, and automatic newline modes.</td>
 </tr>
 <tr>
+<td>Repeat character</td>
+<td>REP (<code>CSI Ps b</code>) repeats the preceding retained grapheme with the current pen and ordinary write semantics. See the <a href="../reference/protocol.html#repeat-character">protocol contract</a>.</td>
+</tr>
+<tr>
 <td>Reverse wrap</td>
 <td>Modes 45/1045 apply to BS and CUB with autowrap enabled: soft-wrapped rows only (45), or hard breaks and top-to-bottom margin cycling (1045).</td>
 </tr>
@@ -251,7 +255,7 @@ defines event and encoding behavior.</p>
 </tr>
 <tr>
 <td>Kitty graphics</td>
-<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/b855651aee3424078027f0c90311e5fe7cd056b4/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
+<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/92beaf89133df51f9edef1caafb926dc684b6d3b/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
 </tr>
 <tr>
 <td>Custom OSC</td>
@@ -268,7 +272,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b855651aee3424078027f0c90311e5fe7cd056b4/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/92beaf89133df51f9edef1caafb926dc684b6d3b/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
