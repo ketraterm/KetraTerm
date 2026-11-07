@@ -40,6 +40,13 @@ internal class NativeCompletionProtocol(
     fun promptStarted() {
         canConfirmCommandLine = false
         commandLinePrefixResetKeys = emptyList()
+        channel.clearPrompt()
+    }
+
+    fun commandStarted() {
+        canConfirmCommandLine = false
+        commandLinePrefixResetKeys = emptyList()
+        channel.clearPrompt()
     }
 
     fun acceptsPathEpoch(epoch: String): Boolean = inventory.acceptsPathEpoch(epoch)

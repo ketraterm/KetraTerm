@@ -53,6 +53,18 @@ public class TerminalShellCompletionChannel internal constructor(
 
     internal val isReady: Boolean get() = epoch != null
 
+    /** Clears any active prompt epoch and invalidates cached completion receipts. */
+    public fun clearPrompt() {
+        synchronized(lock) {
+            epoch = null
+            receipt = null
+            pending?.apply {
+                responded = true
+                response = null
+            }
+        }
+    }
+
     /** Installs a prompt-scoped epoch and its non-executing completion key chord. */
     public fun ready(
         epoch: String,

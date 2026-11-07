@@ -696,7 +696,7 @@ public class TerminalSession private constructor(
      * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
      * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
      * A replacement request waits for that cancelled slot within its existing timeout, then revalidates
-     * the current buffer. Concurrent requests with an active consumer still return null.
+     * the current buffer. Concurrent requests wait for in-flight queries and reuse verified confirmation.
      * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
      * Provisional snapshots reuse that verified result while their exact context remains current,
      * so confirmation and candidate collection do not invoke the native completer twice.
@@ -715,6 +715,14 @@ public class TerminalSession private constructor(
         cursorOffset: Int,
     ): TerminalShellCompletionResult? {
         while (true) {
+            var activeQuery: Deferred<Unit>? = null
+            synchronized(mutationLock) {
+                activeQuery = runtime.shellCompletion.pending?.retired
+            }
+            if (activeQuery != null) {
+                activeQuery.await()
+                continue
+            }
             val expected = captureCommandEdit() ?: return null
             if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
             var confirmedResult: TerminalShellCompletionResult? = null
@@ -735,10 +743,7 @@ public class TerminalSession private constructor(
                                 }
                                 confirmedResult = runtime.shellCompletion.confirmedResult(expected)
                                 if (confirmedResult != null) return@synchronized null
-                                retiring =
-                                    runtime.shellCompletion.pending
-                                        ?.takeUnless { it.deferred.isActive }
-                                        ?.retired
+                                retiring = runtime.shellCompletion.pending?.retired
                                 if (retiring != null) return@synchronized null
                                 var generation = 0L
                                 renderReader.readRenderFrame { generation = it.frameGeneration }
