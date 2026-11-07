@@ -112,8 +112,18 @@ jobs:
           fi
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  maven:
+  verify:
+    name: Verify exact release revision
     needs: prepare
+    if: needs.prepare.outputs.needed == 'true'
+    uses: ./.github/workflows/tests.yml
+    with:
+      revision: ${{ needs.prepare.outputs.revision }}
+      full: true
+    secrets: inherit
+
+  maven:
+    needs: [prepare, verify]
     if: needs.prepare.outputs.needed == 'true'
     uses: ./.github/workflows/publish.yml
     with:

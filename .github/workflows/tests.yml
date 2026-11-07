@@ -2,104 +2,252 @@ name: Test Suite
 
 on:
   pull_request:
-    branches:
-      - master
-      - main
+    branches: [master, main]
+  merge_group:
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: '43 3 * * *'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: false
+        default: ''
+      full:
+        type: boolean
+        required: false
+        default: true
+    secrets:
+      GRADLE_ENCRYPTION_KEY:
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tests-${{ github.workflow }}-${{ inputs.revision || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
-  build-and-test:
-    name: Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-26.04
-            shells: BASH,ZSH,FISH,POWERSHELL
-          - os: macos-15
-            shells: BASH,ZSH,FISH,POWERSHELL
-          - os: windows-2025
-            shells: WINDOWS_POWERSHELL,POWERSHELL,GIT_BASH
+  plan:
+    name: Plan validation
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      full: ${{ steps.plan.outputs.full }}
+      revision: ${{ steps.plan.outputs.revision }}
+      headless: ${{ steps.plan.outputs.headless }}
+      platform: ${{ steps.plan.outputs.platform }}
+      consumers: ${{ steps.plan.outputs.consumers }}
+      plugin: ${{ steps.plan.outputs.plugin }}
+      benchmarks: ${{ steps.plan.outputs.benchmarks }}
+      website: ${{ steps.plan.outputs.website }}
+      differential: ${{ steps.plan.outputs.differential }}
+      platform_matrix: ${{ steps.plan.outputs.platform_matrix }}
+      consumer_matrix: ${{ steps.plan.outputs.consumer_matrix }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup JBR 25
-        uses: actions/setup-java@v6
+      - uses: actions/checkout@v4
         with:
-          distribution: 'jetbrains'
-          java-version: '25'
-
-      - name: Setup Gradle
-        id: setup_gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Setup Node for process tests and release automation
-        uses: actions/setup-node@v4
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Test CI planning, gating, and release automation
+        run: node --test .github/scripts/*.test.mjs
+      - name: Select validation groups
+        id: plan
+        env:
+          CI_FULL: ${{ inputs.full || false }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: node .github/scripts/ci-plan.mjs
 
-      - name: Test Release Automation
-        if: runner.os == 'Linux'
-        run: node --test .github/scripts/release.test.mjs
+  headless:
+    name: Linux JVM, style, and ABI
+    needs: plan
+    if: needs.plan.outputs.headless == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: Install rendering test fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu-core
+      - name: Verify headless behavior and library contracts
+        run: ./gradlew spotlessCheck checkKotlinAbi test :ketraterm-app:writeNativeVersion --continue
+      - name: Upload JVM reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-headless
+          retention-days: 14
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+            build/reports/problems/
 
-      - name: Install System Dependencies (Linux)
+  platform:
+    name: Platform (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.platform == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.platform_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Linux shells and display
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb zsh fish fonts-dejavu-core
-
-      - name: Install System Dependencies (macOS)
+      - name: Install macOS shells
         if: runner.os == 'macOS'
         run: |
           brew install bash zsh fish
           for formula in bash zsh fish; do
             echo "$(brew --prefix "$formula")/bin" >> "$GITHUB_PATH"
           done
-
-      - name: Run JVM, Native, and Desktop Suites (Linux with Xvfb)
+      - name: Verify Linux native and desktop behavior
         if: runner.os == 'Linux'
-        run: |
-          xvfb-run -a ./gradlew test nativeTest desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
-
-      - name: Run JVM, Native, and Desktop Suites (Windows & macOS)
+        run: xvfb-run -a ./gradlew :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+      - name: Verify Windows and macOS JVM, native, and desktop behavior
         if: runner.os != 'Linux'
-        run: |
-          ./gradlew test nativeTest desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
-
-      - name: Test Published Consumers
-        if: ${{ !cancelled() && steps.setup_gradle.outcome == 'success' }}
-        run: ./gradlew :ketraterm-testkit:publishedConsumerTest --continue
-
-      - name: Run IntelliJ Plugin Tests (Linux)
-        if: runner.os == 'Linux'
-        working-directory: ketraterm-intellij-plugin
-        run: |
-          xvfb-run -a ./gradlew test "-Djava.awt.headless=true"
-
-      - name: Compile Benchmark Harnesses
-        run: ./gradlew :ketraterm-benchmarks:jmhJar
-
-      - name: Check Published Library ABI and Native Version
-        run: ./gradlew checkKotlinAbi :ketraterm-app:writeNativeVersion
-
-      - name: Upload Test Results
+        run: ./gradlew test :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+      - name: Upload platform reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.os }}
-          overwrite: true
+          name: test-results-platform-${{ matrix.os }}
           retention-days: 14
           path: |
             **/build/reports/tests/
             **/build/test-results/
             **/build/test-artifacts/
+
+  consumers:
+    name: Published consumers (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.consumers == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.consumer_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: Verify compiler, metadata, and retained-client compatibility
+        run: ./gradlew :ketraterm-testkit:publishedConsumerTest :ketraterm-testkit:publicationVerificationTest --continue
+      - name: Upload consumer reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-consumers-${{ matrix.os }}
+          retention-days: 14
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+
+  plugin:
+    name: IntelliJ plugin
+    needs: plan
+    if: needs.plan.outputs.plugin == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: Install virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb fonts-dejavu-core
+      - name: Verify IDE integration in its independent build
+        working-directory: ketraterm-intellij-plugin
+        run: xvfb-run -a ./gradlew spotlessCheck test "-Djava.awt.headless=true" --continue
+      - name: Upload IDE reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-intellij
+          retention-days: 14
+          path: |
+            ketraterm-intellij-plugin/**/build/reports/tests/
+            ketraterm-intellij-plugin/**/build/test-results/
+
+  benchmarks:
+    name: Benchmark compilation
+    needs: plan
+    if: needs.plan.outputs.benchmarks == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.revision }}
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - run: ./gradlew :ketraterm-benchmarks:jmhJar
+
+  website:
+    name: Documentation and website
+    needs: plan
+    if: needs.plan.outputs.website == 'true'
+    uses: ./.github/workflows/check-website.yml
+    with:
+      revision: ${{ needs.plan.outputs.revision }}
+
+  differential:
+    name: Terminal state smoke
+    needs: plan
+    if: needs.plan.outputs.differential == 'true'
+    uses: ./.github/workflows/terminal-differential.yml
+    with:
+      profile: smoke
+      revision: ${{ needs.plan.outputs.revision }}
+    secrets: inherit
+
+  gate:
+    name: CI gate
+    needs: [plan, headless, platform, consumers, plugin, benchmarks, website, differential]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require every selected check to succeed
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node .github/scripts/ci-gate.mjs
