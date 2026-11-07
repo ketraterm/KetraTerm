@@ -231,6 +231,14 @@ class ActionEngineTest {
             sinkCalls += "writeCodepoint:$codepoint"
         }
 
+        override fun writeRepeatedCluster(
+            codepoints: IntArray,
+            length: Int,
+            count: Int,
+        ) {
+            sinkCalls += "writeRepeatedCluster:$count:$length"
+        }
+
         override fun writeCluster(
             codepoints: IntArray,
             length: Int,

@@ -334,6 +334,7 @@ public final class io/github/ketraterm/session/TerminalShellCompletionCandidate 
 }
 
 public final class io/github/ketraterm/session/TerminalShellCompletionChannel {
+	public final fun clearPrompt ()V
 	public final fun publishCommands (Lio/github/ketraterm/session/TerminalShellCommandInventory;)V
 	public final fun ready (Ljava/lang/String;Ljava/util/List;)V
 	public final fun respond (Ljava/lang/String;JLio/github/ketraterm/session/TerminalShellCompletionResult;)V

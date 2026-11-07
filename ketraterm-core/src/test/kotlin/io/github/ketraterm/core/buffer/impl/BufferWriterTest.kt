@@ -31,6 +31,120 @@ import org.junit.jupiter.params.provider.CsvSource
 
 class BufferWriterTest {
     @Test
+    fun `repeated scalar writes preserve wide occupants pen attributes and deferred wrap`() {
+        val terminal = TerminalBuffers.create(6, 2)
+        terminal.writeText("界xy界")
+        terminal.positionCursor(col = 1, row = 0)
+        terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(7), underlineStyle = UnderlineStyle.CURLY)
+        terminal.setHyperlinkId(17)
+        terminal.setSelectiveEraseProtection(true)
+        terminal.writeRepeatedCluster(intArrayOf('A'.code), 1, 5)
+        assertEquals(" AAAAA", terminal.getLineAsString(0))
+        assertEquals(5, terminal.cursorCol)
+        for (col in 1..5) {
+            val attr = terminal.getAttrAt(col, 0)
+            assertEquals(CellColor.rgb(0x123456), attr?.foreground)
+            assertEquals(UnderlineStyle.CURLY, attr?.underlineStyle)
+            assertEquals(17, attr?.hyperlinkId)
+            assertEquals(true, attr?.selectiveEraseProtected)
+        }
+        terminal.writeCodepoint('Z'.code)
+        assertEquals("Z", terminal.getLineAsString(1))
+        assertEquals(1, terminal.cursorCol)
+        assertEquals(1, terminal.cursorRow)
+    }
+
+    @Test
+    fun `repeated graphemes match successive writes through modes margins history and cluster replacement`() {
+        val graphics =
+            listOf(
+                intArrayOf('A'.code),
+                intArrayOf('─'.code),
+                intArrayOf('界'.code),
+                intArrayOf('e'.code, 0x0301),
+                intArrayOf(0x1f469, 0x200d, 0x1f4bb),
+            )
+        for (graphic in graphics) {
+            for (mode in 0 until 32) {
+                for (count in listOf(-1, 0, 1, 7, 81)) {
+                    val actual = TerminalBuffers.create(8, 3, maxHistory = 2)
+                    val expected = TerminalBuffers.create(8, 3, maxHistory = 2)
+                    for (terminal in listOf(actual, expected)) {
+                        if (mode and 1 != 0) terminal.enterAltBuffer()
+                        repeat(3) {
+                            terminal.writeText("界")
+                            terminal.writeCluster(intArrayOf('e'.code, 0x0301))
+                            terminal.writeText("12345")
+                        }
+                        terminal.setAutoWrap(mode and 2 == 0)
+                        terminal.setInsertMode(mode and 4 != 0)
+                        terminal.setTreatAmbiguousAsWide(mode and 8 != 0)
+                        if (mode and 16 != 0) {
+                            terminal.setLeftRightMarginMode(true)
+                            terminal.setLeftRightMargins(2, 7)
+                            terminal.setScrollRegion(2, 3)
+                        }
+                        terminal.positionCursor(1, 1)
+                        terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(7), underlineStyle = UnderlineStyle.CURLY)
+                    }
+                    actual.writeRepeatedCluster(graphic, graphic.size, count)
+                    repeat(maxOf(count, 0)) { expected.writeCluster(graphic) }
+                    val context = "graphic=${graphic.contentToString()} mode=$mode count=$count"
+                    assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+                    assertEquals(expected.cursorCol, actual.cursorCol, context)
+                    assertEquals(expected.cursorRow, actual.cursorRow, context)
+                    assertEquals(expected.historySize, actual.historySize, context)
+                    val expectedCluster = IntArray(32)
+                    val actualCluster = IntArray(32)
+                    for (row in 0..2) {
+                        for (col in 0..7) {
+                            assertEquals(expected.getCodepointAt(col, row), actual.getCodepointAt(col, row), context)
+                            assertEquals(expected.getAttrAt(col, row), actual.getAttrAt(col, row), context)
+                            expectedCluster.fill(0)
+                            actualCluster.fill(0)
+                            assertEquals(
+                                expected.getLine(row).readCluster(col, expectedCluster),
+                                actual.getLine(row).readCluster(col, actualCluster),
+                                context,
+                            )
+                            assertArrayEquals(expectedCluster, actualCluster, context)
+                        }
+                    }
+                    actual.writeCodepoint('Z'.code)
+                    expected.writeCodepoint('Z'.code)
+                    assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+                    assertEquals(expected.cursorCol, actual.cursorCol, context)
+                    assertEquals(expected.cursorRow, actual.cursorRow, context)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `repeated graphemes validate the whole prefix before any mutation even for nonpositive counts`() {
+        val terminal = TerminalBuffers.create(6, 2)
+        terminal.writeText("AB")
+        for (count in listOf(-1, 0, 3)) {
+            for ((graphic, length) in listOf(
+                intArrayOf(65) to 0,
+                intArrayOf(65) to 2,
+                IntArray(33) { 65 } to 33,
+                intArrayOf(65, 0xd800) to 2,
+                intArrayOf(65, 0x110000) to 2,
+                intArrayOf(-1) to 1,
+            )) {
+                assertThrows(IllegalArgumentException::class.java) { terminal.writeRepeatedCluster(graphic, length, count) }
+                assertEquals("AB", terminal.getLineAsString(0))
+                assertEquals(2, terminal.cursorCol)
+            }
+        }
+        terminal.writeRepeatedCluster(intArrayOf(65), 1, 0)
+        terminal.writeRepeatedCluster(intArrayOf(65), 1, -1)
+        terminal.updatePreviousCluster(intArrayOf('B'.code, 0x0301))
+        assertEquals("AB\u0301", terminal.getLineAsString(0), "empty repetition preserves the previous cluster target")
+    }
+
+    @Test
     fun `partial pen updates distinguish unchanged fields defaults and false flags`() {
         val terminal = TerminalBuffers.create(4, 2)
         terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(255), bold = true, faint = true)

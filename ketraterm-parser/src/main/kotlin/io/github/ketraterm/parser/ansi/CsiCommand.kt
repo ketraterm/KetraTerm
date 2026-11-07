@@ -89,6 +89,8 @@ internal object CsiCommand {
     const val XTQFMTKEYS: Int = 61
     const val XTSHIFTESCAPE: Int = 62
 
+    const val REP: Int = 64
+
     /** Report product/build identity (CSI > Ps q). */
     const val XTVERSION: Int = 63
 }

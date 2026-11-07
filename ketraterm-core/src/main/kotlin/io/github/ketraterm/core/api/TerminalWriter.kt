@@ -49,6 +49,25 @@ public interface TerminalWriter {
     public fun writeCodepoint(codepoint: Int)
 
     /**
+     * Writes [count] copies of one pre-segmented grapheme using the current pen.
+     * Equivalent to successive [writeCluster] calls, including wrapping, scrolling,
+     * insert mode, and wide-cell handling. Width is calculated once per call.
+     * The used prefix of [codepoints] is consumed synchronously and is not retained.
+     * Non-positive counts leave the buffer unchanged after validating the grapheme.
+     * Work is proportional to the generated output; no count-sized buffer is created.
+     *
+     * @param codepoints Unicode scalars forming one grapheme.
+     * @param length Used prefix length, in `1..32` and at most the size of [codepoints].
+     * @param count Number of additional copies to write.
+     * @throws IllegalArgumentException for an invalid length or scalar, before mutation.
+     */
+    public fun writeRepeatedCluster(
+        codepoints: IntArray,
+        length: Int,
+        count: Int,
+    )
+
+    /**
      * Writes [length] printable ASCII bytes starting at [offset], using the active pen.
      *
      * Each byte is an independent printable character, with the same wrapping, scrolling,

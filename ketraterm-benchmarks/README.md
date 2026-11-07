@@ -52,6 +52,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | --- | --- |
 | Parsing without core mutation | `TerminalParserBenchmark`, `TerminalGraphemeBenchmark` with `pipeline=parser` |
 | Core writes, scrolling, erasure, and frame copying | `TerminalCoreWriteBenchmark`, `TerminalCoreScrollBenchmark`, `TerminalCoreEraseBenchmark`, `TerminalBufferBenchmark` |
+| REP and repeated scalar writes | `TerminalRepeatBenchmark`; equivalent 8/80/1024-cell output through scalar writes, bulk writes, REP bytes, or expanded ASCII bytes. Each invocation starts at home and overwrites the same grid without scrolling. |
 | History disposal and reuse after extended attributes are cleared | `TerminalStorageLifecycleBenchmark` |
 | Input encoding and session output through transport completion | `TerminalInputBenchmark`, `TerminalPasteBenchmark`, `TerminalSessionOutputBenchmark` |
 | OSC 22 parsing and pointer metadata reads | `TerminalPointerShapeBenchmark`; parsing is per request, three per invocation. Excludes Swing/native cursor updates. |

@@ -84,13 +84,19 @@ class TerminalShellIntegrationBootstrapNativeTest {
     private suspend fun TerminalSession.awaitLine(
         line: String,
         stage: String = "input",
+        requireShellCompletion: Boolean = false,
+        cursorOffset: Int = line.length,
     ): TerminalCommandEditContext {
         try {
             var captured: TerminalCommandEditContext? = null
             withTimeout(15.seconds) {
                 renderGeneration.first {
                     val edit = captureCommandEdit() ?: return@first false
-                    if (edit.commandLine.commandText == line) {
+                    if (requireShellCompletion && (!shellCompletionAvailable || edit.prefixResetKeys.isEmpty())) {
+                        return@first false
+                    }
+                    val snapshot = edit.commandLine
+                    if (snapshot.commandText == line && snapshot.cursorOffset == cursorOffset) {
                         captured = edit
                         true
                     } else {
@@ -114,7 +120,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     }
                 }
             throw AssertionError(
-                "Expected editable line '$line' after $stage, observed ${activeShellCommandLine()}, session ${state.value}\n$screen",
+                "Expected editable line '$line' (cursor=$cursorOffset) after $stage (completionAvailable=$shellCompletionAvailable), observed ${activeShellCommandLine()}, session ${state.value}\n$screen",
                 failure,
             )
         }
@@ -770,7 +776,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     ),
                 )
                 assertEquals("ketra-ready", withTimeout(15.seconds) { snapshots.receive() })
-                session.awaitLine("")
+                session.awaitLine("", "after prefix reset setup", requireShellCompletion = true)
 
                 val suffix = " tail \uD83D\uDE80"
                 for (prefix in listOf("echo e\u0301", "echo \uD83D\uDE80", "echo \uD83D\uDC69\u200D\uD83D\uDCBB", "")) {
@@ -850,7 +856,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     val readiness = withTimeout(15.seconds) { snapshots.receive() }
                     assumeTrue(readiness != "ketra-prediction-unavailable", "$executableName PSReadLine does not support predictions")
                     assertEquals("ketra-prediction-ready", readiness)
-                    session.awaitLine("")
+                    session.awaitLine("", "after prediction setup", requireShellCompletion = true)
 
                     val prefix = "Get-Chi"
                     assertEquals(
@@ -989,10 +995,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 }
                 val historyRecord = session.shellIntegrationState.latestCommandRecordId()
                 assertEquals(0, session.shellIntegrationState.commandMetadata(historyRecord)?.exitCode, "History setup failed")
-                val emptyContext = session.awaitLine("", "test history setup")
-                withTimeout(15.seconds) {
-                    session.renderGeneration.first { session.shellCompletionAvailable }
-                }
+                val emptyContext = session.awaitLine("", "test history setup", requireShellCompletion = true)
                 val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
@@ -1003,6 +1006,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
                 session.awaitLine("Get-ChildItem", "first acceptance")
+                var lastAcceptedEdit: TerminalCommandEditContext? = null
                 repeat(3) { iteration ->
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
@@ -1027,13 +1031,16 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(afterDeletion, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
                     )
-                    session.awaitLine("Get-ChildItem", "acceptance cycle $iteration")
+                    val accepted = session.awaitLine("Get-ChildItem", "acceptance cycle $iteration")
+                    if (iteration == 2) {
+                        lastAcceptedEdit = accepted
+                    }
                 }
                 val command = "Write-Output 'ketra-accepted'"
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
                     session.submitInput(
-                        assertNotNull(session.captureCommandEdit()),
+                        checkNotNull(lastAcceptedEdit),
                         listOf(TerminalTextReplacementEvent(0, "Get-ChildItem".length, command), TerminalKeyEvent.key(TerminalKey.ENTER)),
                     ),
                 )
@@ -1043,11 +1050,11 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         state.commandText(state.latestCommandRecordId()) == command
                     }
                 }
-                session.awaitLine("", "executing accepted command")
+                val emptyPostExecution = session.awaitLine("", "executing accepted command", requireShellCompletion = true)
                 val encodingLine = "Get-Content .\\utf8-extended.txt -Encoding u"
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
-                    session.submitInput(assertNotNull(session.captureCommandEdit()), listOf(TerminalPasteEvent(encodingLine))),
+                    session.submitInput(emptyPostExecution, listOf(TerminalPasteEvent(encodingLine))),
                 )
                 val encodingEdit = session.awaitLine(encodingLine, "typing encoding argument")
                 val encodings = assertNotNull(session.requestShellCompletions(encodingLine, encodingLine.length))
@@ -1070,7 +1077,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     ),
                 )
                 var currentLine = encodingLine.dropLast(1) + utf8.replacementText
-                session.awaitLine(currentLine, "accepting encoding argument")
+                var currentEdit = session.awaitLine(currentLine, "accepting encoding argument")
                 for ((line, expectedText) in listOf(
                     "Get-Content -Enc u" to "UTF8",
                     "Get-Content -Encoding:u" to "UTF8",
@@ -1079,7 +1086,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
                         session.submitInput(
-                            assertNotNull(session.captureCommandEdit()),
+                            currentEdit,
                             listOf(TerminalTextReplacementEvent(0, currentLine.length, line)),
                         ),
                     )
@@ -1095,7 +1102,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     )
                     currentLine = line.take(answer.replacementStartOffset) + candidate.replacementText
-                    session.awaitLine(currentLine, "accepting parameter case '$line'")
+                    currentEdit = session.awaitLine(currentLine, "accepting parameter case '$line'")
                 }
             }
         }
@@ -1131,7 +1138,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         metadata?.commandText == setup && metadata.finishedAtEpochMillis != null
                     }
                 }
-                session.awaitLine("", "installing progress completer")
+                session.awaitLine("", "installing progress completer", requireShellCompletion = true)
                 val line = "Get-KetraProgress -Value k"
                 session.submitInput(TerminalPasteEvent(line))
                 session.awaitLine(line, "typing progress completion")
@@ -1167,7 +1174,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         metadata?.commandText == setup && metadata.finishedAtEpochMillis != null
                     }
                 }
-                session.awaitLine("", "defining alias")
+                session.awaitLine("", "defining alias", requireShellCompletion = true)
                 val line = "ketra_smoke_e"
                 session.submitInput(TerminalPasteEvent(line))
                 session.awaitLine(line, "typing alias")

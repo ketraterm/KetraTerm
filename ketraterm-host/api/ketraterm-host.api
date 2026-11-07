@@ -146,6 +146,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun writeAscii ([BII)V
 	public fun writeCluster ([II)V
 	public fun writeCodepoint (I)V
+	public fun writeRepeatedCluster ([III)V
 }
 
 public final class io/github/ketraterm/host/HostControlPolicy : java/lang/Enum {

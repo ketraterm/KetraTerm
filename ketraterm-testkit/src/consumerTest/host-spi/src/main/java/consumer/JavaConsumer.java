@@ -53,6 +53,7 @@ public final class JavaConsumer {
         @Override public void requestModeStatus(int p0, boolean p1) { throw new AssertionError("Unexpected required command: requestModeStatus"); }
         @Override public void writeCodepoint(int p0) { text.appendCodePoint(p0); }
         @Override public void writeCluster(int[] p0, int p1) { for (int i = 0; i < p1; i++) text.appendCodePoint(p0[i]); }
+        @Override public void writeRepeatedCluster(int[] p0, int p1, int p2) { for (int i = 0; i < p2; i++) writeCluster(p0, p1); }
         @Override public void updatePreviousCluster(int[] p0, int p1) { throw new AssertionError("Unexpected required command: updatePreviousCluster"); }
         @Override public void bell() { bells++; }
         @Override public void backspace() { throw new AssertionError("Unexpected required command: backspace"); }

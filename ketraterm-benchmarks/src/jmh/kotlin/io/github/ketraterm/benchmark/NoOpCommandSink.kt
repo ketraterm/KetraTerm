@@ -47,6 +47,12 @@ internal class NoOpCommandSink : TerminalAsciiCommandSink {
 
     override fun writeCodepoint(codepoint: Int) {}
 
+    override fun writeRepeatedCluster(
+        codepoints: IntArray,
+        length: Int,
+        count: Int,
+    ) {}
+
     override fun writeAscii(
         bytes: ByteArray,
         offset: Int,

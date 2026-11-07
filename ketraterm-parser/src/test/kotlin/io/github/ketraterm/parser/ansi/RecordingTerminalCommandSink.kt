@@ -73,6 +73,14 @@ internal class RecordingTerminalCommandSink :
         events += "writeCodepoint:$codepoint"
     }
 
+    override fun writeRepeatedCluster(
+        codepoints: IntArray,
+        length: Int,
+        count: Int,
+    ) {
+        events += "writeRepeatedCluster:$count:$length:${codepoints.take(length).joinToString(":")}"
+    }
+
     override fun writeAscii(
         bytes: ByteArray,
         offset: Int,

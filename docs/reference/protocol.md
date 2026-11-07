@@ -31,6 +31,24 @@ rules apply.
 
 These names and encodings follow [ECMA-48, sections 8.3.58–59 and 8.3.159–160](https://www.ecma-international.org/wp-content/uploads/ECMA-48_5th_edition_june_1991.pdf).
 
+## Repeat character
+
+REP (`CSI Ps b`) writes `Ps` additional copies of the preceding graphic, as defined
+by [xterm's control sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html).
+Omitted and zero counts mean one. KetraTerm repeats the complete retained grapheme
+after charset mapping, including spaces, combining sequences, and emoji, bounded
+by the existing 32-codepoint retention limit. With no preceding graphic, REP is
+ignored. Cursor movement, erasure, SGR, and screen switches preserve the source;
+parser reset, RIS, and DECSTR clear it.
+
+Copies use the current pen and width policy, insert mode, margins, autowrap,
+and scrolling, as ordinary printable writes do. REP does not copy the original
+cell's attributes or read text back from the grid. Counts through `Int.MAX_VALUE`
+are accepted; work is proportional to generated output without a count-sized
+temporary buffer. Numeric overflow, extra fields, colon subparameters, private
+markers, and intermediates reject REP. The shared [CSI limits](#csi-parameters)
+and cancellation rules apply.
+
 ## OSC encoding
 
 Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw

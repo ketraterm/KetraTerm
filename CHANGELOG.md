@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## Unreleased
 
+- Added REP (`CSI Ps b`) to repeat the preceding grapheme with the current pen, preserving wide text, wrapping, margins, insert mode, and scrollback. Custom command sinks and core writers must implement `writeRepeatedCluster`; see the [REP contract](docs/reference/protocol.md#repeat-character).
 - Added `SwingSettings.smoothScrolling`, enabled by default. Library hosts can disable scroll animation while retaining precise wheel accumulation; disabling it during a settings reload settles pending motion at its destination.
 - Added HPR (`CSI Ps a`), VPR (`CSI Ps e`), HPB (`CSI Ps j`), and VPB (`CSI Ps k`) as aliases of existing cursor movement, preserving count defaults, bounds, margins, origin mode, and wrap behavior. See the [cursor alias contract](docs/reference/protocol.md#relative-cursor-aliases).
 - Render frames and caches expose `cursorPendingWrap` without changing visible cursor coordinates. Shell command extraction distinguishes the prompt's final cell from command text at a delayed-wrap boundary and preserves intentional leading spaces.

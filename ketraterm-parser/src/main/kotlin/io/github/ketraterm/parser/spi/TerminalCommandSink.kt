@@ -82,6 +82,18 @@ public interface TerminalCommandSink {
     public fun writeCodepoint(codepoint: Int)
 
     /**
+     * Writes [count] copies of the preceding graphic's retained grapheme (REP).
+     * Each copy uses the current pen and ordinary printable placement semantics.
+     * [length] is in `1..32`, and [count] is positive. The used prefix of [codepoints]
+     * is borrowed only for this synchronous call, including single-codepoint graphemes.
+     */
+    public fun writeRepeatedCluster(
+        codepoints: IntArray,
+        length: Int,
+        count: Int,
+    )
+
+    /**
      * Writes a pre-segmented multi-codepoint grapheme cluster to the grid.
      *
      * The array is borrowed for this call only; the sink must consume or copy its used

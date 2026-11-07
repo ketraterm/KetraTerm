@@ -35,6 +35,22 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
+    @Test
+    fun `concurrent requests for same buffer share one native query and both receive result`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val first = async { fixture.session.requestShellCompletions("git s", 5) }
+                val second = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertEquals("q", fixture.writtenText(), "Only one query must be sent to the shell")
+                fixture.reply()
+                runCurrent()
+                val result1 = checkNotNull(first.await())
+                val result2 = checkNotNull(second.await())
+                assertSame(result1, result2)
+            }
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `confirmation admits original and freshly captured contexts without a second native query`(captureAfterQuery: Boolean) =

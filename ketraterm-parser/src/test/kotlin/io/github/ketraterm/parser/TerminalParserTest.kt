@@ -37,6 +37,77 @@ import org.junit.jupiter.params.provider.CsvSource
 @DisplayName("TerminalParser")
 class TerminalParserTest {
     @Test
+    fun `REP defaults to one and dispatches the complete retained graphic in one call`() {
+        val sink = RecordingTerminalCommandSink()
+        val parser = TerminalParsers.create(sink)
+        parser.accept("abc\u001B[b\u001B[0b\u001B[3b".encodeToByteArray())
+        assertEquals(
+            listOf(
+                "writeCodepoint:97",
+                "writeCodepoint:98",
+                "writeCodepoint:99",
+                "writeRepeatedCluster:1:1:99",
+                "writeRepeatedCluster:1:1:99",
+                "writeRepeatedCluster:3:1:99",
+            ),
+            sink.events,
+        )
+        sink.events.clear()
+        parser.accept("e\u0301\u001B[2147483647b".encodeToByteArray())
+        assertEquals(listOf("writeCluster:2:101:769", "writeRepeatedCluster:2147483647:2:101:769"), sink.events)
+    }
+
+    @Test
+    fun `REP rejects malformed signatures fields and overflow and recovers without losing the graphic`() {
+        for (sequence in listOf(
+            "\u001B[?2b",
+            "\u001B[>2b",
+            "\u001B[2 b",
+            "\u001B[1;2b",
+            "\u001B[1:2b",
+            "\u001B[2147483648b",
+            "\u001B[999999999999999999999b",
+            "\u001B[" + "1;".repeat(32) + "1b",
+            "\u001B[2\u0018b",
+            "\u001B[2\u001Ab",
+        )) {
+            val sink = RecordingTerminalCommandSink()
+            val parser = TerminalParsers.create(sink)
+            parser.accept(("A" + sequence + "\u001B[2bZ").encodeToByteArray())
+            val repetitions = sink.events.filter { it.startsWith("writeRepeatedCluster:") }
+            // After cancellation, the following literal b becomes the preceding graphic.
+            val graphic = if (sequence.contains('\u0018') || sequence.contains('\u001A')) 98 else 65
+            assertEquals(listOf("writeRepeatedCluster:2:1:$graphic"), repetitions, sequence)
+            assertEquals("writeCodepoint:90", sink.events.last(), sequence)
+        }
+    }
+
+    @Test
+    fun `REP ignores missing graphics and clears its source on parser hard and soft resets`() {
+        for (reset in listOf("parser", "\u001Bc", "\u001B[!p")) {
+            val sink = RecordingTerminalCommandSink()
+            val parser = TerminalParsers.create(sink)
+            parser.accept("\u001B[2bA".encodeToByteArray())
+            if (reset == "parser") parser.reset() else parser.accept(reset.encodeToByteArray())
+            parser.accept("\u001B[2bZ\u001B[b".encodeToByteArray())
+            assertEquals(
+                listOf("writeRepeatedCluster:1:1:90"),
+                sink.events.filter { it.startsWith("writeRepeatedCluster:") },
+                reset,
+            )
+        }
+    }
+
+    @Test
+    fun `REP repeats the bounded retained prefix after grapheme overflow`() {
+        val sink = RecordingTerminalCommandSink()
+        val parser = TerminalParsers.create(sink)
+        parser.accept(("e" + "\u0301".repeat(40) + "\u001B[2b").encodeToByteArray())
+        val retained = "101:" + List(31) { "769" }.joinToString(":")
+        assertEquals(listOf("writeCluster:32:$retained", "writeRepeatedCluster:2:32:$retained"), sink.events)
+    }
+
+    @Test
     fun `ASCII runs consume borrowed slices and retain only the trailing grapheme`() {
         val recorded = RecordingTerminalCommandSink()
         val input = byteArrayOf(0, *(0x20..0x7e).map(Int::toByte).toByteArray(), 0)

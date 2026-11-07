@@ -90,7 +90,13 @@ private class OscShellIntegrationSession(
         payload: ByteArray,
         offset: Int,
         length: Int,
-    ) = shellCompletion.observe(command, payload, offset, length)
+    ) {
+        val before = shellCompletion.canConfirmCommandLine
+        shellCompletion.observe(command, payload, offset, length)
+        if (before != shellCompletion.canConfirmCommandLine) {
+            activeCommandLineContextRevision++
+        }
+    }
 
     override val state = TerminalShellIntegrationState()
     private val mutablePromptReady = MutableStateFlow(false)
@@ -156,6 +162,7 @@ private class OscShellIntegrationSession(
             }
             ShellIntegrationMarker.PROMPT_END -> mutablePromptReady.value = readinessPromptStarted
             ShellIntegrationMarker.COMMAND_START, ShellIntegrationMarker.COMMAND_FINISHED -> {
+                shellCompletion.commandStarted()
                 readinessPromptStarted = false
                 mutablePromptReady.value = false
             }
