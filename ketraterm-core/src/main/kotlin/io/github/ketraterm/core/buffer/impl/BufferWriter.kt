@@ -247,6 +247,8 @@ internal class BufferWriter(
 
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
+    override fun moveScreenToHistory() = mutationEngine.moveScreenToHistory()
+
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()
 
     override fun eraseBuffer() = mutationEngine.clearAllHistory()

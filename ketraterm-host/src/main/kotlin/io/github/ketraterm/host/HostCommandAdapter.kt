@@ -427,6 +427,7 @@ public class HostCommandAdapter
                 !selective && mode == 1 -> terminal.eraseScreenToCursor()
                 !selective && mode == 2 -> terminal.eraseEntireScreen()
                 !selective && mode == 3 -> terminal.eraseScreenAndHistory()
+                !selective && mode == 22 -> terminal.moveScreenToHistory()
             }
         }
 

@@ -179,7 +179,12 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                 )
             CsiCommand.VPA -> sink.setCursorRow(oneBasedPositionParam(state, 0))
 
-            CsiCommand.ED -> sink.eraseInDisplay(modeParam(state, 0), selective = false)
+            CsiCommand.ED -> {
+                val mode = modeParam(state, 0)
+                if (mode != 22 || (state.paramCount == 1 && state.subParameterMask == 0 && !state.parameterValueSaturated)) {
+                    sink.eraseInDisplay(mode, selective = false)
+                }
+            }
             CsiCommand.EL -> sink.eraseInLine(modeParam(state, 0), selective = false)
             CsiCommand.DECSED -> sink.eraseInDisplay(modeParam(state, 0), selective = true)
             CsiCommand.DECSEL -> sink.eraseInLine(modeParam(state, 0), selective = true)

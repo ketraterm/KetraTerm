@@ -27,6 +27,10 @@ See the parser
 and [core contract](../../ketraterm-core/docs/terminal-core-contract.md)
 for parameter-level rules.
 
+ED mode 22 maps to `moveScreenToHistory`; selective ED mode 22 is unsupported
+and ignored. Core owns row retention, image clipping, and the ED 2 clear phase.
+See the [protocol contract](../../docs/reference/protocol.md#screen-to-history-clear).
+
 ## 2. Screen Buffer Toggling Modes
 
 The adapter delegates screen transitions to core. See the

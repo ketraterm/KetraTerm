@@ -1688,6 +1688,34 @@ internal class MutationEngine(
         }
     }
 
+    /** Retains occupied primary rows for Kitty ED 22, then applies ordinary ED 2. */
+    fun moveScreenToHistory() =
+        structuralMutation {
+            if (!state.isAltScreenActive && state.activeBuffer.maxHistory > 0 && state.activeBuffer.isFullViewportScroll(height)) {
+                var rows = height
+                val imageRows = state.graphics.viewportContentBottom(false, height)
+                while (rows > imageRows) {
+                    val line = getLine(rows - 1)
+                    var col = 0
+                    while (col < width && line.rawCodepoint(col) == TerminalConstants.EMPTY) col++
+                    if (col < width) break
+                    rows--
+                }
+                if (rows > 0) {
+                    state.graphics.moveViewportToHistory(
+                        rows,
+                        width,
+                        height,
+                        minOf(state.activeBuffer.maxHistory, state.historySize + rows),
+                    )
+                    // The ED 2 phase below initializes all recycled viewport rows once.
+                    repeat(rows) { state.ring.push() }
+                    state.markStructureChanged()
+                }
+            }
+            clearViewportInternal()
+        }
+
     /** Clears the visible viewport without touching scrollback history. */
     fun clearViewport() =
         structuralMutation {

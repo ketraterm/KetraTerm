@@ -211,6 +211,42 @@ internal class GraphicsStore {
         return placementIndex.get((slot.toLong() shl 32) or placementId)
     }
 
+    /** Exclusive last occupied viewport row, including image-only rows for ED 22. */
+    fun viewportContentBottom(
+        screen: Boolean,
+        height: Int,
+    ): Int {
+        var bottom = 0
+        for (i in 0 until count) {
+            val b = i * STRIDE
+            if (screens[records[b + SLOT]] != screen) continue
+            val start = maxOf(0, records[b + ROW], records[b + CLIP_TOP])
+            val end = minOf(height.toLong(), records[b + ROW].toLong() + records[b + EFFECTIVE_ROWS], records[b + CLIP_BOTTOM].toLong())
+            if (start < end) bottom = maxOf(bottom, end.toInt())
+        }
+        return bottom
+    }
+
+    /** Retains primary viewport images before ED 2 clears the newly blank viewport. */
+    fun moveViewportToHistory(
+        rows: Int,
+        width: Int,
+        height: Int,
+        historySize: Int,
+    ) {
+        // Crop off-bottom content before moving; otherwise ED 2 would remove an
+        // oversized placement together with its newly historical visible portion.
+        var i = count - 1
+        while (i >= 0) {
+            val b = i * STRIDE
+            if (!screens[records[b + SLOT]] && !cropToMargins(i, minOf(0, records[b + ROW]), rows - 1)) {
+                removePlacement(i)
+            }
+            i--
+        }
+        scroll(false, 0, height - 1, 0, width - 1, -rows, true, historySize, wholeViewport = true)
+    }
+
     /**
      * Clears the selected screen regions. History-only clearing clips a placement
      * crossing row zero so its visible portion survives. [data] releases every image

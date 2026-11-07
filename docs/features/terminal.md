@@ -17,7 +17,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Alternate screen | Modes 47/1047/1049, screen-local saved cursor state, and primary scrollback preservation. |
 | Scrollback | Bounded history, incremental storage allocation, and logical-line resize reflow. |
 | Grid width | Minimum two columns, with 80/132-column switching through DECCOLM. |
-| Resets | Hard reset, soft reset, screen/history erase, and DEC alignment test. |
+| Resets | Hard reset, soft reset, screen/history erase, Kitty ED 22 [screen-to-history clear](../reference/protocol.md#screen-to-history-clear), and DEC alignment test. |
 | Synchronized output | Mode 2026 delays frame publication until completion or timeout. |
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
 | Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. Mode 2027 reports grapheme processing as permanently enabled; see [mode status](../reference/protocol.md#mode-status-reports). |
