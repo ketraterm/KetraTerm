@@ -54,7 +54,7 @@ import kotlin.time.Duration.Companion.seconds
 internal class StandaloneSuggestionFixture private constructor(
     val tab: TerminalWorkspaceTab,
     val provider: SwingShellSuggestionProvider,
-    settings: KetraTermSettings,
+    private val settings: KetraTermSettings,
 ) {
     val session get() = tab.session
     private val publications = Channel<Pair<String?, SwingShellSuggestionViewSnapshot>>(Channel.UNLIMITED)
@@ -219,6 +219,11 @@ internal class StandaloneSuggestionFixture private constructor(
             val state = session.shellIntegrationState
             assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
         }
+
+    suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
+        withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
+        withContext(Dispatchers.Swing) { terminal.reloadSettings() }
+    }
 
     suspend fun type(text: String) =
         withContext(Dispatchers.Swing) {

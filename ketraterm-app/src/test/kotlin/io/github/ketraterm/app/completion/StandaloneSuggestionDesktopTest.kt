@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
-import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.KeyEvent
 import java.nio.file.Files
 import java.nio.file.Path
@@ -48,14 +48,19 @@ import kotlin.time.Duration.Companion.seconds
 /** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
 @Tag("desktop")
 class StandaloneSuggestionDesktopTest {
-    @ParameterizedTest(name = "automatic inline prediction [wrapped={0}]")
-    @ValueSource(booleans = [false, true])
+    @ParameterizedTest(name = "automatic inline prediction [wrapped={0}, alreadyVisible={1}]")
+    @CsvSource("false, false", "false, true", "true, false", "true, true")
     internal fun `PowerShell automatically confirms inline predictions before showing and accepting suggestions`(
         wrappedPrediction: Boolean,
+        predictionAlreadyVisible: Boolean,
         @TempDir directory: Path,
     ): Unit =
         runBlocking {
             withSession(StandaloneSuggestionShell.POWERSHELL.profile(directory), directory) {
+                if (predictionAlreadyVisible) {
+                    // Establish the rendered prediction before enabling the automatic completion interaction.
+                    setAutomaticSuggestionsEnabled(false)
+                }
                 val location =
                     if (wrappedPrediction) {
                         var nameLength = 0
@@ -81,18 +86,21 @@ class StandaloneSuggestionDesktopTest {
                 awaitLine("", requireShellCompletion = true)
 
                 type("Get-Chi")
-                withTimeout(15.seconds) {
-                    session.renderGeneration.first {
-                        val snapshot = session.activeShellCommandLine()
-                        var predictionWrapped = !wrappedPrediction
-                        if (snapshot != null && wrappedPrediction) {
-                            session.readRenderFrame { frame -> predictionWrapped = frame.lineWrapped(snapshot.cursorRow) }
+                if (predictionAlreadyVisible) {
+                    withTimeout(15.seconds) {
+                        session.renderGeneration.first {
+                            val snapshot = session.activeShellCommandLine()
+                            var predictionWrapped = !wrappedPrediction
+                            if (snapshot != null && wrappedPrediction) {
+                                session.readRenderFrame { frame -> predictionWrapped = frame.lineWrapped(snapshot.cursorRow) }
+                            }
+                            snapshot?.commandText == "Get-Chi" &&
+                                snapshot.cursorOffset == 7 &&
+                                snapshot.requiresShellConfirmation &&
+                                predictionWrapped
                         }
-                        snapshot?.commandText == "Get-Chi" &&
-                            snapshot.cursorOffset == 7 &&
-                            snapshot.requiresShellConfirmation &&
-                            predictionWrapped
                     }
+                    setAutomaticSuggestionsEnabled(true)
                 }
                 awaitPopup("Get-Chi", "Get-ChildItem")
                 selectAndAccept("Get-ChildItem")
