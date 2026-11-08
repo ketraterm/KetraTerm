@@ -35,9 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.swing.Swing
-import java.awt.event.FocusAdapter
-import java.awt.event.FocusEvent
-import java.awt.event.KeyEvent
+import java.awt.event.*
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
@@ -131,6 +129,13 @@ internal class StandaloneSuggestionFixture private constructor(
             val frame = JFrame("KetraTerm suggestion smoke: ${tab.profile.id}")
             window = frame
             frame.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
+            frame.addWindowFocusListener(
+                object : WindowAdapter() {
+                    override fun windowGainedFocus(event: WindowEvent) {
+                        terminal.requestFocusInWindow()
+                    }
+                },
+            )
             frame.contentPane.add(terminal)
             frame.pack()
             frame.isVisible = true

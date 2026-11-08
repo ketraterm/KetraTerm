@@ -31,8 +31,9 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * core, cursor, attribute, and input-encoder behavior are owned by
  * `terminal-session` and lower layers.
  * Normal closure follows both process exit and delivery of stdout through EOF.
- * Local close cancels pending reads instead of draining; read or byte-listener failure
- * reports the original error and releases the process and both streams once.
+ * Local close suppresses pending delivery; ConPTY shutdown output is drained and discarded.
+ * A read or byte-listener failure reports the original error and releases the
+ * process and both streams once.
  * Listener callbacks may close this connector reentrantly.
  *
  * @param process the underlying PTY process.
@@ -177,16 +178,18 @@ public class PtyConnector internal constructor(
         try {
             process.destroy()
         } finally {
-            try {
-                process.input.close()
-            } catch (_: IOException) {
-                // Destruction can already have closed the native stream.
-            } finally {
-                synchronized(writeLock) {
-                    try {
-                        process.output.close()
-                    } catch (_: IOException) {
-                        // Local close should remain best-effort and idempotent.
+            if (!process.requiresOutputDrainOnClose || !started.get()) {
+                try {
+                    process.input.close()
+                } catch (_: IOException) {
+                    // Destruction can already have closed the native stream.
+                } finally {
+                    synchronized(writeLock) {
+                        try {
+                            process.output.close()
+                        } catch (_: IOException) {
+                            // Local close should remain best-effort and idempotent.
+                        }
                     }
                 }
             }
@@ -238,7 +241,21 @@ public class PtyConnector internal constructor(
                 }
             }
         } finally {
-            outputDrained.countDown()
+            try {
+                if (localCloseRequested.get() && process.requiresOutputDrainOnClose) {
+                    // ConPTY owns pipe closure. Keep its shutdown output moving without
+                    // delivering it to the closed session or racing a native handle close.
+                    try {
+                        while (process.input.read(buffer) >= 0) {
+                            // Discard output until the backend closes the pipe.
+                        }
+                    } catch (_: IOException) {
+                        // The backend may close the stream before this final read.
+                    }
+                }
+            } finally {
+                outputDrained.countDown()
+            }
         }
     }
 

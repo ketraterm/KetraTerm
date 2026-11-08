@@ -32,8 +32,9 @@ to release native resources.
 ## Failure and local close
 
 A reader or byte-listener exception is retained in `PtyConnector.failure` and
-reported through `onError`. The connector closes the process and both streams,
-then invokes `onClosed(null)`. It does not retry the failed chunk or replace the
+reported through `onError`. The connector requests process and stream cleanup,
+then invokes `onClosed(null)`; backend-owned pipe cleanup can finish afterward.
+It does not retry the failed chunk or replace the
 original failure with a later process exit. Connector callbacks may close
 reentrantly.
 
@@ -42,9 +43,17 @@ remote `onClosed` callback; the session records its own local termination.
 Exceptions arriving after local close are teardown and do not become remote
 failures.
 
-Cleanup requests process destruction and closes both streams without waiting
+Cleanup requests process destruction and stream closure without waiting
 for an active byte callback. The reader retains its borrowed buffer until that
 callback returns, then stops delivery; the watcher exits after the reader.
+For a started ConPTY connector, Pty4J owns both pipes' closure. The reader
+discards shutdown output through EOF so
+[pseudoconsole cleanup](https://learn.microsoft.com/en-us/windows/console/closepseudoconsole) can finish;
+local close never closes that pipe concurrently with its pending native read.
+It also avoids waiting for a pending stdin write before stdout can drain.
+ConPTY close awaits process termination to release the child's working directory;
+it does not wait for byte callbacks or pipe cleanup to finish.
+An unstarted connector closes the pipes directly because no reader owns stdout.
 Close is idempotent, but native destruction and stream cleanup can block. Keep
 it off a UI thread.
 
