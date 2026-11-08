@@ -217,27 +217,24 @@ class SwingTerminalCursorBlinkTest {
     @Test
     @Tag("desktop")
     fun `zero cursor blink setting keeps timer stopped and cursor visible`() {
-        val component =
-            SwingTerminal(
-                settingsProvider = {
-                    SwingSettings.create { draft ->
-                        draft.cursorBlinkMillis = 0
-                    }
-                },
-            )
-        val frame = JFrame()
-
-        try {
-            SwingUtilities.invokeAndWait {
+        SwingUtilities.invokeAndWait {
+            val component =
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.cursorBlinkMillis = 0
+                        }
+                    },
+                )
+            val frame = JFrame()
+            try {
                 component.cursorBlinkVisible = false
                 frame.add(component)
                 frame.pack()
-            }
 
-            assertFalse(component.cursorTimer.isRunning)
-            assertTrue(component.cursorBlinkVisible)
-        } finally {
-            SwingUtilities.invokeAndWait {
+                assertFalse(component.cursorTimer.isRunning)
+                assertTrue(component.cursorBlinkVisible)
+            } finally {
                 frame.dispose()
                 component.dispose()
             }
@@ -260,61 +257,50 @@ class SwingTerminalCursorBlinkTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
-        val component = controlledTerminal()
-
-        val frame = JFrame()
         try {
             SwingUtilities.invokeAndWait {
-                frame.add(component)
-                frame.pack()
-                component.bind(session)
-                dispatcher.scheduler.runCurrent()
-            }
+                val component = controlledTerminal()
+                val frame = JFrame()
+                try {
+                    frame.add(component)
+                    frame.pack()
+                    component.bind(session)
+                    dispatcher.scheduler.runCurrent()
+                    assertTrue(component.cursorTimer.isRunning)
 
-            // Verify cursor timer is started when component is added
-            assertTrue(component.cursorTimer.isRunning)
+                    // Drive blink state explicitly after verifying that binding starts the timer.
+                    component.cursorTimer.stop()
+                    component.cursorBlinkVisible = false
+                    assertFalse(component.cursorBlinkVisible)
 
-            // Drive blink state explicitly after verifying that binding starts the timer.
-            SwingUtilities.invokeAndWait {
-                component.cursorTimer.stop()
-            }
+                    val keyEvent =
+                        KeyEvent(
+                            component,
+                            KeyEvent.KEY_PRESSED,
+                            System.currentTimeMillis(),
+                            0,
+                            KeyEvent.VK_A,
+                            'A',
+                        )
+                    for (listener in component.keyListeners) {
+                        listener.keyPressed(keyEvent)
+                    }
+                    assertTrue(component.cursorBlinkVisible)
 
-            // 1. Manually set cursorBlinkVisible to false and verify, then dispatch key event and verify, then set back to false and verify
-            SwingUtilities.invokeAndWait {
-                component.cursorBlinkVisible = false
-                assertFalse(component.cursorBlinkVisible)
+                    component.cursorBlinkVisible = false
+                    assertFalse(component.cursorBlinkVisible)
 
-                val keyEvent =
-                    KeyEvent(
-                        component,
-                        KeyEvent.KEY_PRESSED,
-                        System.currentTimeMillis(),
-                        0,
-                        KeyEvent.VK_A,
-                        'A',
-                    )
-                for (listener in component.keyListeners) {
-                    listener.keyPressed(keyEvent)
+                    val previousGeneration = session.renderGeneration.value
+                    session.requestRender(scrollbackOffset = 0)
+                    dispatcher.scheduler.runCurrent()
+                    assertTrue(session.renderGeneration.value > previousGeneration, "render was not published")
+                    assertTrue(component.cursorBlinkVisible)
+                } finally {
+                    frame.dispose()
+                    component.dispose()
                 }
-                assertTrue(component.cursorBlinkVisible)
-
-                component.cursorBlinkVisible = false
-                assertFalse(component.cursorBlinkVisible)
-            }
-
-            SwingUtilities.invokeAndWait {
-                component.cursorBlinkVisible = false
-                val previousGeneration = session.renderGeneration.value
-                session.requestRender(scrollbackOffset = 0)
-                dispatcher.scheduler.runCurrent()
-                assertTrue(session.renderGeneration.value > previousGeneration, "render was not published")
-                assertTrue(component.cursorBlinkVisible)
             }
         } finally {
-            SwingUtilities.invokeAndWait {
-                frame.dispose()
-                component.dispose()
-            }
             session.close()
         }
     }
