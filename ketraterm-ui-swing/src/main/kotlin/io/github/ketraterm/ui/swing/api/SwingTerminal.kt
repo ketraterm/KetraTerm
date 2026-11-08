@@ -2289,6 +2289,14 @@ public class SwingTerminal
                                     }
                                 }
                             },
+                            {
+                                if (automatic &&
+                                    interaction.closeReason == SwingShellSuggestionCloseReason.INVALIDATED &&
+                                    suggestionRevision == revision
+                                ) {
+                                    suggestionScheduler?.refresh()
+                                }
+                            },
                         )
                     }
                 },
@@ -3195,6 +3203,10 @@ public class SwingTerminal
             val interaction = activeSuggestionInteraction
             val scope = suggestionScope
             val target = activeSuggestionTarget
+            val refreshContext =
+                closeReason == SwingShellSuggestionCloseReason.INVALIDATED &&
+                    activeSuggestionIsAutomatic &&
+                    interaction?.contextIsCurrent?.invoke() == false
             val retain =
                 retainPresentation &&
                     target == null &&
@@ -3212,6 +3224,7 @@ public class SwingTerminal
                 { interaction?.close(closeReason) },
                 { if (suggestionRevision == revision && !retain) shellSuggestionController?.hide() },
                 { hideCapturedSuggestionTarget(target, revision) },
+                { if (suggestionRevision == revision && refreshContext) suggestionScheduler?.refresh() },
             )
         }
 

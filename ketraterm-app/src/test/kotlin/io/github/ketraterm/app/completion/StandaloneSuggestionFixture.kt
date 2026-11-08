@@ -32,13 +32,17 @@ import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.swing.Swing
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
 import java.awt.image.BufferedImage
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import javax.imageio.ImageIO
 import javax.swing.JComponent
 import javax.swing.JFrame
@@ -62,6 +66,7 @@ internal class StandaloneSuggestionFixture private constructor(
     private var window: JFrame? = null
     private var latestSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
     private var latestRequest: SwingShellSuggestionRequest? = null
+    private var latestProviderCollection = AtomicReference("not opened")
     private var viewListener: SwingShellSuggestionViewListener? = null
     private val terminal =
         SwingTerminal(
@@ -94,10 +99,17 @@ internal class StandaloneSuggestionFixture private constructor(
 
                     override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
                         latestRequest = request
+                        val collection = AtomicReference("opened; collection not started")
+                        latestProviderCollection = collection
                         val source = effectiveProvider.open(request)
                         val originalFeedback = source.feedbackHandler
                         return SwingShellSuggestionSource(
-                            suggestions = source.suggestions,
+                            suggestions =
+                                source.suggestions
+                                    .onStart { collection.set("collection started") }
+                                    .onCompletion { cause ->
+                                        collection.updateAndGet { "$it; completed with ${cause ?: "success"}" }
+                                    },
                             feedbackHandler =
                                 { feedback ->
                                     originalFeedback.onSuggestionFeedback(feedback)
@@ -133,6 +145,7 @@ internal class StandaloneSuggestionFixture private constructor(
     suspend fun awaitPopup(
         line: String,
         replacement: String,
+        traceFile: Path? = null,
     ): SwingShellSuggestionViewSnapshot {
         var lastUpdate: Pair<String?, SwingShellSuggestionViewSnapshot>? = null
         try {
@@ -153,10 +166,23 @@ internal class StandaloneSuggestionFixture private constructor(
             val state =
                 withContext(Dispatchers.Swing) {
                     "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}; " +
-                        "latest provider request=$latestRequest; current projection=${session.activeShellCommandLine()}"
+                        "latest provider request=$latestRequest; provider collection=${latestProviderCollection.get()}; " +
+                        "current projection=${session.activeShellCommandLine()}"
+                }
+            val trace =
+                if (traceFile == null) {
+                    ""
+                } else {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            "\nNative completion trace:\n${Files.readString(traceFile)}"
+                        } catch (unavailable: IOException) {
+                            "\nNative completion trace unavailable: $unavailable"
+                        }
+                    }
                 }
             throw AssertionError(
-                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate\n${screenText()}",
+                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate$trace\n${screenText()}",
                 failure,
             )
         }

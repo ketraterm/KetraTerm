@@ -321,6 +321,124 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
+    fun `automatic suggestions recapture changed geometry when the command projection stays equal`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            val opened = ArrayList<SwingShellSuggestionRequest>()
+            val collected = ArrayList<SwingShellSuggestionRequest>()
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collected += request
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        opened += request
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
+                }
+            val confirmed = TerminalShellCompletionResult("git s", 5, 4, 5, emptyList())
+            try {
+                terminal.setShellSuggestionProvider(provider)
+                terminal.bind(fixture.session)
+                runCurrent()
+                var columns = 0
+                var rows = 0
+                fixture.session.readRenderFrame { frame ->
+                    columns = frame.columns
+                    rows = frame.rows
+                }
+                assertTrue(fixture.session.tryUpdateViewportPixels(columns, rows, 300, 80))
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(request), opened)
+                assertTrue(collected.isEmpty())
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                val original = assertNotNull(fixture.session.captureCommandEdit())
+                val observationRevision = fixture.session.activeShellCommandLineRevision.value
+
+                assertTrue(fixture.session.tryUpdateViewportPixels(columns, rows, 600, 160))
+                runCurrent()
+                assertFalse(fixture.session.isCommandEditCurrent(original))
+                assertEquals(original.commandLine, fixture.session.activeShellCommandLine())
+                assertEquals(observationRevision, fixture.session.activeShellCommandLineRevision.value)
+
+                // The old wire request must retire before the replacement can confirm the new authority.
+                fixture.respond(confirmed)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(request, request), opened, "Equal text cannot deduplicate a new editing authority")
+                assertTrue(collected.isEmpty())
+                assertEquals("\u001b[24~\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+
+                fixture.respond(confirmed, requestId = 2)
+                runCurrent()
+                assertEquals(listOf(request), collected)
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `stale host publication recaptures automatic suggestions before queued context observation`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), screenDerived = true)
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                runCurrent()
+                var columns = 0
+                var rows = 0
+                fixture.session.readRenderFrame { frame ->
+                    columns = frame.columns
+                    rows = frame.rows
+                }
+                assertTrue(fixture.session.tryUpdateViewportPixels(columns, rows, 300, 80))
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val original = target.interactions.single()
+                val projection = fixture.session.activeShellCommandLine()
+                val observationRevision = fixture.session.activeShellCommandLineRevision.value
+
+                assertTrue(fixture.session.tryUpdateViewportPixels(columns, rows, 600, 160))
+                // Publication validates synchronously, before the queued session observer can close the interaction.
+                assertFalse(original.publish(listOf(suggestion)))
+                assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, original.closeReason)
+                assertEquals(projection, fixture.session.activeShellCommandLine())
+                assertEquals(observationRevision, fixture.session.activeShellCommandLineRevision.value)
+
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+
+                assertEquals(2, target.interactions.size, "Direct invalidation must release the obsolete request identity")
+                val replacement = target.interactions.last()
+                assertEquals(original.request, replacement.request)
+                assertTrue(replacement.publish(listOf(suggestion)))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `failed confirmation reconsiders an echo completed while the request was pending`() =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
