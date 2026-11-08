@@ -127,12 +127,13 @@ prefix-reset keys. Metadata that leaves this command observation unchanged does
 not invalidate it. A changed observation cannot become current again merely
 because later output reconstructs equal text.
 
-Semantic input revisions conservatively advance for ordinary input even when
-modes suppress its bytes, except for a single key-release event that emits no
-bytes. Such a release cannot edit the shell buffer; encoded releases still
-invalidate contexts. Native completion chords and terminal protocol replies do
-not advance the editing input revision. Empty input has the event-specific rules
-described by the API.
+Ordinary semantic input encoded synchronously advances the editing input revision
+only when encoding emits bytes. Suppressed modifier, key-release, focus, and mouse
+events preserve the editing context; encoded events still invalidate it. Bulk and
+compound operations conservatively advance the revision when reserving outbound
+work because their encoding happens later. Native completion chords and terminal
+protocol replies do not advance the editing input revision. Empty input has the
+event-specific rules described by the API.
 
 Interactive consumers use `requestShellCompletions(expected)` with the context
 captured before provider work. The native reply must confirm that context's exact
@@ -164,7 +165,7 @@ a context marked `requiresShellConfirmation` even when the raw screen snapshot
 looks complete. It must obtain a successful native reply before publishing or
 admitting an edit; recapture alone does not restore permission.
 
-Pending-query selection and key-chord admission share mutation, producer, and
+Pending-query selection and request-frame admission share mutation, producer, and
 outbound serialization. Concurrent callers share one native query only for the
 same current editing authority and command/cursor. The query itself does not
 consume that authority. Results complete outside session locks. Each caller owns
@@ -176,6 +177,16 @@ revalidates before sending another query. Waiting and execution share each
 caller's [native completion deadline](../../docs/reference/protocol.md#private-powershell-completion-metadata).
 Local primary-buffer clear retires an invalidated query without waiting for
 further shell output. Closure cancels both response and retirement waiters.
+
+The session assigns positive request IDs that remain unique across all prompt
+epochs in its lifetime. A custom producer supplies a request encoder to
+`TerminalShellCompletionChannel.ready`; it receives that ID and returns one to
+64 semantic input events carrying it to the shell. The encoder runs synchronously
+under session serialization and must be bounded, nonblocking, and non-reentrant.
+The producer must return the same ID in `respond`; independently counting shell
+invocations cannot correlate queued requests across prompt changes. Protocol
+framing belongs to the producer, while the session owns ID allocation and ordered
+admission.
 
 A screen-derived snapshot with `requiresShellConfirmation` contains only the
 prompt-to-cursor prefix: visible text after the cursor may be a shell prediction

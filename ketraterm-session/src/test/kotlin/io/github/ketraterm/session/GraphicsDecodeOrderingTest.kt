@@ -206,7 +206,7 @@ class GraphicsDecodeOrderingTest {
                     session.start(10, 3)
                     val previous = assertNotNull(session.captureCommandEdit())
                     if (nativeConfirmed) {
-                        channel.ready("epoch", listOf(TerminalKeyEvent.text("q")))
+                        channel.ready("epoch") { listOf(TerminalKeyEvent.text("q")) }
                         val query = async { session.requestShellCompletions(previous) }
                         runCurrent()
                         channel.respond("epoch", 1, TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))

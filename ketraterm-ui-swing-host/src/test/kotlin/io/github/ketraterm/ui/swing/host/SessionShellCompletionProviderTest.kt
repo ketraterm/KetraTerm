@@ -333,7 +333,7 @@ class SessionShellCompletionProviderTest {
                 shellIntegration =
                     TerminalShellIntegrationFactory { context ->
                         channel = context.shellCompletion
-                        channel.ready("test", listOf(TerminalKeyEvent(codepoint = 'e'.code)))
+                        channel.ready("test") { listOf(TerminalKeyEvent(codepoint = 'e'.code)) }
                         host.create(context)
                     },
                 workerDispatcher = dispatcher,

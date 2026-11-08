@@ -29,6 +29,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -51,26 +53,37 @@ class TerminalCommandEditTest {
             }
         }
 
-    @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `key release invalidates a fresh edit only when sent to the shell`(reportReleases: Boolean) =
-        runTest {
-            val connector = MockConnector()
-            val model = TerminalShellCommandLineState(snapshot())
-            session(connector, model).use { session ->
-                session.start(10, 3)
-                if (reportReleases) connector.feedFromHost("\u001b[=11u".toByteArray())
-                val expected = checkNotNull(session.captureCommandEdit())
-                val release = TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE)
-                assertEquals(ACCEPTED, session.submitInput(release))
-                runCurrent()
-                assertEquals(reportReleases, connector.writtenBytes.isNotEmpty())
-                assertEquals(
-                    if (reportReleases) STALE_CONTEXT else ACCEPTED,
-                    session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 1, "status"))),
-                )
-            }
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("synchronousInputCases")
+    fun `synchronous input invalidates a fresh edit only when sent to the shell`(
+        scenario: String,
+        modes: String,
+        event: TerminalInputEvent,
+        emitted: String,
+    ) = runTest {
+        val connector = MockConnector()
+        val model = TerminalShellCommandLineState(snapshot())
+        session(connector, model).use { session ->
+            session.start(10, 3)
+            connector.feedFromHost(modes.toByteArray())
+            val expected = checkNotNull(session.captureCommandEdit())
+            assertEquals(ACCEPTED, session.submitInput(event))
+            runCurrent()
+            assertEquals(emitted, connector.writtenBytes.toString(Charsets.UTF_8), scenario)
+            assertEquals(emitted.isEmpty(), session.isCommandEditCurrent(expected), scenario)
+            assertEquals(
+                if (emitted.isEmpty()) ACCEPTED else STALE_CONTEXT,
+                session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 1, "status"))),
+                scenario,
+            )
+            runCurrent()
+            assertEquals(
+                if (emitted.isEmpty()) "\u007fstatus" else emitted,
+                connector.writtenBytes.toString(Charsets.UTF_8),
+                scenario,
+            )
         }
+    }
 
     @Test
     fun `fresh context admits one compound edit and cannot admit another edit`() =
@@ -371,4 +384,37 @@ class TerminalCommandEditTest {
     }
 
     private fun snapshot(): TerminalShellCommandLineSnapshot = TerminalShellCommandLineSnapshot("git s", 5, 5, 0)
+
+    companion object {
+        @JvmStatic
+        fun synchronousInputCases(): List<Arguments> {
+            val release = TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.RELEASE)
+            val shift = TerminalKeyEvent.key(TerminalKey.LEFT_SHIFT, TerminalModifiers.SHIFT)
+            val control = TerminalKeyEvent.key(TerminalKey.LEFT_CONTROL, TerminalModifiers.CTRL)
+            val alt = TerminalKeyEvent.key(TerminalKey.LEFT_ALT, TerminalModifiers.ALT)
+            val focusIn = TerminalFocusEvent(focused = true)
+            val focusOut = TerminalFocusEvent(focused = false)
+            val motion = TerminalMouseEvent(1, 1, TerminalMouseButton.NONE, TerminalMouseEventType.MOTION)
+            val drag = motion.copy(button = TerminalMouseButton.LEFT)
+            return listOf(
+                Arguments.of("legacy key release", "", release, ""),
+                Arguments.of("reported key release", "\u001b[=11u", release, "\u001b[127;1:3u"),
+                Arguments.of("legacy shift press", "", shift, ""),
+                Arguments.of("reported shift press", "\u001b[=9u", shift, "\u001b[57441;2u"),
+                Arguments.of("legacy control press", "", control, ""),
+                Arguments.of("reported control press", "\u001b[=9u", control, "\u001b[57442;5u"),
+                Arguments.of("legacy alt press", "", alt, ""),
+                Arguments.of("reported alt press", "\u001b[=9u", alt, "\u001b[57443;3u"),
+                Arguments.of("unreported focus gain", "", focusIn, ""),
+                Arguments.of("reported focus gain", "\u001b[?1004h", focusIn, "\u001b[I"),
+                Arguments.of("unreported focus loss", "", focusOut, ""),
+                Arguments.of("reported focus loss", "\u001b[?1004h", focusOut, "\u001b[O"),
+                Arguments.of("disabled mouse tracking", "", motion, ""),
+                Arguments.of("normal mouse motion", "\u001b[?1000;1006h", motion, ""),
+                Arguments.of("button mouse motion without a button", "\u001b[?1002;1006h", motion, ""),
+                Arguments.of("reported mouse motion", "\u001b[?1003;1006h", motion, "\u001b[<35;2;2M"),
+                Arguments.of("reported mouse drag", "\u001b[?1002;1006h", drag, "\u001b[<32;2;2M"),
+            )
+        }
+    }
 }

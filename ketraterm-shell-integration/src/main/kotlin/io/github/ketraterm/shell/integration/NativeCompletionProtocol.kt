@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.shell.integration
 
+import io.github.ketraterm.input.event.TerminalInputEvent
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.TerminalShellCompletionCandidate
@@ -67,12 +68,12 @@ internal class NativeCompletionProtocol(
             inventory.observe(fields)
             return false
         }
-        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "2") return false
+        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "3") return false
         val epoch = fields[3]
         if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return false
         if (fields[2] == "Ready" && (fields.size == 4 || fields.size == 5 && fields[4] == "PrefixReset")) {
             if (!promptActive) return false
-            channel.ready(epoch, listOf(TerminalKeyEvent(key = TerminalKey.F12), TerminalKeyEvent(codepoint = 'e'.code)))
+            channel.ready(epoch, ::requestInput)
             canConfirmCommandLine = true
             commandLinePrefixResetKeys =
                 if (fields.size == 5) {
@@ -127,6 +128,19 @@ internal class NativeCompletionProtocol(
         }
         return TerminalShellCompletionResult(line, cursor, start, end, candidates, externalCommandName)
     }
+
+    private fun requestInput(requestId: Long): List<TerminalInputEvent> =
+        buildList(42) {
+            val prefix = TerminalKeyEvent(key = TerminalKey.F12)
+            add(prefix)
+            add(TerminalKeyEvent(codepoint = 'q'.code))
+            for (digit in requestId.toString().padStart(19, '0')) {
+                add(prefix)
+                add(TerminalKeyEvent(codepoint = digit.code))
+            }
+            add(prefix)
+            add(TerminalKeyEvent(codepoint = 'e'.code))
+        }
 
     private fun text(
         encoded: String,

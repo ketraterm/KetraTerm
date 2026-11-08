@@ -1473,8 +1473,7 @@ public class TerminalSession private constructor(
             else ->
                 admitInput {
                     val byteCount = outboundWriter.submit(signal = false) { inputEncoder.encodeEvent(event) }
-                    // A suppressed physical release cannot change the shell buffer after suggestions were captured.
-                    if (byteCount != 0 || event !is TerminalKeyEvent || event.type != TerminalKeyEventType.RELEASE) inputRevision++
+                    if (byteCount != 0) inputRevision++
                     if (event.cancelsStartup()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
                 }
         }

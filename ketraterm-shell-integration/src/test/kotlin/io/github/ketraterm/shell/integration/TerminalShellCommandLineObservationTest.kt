@@ -42,7 +42,7 @@ class TerminalShellCommandLineObservationTest {
                 val snapshot = fixture.session.activeShellCommandLine()
                 var revision = fixture.session.activeShellCommandLineRevision.value
                 for (capability in listOf("a".repeat(32), "${"a".repeat(32)};PrefixReset", "${"b".repeat(32)};PrefixReset")) {
-                    fixture.feed("\u001b]633;KetraTermCompletion;2;Ready;$capability\u0007")
+                    fixture.feed("\u001b]633;KetraTermCompletion;3;Ready;$capability\u0007")
                     runCurrent()
                     assertEquals(snapshot, fixture.session.activeShellCommandLine())
                     assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
@@ -56,7 +56,7 @@ class TerminalShellCommandLineObservationTest {
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
-                fixture.feed("\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007\u001b]133;B\u0007git s")
+                fixture.feed("\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)}\u0007\u001b]133;B\u0007git s")
                 runCurrent()
                 val initial = kotlin.test.assertNotNull(fixture.session.activeShellCommandLine())
                 assertFalse(initial.requiresShellConfirmation)
@@ -93,7 +93,7 @@ class TerminalShellCommandLineObservationTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
                 fixture.feed(
-                    "\u001b]133;A\u0007P> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(
+                    "\u001b]133;A\u0007P> \u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(
                         32,
                     )}\u0007\u001b]133;B\u0007" + "x".repeat(27) +
                         "ghost\u001b[5D",

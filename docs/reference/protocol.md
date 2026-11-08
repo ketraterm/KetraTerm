@@ -455,26 +455,40 @@ and [streaming placement](#streaming-grapheme-placement).
 The same optional producer also accepts the bounded Bash command inventory
 [described below](#private-bash-command-inventory).
 
-The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;2;... BEL`
+The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;3;... BEL`
 (ST is also accepted) from the workspace's PSReadLine hook. All envelope fields
 are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+Other completion protocol versions are ignored.
 The session's default parser forwards unknown OSC bodies synchronously to the
 selected producer. Custom parser factories must forward `observeCustomOsc` and
 use `customOscPayloadLimitBytes` themselves.
 
-| Message body after `KetraTermCompletion;2;` | Meaning |
+| Message body after `KetraTermCompletion;3;` | Meaning |
 | --- | --- |
-| `Ready;epoch` | Prompt completion hook, with 32 lowercase hexadecimal epoch characters. A new epoch resets the request counter to zero. |
+| `Ready;epoch` | Prompt completion hook, with 32 lowercase hexadecimal epoch characters. |
 | `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
 | `Result;epoch;id;Failed` | Correlated failure. |
 | `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
 
-The host admits at most one request per session, sending the semantic `F12,e`
-chord through ordinary ordered input. Host and hook increment their counters for
-each request. Replies must match the current prompt epoch and pending positive
-request ID. They must also match the captured command and cursor; wrong epochs
-or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
-metadata has no editing authority.
+The session assigns each query a positive signed 64-bit request ID, never reused during
+that session, including across prompt changes. It admits at most one query at a
+time and sends the ID through ordered semantic input as one frame:
+
+1. `F12,q` starts the frame.
+2. Nineteen `F12,digit` chords carry the decimal ID, padded with leading zeroes.
+3. `F12,e` commits the frame and invokes the completer.
+
+The hook echoes the supplied ID and its current prompt epoch; it keeps no
+independent request counter. Missing, incomplete, zero, overflowing, or otherwise
+invalid frames are ignored without editing the buffer or invoking completion.
+Starting a new frame or announcing `Ready` discards any partial frame. Commit
+consumes the frame once, including when validation fails, and invalid frames emit
+no reply.
+Replies must match the active prompt epoch and pending request ID, as well as
+the captured command and cursor. A request processed after a prompt change cannot
+satisfy a later query because its ID remains distinct. Wrong epochs or IDs are
+ignored; a matched malformed reply fails its query. Unsolicited result metadata
+has no editing authority.
 
 The hook samples PSReadLine's input buffer and cursor before invoking completers,
 then checks both again immediately before emitting a successful result. If either
@@ -489,12 +503,13 @@ for its lifetime and final admission checks.
 `A`; it may precede `B`. Command start/finish (`C`/`D`), a local primary-buffer
 clear, or an observed alternate-screen transition revoke the completion hook.
 A new `A` also clears the previous epoch and requires a fresh announcement.
-Repeating `Ready` within the same epoch preserves the request counter. Every
-accepted announcement invalidates earlier editing contexts and pending results,
+Prompt announcements never reset the session's request IDs. Every accepted
+announcement invalidates earlier editing contexts and pending results,
 including announcements that change only `PrefixReset`.
+The hook reinstalls its private PSReadLine bindings before each `Ready` announcement.
 Readiness advertises the prompt's hook, not completion of prompt rendering or
 PSReadLine initialization. The query handler reads the editor when the shell
-processes the requested key chord.
+processes the completed request frame.
 
 `PrefixReset` lets acceptance clear the text before the real cursor through
 `PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same

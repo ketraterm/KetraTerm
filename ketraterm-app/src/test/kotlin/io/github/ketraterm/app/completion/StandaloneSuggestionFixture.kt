@@ -39,7 +39,6 @@ import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
 import java.awt.image.BufferedImage
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
@@ -145,7 +144,6 @@ internal class StandaloneSuggestionFixture private constructor(
     suspend fun awaitPopup(
         line: String,
         replacement: String,
-        traceFile: Path? = null,
     ): SwingShellSuggestionViewSnapshot {
         var lastUpdate: Pair<String?, SwingShellSuggestionViewSnapshot>? = null
         try {
@@ -169,20 +167,8 @@ internal class StandaloneSuggestionFixture private constructor(
                         "latest provider request=$latestRequest; provider collection=${latestProviderCollection.get()}; " +
                         "current projection=${session.activeShellCommandLine()}"
                 }
-            val trace =
-                if (traceFile == null) {
-                    ""
-                } else {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            "\nNative completion trace:\n${Files.readString(traceFile)}"
-                        } catch (unavailable: IOException) {
-                            "\nNative completion trace unavailable: $unavailable"
-                        }
-                    }
-                }
             throw AssertionError(
-                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate$trace\n${screenText()}",
+                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate\n${screenText()}",
                 failure,
             )
         }

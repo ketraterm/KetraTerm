@@ -16,6 +16,7 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalInputEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.TerminalInputAdmission.*
 import io.github.ketraterm.testkit.MockConnector
@@ -29,6 +30,117 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["before-next-request", "during-next-request", "dropped"])
+    fun `request identity survives an earlier request crossing a prompt boundary`(oldReply: String) =
+        runTest {
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                requestInput = { requestId -> listOf(TerminalKeyEvent.text("q$requestId")) },
+            ).use { fixture ->
+                val previous = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertEquals("q1", fixture.writtenText())
+
+                fixture.clearPrompt()
+                fixture.model.value = fixture.model.value
+                fixture.ready("nextEpoch")
+                runCurrent()
+                assertNull(previous.await())
+                if (oldReply == "before-next-request") fixture.reply(requestId = 1)
+
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val current = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertEquals("q1q2", fixture.writtenText(), "The new prompt must receive a distinct explicit identifier")
+                if (oldReply == "during-next-request") fixture.reply(requestId = 1)
+                fixture.reply(requestId = 2, epoch = "epoch")
+                runCurrent()
+                assertFalse(current.isCompleted, "Neither an old request in the new prompt nor the wrong epoch can confirm this query")
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
+
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(current.await())
+                assertEquals(ACCEPTED, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("t"))))
+                runCurrent()
+                assertEquals("q1q2t", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["empty", "oversized", "throws"])
+    fun `invalid request encoding preserves receipt and does not consume an identifier`(invalidEncoding: String) =
+        runTest {
+            var rejectEncoding = false
+            val identifiers = mutableListOf<Long>()
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                requiresConfirmation = false,
+                requestInput = { requestId ->
+                    identifiers += requestId
+                    if (!rejectEncoding) {
+                        listOf(TerminalKeyEvent.text("q$requestId"))
+                    } else {
+                        when (invalidEncoding) {
+                            "empty" -> emptyList()
+                            "oversized" -> List(65) { TerminalKeyEvent.text("never") }
+                            else -> throw IllegalArgumentException("Request encoder failed")
+                        }
+                    }
+                },
+            ).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val first = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                fixture.reply()
+                runCurrent()
+                assertNotNull(first.await())
+
+                rejectEncoding = true
+                val invalid =
+                    async {
+                        kotlin.test.assertFailsWith<IllegalArgumentException> { fixture.session.requestShellCompletions(expected) }
+                    }
+                runCurrent()
+                invalid.await()
+                assertTrue(fixture.session.isCommandEditCurrent(expected), "Rejected encoding cannot revoke an existing receipt")
+                assertEquals("q1", fixture.writtenText())
+
+                rejectEncoding = false
+                val next = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertEquals(listOf(1L, 2L, 2L), identifiers)
+                assertEquals("q1q2", fixture.writtenText())
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(next.await())
+                assertEquals(ACCEPTED, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @Test
+    fun `maximum sized request input is detached before its asynchronous write`() =
+        runTest {
+            val ioScheduler = TestCoroutineScheduler()
+            val input = MutableList<TerminalInputEvent>(64) { TerminalKeyEvent.text("q") }
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                ioDispatcher = StandardTestDispatcher(ioScheduler),
+                requestInput = { input },
+            ).use { fixture ->
+                val query = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertEquals("", fixture.writtenText())
+                input.clear()
+                ioScheduler.runCurrent()
+                assertEquals("q".repeat(64), fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+                assertNotNull(query.await())
+            }
+        }
+
     @ParameterizedTest
     @ValueSource(strings = ["failed", "mismatch", "cancelled"])
     fun `ordinary contexts need native proof after their editor state enters a completer`(outcome: String) =
@@ -815,11 +927,13 @@ class TerminalShellCompletionTest {
         requiresConfirmation: Boolean = true,
         ioDispatcher: CoroutineDispatcher = dispatcher,
         private val observationBacked: Boolean = false,
+        private val requestInput: (Long) -> List<TerminalInputEvent> = { listOf(TerminalKeyEvent.text("q")) },
     ) : AutoCloseable {
         val connector = MockConnector()
         val model = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot("git s", 5, 5, 0, requiresConfirmation))
         private var observation = model.value
         private var observationRevision = 0L
+        private var epoch = "epoch"
         private lateinit var channel: TerminalShellCompletionChannel
         private val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
         val session =
@@ -852,7 +966,10 @@ class TerminalShellCompletionTest {
             ready()
         }
 
-        fun ready() = channel.ready("epoch", listOf(TerminalKeyEvent.text("q")))
+        fun ready(epoch: String = "epoch") {
+            this.epoch = epoch
+            channel.ready(epoch, requestInput)
+        }
 
         fun observe(snapshot: TerminalShellCommandLineSnapshot?) {
             check(observationBacked)
@@ -866,7 +983,7 @@ class TerminalShellCompletionTest {
         }
 
         fun failReply() {
-            channel.respond("epoch", 1, null)
+            channel.respond(epoch, 1, null)
             feedMetadata()
         }
 
@@ -875,9 +992,10 @@ class TerminalShellCompletionTest {
             requestId: Long = 1,
             cursorOffset: Int = 5,
             deliverOutput: Boolean = true,
+            epoch: String = this.epoch,
         ) {
             channel.respond(
-                "epoch",
+                epoch,
                 requestId,
                 TerminalShellCompletionResult(
                     commandLine,

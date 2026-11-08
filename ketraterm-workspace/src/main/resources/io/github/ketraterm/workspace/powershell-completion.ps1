@@ -1,10 +1,31 @@
 # Native completion runs inside the existing PSReadLine session.
 function global:__KetraTermCompletionReady {
+    # Setting the same EditMode can also reset PSReadLine's key bindings.
+    global:__KetraTermInstallCompletionHandlers
     if (-not $global:__KetraTermCompletionInstalled) { return }
     $global:__KetraTermCompletionEpoch = [Guid]::NewGuid().ToString('N')
-    $global:__KetraTermCompletionSequence = 0L
     $capabilities = if ($global:__KetraTermCompletionPrefixResetInstalled) { ';PrefixReset' } else { '' }
-    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;2;Ready;' + $global:__KetraTermCompletionEpoch + $capabilities + ([string][char]7))
+    [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;3;Ready;' + $global:__KetraTermCompletionEpoch + $capabilities + ([string][char]7))
+}
+
+function global:__KetraTermCompletionAppend([char] $Digit) {
+    if ($null -eq $global:__KetraTermCompletionRequest) { return }
+    if ($global:__KetraTermCompletionRequest.Length -ge 19 -or [int]$Digit -lt 48 -or [int]$Digit -gt 57) {
+        $global:__KetraTermCompletionRequest = $null
+        return
+    }
+    $global:__KetraTermCompletionRequest += $Digit
+}
+
+function global:__KetraTermCompletionCommit {
+    $digits = $global:__KetraTermCompletionRequest
+    $global:__KetraTermCompletionRequest = $null
+    if ($null -eq $digits -or $digits.Length -ne 19) { return }
+    $requestId = 0L
+    if ([long]::TryParse($digits, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$requestId) -and
+        $requestId -gt 0) {
+        global:__KetraTermComplete $requestId
+    }
 }
 
 function global:__KetraTermCompletionEncode([string] $Value) {
@@ -27,12 +48,12 @@ function global:__KetraTermResetCompletionPrefix {
     }
 }
 
-function global:__KetraTermComplete {
+function global:__KetraTermComplete([long] $RequestId) {
+    if ($RequestId -le 0) { return }
     # Suppress discovery/completer progress without changing the user's interactive preference.
     $ProgressPreference = 'SilentlyContinue'
     $savedExitCode = $global:LASTEXITCODE
-    $global:__KetraTermCompletionSequence++
-    $prefix = 'KetraTermCompletion;2;Result;' + $global:__KetraTermCompletionEpoch + ';' + $global:__KetraTermCompletionSequence + ';'
+    $prefix = 'KetraTermCompletion;3;Result;' + $global:__KetraTermCompletionEpoch + ';' + $RequestId + ';'
     $body = $prefix + 'Failed'
     try {
         $line = ''
@@ -163,22 +184,39 @@ function global:__KetraTermComplete {
     [Console]::Write(([string][char]27) + ']633;' + $body + ([string][char]7))
 }
 
-try {
-    if (Get-Module PSReadLine) {
-        Set-PSReadLineKeyHandler -Chord 'F12,e' -ScriptBlock { global:__KetraTermComplete } -ErrorAction Stop
-        $global:__KetraTermCompletionInstalled = $true
-    }
-} catch {
+function global:__KetraTermInstallCompletionHandlers {
     $global:__KetraTermCompletionInstalled = $false
-}
-
-$global:__KetraTermCompletionPrefixResetInstalled = $false
-try {
-    if ($global:__KetraTermCompletionInstalled) {
-        Set-PSReadLineKeyHandler -Chord 'F12,r' -ScriptBlock { global:__KetraTermResetCompletionPrefix } -ErrorAction Stop
+    $global:__KetraTermCompletionPrefixResetInstalled = $false
+    $global:__KetraTermCompletionRequest = $null
+    try {
+        if (-not (Get-Module PSReadLine)) { return }
+        $mode = (Get-PSReadLineOption).EditMode
+        $handlers = @{
+            'q' = { $global:__KetraTermCompletionRequest = '' }
+            'e' = { global:__KetraTermCompletionCommit }
+            'r' = { global:__KetraTermResetCompletionPrefix }
+        }
+        foreach ($digit in 0..9) {
+            $handlers[[string]$digit] = { param($key, $arg) global:__KetraTermCompletionAppend $key.KeyChar }
+        }
         $global:__KetraTermCompletionPrefixResetInstalled = $true
+        foreach ($suffix in $handlers.Keys) {
+            try {
+                if ($mode -eq 'Vi') {
+                    foreach ($viMode in @('Insert', 'Command')) {
+                        Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -ViMode $viMode -ErrorAction Stop
+                    }
+                } else {
+                    Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -ErrorAction Stop
+                }
+            } catch {
+                if ($suffix -ne 'r') { throw }
+                $global:__KetraTermCompletionPrefixResetInstalled = $false
+            }
+        }
+        $global:__KetraTermCompletionInstalled = $true
+    } catch {
+        $global:__KetraTermCompletionPrefixResetInstalled = $false
     }
-} catch {
-    # Completion remains usable when the editor cannot register prefix replacement.
 }
 

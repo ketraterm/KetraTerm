@@ -1103,6 +1103,66 @@ class TerminalShellIntegrationBootstrapNativeTest {
             }
         }
 
+    @ParameterizedTest(name = "PowerShell completion editor modes [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completion framing survives editor mode changes`(executableName: String): Unit =
+        runBlocking {
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            val setup =
+                "Set-PSReadLineOption -HistorySaveStyle SaveNothing -EditMode Windows; " +
+                    "[Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()"
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile(
+                                "powershell",
+                                "PowerShell",
+                                listOf(executable!!, "-NoLogo", "-NoProfile"),
+                                startupCommand = TerminalStartupCommand(setup),
+                            ),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
+
+                suspend fun awaitFinished(command: String) {
+                    withTimeout(15.seconds) {
+                        session.shellIntegrationState.revision.first {
+                            val state = session.shellIntegrationState
+                            val metadata = state.commandMetadata(state.latestCommandRecordId())
+                            metadata?.commandText == command && metadata.finishedAtEpochMillis != null
+                        }
+                    }
+                    val state = session.shellIntegrationState
+                    assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, command)
+                }
+                awaitFinished(setup)
+                var line = ""
+                for (mode in listOf("Emacs", "Vi", "Windows")) {
+                    val before = session.awaitLine(line, "before changing to $mode", requireShellCompletion = true)
+                    val command = "Set-PSReadLineOption -EditMode $mode"
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(before, before.prefixResetKeys + TerminalPasteEvent(command)),
+                    )
+                    val entered = session.awaitLine(command, "command changing to $mode")
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        session.submitInput(entered, listOf(TerminalKeyEvent.key(TerminalKey.ENTER))),
+                    )
+                    awaitFinished(command)
+                    val prompt = session.awaitLine("", "after changing to $mode", requireShellCompletion = true)
+                    assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(prompt, listOf(TerminalPasteEvent("Get-Chi"))))
+                    val edit = session.awaitLine("Get-Chi", "$mode completion input")
+                    val result = assertNotNull(session.requestShellCompletions(edit), "$mode completion did not reply")
+                    assertEquals("Get-Chi", result.commandLine)
+                    assertEquals(7, result.cursorOffset)
+                    assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
+                    line = "Get-Chi"
+                }
+            }
+        }
+
     @ParameterizedTest(name = "PowerShell completion progress [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
     fun `PowerShell completion progress does not invalidate its non editing reply`(executableName: String): Unit =
@@ -1217,12 +1277,12 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 emptyMap(),
             )
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
-        val readiness = result.stdout.lineSequence().first { it.contains("KetraTermCompletion;2;Ready;") }
+        val readiness = result.stdout.lineSequence().first { it.contains("KetraTermCompletion;3;Ready;") }
         assertTrue(readiness.trimEnd('\u0007', '\r').endsWith(";PrefixReset"), visibleEscapes(readiness))
         val messages =
             result.stdout
                 .lineSequence()
-                .filter { it.contains("KetraTermCompletion;2;Result;") }
+                .filter { it.contains("KetraTermCompletion;3;Result;") }
                 .toList()
         val application =
             result.stdout
@@ -1276,6 +1336,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             assertEquals(5, fields(index).size, "A failed confirmation must not publish stale candidates")
         }
         assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("FRAMING=OK"), visibleEscapes(result.stdout))
     }
 
     @ParameterizedTest

@@ -253,8 +253,9 @@ well as match the buffer and cursor. Pending and confirmed native requests retai
 their original editing authority across partial redraws and prediction layout
 changes; the session validates input, prompt, and geometry revisions independently
 of the rendered observation. A stale automatic request is replaced with a
-new interaction and handler. The old handler is cancelled, never renewed. Custom
-edit targets own their editing authority. If the hook cannot confirm the buffer,
+new interaction and handler even when the command text is unchanged. The old
+handler is cancelled, never renewed. Custom edit targets own their editing
+authority. If the hook cannot confirm the buffer,
 suggestions stay unavailable.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for

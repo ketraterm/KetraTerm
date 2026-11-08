@@ -33,7 +33,7 @@ public class TerminalShellCompletionChannel internal constructor(
     private var epoch: String? = null
     private var closed = false
     private var nextRequestId = 0L
-    private var requestInput: List<TerminalInputEvent> = emptyList()
+    private var requestInput: ((Long) -> List<TerminalInputEvent>)? = null
     internal var pending: Pending? = null
         private set
     private var receipt: Receipt? = null
@@ -59,6 +59,7 @@ public class TerminalShellCompletionChannel internal constructor(
     public fun clearPrompt() {
         synchronized(lock) {
             epoch = null
+            requestInput = null
             receipt = null
             confirmationRequiredFor = null
             pending?.apply {
@@ -69,21 +70,25 @@ public class TerminalShellCompletionChannel internal constructor(
     }
 
     /**
-     * Installs a prompt-scoped epoch and its non-executing completion key chord.
-     * Refreshing the same epoch invalidates confirmation but preserves its request sequence.
+     * Installs a prompt-scoped epoch and its non-executing request encoder.
+     * The encoder must include the supplied positive request identifier in the shell request;
+     * the producer must echo that identifier in [respond]. Identifiers are never reused during
+     * this session, including across prompt epochs. Every announcement invalidates confirmation.
+     *
+     * [requestInput] runs synchronously under session serialization when a query is admitted.
+     * It must be bounded, nonblocking, and non-reentrant, and return between one and 64 semantic
+     * input events. The session detaches that list before reserving the query or sending input.
      * Calls after session closure are ignored.
      */
     public fun ready(
         epoch: String,
-        requestInput: List<TerminalInputEvent>,
+        requestInput: (Long) -> List<TerminalInputEvent>,
     ) {
         require(epoch.length in 1..128 && epoch.all { it.isLetterOrDigit() })
-        require(requestInput.isNotEmpty() && requestInput.size <= 4)
         synchronized(lock) {
             if (closed) return
-            if (this.epoch != epoch) nextRequestId = 0L
             this.epoch = epoch
-            this.requestInput = requestInput.toList()
+            this.requestInput = requestInput
             receipt = null
             confirmationRequiredFor = null
             pending?.apply {
@@ -109,9 +114,17 @@ public class TerminalShellCompletionChannel internal constructor(
 
     internal fun begin(expected: TerminalCommandEditContext): Pending? {
         if (closed || epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
+        val encodeRequest = requestInput ?: return null
+        val requestId = nextRequestId + 1
+        val input = encodeRequest(requestId)
+        require(input.isNotEmpty() && input.size <= 64) { "Completion requests must contain between one and 64 input events" }
+        val detachedInput = input.toList()
+        val current = Pending(requestId, expected, detachedInput)
+        nextRequestId = requestId
         receipt = null
         confirmationRequiredFor = expected
-        return Pending(++nextRequestId, expected, requestInput).also { pending = it }
+        pending = current
+        return current
     }
 
     /** Called under session mutation serialization; cancellation owns a waiter, never another caller's result. */
@@ -206,6 +219,7 @@ public class TerminalShellCompletionChannel internal constructor(
         synchronized(lock) {
             closed = true
             epoch = null
+            requestInput = null
             mutableCommands.value = null
             receipt = null
             confirmationRequiredFor = null

@@ -69,36 +69,8 @@ class StandaloneSuggestionDesktopTest {
                     } else {
                         ""
                     }
-                val traceFile = directory.resolve("native-completion-trace.txt")
-                val traceScript = directory.resolve("completion-trace.ps1")
-                val traceSetup =
-                    """
-                    ${'$'}global:__KetraTermCompletionTracePath = '${traceFile.toString().replace("'", "''")}';
-                    ${'$'}global:__KetraTermOriginalCompletionForTrace = (Get-Item Function:\__KetraTermComplete).ScriptBlock;
-                    [IO.File]::AppendAllText(${'$'}global:__KetraTermCompletionTracePath,
-                        'PSReadLine=' + (Get-Module PSReadLine).Version + '; PowerShell=' + ${'$'}PSVersionTable.PSVersion + [Environment]::NewLine);
-                    function global:__KetraTermComplete {
-                        ${'$'}timer = [Diagnostics.Stopwatch]::StartNew();
-                        ${'$'}line = ''; ${'$'}cursor = 0;
-                        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]${'$'}line, [ref]${'$'}cursor);
-                        [IO.File]::AppendAllText(${'$'}global:__KetraTermCompletionTracePath,
-                            'query-start; request=' + (${'$'}global:__KetraTermCompletionSequence + 1) +
-                            '; epoch=' + ${'$'}global:__KetraTermCompletionEpoch + '; line=' + ${'$'}line +
-                            '; cursor=' + ${'$'}cursor + [Environment]::NewLine);
-                        try { & ${'$'}global:__KetraTermOriginalCompletionForTrace; }
-                        finally {
-                            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]${'$'}line, [ref]${'$'}cursor);
-                            [IO.File]::AppendAllText(${'$'}global:__KetraTermCompletionTracePath,
-                                'query-end; request=' + ${'$'}global:__KetraTermCompletionSequence +
-                                '; epoch=' + ${'$'}global:__KetraTermCompletionEpoch + '; line=' + ${'$'}line +
-                                '; cursor=' + ${'$'}cursor + '; elapsed-ms=' + ${'$'}timer.ElapsedMilliseconds + [Environment]::NewLine);
-                        }
-                    };
-                    """.trimIndent()
-                withContext(Dispatchers.IO) { Files.writeString(traceScript, traceSetup) }
                 val setup =
-                    location + ". '${traceScript.toString().replace("'", "''")}'; " +
-                        "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView; " +
+                    location + "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView; " +
                         "[Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory(); " +
                         "[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory('Get-ChildItem -Name ketra-popup-prediction')"
                 assertEquals(
@@ -122,7 +94,7 @@ class StandaloneSuggestionDesktopTest {
                             predictionWrapped
                     }
                 }
-                awaitPopup("Get-Chi", "Get-ChildItem", traceFile)
+                awaitPopup("Get-Chi", "Get-ChildItem")
                 selectAndAccept("Get-ChildItem")
                 withTimeout(15.seconds) {
                     session.renderGeneration.first {

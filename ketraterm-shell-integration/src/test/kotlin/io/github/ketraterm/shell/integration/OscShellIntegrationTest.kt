@@ -486,7 +486,7 @@ class OscShellIntegrationTest {
             val prefix = "x".repeat(11)
             connector.feedFromHost(
                 (
-                    "\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007" +
+                    "\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)}\u0007" +
                         "\u001b]133;B\u0007${prefix}界\u001b[1;16H"
                 ).toByteArray(Charsets.UTF_8),
             )

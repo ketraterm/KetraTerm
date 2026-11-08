@@ -1456,7 +1456,7 @@ class SwingTerminalCompletionLifecycleTest {
                 shellIntegration =
                     TerminalShellIntegrationFactory { context ->
                         completion = context.shellCompletion
-                        if (nativeCompletion) completion.ready("test", listOf(TerminalKeyEvent.key(TerminalKey.F12)))
+                        if (nativeCompletion) completion.ready("test") { listOf(TerminalKeyEvent.key(TerminalKey.F12)) }
                         val host =
                             if (legacySource == null) {
                                 TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)

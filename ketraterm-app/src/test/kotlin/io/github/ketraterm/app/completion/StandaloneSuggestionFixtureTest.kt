@@ -50,7 +50,7 @@ class StandaloneSuggestionFixtureTest {
                     connector.feedFromHost(
                         (
                             "\u001b]133;A\u0007PS> " +
-                                "\u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)};PrefixReset\u0007" +
+                                "\u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)};PrefixReset\u0007" +
                                 "\u001b]133;B\u0007\u001b[6n"
                         ).encodeToByteArray(),
                     )
@@ -140,7 +140,7 @@ class StandaloneSuggestionFixtureTest {
                     connector.feedFromHost(
                         (
                             "\u001b]133;A\u0007PS> " +
-                                "\u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007" +
+                                "\u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)}\u0007" +
                                 "\u001b]133;B\u0007git sta"
                         ).encodeToByteArray(),
                     )
