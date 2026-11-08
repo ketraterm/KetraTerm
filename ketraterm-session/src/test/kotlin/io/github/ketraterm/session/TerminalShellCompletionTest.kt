@@ -501,6 +501,90 @@ class TerminalShellCompletionTest {
         }
 
     @ParameterizedTest
+    @ValueSource(strings = ["unavailable", "different-text", "different-caret", "moved-anchor", "prediction-cleared"])
+    fun `candidate collection reuses native confirmation during screen projection changes`(projection: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), observationBacked = true).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val confirmation = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                fixture.reply()
+                runCurrent()
+                val result = checkNotNull(confirmation.await())
+
+                fixture.observe(
+                    when (projection) {
+                        "unavailable" -> null
+                        "different-text" -> original.commandLine.copy(commandText = "git status", cursorOffset = 10, cursorColumn = 10)
+                        "different-caret" -> original.commandLine.copy(cursorOffset = 4, cursorColumn = 4)
+                        "moved-anchor" -> original.commandLine.copy(cursorColumn = 2, cursorRow = 1)
+                        "prediction-cleared" -> original.commandLine.copy(requiresShellConfirmation = false)
+                        else -> error("Unknown projection: $projection")
+                    },
+                )
+
+                // The UI confirms its retained context before the provider asks for the same candidates.
+                val candidates = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertTrue(candidates.isCompleted, "Candidate collection must not wait for another shell query")
+                assertSame(result, candidates.await(), "Screen projection is not the native editor's confirmed buffer")
+                assertEquals("q", fixture.writtenText())
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["different-text", "different-caret", "prompt-ended"])
+    fun `a native receipt cannot supply a different or invalidated request`(change: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), observationBacked = true).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val confirmation = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                fixture.reply()
+                runCurrent()
+                assertNotNull(confirmation.await())
+                fixture.observe(null)
+                if (change == "prompt-ended") fixture.clearPrompt()
+
+                val text = if (change == "different-text") "git t" else "git s"
+                val cursor = if (change == "different-caret") 4 else 5
+                assertNull(fixture.session.requestShellCompletions(text, cursor))
+                runCurrent()
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @Test
+    fun `cancelling the first context preserves confirmed candidates for a surviving caller`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), observationBacked = true).use { fixture ->
+                val firstContext = checkNotNull(fixture.session.captureCommandEdit())
+                val secondContext = checkNotNull(fixture.session.captureCommandEdit())
+                val first = async { fixture.session.requestShellCompletions(firstContext) }
+                val second = async { fixture.session.requestShellCompletions(secondContext) }
+                runCurrent()
+                assertEquals("q", fixture.writtenText())
+
+                firstContext.cancel()
+                first.cancelAndJoin()
+                fixture.reply()
+                runCurrent()
+                val result = checkNotNull(second.await())
+                fixture.observe(null)
+
+                assertNull(fixture.session.requestShellCompletions(firstContext), "A cancelled caller cannot reuse its context")
+                assertTrue(fixture.session.isCommandEditCurrent(secondContext))
+                assertSame(
+                    result,
+                    fixture.session.requestShellCompletions("git s", 5),
+                    "The surviving caller can collect confirmed candidates",
+                )
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["input", "resize", "clear", "equal", "ready"])
     fun `confirmation and its cached result expire after intervening state`(change: String) =
         runTest {

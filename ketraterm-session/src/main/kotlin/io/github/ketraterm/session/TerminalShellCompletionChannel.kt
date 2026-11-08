@@ -170,7 +170,32 @@ public class TerminalShellCompletionChannel internal constructor(
     internal fun isConfirming(expected: TerminalCommandEditContext): Boolean =
         pending?.let { it.waiters > 0 && sameAuthority(expected, it.expected) } == true
 
-    /** Reuses confirmation only while the freshly captured editor context still owns its exact receipt. */
+    /**
+     * Candidate collection follows native confirmation even while its screen projection is unavailable.
+     * The receipt belongs to the editor state; cancelling its first caller revokes only that caller's edit token.
+     */
+    internal fun confirmedResult(
+        commandLine: String,
+        cursorOffset: Int,
+        inputRevision: Long,
+        geometryRevision: Long,
+        shellRevision: Long,
+        prefixResetKeys: List<TerminalKeyEvent>,
+    ): TerminalShellCompletionResult? {
+        val completed = receipt ?: return null
+        val expected = completed.expected
+        return completed.result.takeIf {
+            expected.commandLine.requiresShellConfirmation &&
+                expected.commandLine.commandText == commandLine &&
+                expected.commandLine.cursorOffset == cursorOffset &&
+                expected.inputRevision == inputRevision &&
+                expected.geometryRevision == geometryRevision &&
+                expected.shellRevision == shellRevision &&
+                expected.prefixResetKeys == prefixResetKeys
+        }
+    }
+
+    /** Reuses confirmation only while the editor context still owns its exact receipt. */
     internal fun confirmedResult(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
         if (!expected.commandLine.requiresShellConfirmation) return null
         val completed = receipt ?: return null

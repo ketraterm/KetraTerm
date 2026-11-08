@@ -843,6 +843,18 @@ public class TerminalSession private constructor(
                         integration.withCommandLine { revision, snapshot ->
                             synchronized(outboundWriteLock) {
                                 if (!isAcceptingInput()) return@synchronized null
+                                if (original == null) {
+                                    confirmedResult =
+                                        channel.confirmedResult(
+                                            commandLine,
+                                            cursorOffset,
+                                            inputRevision,
+                                            geometryRevision,
+                                            revision,
+                                            integration.commandLinePrefixResetKeys,
+                                        )
+                                    if (confirmedResult != null) return@synchronized null
+                                }
                                 val expected =
                                     if (original != null) {
                                         if (!commandEditAuthorityIsCurrent(original, revision, integration.commandLinePrefixResetKeys)) {

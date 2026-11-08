@@ -4,6 +4,8 @@ These fixtures verify the supported libraries as an external application would:
 from staged Maven artifacts, through exported dependencies and public APIs.
 They are a separate Gradle build copied into testkit's `build/published-consumers`
 directory; source-project substitution and testkit's classpath are not used.
+The parent build serializes all invocations of this shared fixture, including
+source checks and retained-client runtime preparation, even under `--parallel`.
 
 Run from the repository root with a full JDK 25 installation or configured JDK 25
 toolchain. The repository wrapper is reused; use `gradlew.bat` on Windows.

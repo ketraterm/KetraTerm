@@ -182,11 +182,12 @@ prompt-to-cursor prefix: visible text after the cursor may be a shell prediction
 or a real editable suffix. Query the native completer before publishing suggestions.
 Only an exact buffer and cursor match confirms the prefix; real suffixes, including
 whitespace, fail confirmation. Conditional admission rejects unconfirmed contexts.
-The session reuses the confirmed native result for a provisional capture with
-the same editing authority and buffer, avoiding a second query during candidate
-collection. A later explicit request for a complete snapshot invokes the completer
-again. Confirmation also permits a fresh capture of that same context and expires
-under the checks above.
+Candidate collection reuses a provisional context's native result while its
+editing authority and requested buffer remain current, even if the screen
+projection is temporarily unavailable, different, or no longer provisional.
+A context first queried as a complete snapshot invokes the completer again on
+later explicit requests. Confirmation also permits a fresh capture of that same
+context and expires under the checks above.
 
 Rejection returns `STALE_CONTEXT`, `UNSUPPORTED_CONTEXT`, `CANCELLED`, or the
 usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
