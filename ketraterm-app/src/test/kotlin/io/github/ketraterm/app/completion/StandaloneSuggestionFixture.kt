@@ -27,19 +27,13 @@ import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionView
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewSnapshot
+import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.swing.Swing
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
@@ -47,6 +41,7 @@ import java.awt.event.KeyEvent
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import javax.imageio.ImageIO
 import javax.swing.JComponent
 import javax.swing.JFrame
@@ -59,7 +54,7 @@ import kotlin.time.Duration.Companion.seconds
 internal class StandaloneSuggestionFixture private constructor(
     val tab: TerminalWorkspaceTab,
     val provider: SwingShellSuggestionProvider,
-    settings: KetraTermSettings,
+    private val settings: KetraTermSettings,
 ) {
     val session get() = tab.session
     private val publications = Channel<Pair<String?, SwingShellSuggestionViewSnapshot>>(Channel.UNLIMITED)
@@ -68,26 +63,25 @@ internal class StandaloneSuggestionFixture private constructor(
     private val focused = CompletableDeferred<Unit>()
     private var popup: JComponent? = null
     private var window: JFrame? = null
-    private var invalidationRevision = 0L
-    private var activeSnapshotRevision = -1L
+    private var latestSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var latestRequest: SwingShellSuggestionRequest? = null
+    private var latestProviderCollection = AtomicReference("not opened")
+    private var viewListener: SwingShellSuggestionViewListener? = null
     private val terminal =
         SwingTerminal(
-            settingsProvider = { settings.current(tab.profile.kind) },
+            settingsProvider = settings::current,
             hostServices =
                 SwingHostServices.create { draft ->
                     draft.shellSuggestionViewFactory =
                         SwingShellSuggestionViewFactory { listener ->
+                            viewListener = listener
                             val view = SwingShellSuggestionViewFactory.DEFAULT.create(listener)
                             popup = view.component
                             object : SwingShellSuggestionView by view {
                                 override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
                                     view.update(snapshot)
-                                    if (snapshot.visibleSuggestions.isNotEmpty()) {
-                                        activeSnapshotRevision = invalidationRevision
-                                    } else {
-                                        activeSnapshotRevision = -1L
-                                    }
-                                    publications.trySend(session.activeShellCommandLine()?.commandText to snapshot).getOrThrow()
+                                    latestSnapshot = snapshot
+                                    publications.trySend(latestRequest?.commandText to snapshot).getOrThrow()
                                 }
                             }
                         }
@@ -103,12 +97,20 @@ internal class StandaloneSuggestionFixture private constructor(
                     override fun suggestions(request: SwingShellSuggestionRequest) = effectiveProvider.suggestions(request)
 
                     override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        latestRequest = request
+                        val collection = AtomicReference("opened; collection not started")
+                        latestProviderCollection = collection
                         val source = effectiveProvider.open(request)
                         val originalFeedback = source.feedbackHandler
                         return SwingShellSuggestionSource(
-                            suggestions = source.suggestions,
+                            suggestions =
+                                source.suggestions
+                                    .onStart { collection.set("collection started") }
+                                    .onCompletion { cause ->
+                                        collection.updateAndGet { "$it; completed with ${cause ?: "success"}" }
+                                    },
                             feedbackHandler =
-                                SwingShellSuggestionFeedbackHandler { feedback ->
+                                { feedback ->
                                     originalFeedback.onSuggestionFeedback(feedback)
                                     feedbackEvents.trySend(feedback)
                                 },
@@ -116,9 +118,6 @@ internal class StandaloneSuggestionFixture private constructor(
                     }
                 }
             terminal.setShellSuggestionProvider(fixtureProvider)
-            terminal.addShellSuggestionInvalidationListener {
-                invalidationRevision++
-            }
             terminal.bind(session) { failure ->
                 if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
             }
@@ -164,9 +163,14 @@ internal class StandaloneSuggestionFixture private constructor(
         } catch (failure: TimeoutCancellationException) {
             val state =
                 withContext(Dispatchers.Swing) {
-                    "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}"
+                    "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}; " +
+                        "latest provider request=$latestRequest; provider collection=${latestProviderCollection.get()}; " +
+                        "current projection=${session.activeShellCommandLine()}"
                 }
-            throw AssertionError("Expected '$replacement' for '$line'; $state; last update=$lastUpdate\n${screenText()}", failure)
+            throw AssertionError(
+                "Expected '$replacement' for '$line'; $state; last update (request text, popup)=$lastUpdate\n${screenText()}",
+                failure,
+            )
         }
     }
 
@@ -179,8 +183,13 @@ internal class StandaloneSuggestionFixture private constructor(
                 awaitEditableLine(session, line, requireShellCompletion)
             }
         } catch (failure: TimeoutCancellationException) {
+            val edit = session.captureCommandEdit()
+            val admission =
+                "capturable=${edit != null}, completionAvailable=${session.shellCompletionAvailable}, " +
+                    "prefixReset=${edit?.prefixResetKeys?.isNotEmpty()}"
+            edit?.cancel()
             throw AssertionError(
-                "Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}\n${screenText()}",
+                "Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}; $admission\n${screenText()}",
                 failure,
             )
         }
@@ -211,6 +220,11 @@ internal class StandaloneSuggestionFixture private constructor(
             assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
         }
 
+    suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
+        withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
+        withContext(Dispatchers.Swing) { terminal.reloadSettings() }
+    }
+
     suspend fun type(text: String) =
         withContext(Dispatchers.Swing) {
             for (character in text) {
@@ -221,8 +235,6 @@ internal class StandaloneSuggestionFixture private constructor(
 
     suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
 
-    suspend fun requestSuggestions() = withContext(Dispatchers.Swing) { terminal.requestActiveShellSuggestions() }
-
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
         terminal.keyListeners.forEach { it.keyReleased(KeyEvent(terminal, KeyEvent.KEY_RELEASED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
@@ -232,29 +244,28 @@ internal class StandaloneSuggestionFixture private constructor(
         replacement: String,
         execute: Boolean = false,
     ) = withTimeout(15.seconds) {
-        while (withContext(Dispatchers.Swing) {
-                invalidationRevision > activeSnapshotRevision ||
-                    terminal.currentShellSuggestionState().count == 0
-            }
-        ) {
-            val update = publications.receive()
-            if (update.second.visibleSuggestions.any { it.replacementText == replacement }) {
-                break
-            }
+        var attempted: SwingShellSuggestionViewSnapshot? = null
+        while (true) {
+            val accepted =
+                withContext(Dispatchers.Swing) {
+                    val snapshot = latestSnapshot
+                    val index = snapshot.visibleSuggestions.indexOfFirst { it.replacementText == replacement }
+                    if (popup?.isVisible != true || index < 0 || snapshot === attempted) return@withContext false
+                    attempted = snapshot
+                    assertNotNull(viewListener).onSuggestionClicked(snapshot, index)
+                    // A retained or replaced publication rejects the click without touching the shell.
+                    val feedback = feedbackEvents.tryReceive().getOrNull() ?: return@withContext false
+                    assertEquals(
+                        SwingShellSuggestionFeedbackKind.ACCEPTED,
+                        feedback.kind,
+                        "Suggestion acceptance failed: ${feedback.acceptanceResult}",
+                    )
+                    if (execute) press(KeyEvent.VK_ENTER)
+                    true
+                }
+            if (accepted) return@withTimeout
+            publications.receive()
         }
-        withContext(Dispatchers.Swing) {
-            val count = terminal.currentShellSuggestionState().count
-            assertTrue(count > 0)
-            var remaining = count
-            while (terminal.currentShellSuggestionState().selectedSuggestion?.replacementText != replacement && remaining-- > 0) {
-                press(KeyEvent.VK_DOWN)
-            }
-            assertEquals(replacement, terminal.currentShellSuggestionState().selectedSuggestion?.replacementText)
-            press(KeyEvent.VK_TAB)
-            if (execute) press(KeyEvent.VK_ENTER)
-        }
-        val feedback = feedbackEvents.receive()
-        assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.kind, "Suggestion acceptance failed: ${feedback.acceptanceResult}")
     }
 
     suspend fun capturePopup(output: Path) {
@@ -286,7 +297,7 @@ internal class StandaloneSuggestionFixture private constructor(
             line: String,
             requireShellCompletion: Boolean = false,
         ) {
-            session.renderGeneration.first {
+            session.commandEditChanges.first {
                 val edit = session.captureCommandEdit() ?: return@first false
                 val snapshot = edit.commandLine
                 val ready =
@@ -340,14 +351,14 @@ internal class StandaloneSuggestionFixture private constructor(
                 created.start(decorateProvider)
                 if (setup != null) {
                     created.awaitExecution(setup)
-                    created.awaitLine("", requireShellCompletion = profile.kind == TerminalProfileKind.POWERSHELL)
+                    created.awaitLine("", requireShellCompletion = true)
                 }
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.
                 withContext(Dispatchers.Swing) { created.terminal.setShellSuggestionProvider(null) }
                 withTimeout(15.seconds) {
-                    tab.session.renderGeneration.first {
+                    tab.session.commandEditChanges.first {
                         // A shell redraw can temporarily invalidate the context after the scenario.
                         val edit = tab.session.captureCommandEdit() ?: return@first false
                         val line = edit.commandLine

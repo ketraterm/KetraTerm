@@ -24,7 +24,6 @@ import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
-import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.io.IOException
 import java.nio.file.Files
@@ -55,7 +54,7 @@ class SettingsModelTest {
     }
 
     @Test
-    fun `PowerShell keeps explicit suggestions without enabling automatic shell queries`() {
+    fun `pane settings preserve suggestion preferences and automatic modes`() {
         for (mode in SwingShellSuggestionAutomaticMode.entries) {
             val preferences =
                 settings.config.copy(
@@ -64,17 +63,18 @@ class SettingsModelTest {
                     shellSuggestionAutomaticMode = mode,
                 )
             settings.update(preferences)
-            val powerShell = settings.current(TerminalProfileKind.POWERSHELL)
-            assertTrue(powerShell.smartSuggestionsEnabled)
-            assertFalse(powerShell.shellSuggestionsEnabled)
-            assertEquals(mode, powerShell.shellSuggestionAutomaticMode)
-            assertTrue(settings.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+            val current = settings.current()
+            assertTrue(current.smartSuggestionsEnabled)
+            assertTrue(current.shellSuggestionsEnabled)
+            assertEquals(mode, current.shellSuggestionAutomaticMode)
             assertEquals(preferences, settings.config)
             assertEquals(preferences, KetraTermConfigManager(tempFile).load())
         }
-        settings.update(settings.config.copy(shellSuggestionsEnabled = false, smartSuggestionsEnabled = false))
-        assertFalse(settings.current(TerminalProfileKind.POWERSHELL).smartSuggestionsEnabled)
-        assertFalse(settings.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+        settings.update(settings.config.copy(shellSuggestionsEnabled = false))
+        assertTrue(settings.current().smartSuggestionsEnabled)
+        assertFalse(settings.current().shellSuggestionsEnabled)
+        settings.update(settings.config.copy(smartSuggestionsEnabled = false))
+        assertFalse(settings.current().smartSuggestionsEnabled)
     }
 
     @Test

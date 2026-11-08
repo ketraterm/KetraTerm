@@ -26,14 +26,11 @@ import io.github.ketraterm.protocol.TerminalGraphicsCommand
 import io.github.ketraterm.render.api.TerminalRenderImage
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -44,6 +41,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GraphicsDecodeOrderingTest {
@@ -179,8 +177,9 @@ class GraphicsDecodeOrderingTest {
             }
         }
 
-    @Test
-    fun `conditional edit capture rejects partial output batches across a decode yield`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `conditional edits reject partial batches and retain unchanged authority after a decode yield`(nativeConfirmed: Boolean) =
         runTest {
             val entered = CountDownLatch(1)
             val release = CountDownLatch(1)
@@ -188,6 +187,8 @@ class GraphicsDecodeOrderingTest {
             val commandLine = TerminalShellCommandLineSnapshot("git s", 5, 5, 0)
             val model = TerminalShellCommandLineState(commandLine)
             val connector = MockConnector()
+            val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
+            lateinit var channel: TerminalShellCompletionChannel
             TerminalSession
                 .create(
                     TerminalBuffers.create(10, 3),
@@ -196,25 +197,40 @@ class GraphicsDecodeOrderingTest {
                     ioDispatcher = dispatcher,
                     cleanupDispatcher = dispatcher,
                     parserFactory = blockedParser(entered, release),
-                    shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
+                    shellIntegration =
+                        TerminalShellIntegrationFactory { context ->
+                            channel = context.shellCompletion
+                            host.create(context)
+                        },
                 ).use { session ->
                     session.start(10, 3)
                     val previous = assertNotNull(session.captureCommandEdit())
+                    if (nativeConfirmed) {
+                        channel.ready("epoch") { listOf(TerminalKeyEvent.text("q")) }
+                        val query = async { session.requestShellCompletions(previous) }
+                        runCurrent()
+                        channel.respond("epoch", 1, TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))
+                        connector.feedFromHost("\u001b]633;ignored\u0007".encodeToByteArray())
+                        runCurrent()
+                        assertNotNull(query.await())
+                    }
+                    val events = listOf(TerminalKeyEvent.text("x"))
                     SessionTestThread("graphics-edit-ingress") {
                         connector.feedFromHost((QUERY + "X").encodeToByteArray())
                     }.use { ingress ->
                         try {
                             entered.awaitEvent()
                             assertNull(session.captureCommandEdit(), "A partial output batch is not an editing boundary")
+                            assertEquals(TerminalInputAdmission.STALE_CONTEXT, session.submitInput(previous, events))
                             release.countDown()
                             ingress.awaitCompletion()
                             runCurrent()
                             assertEquals(1, cursorColumn(session))
-                            val events = listOf(TerminalKeyEvent.text("x"))
-                            assertEquals(TerminalInputAdmission.STALE_CONTEXT, session.submitInput(previous, events))
                             val current = assertNotNull(session.captureCommandEdit())
                             assertEquals(commandLine, current.commandLine)
-                            assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(current, events))
+                            assertTrue(session.isCommandEditCurrent(previous))
+                            assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(previous, events))
+                            assertEquals(TerminalInputAdmission.STALE_CONTEXT, session.submitInput(current, events))
                         } finally {
                             release.countDown()
                         }
@@ -256,11 +272,13 @@ class GraphicsDecodeOrderingTest {
                 entered.awaitEvent()
                 var expectedFailure: Throwable? = if (scenario == "close-failure") failure else null
                 if (scenario == "capacity") {
-                    SwingUtilities.invokeAndWait {
-                        assertEquals(
-                            TerminalInputAdmission.CAPACITY_EXCEEDED,
-                            session.submitBytes(ByteArray(OutboundWriter.MAX_QUEUED_BYTES + 1)),
-                        )
+                    withContext(Dispatchers.IO) {
+                        SwingUtilities.invokeAndWait {
+                            assertEquals(
+                                TerminalInputAdmission.CAPACITY_EXCEEDED,
+                                session.submitBytes(ByteArray(OutboundWriter.MAX_QUEUED_BYTES + 1)),
+                            )
+                        }
                     }
                     expectedFailure = assertIs<OutboundCapacityException>(session.failure)
                 } else {
@@ -270,10 +288,12 @@ class GraphicsDecodeOrderingTest {
                 connectorClosed.awaitEvent()
                 assertEquals(0, cursorColumn(session))
                 release.countDown()
-                ingress.get(10, TimeUnit.SECONDS)
+                withContext(Dispatchers.IO) {
+                    ingress.get(10, TimeUnit.SECONDS)
+                }
                 val closed =
                     withContext(Dispatchers.Default) {
-                        withTimeout(10_000) { session.state.first { it is TerminalSessionState.Closed } }
+                        withTimeout(10_000.milliseconds) { session.state.first { it is TerminalSessionState.Closed } }
                     } as TerminalSessionState.Closed
                 assertSame(expectedFailure, closed.event.failure)
                 assertEquals(scenario != "capacity", closed.event.locallyRequested)

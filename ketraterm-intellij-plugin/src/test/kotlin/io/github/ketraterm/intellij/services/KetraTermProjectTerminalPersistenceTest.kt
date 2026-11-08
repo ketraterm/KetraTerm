@@ -552,18 +552,20 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
                 assertEquals("Focus must be checked when the queued alert is delivered", 2, notifications)
                 focusOwner = null
 
+                // Settings reloads enqueue policy updates on the pane's worker. Exercise direct
+                // session revocation first, while no settings update can overwrite that policy.
+                completeCommand()
+                session.setHostPolicy(settings.createHostPolicy().copy(notificationPolicy = HostControlPolicy.DENY))
+                UIUtil.dispatchAllInvocationEvents()
+                assertEquals("Revoked session permission must invalidate an already queued alert", 2, notifications)
+                session.setHostPolicy(settings.createHostPolicy())
+
                 completeCommand()
                 settings.replaceState(settings.state.copy(commandFinishedAlertsEnabled = false))
                 UIUtil.dispatchAllInvocationEvents()
                 assertEquals("Disabling alerts must invalidate an already queued alert", 2, notifications)
                 settings.replaceState(settings.state.copy(commandFinishedAlertsEnabled = true))
                 UIUtil.dispatchAllInvocationEvents()
-
-                completeCommand()
-                session.setHostPolicy(settings.createHostPolicy().copy(notificationPolicy = HostControlPolicy.DENY))
-                UIUtil.dispatchAllInvocationEvents()
-                assertEquals("Revoked session permission must invalidate an already queued alert", 2, notifications)
-                session.setHostPolicy(settings.createHostPolicy())
 
                 completeCommand()
                 service.dispose()

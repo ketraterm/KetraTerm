@@ -26,15 +26,53 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Test
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StandaloneSuggestionFixtureTest {
+    @Test
+    fun `line wait resumes when a cursor report drains after the final prompt frame`() =
+        runTest {
+            val connector = MockConnector()
+            val ioScheduler = TestCoroutineScheduler()
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(100, 24),
+                    connector,
+                    shellIntegration = OscShellIntegration,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(ioScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
+                ).use { session ->
+                    session.start()
+                    connector.feedFromHost(
+                        (
+                            "\u001b]133;A\u0007PS> " +
+                                "\u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)};PrefixReset\u0007" +
+                                "\u001b]133;B\u0007\u001b[6n"
+                        ).encodeToByteArray(),
+                    )
+                    runCurrent()
+                    assertEquals("", session.activeShellCommandLine()?.commandText)
+                    assertTrue(session.shellCompletionAvailable)
+                    assertNull(session.captureCommandEdit(), "Cursor report is still queued")
+                    val ready = async { StandaloneSuggestionFixture.awaitEditableLine(session, "", requireShellCompletion = true) }
+                    runCurrent()
+                    assertFalse(ready.isCompleted)
+                    val rendered = session.renderGeneration.value
+
+                    ioScheduler.runCurrent()
+                    runCurrent()
+                    assertEquals("\u001b[1;5R", connector.writtenBytes.toString(Charsets.UTF_8))
+                    assertNotNull(session.captureCommandEdit())
+                    assertEquals(rendered, session.renderGeneration.value, "Write retirement must not manufacture a render")
+                    assertTrue(ready.isCompleted, "Writer retirement must wake capture waiters without more shell output")
+                    ready.await()
+                }
+        }
+
     @Test
     fun `line wait does not finish while matching output is still being processed`() =
         runTest {
@@ -102,7 +140,7 @@ class StandaloneSuggestionFixtureTest {
                     connector.feedFromHost(
                         (
                             "\u001b]133;A\u0007PS> " +
-                                "\u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007" +
+                                "\u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)}\u0007" +
                                 "\u001b]133;B\u0007git sta"
                         ).encodeToByteArray(),
                     )

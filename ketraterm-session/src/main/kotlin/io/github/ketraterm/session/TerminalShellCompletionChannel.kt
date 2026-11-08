@@ -16,6 +16,7 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.input.event.TerminalInputEvent
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,10 +33,11 @@ public class TerminalShellCompletionChannel internal constructor(
     private var epoch: String? = null
     private var closed = false
     private var nextRequestId = 0L
-    private var requestInput: List<TerminalInputEvent> = emptyList()
+    private var requestInput: ((Long) -> List<TerminalInputEvent>)? = null
     internal var pending: Pending? = null
         private set
     private var receipt: Receipt? = null
+    private var confirmationRequiredFor: TerminalCommandEditContext? = null
     private val mutableCommands = MutableStateFlow<TerminalShellCommandInventory?>(null)
     internal val commands = mutableCommands.asStateFlow()
 
@@ -57,7 +59,9 @@ public class TerminalShellCompletionChannel internal constructor(
     public fun clearPrompt() {
         synchronized(lock) {
             epoch = null
+            requestInput = null
             receipt = null
+            confirmationRequiredFor = null
             pending?.apply {
                 responded = true
                 response = null
@@ -65,18 +69,28 @@ public class TerminalShellCompletionChannel internal constructor(
         }
     }
 
-    /** Installs a prompt-scoped epoch and its non-executing completion key chord. */
+    /**
+     * Installs a prompt-scoped epoch and its non-executing request encoder.
+     * The encoder must include the supplied positive request identifier in the shell request;
+     * the producer must echo that identifier in [respond]. Identifiers are never reused during
+     * this session, including across prompt epochs. Every announcement invalidates confirmation.
+     *
+     * [requestInput] runs synchronously under session serialization when a query is admitted.
+     * It must be bounded, nonblocking, and non-reentrant, and return between one and 64 semantic
+     * input events. The session detaches that list before reserving the query or sending input.
+     * Calls after session closure are ignored.
+     */
     public fun ready(
         epoch: String,
-        requestInput: List<TerminalInputEvent>,
+        requestInput: (Long) -> List<TerminalInputEvent>,
     ) {
         require(epoch.length in 1..128 && epoch.all { it.isLetterOrDigit() })
-        require(requestInput.isNotEmpty() && requestInput.size <= 4)
         synchronized(lock) {
+            if (closed) return
             this.epoch = epoch
-            this.requestInput = requestInput.toList()
-            nextRequestId = 0L
+            this.requestInput = requestInput
             receipt = null
+            confirmationRequiredFor = null
             pending?.apply {
                 responded = true
                 response = null
@@ -98,101 +112,159 @@ public class TerminalShellCompletionChannel internal constructor(
         }
     }
 
-    internal fun begin(
-        expected: TerminalCommandEditContext,
-        frameGeneration: Long,
-    ): Pending? {
-        if (epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
+    internal fun begin(expected: TerminalCommandEditContext): Pending? {
+        if (closed || epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
+        val encodeRequest = requestInput ?: return null
+        val requestId = nextRequestId + 1
+        val input = encodeRequest(requestId)
+        require(input.isNotEmpty() && input.size <= 64) { "Completion requests must contain between one and 64 input events" }
+        val detachedInput = input.toList()
+        val current = Pending(requestId, expected, detachedInput)
+        nextRequestId = requestId
         receipt = null
-        return Pending(++nextRequestId, expected, requestInput, frameGeneration).also { pending = it }
+        confirmationRequiredFor = expected
+        pending = current
+        return current
+    }
+
+    /** Called under session mutation serialization; cancellation owns a waiter, never another caller's result. */
+    internal fun join(expected: TerminalCommandEditContext): Pending? {
+        val current = pending ?: return null
+        if (current.waiters == 0 ||
+            current.responded ||
+            !sameAuthority(expected, current.expected)
+        ) {
+            return null
+        }
+        current.waiters++
+        return current
+    }
+
+    internal fun release(current: Pending) {
+        synchronized(lock) {
+            current.waiters--
+        }
     }
 
     internal fun finish(
         inputRevision: Long,
-        outputRevision: Long,
+        geometryRevision: Long,
         shellRevision: Long,
-        snapshot: TerminalShellCommandLineSnapshot?,
-        frameGeneration: Long,
+        prefixResetKeys: List<TerminalKeyEvent>,
     ): Pending? {
         val current = pending?.takeIf { it.responded } ?: return null
         pending = null
         val result = current.response
         val expected = current.expected
-        if (current.deferred.isActive &&
+        if (!closed &&
+            current.waiters > 0 &&
             result != null &&
-            !current.editInvalidated &&
-            inputRevision == expected.inputRevision + 1 &&
-            frameGeneration == current.frameGeneration &&
+            inputRevision == expected.inputRevision &&
+            geometryRevision == expected.geometryRevision &&
             shellRevision == expected.shellRevision &&
-            snapshot != null &&
-            snapshot == expected.commandLine &&
-            result.commandLine == snapshot.commandText &&
-            result.cursorOffset == snapshot.cursorOffset
+            prefixResetKeys == expected.prefixResetKeys &&
+            result.commandLine == expected.commandLine.commandText &&
+            result.cursorOffset == expected.commandLine.cursorOffset
         ) {
-            receipt = Receipt(expected, inputRevision, outputRevision, result)
+            receipt = Receipt(expected, result)
         } else {
             current.response = null
         }
         return current
     }
 
-    internal fun permits(
-        expected: TerminalCommandEditContext,
+    internal fun permits(expected: TerminalCommandEditContext): Boolean = receipt?.let { sameAuthority(expected, it.expected) } == true
+
+    /** Custom completers may edit their buffer; this editor state needs a verified reply before admission. */
+    internal fun requiresConfirmation(expected: TerminalCommandEditContext): Boolean =
+        confirmationRequiredFor?.let { sameEditorState(expected, it) } == true
+
+    /** A live native query keeps its original request viable while the terminal repaints. */
+    internal fun isConfirming(expected: TerminalCommandEditContext): Boolean =
+        pending?.let { it.waiters > 0 && sameAuthority(expected, it.expected) } == true
+
+    /**
+     * Candidate collection follows native confirmation even while its screen projection is unavailable.
+     * The receipt belongs to the editor state; cancelling its first caller revokes only that caller's edit token.
+     */
+    internal fun confirmedResult(
+        commandLine: String,
+        cursorOffset: Int,
         inputRevision: Long,
-        outputRevision: Long,
-    ): Boolean {
-        val completed = receipt ?: return false
-        val capturedBeforeQuery =
-            expected.inputRevision == completed.before.inputRevision && expected.outputRevision == completed.before.outputRevision
-        val capturedAfterQuery = expected.inputRevision == completed.inputRevision && expected.outputRevision == completed.outputRevision
-        return (capturedBeforeQuery || capturedAfterQuery) &&
-            expected.shellRevision == completed.before.shellRevision &&
-            expected.prefixResetKeys == completed.before.prefixResetKeys &&
-            expected.commandLine == completed.before.commandLine &&
-            completed.inputRevision == inputRevision &&
-            completed.outputRevision == outputRevision
+        geometryRevision: Long,
+        shellRevision: Long,
+        prefixResetKeys: List<TerminalKeyEvent>,
+    ): TerminalShellCompletionResult? {
+        val completed = receipt ?: return null
+        val expected = completed.expected
+        return completed.result.takeIf {
+            expected.commandLine.requiresShellConfirmation &&
+                expected.commandLine.commandText == commandLine &&
+                expected.commandLine.cursorOffset == cursorOffset &&
+                expected.inputRevision == inputRevision &&
+                expected.geometryRevision == geometryRevision &&
+                expected.shellRevision == shellRevision &&
+                expected.prefixResetKeys == prefixResetKeys
+        }
     }
 
-    /** Reuses confirmation only while the freshly captured editor context still owns its exact receipt. */
+    /** Reuses confirmation only while the editor context still owns its exact receipt. */
     internal fun confirmedResult(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
         if (!expected.commandLine.requiresShellConfirmation) return null
         val completed = receipt ?: return null
-        return completed.result.takeIf { permits(expected, expected.inputRevision, expected.outputRevision) }
+        return completed.result.takeIf { sameAuthority(expected, completed.expected) }
     }
 
     internal fun close(): Pending? =
         synchronized(lock) {
             closed = true
             epoch = null
+            requestInput = null
             mutableCommands.value = null
             receipt = null
+            confirmationRequiredFor = null
             pending.also { pending = null }
         }
 
-    internal fun invalidateEdit() {
-        receipt = null
-        pending?.editInvalidated = true
-    }
+    private fun sameEditorState(
+        first: TerminalCommandEditContext,
+        second: TerminalCommandEditContext,
+    ): Boolean =
+        first.inputRevision == second.inputRevision &&
+            first.geometryRevision == second.geometryRevision &&
+            first.shellRevision == second.shellRevision &&
+            first.prefixResetKeys == second.prefixResetKeys
+
+    private fun sameAuthority(
+        first: TerminalCommandEditContext,
+        second: TerminalCommandEditContext,
+    ): Boolean =
+        sameEditorState(first, second) &&
+            first.commandLine.commandText == second.commandLine.commandText &&
+            first.commandLine.cursorOffset == second.commandLine.cursorOffset
 
     internal class Pending(
         val requestId: Long,
         val expected: TerminalCommandEditContext,
         val input: List<TerminalInputEvent>,
-        val frameGeneration: Long,
     ) {
         val deferred = CompletableDeferred<TerminalShellCompletionResult?>()
+        var waiters = 1
 
         // Consumer cancellation does not mean that the shell has consumed its request.
         val retired = CompletableDeferred<Unit>()
         var responded = false
         var response: TerminalShellCompletionResult? = null
-        var editInvalidated = false
+
+        // Resume consumers only after releasing session locks.
+        fun complete() {
+            deferred.complete(response)
+            retired.complete(Unit)
+        }
     }
 
     private class Receipt(
-        val before: TerminalCommandEditContext,
-        val inputRevision: Long,
-        val outputRevision: Long,
+        val expected: TerminalCommandEditContext,
         val result: TerminalShellCompletionResult,
     )
 }

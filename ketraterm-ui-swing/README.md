@@ -239,11 +239,24 @@ for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
-Automatic requests require an unambiguous command snapshot and do not perform
-native shell confirmation of screen-derived prefixes. Explicit requests may
-confirm such a prefix through the session. Hosts using a provider that invokes
-the live shell should disable automatic popups for that provider, as the products
-do for PowerShell.
+Late shell-command inventory updates refresh eligible automatic suggestions after
+the normal debounce, even when the typed text is unchanged.
+Automatic and explicit requests both capture the current editing context before
+provider work. Automatic requests that cannot yet capture retry on session
+[admission wakeups](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits),
+without cancelling an already captured request or requiring another keystroke.
+A screen-derived prefix requiring shell confirmation is queried
+through the session's installed native hook before collecting suggestions. The
+default session target passes its original captured context to
+`requestShellCompletions(expected)`; confirmation must preserve that context as
+well as match the buffer and cursor. Pending and confirmed native requests retain
+their original editing authority across partial redraws and prediction layout
+changes; the session validates input, prompt, and geometry revisions independently
+of the rendered observation. A stale automatic request is replaced with a
+new interaction and handler even when the command text is unchanged. The old
+handler is cancelled, never renewed. Custom edit targets own their editing
+authority. If the hook cannot confirm the buffer,
+suggestions stay unavailable.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for
 parameter-only automatic requests. The shared completion adapter forwards it

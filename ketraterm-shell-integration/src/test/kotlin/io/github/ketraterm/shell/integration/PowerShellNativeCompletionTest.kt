@@ -23,10 +23,7 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
 import io.github.ketraterm.testkit.MockConnector
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -37,6 +34,49 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
+    @Test
+    fun `completion readiness is accepted only within a primary prompt`() =
+        runTest {
+            for (boundary in listOf("\u001b]133;C\u0007", "\u001b]133;D;0\u0007", "\u001b[?1049h")) {
+                Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                    assertTrue(fixture.session.shellCompletionAvailable)
+                    fixture.feed(boundary)
+                    assertFalse(fixture.session.shellCompletionAvailable)
+                    fixture.feed(ready("b".repeat(32)))
+                    assertFalse(fixture.session.shellCompletionAvailable)
+                    assertNull(fixture.session.requestShellCompletions("Get-Chi", 7))
+                    runCurrent()
+                    assertTrue(fixture.connector.writtenBytes.isEmpty())
+                }
+            }
+        }
+
+    @Test
+    fun `local primary clear retires completion without awaiting further output`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                assertFalse(query.isCompleted)
+                assertTrue(fixture.session.clearBuffer())
+                runCurrent()
+                assertFalse(fixture.session.shellCompletionAvailable)
+                assertTrue(query.isCompleted)
+                assertNull(query.await())
+                fixture.feed(ready("b".repeat(32)))
+                assertFalse(fixture.session.shellCompletionAvailable)
+
+                fixture.feed("\u001b]133;A\u0007PS> \u001b]133;B\u0007Get-Chi")
+                for (byte in ready("c".repeat(32)).toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                assertTrue(fixture.session.shellCompletionAvailable)
+                val next = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi", epoch = "c".repeat(32), id = 2))
+                runCurrent()
+                assertNotNull(next.await())
+            }
+        }
+
     @Test
     fun `visible prediction requires exact native confirmation before editing`() =
         runTest {
@@ -57,6 +97,36 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
+    fun `changed wrapped prediction preserves native buffer confirmation`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), columns = 16).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                fixture.feed("ldItem -Name old\u001b[1;12H")
+                fixture.session.requestRender(0)
+                runCurrent()
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals("Get-Chi", expected.commandLine.commandText)
+                assertTrue(expected.commandLine.requiresShellConfirmation)
+                val previousRevision = fixture.session.activeShellCommandLineRevision.value
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+
+                // The later packet changes only the prediction's wrapped continuation.
+                fixture.feed("\u001b[2;1Hm -Name new\u001b[1;12H")
+                fixture.feed(reply("Get-Chi"))
+                fixture.session.requestRender(0)
+                runCurrent()
+                assertNotNull(query.await())
+                assertEquals(expected.commandLine, fixture.session.activeShellCommandLine())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > previousRevision)
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
+                )
+            }
+        }
+
+    @Test
     fun `actual editable suffix cannot confirm a screen prefix`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
@@ -73,7 +143,7 @@ class PowerShellNativeCompletionTest {
                     TerminalInputAdmission.STALE_CONTEXT,
                     fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "wrong"))),
                 )
-                assertEquals("\u001b[24~e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+                assertEquals(request(1), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
             }
         }
 
@@ -115,7 +185,7 @@ class PowerShellNativeCompletionTest {
                 assertEquals(emptyList(), keys())
                 for (invalid in listOf(
                     ready("bad-epoch"),
-                    ready().replace(";2;", ";1;"),
+                    ready().replace(";3;", ";2;"),
                     ready().replace("Ready;", "Unknown;"),
                     ready().replace("\u0007", ";Unknown\u0007"),
                     ready().replace("\u0007", ";PrefixReset;extra\u0007"),
@@ -162,7 +232,7 @@ class PowerShellNativeCompletionTest {
                 val expected = assertNotNull(it.session.captureCommandEdit())
                 val query = async { it.session.requestShellCompletions("Get-Chi", 7) }
                 runCurrent()
-                assertEquals("\u001b[24~e", it.connector.writtenBytes.toString(Charsets.UTF_8))
+                assertEquals(request(1), it.connector.writtenBytes.toString(Charsets.UTF_8))
                 val reply = reply("Get-Chi", value = "Get-ChildItem", label = "Get-ChildItem", externalCommandName = "git.exe")
                 for (byte in reply.toByteArray()) it.connector.feedFromHost(byteArrayOf(byte))
                 runCurrent()
@@ -200,7 +270,7 @@ class PowerShellNativeCompletionTest {
                 runCurrent()
                 it.feed(reply("Get-Chi", epoch = "b".repeat(32)))
                 it.feed(reply("Get-Chi", id = 2))
-                it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
+                it.feed(reply("Get-Chi").replace("KetraTermCompletion;3;", "KetraTermCompletion;1;"))
                 runCurrent()
                 assertFalse(query.isCompleted)
                 it.feed(reply("Get-Chi"))
@@ -210,7 +280,7 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `user input and visually changed output cannot renew old edits`() =
+    fun `user input invalidates native authority while repaint preserves it`() =
         runTest {
             for (input in listOf(true, false)) {
                 Fixture(StandardTestDispatcher(testScheduler)).use {
@@ -224,9 +294,9 @@ class PowerShellNativeCompletionTest {
                     }
                     it.feed(reply("Get-Chi"))
                     runCurrent()
-                    assertNull(query.await())
+                    if (input) assertNull(query.await()) else assertNotNull(query.await())
                     assertEquals(
-                        TerminalInputAdmission.STALE_CONTEXT,
+                        if (input) TerminalInputAdmission.STALE_CONTEXT else TerminalInputAdmission.ACCEPTED,
                         it.session.submitInput(expected, listOf(TerminalKeyEvent(codepoint = 'y'.code))),
                     )
                 }
@@ -234,7 +304,7 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `output after a valid response still invalidates pre-query editing authority`() =
+    fun `title output after a valid response preserves editing authority`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use {
                 val expected = assertNotNull(it.session.captureCommandEdit())
@@ -245,9 +315,41 @@ class PowerShellNativeCompletionTest {
                 assertNotNull(query.await())
                 it.feed("\u001b]0;changed title\u0007")
                 assertEquals(
-                    TerminalInputAdmission.STALE_CONTEXT,
+                    TerminalInputAdmission.ACCEPTED,
                     it.session.submitInput(expected, listOf(TerminalKeyEvent(codepoint = 'y'.code))),
                 )
+            }
+        }
+
+    @Test
+    fun `native confirmation is independent of reply position within a fragmented redraw`() =
+        runTest {
+            val redraw = listOf("\r", "\u001b[1;5H", "\u001b[K", "Get-", "Chi", "ldItem -Name prediction", "\u001b[1;12H")
+            for (replyPosition in 0..redraw.size) {
+                Fixture(StandardTestDispatcher(testScheduler), columns = 16).use { fixture ->
+                    fixture.feed("ldItem -Name old\u001b[1;12H")
+                    val expected = assertNotNull(fixture.session.captureCommandEdit())
+                    val query = async { fixture.session.requestShellCompletions(expected) }
+                    runCurrent()
+                    for (index in 0..redraw.size) {
+                        if (index == replyPosition) {
+                            for (byte in reply("Get-Chi").toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                            runCurrent()
+                            assertNotNull(query.await(), "reply at redraw offset $replyPosition")
+                        }
+                        if (index < redraw.size) {
+                            for (byte in redraw[index].toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                        }
+                        runCurrent()
+                    }
+                    assertEquals("Get-Chi", fixture.session.activeShellCommandLine()?.commandText)
+                    assertTrue(fixture.session.isCommandEditCurrent(expected))
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
+                        "reply at redraw offset $replyPosition",
+                    )
+                }
             }
         }
 
@@ -266,7 +368,7 @@ class PowerShellNativeCompletionTest {
                 it.feed(reply("Get-Chi", id = 1))
                 assertFalse(next.isCompleted)
                 it.feed(reply("Get-Chi", id = 2))
-                it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
+                it.feed(reply("Get-Chi").replace("KetraTermCompletion;3;", "KetraTermCompletion;1;"))
                 runCurrent()
                 assertNotNull(next.await())
             }
@@ -308,7 +410,41 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `a new prompt retires old requests and resets correlation`() =
+    fun `a queued query consumed at a later prompt cannot steal its next reply`() =
+        runTest {
+            for (oldReplyBeforeRequest in listOf(true, false)) {
+                Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                    val old = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                    runCurrent()
+                    assertEquals(request(1), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+
+                    val epoch = "b".repeat(32)
+                    val nextPrompt =
+                        "\u001b]133;C\u0007\r\n\u001b]133;D;0\u0007\u001b]133;A\u0007PS> " +
+                            ready(epoch) + "\u001b]133;B\u0007Get-Chi"
+                    for (byte in nextPrompt.toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                    runCurrent()
+                    assertNull(old.await())
+
+                    // Input and output are independent streams: the old chord can execute after Ready.
+                    val lateReply = reply("", epoch = epoch, id = 1)
+                    if (oldReplyBeforeRequest) fixture.feed(lateReply)
+                    val current = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                    runCurrent()
+                    if (!oldReplyBeforeRequest) fixture.feed(lateReply)
+                    runCurrent()
+                    assertFalse(current.isCompleted)
+                    assertEquals(request(1) + request(2), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+
+                    fixture.feed(reply("Get-Chi", epoch = epoch, id = 2))
+                    runCurrent()
+                    assertEquals("Get-Chi", assertNotNull(current.await()).commandLine)
+                }
+            }
+        }
+
+    @Test
+    fun `a new prompt retires old requests without reusing their identities`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use {
                 val query = async { it.session.requestShellCompletions("Get-Chi", 7) }
@@ -320,9 +456,32 @@ class PowerShellNativeCompletionTest {
                 runCurrent()
                 it.feed(reply("Get-Chi"))
                 assertFalse(next.isCompleted)
-                it.feed(reply("Get-Chi", epoch = "b".repeat(32)))
+                it.feed(reply("Get-Chi", epoch = "b".repeat(32), id = 2))
                 runCurrent()
                 assertNotNull(next.await())
+            }
+        }
+
+    @Test
+    fun `repeated readiness for the same epoch never reuses a request id`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val first = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi"))
+                runCurrent()
+                assertNotNull(first.await())
+
+                fixture.feed(ready())
+                val second = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi", id = 1))
+                runCurrent()
+                assertFalse(second.isCompleted)
+                fixture.feed(reply("Get-Chi", id = 2))
+                runCurrent()
+                assertNotNull(second.await())
+                assertEquals(request(1) + request(2), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
             }
         }
 
@@ -378,7 +537,7 @@ class PowerShellNativeCompletionTest {
                     val next = async { it.session.requestShellCompletions("Get-Chi", 7) }
                     runCurrent()
                     it.feed(reply("Get-Chi", id = 2))
-                    it.feed(reply("Get-Chi").replace("KetraTermCompletion;2;", "KetraTermCompletion;1;"))
+                    it.feed(reply("Get-Chi").replace("KetraTermCompletion;3;", "KetraTermCompletion;1;"))
                     runCurrent()
                     assertNotNull(next.await())
                 }
@@ -388,11 +547,12 @@ class PowerShellNativeCompletionTest {
     private class Fixture(
         dispatcher: CoroutineDispatcher,
         ready: Boolean = true,
+        columns: Int = 80,
     ) : AutoCloseable {
         val connector = MockConnector()
         val session =
             TerminalSession.create(
-                TerminalBuffers.create(80, 4),
+                TerminalBuffers.create(columns, 4),
                 connector,
                 shellIntegration = OscShellIntegration,
                 workerDispatcher = dispatcher,
@@ -411,9 +571,17 @@ class PowerShellNativeCompletionTest {
     }
 
     companion object {
+        private fun request(id: Long): String =
+            "\u001b[24~q" +
+                id
+                    .toString()
+                    .padStart(19, '0')
+                    .map { "\u001b[24~$it" }
+                    .joinToString("") + "\u001b[24~e"
+
         private fun encoded(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 
-        private fun ready(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCompletion;2;Ready;$epoch\u0007"
+        private fun ready(epoch: String = "a".repeat(32)) = "\u001b]633;KetraTermCompletion;3;Ready;$epoch\u0007"
 
         private fun reply(
             line: String,
@@ -426,7 +594,7 @@ class PowerShellNativeCompletionTest {
             cursor: Int = line.length,
             externalCommandName: String = "",
         ): String =
-            "\u001b]633;KetraTermCompletion;2;Result;$epoch;$id;Ok;$cursor;$start;$end;${encoded(
+            "\u001b]633;KetraTermCompletion;3;Result;$epoch;$id;Ok;$cursor;$start;$end;${encoded(
                 line,
             )};${encoded(externalCommandName)};1;Command;${encoded(value)};${encoded(label)};\u0007"
     }

@@ -325,7 +325,7 @@ public class TerminalSession private constructor(
     private val outboundWriter = OutboundWriter(connector, outboundWriteLock)
     private val editContextOwner = Any()
     private var inputRevision = 0L // Protected by outboundWriteLock.
-    private var outputRevision = 0L // Protected by mutationLock; includes resize.
+    private var geometryRevision = 0L // Protected by mutationLock; explicit resize and local clear.
     private val inputEncoder =
         createInputEncoder(
             object : TerminalInputState {
@@ -455,7 +455,9 @@ public class TerminalSession private constructor(
      * not wait for rendering or require reading the grid.
      *
      * Nonnegative values identify changes in command text, cursor offset/anchor,
-     * or snapshot availability. Treat them as opaque revisions;
+     * snapshot availability, or the producer's prompt and editing capabilities. For provisional
+     * snapshots, relevant visible suffix text and layout also participate even when the prefix is unchanged.
+     * Treat values as opaque revisions;
      * intermediate changes may be conflated. Consumers should debounce this
      * signal and call [activeShellCommandLine] when they need a command snapshot.
      * Session closure cancels tracking; collectors own their collection lifetime.
@@ -470,6 +472,18 @@ public class TerminalSession private constructor(
 
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
+
+    /**
+     * Conflated opportunities to retry [captureCommandEdit], including an initial sample.
+     * Observes output publication, producer revisions, outbound write retirement, and lifecycle.
+     * A wakeup neither guarantees capture will succeed nor invalidates a retained edit context;
+     * callers must perform the atomic capture or admission check again. In particular, a native
+     * query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement.
+     * Collectors own cancellation and should stop waiting when [isClosed] becomes true.
+     */
+    public val commandEditChanges: Flow<Unit> by lazy {
+        merge<Any>(renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
+    }
 
     private val outboundJob: Job
 
@@ -650,6 +664,8 @@ public class TerminalSession private constructor(
      * model untrustworthy; queue idleness is not acknowledgement by a remote shell.
      * A snapshot marked [TerminalShellCommandLineSnapshot.requiresShellConfirmation]
      * can be captured for a native query, but cannot admit edits until that query confirms it.
+     * Capture also marks a complete screen observation this way when a previous native query
+     * left its editor state without a verified receipt.
      *
      * @throws IllegalArgumentException if the producer's prefix-reset sequence contains more than four keys.
      */
@@ -662,18 +678,80 @@ public class TerminalSession private constructor(
                     if (!isAcceptingInput() || snapshot == null || !outboundWriter.isIdle()) {
                         null
                     } else {
-                        TerminalCommandEditContext(
-                            commandLine = snapshot,
-                            prefixResetKeys = integration.commandLinePrefixResetKeys,
-                            owner = editContextOwner,
-                            inputRevision = inputRevision,
-                            outputRevision = outputRevision,
-                            shellRevision = revision,
-                        )
+                        val expected =
+                            TerminalCommandEditContext(
+                                commandLine = snapshot,
+                                prefixResetKeys = integration.commandLinePrefixResetKeys,
+                                owner = editContextOwner,
+                                inputRevision = inputRevision,
+                                observationRevision = integration.commandLineObservationRevision,
+                                geometryRevision = geometryRevision,
+                                shellRevision = revision,
+                            )
+                        val channel = runtime.shellCompletion
+                        if (snapshot.requiresShellConfirmation || !channel.requiresConfirmation(expected) || channel.permits(expected)) {
+                            expected
+                        } else {
+                            TerminalCommandEditContext(
+                                commandLine = snapshot.copy(requiresShellConfirmation = true),
+                                prefixResetKeys = expected.prefixResetKeys,
+                                owner = expected.owner,
+                                inputRevision = expected.inputRevision,
+                                observationRevision = expected.observationRevision,
+                                geometryRevision = expected.geometryRevision,
+                                shellRevision = expected.shellRevision,
+                            )
+                        }
                     }
                 }
             }
         }
+
+    /**
+     * Whether [expected] still represents a viable editing request, without sending input.
+     * Native-confirmed or pending buffers survive repainting. Provisional buffers with a ready
+     * native hook remain viable until confirmation; this does not authorize their edits.
+     * Other contexts require an unchanged screen observation. A current request may still need
+     * native proof after invoking a custom completer. Final admission always rechecks.
+     */
+    public fun isCommandEditCurrent(expected: TerminalCommandEditContext): Boolean =
+        synchronized(mutationLock) {
+            val integration = runtime.shellIntegration ?: return@synchronized false
+            integration.withCommandLine { revision, snapshot ->
+                synchronized(outboundWriteLock) {
+                    if (!isAcceptingInput() || !commandEditAuthorityIsCurrent(expected, revision, integration.commandLinePrefixResetKeys)) {
+                        false
+                    } else {
+                        val channel = runtime.shellCompletion
+                        channel.permits(expected) ||
+                            channel.isConfirming(expected) ||
+                            expected.commandLine.requiresShellConfirmation &&
+                            channel.isReady ||
+                            !channel.requiresConfirmation(expected) &&
+                            commandObservationIsCurrent(expected, integration, snapshot)
+                    }
+                }
+            } == true
+        }
+
+    private fun commandEditAuthorityIsCurrent(
+        expected: TerminalCommandEditContext,
+        shellRevision: Long,
+        prefixResetKeys: List<TerminalKeyEvent>,
+    ): Boolean =
+        expected.owner === editContextOwner &&
+            !expected.isCancelled &&
+            expected.inputRevision == inputRevision &&
+            expected.geometryRevision == geometryRevision &&
+            expected.shellRevision == shellRevision &&
+            expected.prefixResetKeys == prefixResetKeys
+
+    private fun commandObservationIsCurrent(
+        expected: TerminalCommandEditContext,
+        integration: TerminalShellIntegration,
+        snapshot: TerminalShellCommandLineSnapshot?,
+    ): Boolean =
+        !processingOutput && expected.observationRevision == integration.commandLineObservationRevision && expected.commandLine == snapshot
 
     /**
      * Whether the running session's producer has announced a native completion hook.
@@ -693,11 +771,12 @@ public class TerminalSession private constructor(
 
     /**
      * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
-     * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
-     * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
-     * A replacement request waits for that cancelled slot within its existing timeout, then revalidates
-     * the current buffer. Concurrent requests wait for in-flight queries and reuse verified confirmation.
-     * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
+     * One wire query may be in flight. Concurrent callers for the same buffer share its result;
+     * cancelling one caller does not cancel the others. Unsupported, stale, failed, or timed-out requests return null.
+     * After the last caller cancels, the wire slot stays reserved until the reply or prompt invalidation.
+     * A different-buffer request waits for retirement within its own timeout, then revalidates the current buffer.
+     * A verified non-editing exchange preserves edit contexts across repainting and unrelated metadata;
+     * editing input, authoritative producer updates, and explicit geometry changes revoke that authority.
      * Provisional snapshots reuse that verified result while their exact context remains current,
      * so confirmation and candidate collection do not invoke the native completer twice.
      * The ten-second deadline allows cold native module discovery; callers can cancel earlier.
@@ -710,64 +789,135 @@ public class TerminalSession private constructor(
         return withTimeoutOrNull(10_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
     }
 
+    /**
+     * Queries native completions only for this session's uncancelled [expected] context and verifies
+     * that the reply preserves that original edit authority before returning candidates.
+     * Uses the same query sharing and deadline as the command-line overload.
+     *
+     * Screen observations may change while the shell computes the result. Only the native editor's
+     * exact buffer and cursor confirm the request; intervening editing input, producer authority,
+     * geometry changes, or cancellation still reject it. Final edits must still pass [submitInput].
+     */
+    public suspend fun requestShellCompletions(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
+        currentCoroutineContext().ensureActive()
+        if (expected.owner !== editContextOwner || expected.isCancelled) return null
+        val result =
+            withTimeoutOrNull(10_000.milliseconds) {
+                awaitShellCompletions(expected.commandLine.commandText, expected.commandLine.cursorOffset, expected)
+            } ?: return null
+        currentCoroutineContext().ensureActive()
+        val confirmed =
+            synchronized(mutationLock) {
+                val integration = runtime.shellIntegration ?: return@synchronized false
+                integration.withCommandLine { revision, _ ->
+                    synchronized(outboundWriteLock) {
+                        isAcceptingInput() &&
+                            commandEditAuthorityIsCurrent(expected, revision, integration.commandLinePrefixResetKeys) &&
+                            runtime.shellCompletion.permits(expected)
+                    }
+                } == true
+            }
+        return result.takeIf { confirmed }
+    }
+
     private suspend fun awaitShellCompletions(
         commandLine: String,
         cursorOffset: Int,
+        original: TerminalCommandEditContext? = null,
     ): TerminalShellCompletionResult? {
         while (true) {
-            var activeQuery: Deferred<Unit>? = null
-            synchronized(mutationLock) {
-                activeQuery = runtime.shellCompletion.pending?.retired
-            }
-            if (activeQuery != null) {
-                activeQuery.await()
-                continue
-            }
-            val expected = captureCommandEdit() ?: return null
-            if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
             var confirmedResult: TerminalShellCompletionResult? = null
             var retiring: Deferred<Unit>? = null
+            var waitingForAdmission = false
             val query =
                 try {
                     synchronized(mutationLock) {
-                        runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                        if (!isAcceptingInput()) return@synchronized null
+                        val channel = runtime.shellCompletion
+                        retiring = channel.pending?.retired
+                        if (processingOutput) {
+                            waitingForAdmission = true
+                            return@synchronized null
+                        }
+                        val integration = runtime.shellIntegration ?: return@synchronized null
+                        integration.withCommandLine { revision, snapshot ->
                             synchronized(outboundWriteLock) {
-                                if (
-                                    !isAcceptingInput() ||
-                                    inputRevision != expected.inputRevision ||
-                                    outputRevision != expected.outputRevision ||
-                                    revision != expected.shellRevision ||
-                                    snapshot != expected.commandLine
-                                ) {
+                                if (!isAcceptingInput()) return@synchronized null
+                                if (original == null) {
+                                    confirmedResult =
+                                        channel.confirmedResult(
+                                            commandLine,
+                                            cursorOffset,
+                                            inputRevision,
+                                            geometryRevision,
+                                            revision,
+                                            integration.commandLinePrefixResetKeys,
+                                        )
+                                    if (confirmedResult != null) return@synchronized null
+                                }
+                                val expected =
+                                    if (original != null) {
+                                        if (!commandEditAuthorityIsCurrent(original, revision, integration.commandLinePrefixResetKeys)) {
+                                            return@synchronized null
+                                        }
+                                        original
+                                    } else {
+                                        if (snapshot == null ||
+                                            snapshot.commandText != commandLine ||
+                                            snapshot.cursorOffset != cursorOffset
+                                        ) {
+                                            return@synchronized null
+                                        }
+                                        TerminalCommandEditContext(
+                                            commandLine = snapshot,
+                                            prefixResetKeys = integration.commandLinePrefixResetKeys,
+                                            owner = editContextOwner,
+                                            inputRevision = inputRevision,
+                                            observationRevision = integration.commandLineObservationRevision,
+                                            geometryRevision = geometryRevision,
+                                            shellRevision = revision,
+                                        )
+                                    }
+                                if (channel.pending != null) return@synchronized channel.join(expected)
+                                if (!outboundWriter.isIdle()) {
+                                    waitingForAdmission = true
                                     return@synchronized null
                                 }
-                                confirmedResult = runtime.shellCompletion.confirmedResult(expected)
+                                confirmedResult = channel.confirmedResult(expected)
                                 if (confirmedResult != null) return@synchronized null
-                                retiring = runtime.shellCompletion.pending?.retired
-                                if (retiring != null) return@synchronized null
-                                var generation = 0L
-                                renderReader.readRenderFrame { generation = it.frameGeneration }
-                                val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
+                                val pending = channel.begin(expected) ?: return@synchronized null
                                 outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
-                                inputRevision++
                                 pending
                             }
                         }
                     }
                 } catch (failure: OutboundCapacityException) {
                     failWrite(failure)
-                    return null
+                    null
                 }
             if (query == null) {
-                val previous = retiring ?: return confirmedResult
-                previous.await()
-                continue
+                val previous = retiring
+                if (previous != null) {
+                    previous.await()
+                    continue
+                }
+                if (waitingForAdmission) {
+                    commandEditChanges.first {
+                        synchronized(mutationLock) {
+                            synchronized(outboundWriteLock) {
+                                !isAcceptingInput() || (!processingOutput && outboundWriter.isIdle())
+                            }
+                        }
+                    }
+                    continue
+                }
+                return confirmedResult
             }
             outboundWriter.signalPending()
             return try {
                 query.deferred.await()
             } finally {
-                query.deferred.cancel(CancellationException("Shell completion request ended"))
+                runtime.shellCompletion.release(query)
             }
         }
     }
@@ -775,8 +925,10 @@ public class TerminalSession private constructor(
     /**
      * Atomically validates [expected] and admits the complete semantic [events].
      * Checks session identity, cancellation, producer revision/snapshot and all
-     * intervening input/output/resize under mutation, producer and admission
+     * intervening editing input, producer authority, observation and resize under mutation, producer and admission
      * serialization. Rejection sends no prefix and does not consume capacity.
+     * Partial output batches and pending native queries cannot admit edits. Once custom shell
+     * completion code has run, that editor state needs a verified receipt even for a complete snapshot.
      * Success uses the same bounds, mode/policy capture and writer as [submitInput].
      *
      * The caller owns editor semantics: translate valid caret/deletion spans to
@@ -798,18 +950,16 @@ public class TerminalSession private constructor(
                     synchronized(outboundWriteLock) {
                         inputRejection() ?: when {
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
-                            expected.owner !== editContextOwner ||
+                            processingOutput ||
+                                runtime.shellCompletion.pending != null ||
+                                !commandEditAuthorityIsCurrent(expected, revision, integration.commandLinePrefixResetKeys) ||
+                                !runtime.shellCompletion.permits(expected) &&
                                 (
-                                    (
-                                        expected.commandLine.requiresShellConfirmation ||
-                                            expected.inputRevision != inputRevision ||
-                                            expected.outputRevision != outputRevision
-                                    ) &&
-                                        !runtime.shellCompletion.permits(expected, inputRevision, outputRevision)
-                                ) ||
-                                expected.shellRevision != revision ||
-                                expected.prefixResetKeys != integration.commandLinePrefixResetKeys ||
-                                expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
+                                    expected.commandLine.requiresShellConfirmation ||
+                                        runtime.shellCompletion.requiresConfirmation(expected) ||
+                                        !commandObservationIsCurrent(expected, integration, snapshot)
+                                ) ->
+                                TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)
                                 TerminalInputAdmission.ACCEPTED
@@ -1003,8 +1153,7 @@ public class TerminalSession private constructor(
             return mutate {
                 if (isSessionClosed()) return null
                 drainResponses()
-                outputRevision++
-                runtime.shellCompletion.invalidateEdit()
+                geometryRevision++
                 var resizeCompleted = false
                 var coreResizeCompleted = false
                 try {
@@ -1090,8 +1239,7 @@ public class TerminalSession private constructor(
         try {
             return mutate {
                 if (isSessionClosed() || resizePending || terminal.width != columns || terminal.height != rows) return false
-                outputRevision++
-                runtime.shellCompletion.invalidateEdit()
+                geometryRevision++
                 terminal.setWindowSizePixels(pixelWidth, pixelHeight)
                 drainResponses()
                 true
@@ -1325,8 +1473,7 @@ public class TerminalSession private constructor(
             else ->
                 admitInput {
                     val byteCount = outboundWriter.submit(signal = false) { inputEncoder.encodeEvent(event) }
-                    // A suppressed physical release cannot change the shell buffer after suggestions were captured.
-                    if (byteCount != 0 || event !is TerminalKeyEvent || event.type != TerminalKeyEventType.RELEASE) inputRevision++
+                    if (byteCount != 0) inputRevision++
                     if (event.cancelsStartup()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
                 }
         }
@@ -1431,11 +1578,12 @@ public class TerminalSession private constructor(
      * @throws IllegalStateException on reentry from an output or clear callback.
      */
     public fun clearBuffer(): Boolean {
+        var completedShellQuery: TerminalShellCompletionChannel.Pending? = null
         try {
             mutate {
                 if (isSessionClosed()) return false
                 check(!processingOutput) { "Output callbacks must not reenter the session" }
-                outputRevision++
+                geometryRevision++
                 processingOutput = true
                 try {
                     terminal.eraseBuffer()
@@ -1446,10 +1594,12 @@ public class TerminalSession private constructor(
                     )
                 } finally {
                     processingOutput = false
+                    completedShellQuery = finishShellCompletion()
                 }
             }
             return true
         } finally {
+            completedShellQuery?.complete()
             invalidateRender()
         }
     }
@@ -1495,7 +1645,6 @@ public class TerminalSession private constructor(
                 if (isSessionClosed()) return
                 check(!processingOutput) { "Output callbacks must not reenter the session" }
                 synchronized(mutationLock) {
-                    if (length != 0) outputRevision++
                     processingOutput = true
                 }
                 try {
@@ -1535,28 +1684,28 @@ public class TerminalSession private constructor(
                 } finally {
                     synchronized(mutationLock) {
                         processingOutput = false
-                        if (runtime.shellCompletion.pending?.responded == true) {
-                            completedShellQuery =
-                                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
-                                    synchronized(outboundWriteLock) {
-                                        var generation = 0L
-                                        renderReader.readRenderFrame { generation = it.frameGeneration }
-                                        runtime.shellCompletion.finish(inputRevision, outputRevision, revision, snapshot, generation)
-                                    }
-                                }
-                        }
+                        completedShellQuery = finishShellCompletion()
                     }
                 }
                 submitStartupCommand()
             }
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
-        }
-        completedShellQuery?.let {
-            it.deferred.complete(it.response)
-            it.retired.complete(Unit)
+        } finally {
+            completedShellQuery?.complete()
         }
         invalidateRender(immediate = false)
+    }
+
+    // Called under mutation serialization after the complete output or local-clear operation.
+    private fun finishShellCompletion(): TerminalShellCompletionChannel.Pending? {
+        if (runtime.shellCompletion.pending?.responded != true) return null
+        val integration = runtime.shellIntegration ?: return null
+        return integration.withCommandLine { revision, _ ->
+            synchronized(outboundWriteLock) {
+                runtime.shellCompletion.finish(inputRevision, geometryRevision, revision, integration.commandLinePrefixResetKeys)
+            }
+        }
     }
 
     private fun submitStartupCommand() {

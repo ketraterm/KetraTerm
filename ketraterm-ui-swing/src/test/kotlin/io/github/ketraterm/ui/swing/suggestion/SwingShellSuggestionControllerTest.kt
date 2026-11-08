@@ -35,6 +35,52 @@ class SwingShellSuggestionControllerTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun `versioned clicks ignore retained rows and accept only the fresh publication`() =
+        onEdt {
+            val scope = TestScope()
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(
+                    host,
+                    { listener -> RecordingSuggestionView(listener).also { view = it } },
+                    scope,
+                )
+            val old = SwingShellSuggestionInteraction(request(), host.suggestionHandler, host.suggestionFeedbackHandler)
+            val fresh = SwingShellSuggestionInteraction(request(), host.suggestionHandler, host.suggestionFeedbackHandler)
+            val items = suggestions(1)
+            try {
+                old.publish(items)
+                controller.present(old)
+                val displayed = view.snapshot
+                controller.retainPresentation()
+                old.close()
+
+                assertTrue(controller.state().visible)
+                assertEquals(1, controller.state().count)
+                assertSame(displayed, view.snapshot)
+                assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)))
+                view.listener.onSuggestionClicked(displayed, 0)
+                assertTrue(host.acceptedSuggestions.isEmpty())
+                assertTrue(host.feedbackKinds.isEmpty())
+
+                controller.present(fresh)
+                fresh.publish(items)
+                view.listener.onSuggestionClicked(displayed, 0)
+                assertTrue(host.acceptedSuggestions.isEmpty())
+                view.listener.onSuggestionClicked(view.snapshot, 0)
+                assertEquals(items, host.acceptedSuggestions)
+                assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
+            } finally {
+                controller.close()
+                old.close()
+                fresh.close()
+                scope.cancel()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun `slow refresh expires old rows without disconnecting the new publication`() =
         onEdt {
             val scope = TestScope()

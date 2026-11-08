@@ -8,8 +8,8 @@ with [ketraterm-swing](../ketraterm-swing/README.md) and the
 
 ## Run from source
 
-Use a JDK 25 installation and the repository's Gradle wrapper. From the
-repository root:
+Follow the [development JDK setup](../README.md#development) and use the
+repository's Gradle wrapper. From the repository root:
 
 ```shell
 ./gradlew :ketraterm-app:run
@@ -52,8 +52,9 @@ application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
 Suggestions are enabled by default. Use the Shell Suggestions section in settings
-to control completion, automatic popups, Enter acceptance, and learning persistence;
-PowerShell uses explicit requests (Ctrl+Space). See [completion availability](../docs/features/completion.md).
+to control completion, automatic popups, Enter acceptance, and learning persistence.
+Ctrl+Space requests suggestions even when automatic popups are disabled.
+See [completion availability](../docs/features/completion.md) for shell requirements.
 
 Native local profiles receive a small `ketra` companion command:
 

@@ -133,7 +133,7 @@ class OscShellIntegrationTest {
     }
 
     @Test
-    fun `OSC command context supports conditional admission and rejects later output`() {
+    fun `OSC command context preserves editing authority across unrelated output`() {
         val connector = MockConnector()
         createStartedSession(connector, columns = 30, rows = 4).use { session ->
             connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
@@ -148,9 +148,35 @@ class OscShellIntegrationTest {
             assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
             connector.feedFromHost("\u007fstatus".ascii())
             val next = checkNotNull(session.captureCommandEdit())
-            connector.feedFromHost("\u001b[?2004h".ascii())
-            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(next, edit))
-            assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+            connector.feedFromHost("\u001b]0;changed title\u0007".ascii())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED, session.submitInput(next, edit))
+            assertEquals("\u007fstatus\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test
+    fun `screen derived edits reject observed changes away and back without a render subscriber`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
+            val expected = checkNotNull(session.captureCommandEdit())
+            connector.feedFromHost("x".ascii())
+            connector.feedFromHost("\b \b".ascii())
+            assertEquals(expected.commandLine, session.activeShellCommandLine())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(expected, emptyList()))
+            assertTrue(connector.writtenBytes.isEmpty())
+        }
+    }
+
+    @Test
+    fun `screen derived edits survive identical redraw and metadata without a render subscriber`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
+            val expected = checkNotNull(session.captureCommandEdit())
+            connector.feedFromHost("\u001b]0;title\u0007\u001b[?25h\u001b[1;3Hgit s".ascii())
+            assertEquals(expected.commandLine, session.activeShellCommandLine())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED, session.submitInput(expected, emptyList()))
         }
     }
 
@@ -450,6 +476,63 @@ class OscShellIntegrationTest {
             )
             assertEquals(0L, frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
             assertArrayEquals(frameFingerprint, cacheFingerprint)
+        }
+    }
+
+    @Test
+    fun `wide prediction beyond right margin padding participates in frame and cache fingerprints`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 16, rows = 4).use { session ->
+            val prefix = "x".repeat(11)
+            connector.feedFromHost(
+                (
+                    "\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;3;Ready;${"a".repeat(32)}\u0007" +
+                        "\u001b]133;B\u0007${prefix}界\u001b[1;16H"
+                ).toByteArray(Charsets.UTF_8),
+            )
+            val active = requireNotNull(session.activeShellCommandLine())
+            assertEquals(prefix, active.commandText)
+            assertTrue(active.requiresShellConfirmation)
+            assertEquals(15, active.cursorColumn)
+
+            val extractor = ShellIntegrationCommandTextExtractor()
+            val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            session.readRenderFrame { frame ->
+                assertTrue(frame.lineWrapped(0))
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION,
+                    extractor.fingerprint(frame, frame.lineId(0), 4, 0, 15, frameFingerprint, allowVisibleSuffix = true),
+                )
+            }
+            val cache = TerminalRenderCache(16, 4).also { it.updateFrom(session) }
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION,
+                extractor.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint, allowVisibleSuffix = true),
+            )
+            assertEquals(prefix.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+            assertArrayEquals(frameFingerprint, cacheFingerprint)
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.INVALID,
+                extractor.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint),
+            )
+            for (bounded in listOf(
+                ShellIntegrationCommandTextExtractor(maxTextLength = prefix.length),
+                ShellIntegrationCommandTextExtractor(maxRows = 1),
+            )) {
+                session.readRenderFrame { frame ->
+                    assertEquals(
+                        TerminalShellCommandFingerprintStatus.INVALID,
+                        bounded.fingerprint(frame, frame.lineId(0), 4, 0, 15, frameFingerprint, allowVisibleSuffix = true),
+                    )
+                }
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.INVALID,
+                    bounded.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint, allowVisibleSuffix = true),
+                )
+                assertEquals(prefix.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+                assertArrayEquals(frameFingerprint, cacheFingerprint)
+            }
         }
     }
 

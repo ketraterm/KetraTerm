@@ -39,8 +39,9 @@ private const val SHELL_COMMAND_LINE_CONTEXT_CONFIRMATION_INDEX = 3
  *
  * Select this factory when the host installs compatible shell hooks. Each
  * session receives its own bounded command timeline, prompt readiness, and
- * command-text extractor. Active editing revisions are tracked only while
- * collected and reuse primitive scratch storage between render publications.
+ * command-text extractor. Render observations are tracked while collected;
+ * conditional edits start synchronous observation tracking at their first capture.
+ * Both paths reuse primitive scratch storage.
  */
 public object OscShellIntegration : TerminalShellIntegrationFactory {
     override fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration = OscShellIntegrationSession(context, false)
@@ -91,9 +92,7 @@ private class OscShellIntegrationSession(
         offset: Int,
         length: Int,
     ) {
-        val before = shellCompletion.canConfirmCommandLine
-        shellCompletion.observe(command, payload, offset, length)
-        if (before != shellCompletion.canConfirmCommandLine) {
+        if (shellCompletion.observe(command, payload, offset, length, promptActive = readinessPromptStarted)) {
             activeCommandLineContextRevision++
         }
     }
@@ -105,6 +104,7 @@ private class OscShellIntegrationSession(
     private val readinessFrameConsumer =
         TerminalRenderFrameConsumer { frame ->
             if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) {
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = false
                 mutablePromptReady.value = false
             }
@@ -124,6 +124,7 @@ private class OscShellIntegrationSession(
 
     override fun bufferCleared(buffer: TerminalRenderBufferKind) {
         if (buffer != TerminalRenderBufferKind.PRIMARY) return
+        shellCompletion.clearPrompt()
         readinessPromptStarted = false
         mutablePromptReady.value = false
         promptEndLineId = NO_LINE_ID
@@ -138,6 +139,8 @@ private class OscShellIntegrationSession(
     override fun outputProcessed() {
         shellCompletion.outputProcessed()
         if (readinessPromptStarted) context.readRenderFrame(readinessFrameConsumer)
+        val tracker = observationTracker
+        if (tracker != null) updateObservation(tracker)
     }
 
     override fun sessionClosed() {
@@ -150,19 +153,20 @@ private class OscShellIntegrationSession(
         primary: Boolean,
     ) {
         if (!primary) {
+            shellCompletion.clearPrompt()
             readinessPromptStarted = false
             mutablePromptReady.value = false
             return
         }
         when (marker) {
             ShellIntegrationMarker.PROMPT_START -> {
-                shellCompletion.promptStarted()
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = true
                 mutablePromptReady.value = false
             }
             ShellIntegrationMarker.PROMPT_END -> mutablePromptReady.value = readinessPromptStarted
             ShellIntegrationMarker.COMMAND_START, ShellIntegrationMarker.COMMAND_FINISHED -> {
-                shellCompletion.commandStarted()
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = false
                 mutablePromptReady.value = false
             }
@@ -179,6 +183,10 @@ private class OscShellIntegrationSession(
     private var promptScanAttrWords = LongArray(0)
     private var promptScanFlags = IntArray(0)
     private var activeCommandLineContextRevision = 0L
+    private var observationTracker: ShellCommandLineRevisionTracker? = null
+    private var observationRevision = 0L
+
+    override val commandLineObservationRevision: Long get() = observationRevision
 
     override fun observeShellMarker(event: ShellIntegrationEvent) {
         var cursorLineId = NO_LINE_ID
@@ -334,7 +342,15 @@ private class OscShellIntegrationSession(
     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = context.withTerminalState { activeCommandLineLocked() }
 
     override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
-        context.withTerminalState { action(activeCommandLineContextRevision, activeCommandLineLocked()) }
+        context.withTerminalState {
+            val tracker = observationTracker ?: ShellCommandLineRevisionTracker().also { observationTracker = it }
+            updateObservation(tracker)
+            action(activeCommandLineContextRevision, activeCommandLineLocked())
+        }
+
+    private fun updateObservation(tracker: ShellCommandLineRevisionTracker) {
+        if (tracker.updateLive()) observationRevision++
+    }
 
     private fun activeCommandLineLocked(): TerminalShellCommandLineSnapshot? {
         if (!promptStartedForCommandText || promptEndLineId == NO_LINE_ID) return null
@@ -448,7 +464,7 @@ private class OscShellIntegrationSession(
         private const val PROMPT_CONTENT_FLAGS = TerminalRenderCellFlags.CODEPOINT + TerminalRenderCellFlags.CLUSTER
     }
 
-    /** Collector-confined primitive scratch and callbacks are reused between frame checks. */
+    /** Each tracker owns reusable primitive scratch, guarded by its collector or terminal serialization. */
     private inner class ShellCommandLineRevisionTracker {
         private val contextScratch = LongArray(SHELL_COMMAND_LINE_CONTEXT_LONGS)
         private val fingerprintScratch = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
@@ -458,6 +474,7 @@ private class OscShellIntegrationSession(
         private var previousRequiresShellConfirmation = false
         private var previousCursorRow = 0
         private var previousCursorColumn = 0
+        private var previousContextRevision = 0L
         private var contextRevision = 0L
         private var promptEndLineId = NO_LINE_ID
         private var promptEndColumn = 0
@@ -499,6 +516,8 @@ private class OscShellIntegrationSession(
         }
         private val historyFrameConsumer =
             TerminalRenderFrameConsumer { frame ->
+                historySize = frame.historySize
+                liveRows = frame.rows
                 cursorRow = frame.cursor.row
                 cursorColumn = frame.cursor.column + if (frame.cursorPendingWrap) 1 else 0
                 status =
@@ -512,6 +531,30 @@ private class OscShellIntegrationSession(
                         allowVisibleSuffix = canConfirmCommandLine,
                     )
             }
+
+        /** Records every observed transition even without a subscriber or render publication. */
+        fun updateLive(): Boolean {
+            sampleContext()
+            status = TerminalShellCommandFingerprintStatus.INVALID
+            cursorRow = 0
+            cursorColumn = 0
+            historySize = 0
+            if (active) {
+                context.readRenderFrame(historyFrameConsumer)
+                if (status == TerminalShellCommandFingerprintStatus.MISSING_START_LINE && historySize > 0) {
+                    val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
+                    context.readRenderFrame(historyRows, liveRows + historyRows, historyFrameConsumer)
+                }
+            }
+            val available =
+                active &&
+                    (
+                        status == TerminalShellCommandFingerprintStatus.COMPLETE ||
+                            status == TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION
+                    )
+            return recordFingerprint(available)
+        }
+
         private val readHistory: () -> Unit = {
             contextUnchanged = contextMatches()
             if (contextUnchanged) {
@@ -562,6 +605,7 @@ private class OscShellIntegrationSession(
                     previousFingerprintAvailable
                 } else {
                     !previousFingerprintAvailable ||
+                        previousContextRevision != contextRevision ||
                         previousRequiresShellConfirmation != requiresShellConfirmation ||
                         previousCursorRow != cursorRow ||
                         previousCursorColumn != cursorColumn ||
@@ -571,6 +615,7 @@ private class OscShellIntegrationSession(
             previousFingerprintAvailable = available
             previousRequiresShellConfirmation = requiresShellConfirmation
             if (available) {
+                previousContextRevision = contextRevision
                 fingerprintScratch.copyInto(previousFingerprint)
                 previousCursorRow = cursorRow
                 previousCursorColumn = cursorColumn

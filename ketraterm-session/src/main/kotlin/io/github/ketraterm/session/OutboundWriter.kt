@@ -20,6 +20,8 @@ import io.github.ketraterm.transport.checkBounds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.IOException
 import kotlin.coroutines.CoroutineContext
 
@@ -33,6 +35,8 @@ internal class OutboundWriter(
     private val lock: Any,
 ) {
     private val ready = Channel<Unit>(Channel.CONFLATED)
+    private val mutableIdleRevision = MutableStateFlow(0L)
+    val idleRevision = mutableIdleRevision.asStateFlow()
     private var bytes = ByteArray(INITIAL_CAPACITY)
     private var head = 0
     private var size = 0
@@ -155,6 +159,9 @@ internal class OutboundWriter(
         try {
             for (signal in ready) {
                 drain(scratch, context)
+                // Publish outside admission locks. Later input can already be queued;
+                // consumers must recheck admission rather than infer writer idleness.
+                mutableIdleRevision.value++
             }
         } finally {
             scratch.fill(0)

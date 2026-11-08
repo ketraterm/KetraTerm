@@ -32,7 +32,6 @@ import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
-import io.github.ketraterm.workspace.TerminalProfileKind
 import kotlinx.collections.immutable.persistentListOf
 import java.awt.Font
 import java.util.*
@@ -65,8 +64,7 @@ class KetraTermIntellijSettings :
      *
      * @return immutable Swing terminal settings.
      */
-    fun current(profileKind: TerminalProfileKind? = null): SwingSettings =
-        KetraTermIntellijSettingsMapper.toSwingSettings(state, profileKind)
+    fun current(): SwingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(state)
 
     /**
      * Returns whether the IDE host should bind middle-click paste for terminal panes.
@@ -516,10 +514,7 @@ internal object KetraTermIntellijSettingsMapper {
      * @param state normalized IntelliJ settings state.
      * @return immutable Swing terminal settings.
      */
-    fun toSwingSettings(
-        state: KetraTermIntellijSettings.State,
-        profileKind: TerminalProfileKind? = null,
-    ): SwingSettings {
+    fun toSwingSettings(state: KetraTermIntellijSettings.State): SwingSettings {
         val fontSize = state.fontSize
         val fontFamily = SwingSettings.resolveFontFamily(state.fontFamily)
         val fallbackFontFamily = SwingSettings.resolveFontFamily(state.fallbackFontFamily)
@@ -545,7 +540,7 @@ internal object KetraTermIntellijSettingsMapper {
             draft.stickyCommandHeadersEnabled = state.stickyCommandHeadersEnabled
             draft.lineHeight = state.lineHeight
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
-            draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled && profileKind != TerminalProfileKind.POWERSHELL
+            draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled
             draft.shellSuggestionAutomaticMode =
                 SwingShellSuggestionAutomaticMode.entries.first {
                     it.name.equals(state.shellSuggestionAutomaticMode, ignoreCase = true)

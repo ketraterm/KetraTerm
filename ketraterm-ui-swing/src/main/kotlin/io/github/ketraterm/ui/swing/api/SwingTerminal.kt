@@ -2123,10 +2123,13 @@ public class SwingTerminal
                     edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
                     isFocused = { terminalFocused },
                     isEligible = { isAutomaticShellSuggestionEligible() },
-                    requestSuggestions = { _, feedback ->
+                    isRequestCurrent = {
+                        activeSuggestionInteraction?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
+                    },
+                    requestSuggestions = { snapshot, feedback ->
                         val provider = shellSuggestionProvider
                         val target = shellSuggestionTarget
-                        val interaction = beginActiveShellSuggestionInteraction(SwingShellSuggestionTrigger.AUTOMATIC, feedback)
+                        val interaction = beginShellSuggestionInteraction(snapshot, SwingShellSuggestionTrigger.AUTOMATIC, feedback)
                         if (interaction != null) {
                             if (target != null) {
                                 try {
@@ -2144,6 +2147,7 @@ public class SwingTerminal
                                 requestShellSuggestions(interaction, provider)
                             }
                         }
+                        interaction != null
                     },
                     hideSuggestions = { refreshing ->
                         if (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) {
@@ -2170,7 +2174,9 @@ public class SwingTerminal
          * [TerminalShellCommandLineSnapshot.requiresShellConfirmation] through
          * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
          * before collecting a provider; conditional session admission also rejects unconfirmed edits.
-         * Automatic interactions reject provisional session text instead of querying the shell to confirm it.
+         * Automatic and explicit provider requests use the same native confirmation before collecting suggestions.
+         * Session-backed interactions retain their original edit authority across native-query redraws;
+         * presentation changes alone do not replace a pending or confirmed interaction.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -2198,7 +2204,6 @@ public class SwingTerminal
                 bound?.activeShellCommandLine()?.takeIf {
                     it.commandText == effectiveRequest.commandText && it.cursorOffset == effectiveRequest.cursorOffset
                 }
-            if (automatic && observed?.requiresShellConfirmation == true) return null
             val revision = suggestionRevision + 1
             cancelAndHideShellSuggestionsOnEdt(
                 "Shell suggestion request replaced",
@@ -2206,19 +2211,30 @@ public class SwingTerminal
                 retainPresentation = automatic,
             )
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
+            var sessionEditContext: TerminalCommandEditContext? = null
             val captured =
                 when {
                     editTarget != null -> editTarget.capture(effectiveRequest)
-                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest)
+                    bound != null -> {
+                        sessionEditContext = bound.captureCommandEdit()
+                        SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest, sessionEditContext)
+                    }
                     else -> SwingShellSuggestionHandler.NONE
                 } ?: run {
                     if (suggestionRevision == revision) shellSuggestionController?.hide()
                     return null
                 }
+            val expected = sessionEditContext
+            val contextIsCurrent: (() -> Boolean)? =
+                when {
+                    bound != null && expected != null -> ({ bound.isCommandEditCurrent(expected) })
+                    bound != null && observed != null -> ({ !bound.isClosed && bound.activeShellCommandLine() == observed })
+                    else -> null
+                }
             if (disposed ||
                 suggestionRevision != revision ||
                 session !== bound ||
-                (observed != null && bound.activeShellCommandLine() != observed)
+                contextIsCurrent?.invoke() == false
             ) {
                 captured.close()
                 if (suggestionRevision == revision) shellSuggestionController?.hide()
@@ -2236,9 +2252,8 @@ public class SwingTerminal
                     override fun close() = captured.close()
                 }
             val interaction = SwingShellSuggestionInteraction(effectiveRequest, handler, feedbackHandler)
-            if (bound != null && observed != null) {
-                interaction.contextIsCurrent = { !bound.isClosed && bound.activeShellCommandLine() == observed }
-            }
+            interaction.sessionEditContext = sessionEditContext
+            interaction.contextIsCurrent = contextIsCurrent
             val scope = CoroutineScope(componentScope.coroutineContext + Job(componentJob) + CoroutineName("shell-suggestions"))
             activeSuggestionInteraction = interaction
             activeSuggestionIsAutomatic = automatic
@@ -2274,25 +2289,32 @@ public class SwingTerminal
                                     }
                                 }
                             },
+                            {
+                                if (automatic &&
+                                    interaction.closeReason == SwingShellSuggestionCloseReason.INVALIDATED &&
+                                    suggestionRevision == revision
+                                ) {
+                                    suggestionScheduler?.refresh()
+                                }
+                            },
                         )
                     }
                 },
             )
             if (!automatic) suggestionScheduler?.onExplicitRequest()
-            if (bound != null && observed != null) {
+            if (bound != null && contextIsCurrent != null) {
                 scope.launch {
-                    combine(bound.activeShellCommandLineRevision, bound.state) { _, _ -> }
-                        .collect {
-                            if (activeSuggestionInteraction === interaction &&
-                                (bound.isClosed || session !== bound || bound.activeShellCommandLine() != observed)
-                            ) {
-                                cancelAndHideShellSuggestionsOnEdt(
-                                    "Active shell command changed",
-                                    SwingShellSuggestionCloseReason.INVALIDATED,
-                                    retainPresentation = automatic,
-                                )
-                            }
+                    bound.commandEditChanges.collect {
+                        if (activeSuggestionInteraction === interaction &&
+                            (session !== bound || !contextIsCurrent())
+                        ) {
+                            cancelAndHideShellSuggestionsOnEdt(
+                                "Active shell command changed",
+                                SwingShellSuggestionCloseReason.INVALIDATED,
+                                retainPresentation = automatic,
+                            )
                         }
+                    }
                 }
             }
             return interaction.takeIf { activeSuggestionInteraction === it && it.isActive }
@@ -2317,6 +2339,15 @@ public class SwingTerminal
                 cancelAndHideShellSuggestionsOnEdt("Active shell command is unavailable", SwingShellSuggestionCloseReason.INVALIDATED)
                 return null
             }
+            return beginShellSuggestionInteraction(snapshot, trigger, feedbackHandler, editTarget)
+        }
+
+        private fun beginShellSuggestionInteraction(
+            snapshot: TerminalShellCommandLineSnapshot,
+            trigger: SwingShellSuggestionTrigger,
+            feedbackHandler: SwingShellSuggestionFeedbackHandler,
+            editTarget: SwingShellSuggestionEditTarget? = null,
+        ): SwingShellSuggestionInteraction? {
             val interaction =
                 beginShellSuggestionInteraction(
                     SwingShellSuggestionRequest(snapshot.commandText, snapshot.cursorOffset),
@@ -2353,7 +2384,9 @@ public class SwingTerminal
          * This does not mount UI. Its request-specific observer is captured before collection.
          * Closing the interaction cancels collection; final visible results survive stream completion.
          * Each interaction accepts one provider collection. Combine independent sources in the provider.
-         * Provisional session input is confirmed by the shell before collecting provider results.
+         * Provisional session input is confirmed against the original captured edit context before
+         * collecting provider results. A stale context requires a new interaction; confirmation never
+         * replaces the existing handler's editing authority. Custom edit targets own that contract.
          */
         @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
@@ -2364,7 +2397,8 @@ public class SwingTerminal
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
             val scope = suggestionScope ?: return
             val bound = session
-            val snapshot = bound?.activeShellCommandLine()
+            val sessionEditContext = interaction.sessionEditContext
+            val snapshot = sessionEditContext?.commandLine ?: bound?.activeShellCommandLine()
             val requiresConfirmation =
                 snapshot?.requiresShellConfirmation == true &&
                     snapshot.commandText == interaction.request.commandText &&
@@ -2388,16 +2422,22 @@ public class SwingTerminal
             val publications = source.suggestions.flowOn(Dispatchers.Default).conflate()
             scope.launch {
                 try {
-                    if (requiresConfirmation &&
-                        bound.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset) == null
-                    ) {
-                        if (activeSuggestionInteraction === interaction) {
-                            cancelAndHideShellSuggestionsOnEdt(
-                                "Shell could not confirm suggestion input",
-                                SwingShellSuggestionCloseReason.INVALIDATED,
-                            )
+                    if (requiresConfirmation) {
+                        val confirmed =
+                            if (sessionEditContext != null) {
+                                bound?.requestShellCompletions(sessionEditContext)
+                            } else {
+                                bound?.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset)
+                            }
+                        if (confirmed == null) {
+                            if (activeSuggestionInteraction === interaction) {
+                                cancelAndHideShellSuggestionsOnEdt(
+                                    "Shell could not confirm suggestion input",
+                                    SwingShellSuggestionCloseReason.INVALIDATED,
+                                )
+                            }
+                            return@launch
                         }
-                        return@launch
                     }
                     ensureActive()
                     if (activeSuggestionInteraction !== interaction || !interaction.validateContext()) return@launch
@@ -2418,6 +2458,10 @@ public class SwingTerminal
                 } catch (failure: Exception) {
                     ensureActive()
                     reportSuggestionFailure(interaction, failure)
+                } finally {
+                    if (!interaction.isActive && activeSuggestionInteraction == null && session === bound) {
+                        suggestionScheduler?.onRequestFinished()
+                    }
                 }
             }
         }
@@ -3159,6 +3203,10 @@ public class SwingTerminal
             val interaction = activeSuggestionInteraction
             val scope = suggestionScope
             val target = activeSuggestionTarget
+            val refreshContext =
+                closeReason == SwingShellSuggestionCloseReason.INVALIDATED &&
+                    activeSuggestionIsAutomatic &&
+                    interaction?.contextIsCurrent?.invoke() == false
             val retain =
                 retainPresentation &&
                     target == null &&
@@ -3176,6 +3224,7 @@ public class SwingTerminal
                 { interaction?.close(closeReason) },
                 { if (suggestionRevision == revision && !retain) shellSuggestionController?.hide() },
                 { hideCapturedSuggestionTarget(target, revision) },
+                { if (suggestionRevision == revision && refreshContext) suggestionScheduler?.refresh() },
             )
         }
 
@@ -3271,7 +3320,6 @@ public class SwingTerminal
                     resizeAnchorRevision = viewportInteractionRevision
                 }
             }
-            var resizedGrid = false
             var anchoring = false
             var completionTransferred = false
             pendingGeometryRequests++
@@ -3296,7 +3344,7 @@ public class SwingTerminal
                             anchoring = !pixelsUpdated || resizeResultPending
                             if (anchoring) resizeResultPending = true
                         }
-                        resizedGrid = !pixelsUpdated
+                        val resizedGrid = !pixelsUpdated
                         val resizedViewport =
                             if (!anchoring) {
                                 null

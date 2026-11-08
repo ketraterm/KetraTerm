@@ -80,10 +80,9 @@ tracks remaining work. Consumer-visible changes are in the [library changelog](C
 
 ## Development
 
-Use JetBrains JDK (JBR) 25 and the included Gradle wrapper (`gradlew` /
-`gradlew.bat`). The root build selects JBR 25 for the Gradle daemon, compilation,
-tests, and application runs. Gradle can download it when needed. In IntelliJ,
-select JBR 25 as the Gradle JVM to match command-line builds.
+Use the JetBrains Runtime SDK pinned in the [runtime manifest](gradle/jbr-checksums.properties)
+and the included Gradle wrapper (`gradlew` / `gradlew.bat`). Set `JAVA_HOME` and
+IntelliJ's Gradle JVM to that SDK.
 
 ```bash
 ./gradlew :ketraterm-app:run

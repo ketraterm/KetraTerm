@@ -81,7 +81,9 @@ PowerShell bridge, a visible suffix instead produces a provisional prefix marked
 `requiresShellConfirmation`; follow the session's
 [conditional-edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
 before using it for suggestions. Use
-`session.activeShellCommandLineRevision` to observe edits; session shares one
+`session.activeShellCommandLineRevision` to observe text, cursor, availability,
+prompt context, native editing capabilities, and the visible suffix of a provisional
+snapshot. Session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session's conditional-edit APIs when admitting asynchronous suggestions.
@@ -92,9 +94,12 @@ With workspace PowerShell hooks and PSReadLine, this producer also decodes
 [native completion metadata](../docs/reference/protocol.md#private-powershell-completion-metadata).
 Call `session.requestShellCompletions(commandLine, cursorOffset)` from a caller-owned
 coroutine, or install `SessionShellCompletionProvider` from `ketraterm-ui-swing-host`
-in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
-return null; caller cancellation propagates. The native handler reads the current
-buffer and does not submit the command. Custom parser factories must explicitly
+in a completion engine. Concurrent requests for the same current editor context
+share one native query; each caller can cancel its own wait. Unsupported, stale,
+failed, or timed-out requests return null. See the session's
+[query lifecycle](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
+The native handler reads the current buffer and does not submit the command.
+Custom parser factories must explicitly
 forward the selected producer's custom OSC callback and collection limit.
 
 A prompt becomes ready after an ordered `A`/`B` pair in the primary screen.

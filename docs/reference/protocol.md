@@ -455,33 +455,68 @@ and [streaming placement](#streaming-grapheme-placement).
 The same optional producer also accepts the bounded Bash command inventory
 [described below](#private-bash-command-inventory).
 
-The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;2;... BEL`
+The optional OSC shell producer accepts `OSC 633;KetraTermCompletion;3;... BEL`
 (ST is also accepted) from the workspace's PSReadLine hook. All envelope fields
 are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+Other completion protocol versions are ignored.
 The session's default parser forwards unknown OSC bodies synchronously to the
 selected producer. Custom parser factories must forward `observeCustomOsc` and
 use `customOscPayloadLimitBytes` themselves.
 
-| Message body after `KetraTermCompletion;2;` | Meaning |
+| Message body after `KetraTermCompletion;3;` | Meaning |
 | --- | --- |
-| `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
+| `Ready;epoch` | Prompt completion hook, with 32 lowercase hexadecimal epoch characters. |
 | `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
 | `Result;epoch;id;Failed` | Correlated failure. |
 | `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
 
-The host admits at most one request per session, sending the semantic `F12,e`
-chord through ordinary ordered input. Host and hook increment their counters for
-each request. Replies must match the current prompt epoch and pending positive
-request ID. They must also match the captured command and cursor; wrong epochs
-or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
-metadata has no editing authority.
+The session assigns each query a positive signed 64-bit request ID, never reused during
+that session, including across prompt changes. It admits at most one query at a
+time and sends the ID through ordered semantic input as one frame:
+
+1. `F12,q` starts the frame.
+2. Nineteen `F12,digit` chords carry the decimal ID, padded with leading zeroes.
+3. `F12,e` commits the frame and invokes the completer.
+
+The hook echoes the supplied ID and its current prompt epoch; it keeps no
+independent request counter. Missing, incomplete, zero, overflowing, or otherwise
+invalid frames are ignored without editing the buffer or invoking completion.
+Starting a new frame or announcing `Ready` discards any partial frame. Commit
+consumes the frame once, including when validation fails, and invalid frames emit
+no reply.
+Replies must match the active prompt epoch and pending request ID, as well as
+the captured command and cursor. A request processed after a prompt change cannot
+satisfy a later query because its ID remains distinct. Wrong epochs or IDs are
+ignored; a matched malformed reply fails its query. Unsolicited result metadata
+has no editing authority.
+
+The hook samples PSReadLine's input buffer and cursor before invoking completers,
+then checks both again immediately before emitting a successful result. If either
+differs, or the final read fails, it emits `Failed` without candidates. This also
+applies when a completer throws after changing the editor. Terminal repainting
+does not itself change that buffer. The host treats this correlated buffer
+confirmation separately from its screen-derived command observation; see the
+[conditional-edit contract](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for its lifetime and final admission checks.
+
+`Ready` is accepted only within an active primary-screen OSC 133 prompt, after
+`A`; it may precede `B`. Command start/finish (`C`/`D`), a local primary-buffer
+clear, or an observed alternate-screen transition revoke the completion hook.
+A new `A` also clears the previous epoch and requires a fresh announcement.
+Prompt announcements never reset the session's request IDs. Every accepted
+announcement invalidates earlier editing contexts and pending results,
+including announcements that change only `PrefixReset`.
+The hook reinstalls its private PSReadLine bindings before each `Ready` announcement.
+Readiness advertises the prompt's hook, not completion of prompt rendering or
+PSReadLine initialization. The query handler reads the editor when the shell
+processes the completed request frame.
 
 `PrefixReset` lets acceptance clear the text before the real cursor through
 `PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same
 ordered input operation. Text after the cursor is preserved. This avoids relying
 on version-dependent Delete/Backspace behavior. The binding does not execute the
-command and preserves `LASTEXITCODE`. Its capability is cleared at each OSC 133
-prompt start and must be announced again for that prompt.
+command and preserves `LASTEXITCODE`. This capability has the same prompt lifetime
+as the completion hook.
 
 Complete custom OSC collection is capped at 256 KiB with this producer installed;
 built-in command limits remain unchanged. Replies contain at most 128 candidates,
@@ -497,14 +532,11 @@ to the same application/script path and type. Shadowing functions and aliases do
 not authorize that normalization. The command authority and catalog enrichment
 policy belongs to the [completion engine](../../ketraterm-completion/docs/completion-architecture.md#internal-implementation).
 
-Waiting expires after ten seconds, allowing cold PowerShell module discovery.
-Callers can cancel earlier. Cancelled/timed-out requests retain the wire
-slot until their reply or a new prompt, so a late result cannot satisfy a newer
-request. A replacement request can wait for that slot within its own ten-second
-deadline, then revalidate the current command buffer before sending its query.
-Native completers run in the shell and may continue after host cancellation.
-Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
-for the validation required before suggestion acceptance.
+Each caller's wait expires after ten seconds, allowing cold PowerShell module
+discovery. Callers can cancel earlier. Native completers run in the shell and may
+continue after host cancellation. See the session's
+[query lifecycle and conditional editing contract](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for shared queries, wire-slot retirement, and validation before suggestion acceptance.
 
 ## Private Bash command inventory
 

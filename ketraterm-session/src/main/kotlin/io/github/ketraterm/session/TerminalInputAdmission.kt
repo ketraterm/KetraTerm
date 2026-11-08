@@ -34,7 +34,7 @@ public enum class TerminalInputAdmission {
     /** A queue or operation budget was exceeded; nothing was admitted and the session fails closed. */
     CAPACITY_EXCEEDED,
 
-    /** The issuing session, shell revision, input, output or geometry no longer matches. */
+    /** The request no longer has current session, editor or geometry authority. */
     STALE_CONTEXT,
 
     /** The selected shell producer cannot serialize conditional editing. */

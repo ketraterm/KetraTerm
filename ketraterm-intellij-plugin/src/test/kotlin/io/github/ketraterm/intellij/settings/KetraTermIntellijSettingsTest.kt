@@ -29,7 +29,6 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
-import io.github.ketraterm.workspace.TerminalProfileKind
 import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
@@ -40,7 +39,7 @@ import java.util.concurrent.CancellationException
  */
 class KetraTermIntellijSettingsTest {
     @Test
-    fun `PowerShell keeps explicit suggestions without enabling automatic shell queries`() {
+    fun `automatic suggestions follow stored preferences for every popup mode`() {
         val service = KetraTermIntellijSettings()
         for (mode in SwingShellSuggestionAutomaticMode.entries) {
             val preferences =
@@ -51,19 +50,18 @@ class KetraTermIntellijSettingsTest {
                     shellSuggestionAutomaticMode = mode.name.lowercase(),
                 )
             service.loadState(preferences)
-            val powerShell = service.current(TerminalProfileKind.POWERSHELL)
-            assertTrue(powerShell.smartSuggestionsEnabled)
-            assertFalse(powerShell.shellSuggestionsEnabled)
-            assertEquals(mode, powerShell.shellSuggestionAutomaticMode)
-            assertTrue(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+            val settings = service.current()
+            assertTrue(settings.smartSuggestionsEnabled)
+            assertTrue(settings.shellSuggestionsEnabled)
+            assertEquals(mode, settings.shellSuggestionAutomaticMode)
             assertEquals(preferences, service.state)
             assertTrue(
                 requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java).shellSuggestionsEnabled,
             )
         }
         service.loadState(service.state.copy(shellSuggestionsEnabled = false, smartSuggestionsEnabled = false))
-        assertFalse(service.current(TerminalProfileKind.POWERSHELL).smartSuggestionsEnabled)
-        assertFalse(service.current(TerminalProfileKind.BASH).shellSuggestionsEnabled)
+        assertFalse(service.current().smartSuggestionsEnabled)
+        assertFalse(service.current().shellSuggestionsEnabled)
     }
 
     @Test

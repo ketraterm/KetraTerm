@@ -40,7 +40,8 @@ internal class TerminalCellPrimitivePainter {
             TerminalBlockElementGlyphs.canPaint(codePoint) ||
             TerminalGeometricShapeGlyphs.canPaint(codePoint) ||
             TerminalBraillePainter.canPaint(codePoint) ||
-            TerminalPowerlinePainter.canPaint(codePoint)
+            TerminalPowerlinePainter.canPaint(codePoint) ||
+            TerminalMosaicPainter.canPaint(codePoint)
 
     /**
      * Paints one supported cell-native glyph.
@@ -100,6 +101,10 @@ internal class TerminalCellPrimitivePainter {
 
                 TerminalPowerlinePainter.canPaint(codePoint) -> {
                     powerlinePainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1, nominalCellWidth)
+                }
+
+                TerminalMosaicPainter.canPaint(codePoint) -> {
+                    TerminalMosaicPainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1)
                 }
 
                 TerminalGeometricShapeGlyphs.canPaint(codePoint) -> {

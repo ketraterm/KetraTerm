@@ -286,6 +286,15 @@ tasks.test {
 }
 
 val consumerFixtureDirectory = layout.buildDirectory.dir("published-consumers")
+
+// Nested builds share the fixture's project caches, outputs, and retained-client runtimes.
+abstract class PublishedConsumerFixture : BuildService<BuildServiceParameters.None>
+
+val publishedConsumerFixture =
+    gradle.sharedServices.registerIfAbsent("publishedConsumerFixture", PublishedConsumerFixture::class) {
+        maxParallelUsages.set(1)
+    }
+
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     kotlinGradle { target("*.gradle.kts", "src/consumerTest/*.gradle.kts") }
 }
@@ -327,6 +336,7 @@ fun JavaExec.configureConsumerBuild(
             .getKotlinPluginVersion(logger),
 ) {
     dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryPublicationRepository"))
+    usesService(publishedConsumerFixture)
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
     classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
     mainClass.set("org.gradle.wrapper.GradleWrapperMain")
@@ -383,7 +393,6 @@ val verifyPublishedConsumers =
             }
         }
     }
-verifyPublishedConsumers.zipWithNext { previous, next -> next.configure { mustRunAfter(previous) } }
 
 val prepareCompiledClientRuntimes =
     listOf("gradle", "pom").flatMap { metadata ->
@@ -396,7 +405,6 @@ val prepareCompiledClientRuntimes =
             }
         }
     }
-prepareCompiledClientRuntimes.zipWithNext { previous, next -> next.configure { mustRunAfter(previous) } }
 
 val compiledClientUpgradeTest =
     tasks.register<Test>("compiledClientUpgradeTest") {

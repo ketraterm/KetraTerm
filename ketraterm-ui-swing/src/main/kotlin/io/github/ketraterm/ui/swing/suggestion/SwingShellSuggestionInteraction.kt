@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.session.TerminalCommandEditContext
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.preserveSwingFailure
 import java.util.*
@@ -87,6 +88,9 @@ public class SwingShellSuggestionInteraction(
     internal val hasPublication: Boolean get() = published
     private var sourceAttached = false
     internal var contextIsCurrent: (() -> Boolean)? = null
+
+    // Confirmation borrows the original token; the captured handler owns its cancellation.
+    internal var sessionEditContext: TerminalCommandEditContext? = null
 
     /** Current complete publication; selection changes reuse its immutable candidate list. */
     public var snapshot: SwingShellSuggestionSnapshot = SwingShellSuggestionSnapshot(this, emptyList(), -1)

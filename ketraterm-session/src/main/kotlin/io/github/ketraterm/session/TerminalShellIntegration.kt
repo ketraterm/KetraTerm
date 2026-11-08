@@ -72,10 +72,20 @@ public interface TerminalShellIntegration {
     public val commandLinePrefixResetKeys: List<TerminalKeyEvent> get() = emptyList()
 
     /**
+     * Revision of a screen-derived command observation, read under [withCommandLine].
+     * Producers advance this for observed text, cursor, availability, or layout changes,
+     * including changes away from and back to an equal observation. Authoritative host
+     * editors leave it at zero and report their updates through [withCommandLine]'s revision.
+     * Native shell confirmation can preserve editing authority across observation changes.
+     */
+    public val commandLineObservationRevision: Long get() = 0L
+
+    /**
      * Runs a short conditional-edit action under the producer's revision guard.
-     * The revision must change for every authoritative editing update, including
+     * The revision must change for every authoritative editing or prompt-capability update, including
      * changes away from and back to an equal snapshot. The callback must finish
-     * before another producer update can become visible.
+     * before another producer update can become visible. Screen-derived producers report
+     * presentation changes separately through [commandLineObservationRevision].
      *
      * Session calls this with terminal mutation serialized, before acquiring its
      * input admission monitor. Implementations must not acquire terminal state

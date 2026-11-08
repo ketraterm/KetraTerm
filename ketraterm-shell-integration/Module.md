@@ -19,7 +19,8 @@ and startup submission. The producer owns no threads or coroutine scope.
 
 `NativeCompletionProtocol` validates the bounded private OSC 633 metadata
 and publishes prompt readiness/results through the session-owned completion
-channel. Session owns key-chord admission, request lifetime, and edit validation;
+channel. It maps session-assigned request IDs to semantic request frames. Session
+owns ID allocation, admission, request lifetime, and edit validation;
 workspace owns the installed PowerShell script. The producer performs no shell I/O.
 
 `ShellCommandInventoryProtocol` assembles independent ordered, bounded shell-local and PATH snapshots,

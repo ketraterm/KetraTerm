@@ -1477,6 +1477,43 @@ class TerminalTextPainterTest {
         }
 
         @Test
+        fun `astral sextants and octants retain cell geometry in bidi and cursor painting`() {
+            val ltr = fixture().copy(metrics = SwingMetrics(7, 13, 10, 11, 6, 0, 1))
+            val rtl = fixture().copy(metrics = ltr.metrics)
+            try {
+                for (codePoint in intArrayOf(0x1FB00, 0x1FB14, 0x1FB3B, 0x1CD00, 0x1CD80, 0x1CDE5)) {
+                    val text = String(Character.toChars(codePoint))
+                    val cache = renderCache(TestRenderFrame.text(text))
+                    val bidiCache = renderCache(TestRenderFrame.text("\u05D0$text"))
+                    assertEquals(1, cache.columns)
+                    ltr.clearCell(0)
+                    rtl.clearCell(0)
+                    rtl.clearCell(1)
+                    ltr.paintRow(cache)
+                    rtl.paintRow(bidiCache)
+                    val expected = ltr.image.getRGB(0, 0, 7, 13, null, 0, 7)
+                    assertTrue(expected.any { it == TEST_RED })
+                    assertContentEquals(expected, rtl.image.getRGB(0, 0, 7, 13, null, 0, 7))
+                    ltr.clearCell(0)
+                    ltr.painter.paintCellForeground(
+                        ltr.g,
+                        cache,
+                        ltr.metrics,
+                        column = 0,
+                        row = 0,
+                        foreground = TEST_GREEN,
+                        fontRenderContext = ltr.g.fontRenderContext,
+                    )
+                    val after = ltr.image.getRGB(0, 0, 7, 13, null, 0, 7)
+                    for (i in expected.indices) assertEquals(if (expected[i] == 0) 0 else TEST_GREEN, after[i])
+                }
+            } finally {
+                ltr.g.dispose()
+                rtl.g.dispose()
+            }
+        }
+
+        @Test
         fun `geometric square meter glyphs are painted as contiguous terminal primitives`() {
             val fixture = fixture()
             val cache = renderCache(TestRenderFrame.text("\u25A0\u25A0"))

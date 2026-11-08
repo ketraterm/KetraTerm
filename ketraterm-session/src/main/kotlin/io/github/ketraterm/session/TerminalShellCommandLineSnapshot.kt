@@ -23,13 +23,15 @@ package io.github.ketraterm.session
  * a shell prediction, it may expose the prompt-to-cursor prefix with
  * [requiresShellConfirmation]. Consumers must confirm that prefix against the
  * native editor before publishing suggestions or submitting edits.
+ * A captured context may also require confirmation for complete observed text
+ * when an earlier native query left that editing state without a valid receipt.
  * A host-owned shell editor can instead supply its complete logical command
  * text and an offset anywhere in that text through [TerminalShellIntegrationFactory.host].
  * Hosts own their source's text limits and publish updates when text, cursor,
  * anchor, or availability changes. Snapshots are consumed outside paint loops.
  *
- * @property commandText command-line text without the prompt; a provisional
- * prefix when [requiresShellConfirmation] is true.
+ * @property commandText command-line text without the prompt; this may be only a
+ * provisional prefix when visible suffix text is not known to be editable.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
  * @property cursorColumn zero-based live terminal-grid cursor column to use as a
  * popup anchor.
@@ -38,7 +40,8 @@ package io.github.ketraterm.session
  * @property requiresShellConfirmation whether the text needs an exact native
  * editor-buffer match through [TerminalSession.requestShellCompletions]. Until
  * that succeeds, conditional edit admission rejects this snapshot. Confirmation
- * expires on subsequent input, output, resize, or producer changes.
+ * expires on editing input, authoritative producer changes, explicit geometry
+ * changes, cancellation, or closure; repainting and unrelated metadata do not revoke it.
  */
 public data class TerminalShellCommandLineSnapshot
     @JvmOverloads

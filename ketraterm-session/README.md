@@ -198,7 +198,18 @@ in a command-finished listener before later bounded eviction. Custom shell views
 may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 `captureCommandEdit()` and submit with `submitInput(expected, events)` so stale
-edits are rejected. If the editor provides an exact operation for clearing text
+edits are rejected. If native confirmation is required, pass that same context to
+`requestShellCompletions(expected)` before collecting suggestions. A native query
+does not count as a user edit. Its confirmed buffer remains valid across terminal
+repaints and unrelated metadata; real input, producer editing or lifecycle changes,
+resize, cancellation, and closure still invalidate it. Use
+`isCommandEditCurrent(expected)` to check retained authority without sending input;
+a current provisional context still requires native confirmation before editing.
+A failed query can make a fresh capture require confirmation even when the raw
+screen snapshot appears complete.
+When capture is temporarily unavailable, observe
+`commandEditChanges` and retry the capture; render publication alone does not
+signal that pending writes have retired. If the editor provides an exact operation for clearing text
 before the cursor, pass its key sequence as `prefixResetKeys` to the host factory.
 The captured context retains that capability alongside the command text. See
 [conditional edits](docs/session-concurrency-locks.md#conditional-command-edits)

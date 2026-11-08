@@ -22,9 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Session-issued editing context captured with a selected producer's revision.
  * Retain it from suggestion request through final admission; never recapture it
  * merely to make an old edit pass. It is specific to its issuing session and
- * becomes stale after input, output, resize or a producer update. A session-validated,
- * non-editing native completion exchange can preserve the original context when
- * the command, cursor, producer revision, and render generation remain unchanged.
+ * becomes stale after editing input, resize or an authoritative producer update.
+ * Screen-derived contexts also track the producer's observation revision. A native
+ * completion exchange can confirm the original buffer and cursor independently of repainting.
  * No writer or frame lease is retained. Acceptance still does not confirm remote execution.
  *
  * @property commandLine snapshot used to calculate editor actions. A snapshot
@@ -38,7 +38,8 @@ public class TerminalCommandEditContext internal constructor(
     prefixResetKeys: List<TerminalKeyEvent>,
     internal val owner: Any,
     internal val inputRevision: Long,
-    internal val outputRevision: Long,
+    internal val observationRevision: Long,
+    internal val geometryRevision: Long,
     internal val shellRevision: Long,
 ) {
     public val prefixResetKeys: List<TerminalKeyEvent> = copyCommandLinePrefixResetKeys(prefixResetKeys)

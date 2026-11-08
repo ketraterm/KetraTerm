@@ -20,16 +20,13 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 ## Completion and suggestions
 
 Completion is implemented and enabled by default in the standalone app and
-IntelliJ plugin. PowerShell suggestions require an explicit request; other eligible
-profiles can show automatic popups. The engine and shared popup remain
+IntelliJ plugin. The engine and shared popup remain
 [experimental](features/completion.md#stability-experimental); library consumers
 can customize or replace both. See the [completion catalog](features/completion.md)
 for supported sources, matching, learning, and UI behavior.
 
 Nested-shell integration is deliberately outside the supported scope; see
-[shell support](features/shells.md#prompt-hooks-and-completion-dialects). Automatic
-PowerShell requests are not part of the product behavior because native completers
-share the interactive shell's input and cannot be cancelled once running.
+[shell support](features/shells.md#prompt-hooks-and-completion-dialects).
 
 Remaining work:
 

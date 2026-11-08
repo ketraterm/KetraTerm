@@ -16,8 +16,10 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandInventory
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
@@ -30,7 +32,8 @@ internal class SwingShellSuggestionScheduler(
     private val edtDispatcher: CoroutineDispatcher,
     private val isFocused: () -> Boolean,
     private val isEligible: () -> Boolean,
-    private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Unit,
+    private val isRequestCurrent: () -> Boolean,
+    private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Boolean,
     private val hideSuggestions: (refreshing: Boolean) -> Unit,
     private val debounceMillis: Int = 75,
     private val minimumNonWhitespaceCharacters: Int = 2,
@@ -58,12 +61,19 @@ internal class SwingShellSuggestionScheduler(
             stop()
             return
         }
-        start(session::activeShellCommandLine, session.activeShellCommandLineRevision)
+        start(
+            session::activeShellCommandLine,
+            session.activeShellCommandLineRevision,
+            session.shellCommandInventory,
+            session.commandEditChanges,
+        )
     }
 
     internal fun start(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         shellCommandLineRevisions: StateFlow<Long>,
+        shellCommandInventory: StateFlow<TerminalShellCommandInventory?>? = null,
+        commandEditChanges: Flow<Unit>? = null,
     ) {
         checkEdt()
         if (observationJob?.isActive == true && this.shellCommandLineRevisions === shellCommandLineRevisions) return
@@ -71,6 +81,7 @@ internal class SwingShellSuggestionScheduler(
         val revision = lifecycleRevision
         this.activeCommandLine = activeCommandLine
         this.shellCommandLineRevisions = shellCommandLineRevisions
+        val initialInventory = shellCommandInventory?.value
         val observation =
             observationScope.launch(edtDispatcher + CoroutineName("swing-shell-suggestions"), start = CoroutineStart.LAZY) {
                 try {
@@ -80,8 +91,30 @@ internal class SwingShellSuggestionScheduler(
                             refreshes
                                 .debounce { if (it == null) 0L else debounceMillis.toLong() }
                                 .collect { sequence ->
-                                    if (lifecycleRevision == revision && sequence != null && sequence == refreshes.value) refreshNow()
+                                    if (lifecycleRevision == revision && sequence != null && sequence == refreshes.value) {
+                                        refreshes.value = null
+                                        refreshNow()
+                                    }
                                 }
+                        }
+                        if (shellCommandInventory != null) {
+                            launch {
+                                var previous = initialInventory
+                                shellCommandInventory.collect { inventory ->
+                                    if (lifecycleRevision != revision || inventory === previous) return@collect
+                                    previous = inventory
+                                    cancelAndHide(refreshing = true)
+                                    if (lifecycleRevision == revision) scheduleRefresh()
+                                }
+                            }
+                        }
+                        if (commandEditChanges != null) {
+                            launch {
+                                commandEditChanges.collect {
+                                    // An admission opportunity must not postpone a pending editing refresh.
+                                    if (lifecycleRevision == revision && refreshes.value == null) scheduleRefresh()
+                                }
+                            }
                         }
                         shellCommandLineRevisions.collect { commandRevision ->
                             if (lifecycleRevision != revision || commandRevision < 0L) return@collect
@@ -99,7 +132,7 @@ internal class SwingShellSuggestionScheduler(
                             }
                             invalidatedRevision = null
                             invalidatedSnapshot = null
-                            if (!initialRevision) cancelAndHide(refreshing = true)
+                            if (!initialRevision && !isRequestCurrent()) cancelAndHide(refreshing = true)
                             if (lifecycleRevision == revision) scheduleRefresh()
                         }
                     }
@@ -152,6 +185,12 @@ internal class SwingShellSuggestionScheduler(
         scheduleRefresh()
     }
 
+    /** Reconsiders an observation that changed during a request, while deduplicating an unchanged failed buffer. */
+    fun onRequestFinished() {
+        checkEdt()
+        if (refreshes.value == null) scheduleRefresh()
+    }
+
     fun onFocusLost() {
         checkEdt()
         if (observationJob != null) cancelAndHide()
@@ -190,6 +229,7 @@ internal class SwingShellSuggestionScheduler(
             return
         }
         val revision = lifecycleRevision
+        if (isRequestCurrent()) return
         val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
         if (dismissedCommandText != null && snapshot?.commandText == dismissedCommandText) return
@@ -200,7 +240,7 @@ internal class SwingShellSuggestionScheduler(
         }
         if (snapshot == lastRequest) return
         lastRequest = snapshot
-        requestSuggestions(snapshot, feedbackHandler)
+        if (!requestSuggestions(snapshot, feedbackHandler) && lifecycleRevision == revision && lastRequest === snapshot) lastRequest = null
     }
 
     private fun scheduleRefresh() {
@@ -218,7 +258,6 @@ internal class SwingShellSuggestionScheduler(
     private fun isEligibleNow(): Boolean = isFocused() && isEligible()
 
     private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
-        if (snapshot.requiresShellConfirmation) return false
         val text = snapshot.commandText
         val cursorOffset = snapshot.cursorOffset
         var nonWhitespaceCharacters = 0
