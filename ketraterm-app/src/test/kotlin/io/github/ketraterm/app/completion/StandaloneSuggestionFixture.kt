@@ -61,6 +61,7 @@ internal class StandaloneSuggestionFixture private constructor(
     private var popup: JComponent? = null
     private var window: JFrame? = null
     private var latestSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var latestRequest: SwingShellSuggestionRequest? = null
     private var viewListener: SwingShellSuggestionViewListener? = null
     private val terminal =
         SwingTerminal(
@@ -92,6 +93,7 @@ internal class StandaloneSuggestionFixture private constructor(
                     override fun suggestions(request: SwingShellSuggestionRequest) = effectiveProvider.suggestions(request)
 
                     override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        latestRequest = request
                         val source = effectiveProvider.open(request)
                         val originalFeedback = source.feedbackHandler
                         return SwingShellSuggestionSource(
@@ -150,9 +152,13 @@ internal class StandaloneSuggestionFixture private constructor(
         } catch (failure: TimeoutCancellationException) {
             val state =
                 withContext(Dispatchers.Swing) {
-                    "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}"
+                    "focused=${terminal.isFocusOwner}, popup=${terminal.currentShellSuggestionState()}; " +
+                        "latest provider request=$latestRequest; current projection=${session.activeShellCommandLine()}"
                 }
-            throw AssertionError("Expected '$replacement' for '$line'; $state; last update=$lastUpdate\n${screenText()}", failure)
+            throw AssertionError(
+                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate\n${screenText()}",
+                failure,
+            )
         }
     }
 

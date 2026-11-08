@@ -272,6 +272,55 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
+    fun `automatic requests recover when the screen changes after the scheduler samples its buffer`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            val collected = ArrayList<SwingShellSuggestionRequest>()
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collected += request
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            val stable = assertNotNull(fixture.session.activeShellCommandLine())
+            val transient = stable.copy(commandText = "git ", cursorOffset = 4, cursorColumn = 4)
+            try {
+                terminal.setShellSuggestionProvider(provider)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+
+                // One screen sample can become obsolete before the component captures its editing context.
+                fixture.afterCommandLineSample = { fixture.observeCommandLine(transient) }
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                fixture.observeCommandLine(stable)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+
+                fixture.respond(TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+
+                assertEquals(listOf(request), collected, "An unqueried scheduler sample must remain eligible after the screen settles")
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `failed confirmation reconsiders an echo completed while the request was pending`() =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
@@ -1277,6 +1326,7 @@ class SwingTerminalCompletionLifecycleTest {
             )
         private val observations = MutableStateFlow(0L)
         private var observedCommandLine = model.value
+        var afterCommandLineSample: (() -> Unit)? = null
         private lateinit var completion: TerminalShellCompletionChannel
         val session =
             TerminalSession.create(
@@ -1301,7 +1351,13 @@ class SwingTerminalCompletionLifecycleTest {
                                 override val commandLineChanges = observations
                                 override val commandLineObservationRevision: Long get() = observations.value
 
-                                override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = observedCommandLine
+                                override fun activeCommandLine(): TerminalShellCommandLineSnapshot? {
+                                    val sampled = observedCommandLine
+                                    val afterSample = afterCommandLineSample
+                                    afterCommandLineSample = null
+                                    afterSample?.invoke()
+                                    return sampled
+                                }
 
                                 override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
                                     action(0L, observedCommandLine)

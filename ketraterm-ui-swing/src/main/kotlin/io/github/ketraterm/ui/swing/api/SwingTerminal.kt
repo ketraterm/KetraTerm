@@ -2126,10 +2126,10 @@ public class SwingTerminal
                     isRequestCurrent = {
                         activeSuggestionInteraction?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
                     },
-                    requestSuggestions = { _, feedback ->
+                    requestSuggestions = { snapshot, feedback ->
                         val provider = shellSuggestionProvider
                         val target = shellSuggestionTarget
-                        val interaction = beginActiveShellSuggestionInteraction(SwingShellSuggestionTrigger.AUTOMATIC, feedback)
+                        val interaction = beginShellSuggestionInteraction(snapshot, SwingShellSuggestionTrigger.AUTOMATIC, feedback)
                         if (interaction != null) {
                             if (target != null) {
                                 try {
@@ -2331,6 +2331,15 @@ public class SwingTerminal
                 cancelAndHideShellSuggestionsOnEdt("Active shell command is unavailable", SwingShellSuggestionCloseReason.INVALIDATED)
                 return null
             }
+            return beginShellSuggestionInteraction(snapshot, trigger, feedbackHandler, editTarget)
+        }
+
+        private fun beginShellSuggestionInteraction(
+            snapshot: TerminalShellCommandLineSnapshot,
+            trigger: SwingShellSuggestionTrigger,
+            feedbackHandler: SwingShellSuggestionFeedbackHandler,
+            editTarget: SwingShellSuggestionEditTarget? = null,
+        ): SwingShellSuggestionInteraction? {
             val interaction =
                 beginShellSuggestionInteraction(
                     SwingShellSuggestionRequest(snapshot.commandText, snapshot.cursorOffset),
