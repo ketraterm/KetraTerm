@@ -167,6 +167,19 @@ class SwingColorsTest {
     }
 
     @Test
+    fun mosaicsPreserveColorsWithContrastAdjustmentEnabled() {
+        val foreground = 0xFF220000.toInt()
+        val palette = TerminalColorPalette(defaultForeground = foreground, defaultBackground = 0xFF000000.toInt())
+        for (codePoint in (0x1FB00..0x1FB3B) + (0x1CD00..0x1CDE5)) {
+            assertEquals(foreground, SwingColors.foreground(palette, TerminalRenderAttrs.pack(), codePoint, minimumContrastRatio = 3.0))
+            assertEquals(
+                SwingColors.blend(foreground, palette.defaultBackground, 0.5),
+                SwingColors.foreground(palette, TerminalRenderAttrs.pack(faint = true), codePoint, minimumContrastRatio = 3.0),
+            )
+        }
+    }
+
+    @Test
     fun foregroundBypassesContrastEnforcementForGraphicGlyphs() {
         val attrs = TerminalRenderAttrs.pack()
 

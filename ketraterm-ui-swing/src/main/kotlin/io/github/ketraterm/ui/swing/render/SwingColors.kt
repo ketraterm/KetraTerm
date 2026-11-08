@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.ui.swing.render.primitives.TerminalMosaicPainter
 import io.github.ketraterm.ui.swing.render.primitives.TerminalPowerlinePainter
 import kotlin.math.pow
 
@@ -153,7 +154,10 @@ internal object SwingColors {
         // Block Elements: U+2580..U+259F
         // Geometric Shapes: U+25A0..U+25FF
         // Braille Patterns: U+2800..U+28FF
-        return codePoint in 0x2500..0x25FF || codePoint in 0x2800..0x28FF || TerminalPowerlinePainter.canPaint(codePoint)
+        return codePoint in 0x2500..0x25FF ||
+            codePoint in 0x2800..0x28FF ||
+            TerminalPowerlinePainter.canPaint(codePoint) ||
+            TerminalMosaicPainter.canPaint(codePoint)
     }
 
     /**

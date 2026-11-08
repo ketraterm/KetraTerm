@@ -12,7 +12,7 @@ are internal; hosts configure fonts through `SwingSettings` and `SwingHostServic
 | --- | --- |
 | Compatible LTR ASCII | `drawChars` when font advances match the grid; otherwise a cached vector with explicit cell positions |
 | Contextual scripts / ordinary text in RTL runs | Contextually shaped vectors positioned by terminal-cell ownership |
-| Supported box, block, geometric, Braille, and Powerline characters | Programmatic cell primitives |
+| Supported box, block, geometric, Braille, Powerline, sextant, and octant characters | Programmatic cell primitives |
 | Emoji presentation sequences | Available platform rasterizer, then Java2D fallback |
 | Emoji bases with VS15 | Text font selection and bounded `TextLayout` with proportional cell fitting, including in RTL runs |
 | Other scalars and clusters | Bounded cached `TextLayout` fallback |
@@ -47,8 +47,18 @@ fractional scales. Separator colors bypass minimum-contrast adjustment to match
 adjoining segment backgrounds; faint intensity, selection, and cursor foreground
 still apply. Other Powerline private-use characters use ordinary font fallback.
 
+Sextants (`U+1FB00–U+1FB3B`) and octants (`U+1CD00–U+1CDE5`) fill numbered
+parts of a two-column grid with three or four rows. Shared integer boundaries
+partition each device cell without gaps or overlapping fills, including at odd
+sizes and fractional display scales. A part narrower than one device pixel may
+collapse to zero pixels; adjacent parts still partition the cell exactly. Colors
+retain the same contrast exemption as other terminal graphics. Mapping follows
+Unicode 17 character names; the pinned test data checks all 60 sextants and 230
+octants independently of the renderer's mask representation. Other legacy
+computing characters continue through font fallback.
+
 The [extended UTF-8 corpus](../../utf8-extended.txt) includes all Braille patterns,
-repeated graph rows, and all 16 geometric Powerline separators for manual checks
+repeated graph rows, all 16 geometric Powerline separators, and complete sextant/octant tables for manual checks
 with different fonts, line heights, column spacing, and display scales. Colored
 segment joins, clipping, bidi placement, and cursor repainting also have automated
 rendering tests.

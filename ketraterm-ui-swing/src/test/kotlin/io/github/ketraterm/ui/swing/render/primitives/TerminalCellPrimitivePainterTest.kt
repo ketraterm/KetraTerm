@@ -263,6 +263,45 @@ class TerminalCellPrimitivePainterTest {
         kotlin.test.assertTrue(painted > 0)
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
+    fun `complementary mosaics cover adjacent device cells once at fractional scales`(scale: Double) {
+        for ((a, b) in listOf(0x1FB00 to 0x1FB3B, 0x1CD00 to 0x1CDE3)) {
+            val image = BufferedImage(120, 120, BufferedImage.TYPE_INT_ARGB)
+            val g = image.createGraphics()
+            val metrics = SwingMetrics(7, 13, 10, 11, 6, 0, 1)
+            try {
+                g.color = Color.RED
+                g.composite =
+                    java.awt.AlphaComposite.SrcOver
+                        .derive(0.5f)
+                g.translate(0.4, 0.6)
+                g.scale(scale, scale)
+                val transform = g.transform
+                val router = TerminalCellPrimitivePainter()
+                for (row in 0..1) {
+                    for (column in 0..2) {
+                        router.paint(g, a, column, row, metrics)
+                        router.paint(g, b, column, row, metrics)
+                    }
+                }
+                assertEquals(transform, g.transform)
+            } finally {
+                g.dispose()
+            }
+            val clipLeft = kotlin.math.round(0.4).toInt()
+            val top = kotlin.math.round(0.6).toInt()
+            val clipRight = kotlin.math.round(21 * scale + 0.4).toInt()
+            val clipBottom = kotlin.math.round(26 * scale + 0.6).toInt()
+            for (y in 0 until image.height) {
+                for (x in 0 until image.width) {
+                    val expected = if (x in clipLeft until clipRight && y in top until clipBottom) 0x80FF0000.toInt() else 0
+                    assertEquals(expected, image.getRGB(x, y), "Mosaic clip at ($x,$y), scale $scale")
+                }
+            }
+        }
+    }
+
     private fun firstPaintedY(
         image: BufferedImage,
         xStart: Int,
