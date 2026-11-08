@@ -16,10 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalOptionSpec
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
@@ -31,16 +28,142 @@ import kotlin.test.assertTrue
 
 class LearnedHistoryCompletionEngineTest {
     @Test
+    fun `history supplements completion without listing every successful command`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            repeat(12) { index ->
+                store.recordCommandResult("cat file$index.txt --verbose", true, null, null, index + 1L)
+            }
+            val engine = engine(store)
+            assertTrue(engine.complete(request("ca")).none { it.source == "learned" })
+            assertTrue(engine.complete(request("cat")).none { it.source == "learned" })
+            assertTrue(engine.complete(request("cat ")).none { it.source == "learned" })
+            assertEquals(2, engine.complete(request("cat file")).count { it.source == "learned" })
+
+            repeat(10) { store.recordCommandResult("cat file4.txt --verbose", true, null, null, 50) }
+            assertTrue(engine.complete(request("cat")).none { it.source == "learned" })
+            assertTrue(engine.complete(request("cat ")).none { it.source == "learned" })
+            val favorite = engine.complete(request("cat file4")).single { it.source == "learned" }
+            assertEquals("file4.txt --verbose", favorite.replacementText)
+        }
+
+    @Test
+    fun `accepted and persisted one-off history requires a nonempty argument prefix`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            val command = "cat utf8-extended.txt -Encoding UTF8"
+            store.recordSuggestionFeedback(command, TerminalCompletionFeedbackKind.ACCEPTED, null, "file:///repo", 10)
+            store.recordCommandResult(command, true, null, "file:///repo", 20)
+            assertEquals(
+                1,
+                store
+                    .snapshot()
+                    .rankingStats
+                    .single()
+                    .successCount,
+            )
+            assertEquals(
+                1,
+                store
+                    .snapshot()
+                    .rankingStats
+                    .single()
+                    .acceptedCount,
+            )
+            val restored = TerminalCompletionLearningStore().apply { mergeSnapshot(store.snapshot()) }
+            for (learning in listOf(store, restored)) {
+                val engine = engine(learning, fileSystemProvider = fileSystemWith("utf8-extended.txt"))
+                for (shell in listOf(TerminalShellCapabilities.POWERSHELL, TerminalShellCapabilities.POSIX)) {
+                    for (line in listOf("ca", "cat", "cat ")) {
+                        val candidates = engine.complete(request(line, workingDirectoryUri = "file:///repo", shellCapabilities = shell))
+                        assertTrue(candidates.none { it.source == "learned" }, "$shell: $line: $candidates")
+                        if (line == "cat ") assertEquals("utf8-extended.txt", candidates.single { it.source == "path" }.replacementText)
+                    }
+                    val specific = engine.complete(request("cat utf8", workingDirectoryUri = "file:///repo", shellCapabilities = shell))
+                    assertEquals("utf8-extended.txt -Encoding UTF8", specific.single { it.source == "learned" }.replacementText)
+                }
+            }
+        }
+
+    @Test
+    fun `PowerShell history paths fuse equivalent active operands without losing later arguments`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            for (command in listOf("cat utf8-extended.txt -Encoding UTF8", "cat \"utf8-extended.txt\" -Encoding UTF8")) {
+                repeat(2) { store.recordCommandResult(command, true, null, "file:///repo", 10) }
+            }
+            val engine = engine(store, fileSystemProvider = fileSystemWith("utf8-extended.txt"))
+            val candidates =
+                engine.complete(
+                    request("cat utf8", workingDirectoryUri = "file:///repo", shellCapabilities = TerminalShellCapabilities.POWERSHELL),
+                )
+            assertEquals(1, candidates.count { it.source == "learned" })
+            assertEquals("utf8-extended.txt", candidates.single { it.source == "path" }.replacementText)
+            assertTrue(candidates.single { it.source == "learned" }.replacementText.endsWith(" -Encoding UTF8"))
+        }
+
+    @Test
+    fun `learned row budget does not hide live paths or remove their learning evidence`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            val files = listOf("file-a.txt", "file-b.txt", "file-c.txt", "file-d.txt")
+            for (file in files) {
+                store.recordCommandResult("cat $file", true, null, "file:///repo", 10)
+                store.recordCommandResult("cat $file --verbose", true, null, "file:///repo", 10)
+            }
+            val provider = TerminalFileSystemProvider { files.map { TerminalFileEntry(it, isDirectory = false) } }
+            val candidates =
+                engine(
+                    store,
+                    fileSystemProvider = provider,
+                ).complete(request("cat file", workingDirectoryUri = "file:///repo"))
+            assertEquals(files.toSet(), candidates.filter { it.source == "path" }.map { it.displayText }.toSet())
+            assertEquals(2, candidates.count { it.source == "learned" })
+            val cold =
+                engine(
+                    TerminalCompletionLearningStore(),
+                    fileSystemProvider = provider,
+                ).complete(request("cat file", workingDirectoryUri = "file:///repo"))
+            assertTrue(candidates.single { it.displayText == "file-a.txt" }.score > cold.single { it.displayText == "file-a.txt" }.score)
+        }
+
+    @Test
+    fun `attached path values merge equivalent history operands before later options`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            for (command in listOf("tool --path=folder/ --verbose", "tool --path=folder --verbose")) {
+                repeat(2) { store.recordCommandResult(command, true, null, null, 10) }
+            }
+            val spec =
+                TerminalCommandSpec(
+                    name = "tool",
+                    options =
+                        listOf(
+                            TerminalOptionSpec(listOf("--path"), requiresValue = true, valuePathKind = TerminalPathArgumentKind.DIRECTORY),
+                        ),
+                )
+            val candidates =
+                engine(store, commandSpecs = listOf(spec)).complete(
+                    request("tool --path=fo", shellCapabilities = TerminalShellCapabilities.POWERSHELL),
+                )
+            assertEquals(1, candidates.size)
+            assertTrue(candidates.single().replacementText.endsWith(" --verbose"))
+            assertEquals("tool --path=".length, candidates.single().replacementStartOffset)
+        }
+
+    @Test
     fun `learned ssh values cannot cross case-distinct completed options`() =
         runBlocking {
             val store = TerminalCompletionLearningStore()
-            store.recordCommandResult("ssh -L 8080:localhost:80 server", true, null, null, 10)
-            store.recordCommandResult("ssh -l alice server", true, null, null, 20)
+            repeat(2) {
+                store.recordCommandResult("ssh -L 8080:localhost:80 server", true, null, null, 10)
+                store.recordCommandResult("ssh -l alice server", true, null, null, 20)
+            }
             val engine = engine(store)
             val cases =
                 mapOf(
-                    "ssh -L " to "8080:localhost:80 server",
-                    "ssh -l " to "alice server",
+                    "ssh -L 80" to "8080:localhost:80 server",
+                    "ssh -l al" to "alice server",
                     "ssh -l AL" to "alice server",
                 )
             for (shell in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL, TerminalShellCapabilities.PLAIN)) {
@@ -165,24 +288,19 @@ class LearnedHistoryCompletionEngineTest {
 
             val otherDirectoryCandidates =
                 engine
-                    .complete(request("c", workingDirectoryUri = "$recordedDirectory/IdeaProjects/JvTerm"))
+                    .complete(request("cd I", workingDirectoryUri = "$recordedDirectory/IdeaProjects/JvTerm"))
                     .filter { it.source == "learned" }
             assertTrue(otherDirectoryCandidates.isEmpty())
 
             val matchingDirectoryCandidates =
                 engine
-                    .complete(request("c", workingDirectoryUri = "$recordedDirectory/"))
+                    .complete(request("cd I", workingDirectoryUri = "$recordedDirectory/"))
                     .filter { it.source == "learned" }
                     .mapTo(mutableSetOf()) { it.replacementText }
 
             assertEquals(
                 setOf(
-                    "cd IdeaProjects/JvTerm/",
-                    "cd /usr/bin",
-                    "cd ..",
-                    "cat relative/file.txt",
-                    "cd -- /opt/tools",
-                    "cd -- sibling",
+                    "IdeaProjects/JvTerm/",
                 ),
                 matchingDirectoryCandidates,
             )

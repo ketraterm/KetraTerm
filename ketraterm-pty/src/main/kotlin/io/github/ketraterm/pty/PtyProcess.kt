@@ -17,6 +17,7 @@ package io.github.ketraterm.pty
 
 import com.pty4j.PtyProcessBuilder
 import com.pty4j.WinSize
+import com.pty4j.windows.conpty.WinConPtyProcess
 import java.io.InputStream
 import java.io.OutputStream
 import com.pty4j.PtyProcess as Pty4jNativeProcess
@@ -24,6 +25,9 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
 internal interface PtyProcess {
     val input: InputStream
     val output: OutputStream
+
+    /** Destruction owns stream cleanup; the reader must discard stdout until the backend closes it. */
+    val requiresOutputDrainOnClose: Boolean get() = false
 
     fun foregroundProcessName(): String? = null
 
@@ -74,12 +78,25 @@ internal class Pty4jProcess(
     override val output: OutputStream
         get() = process.outputStream
 
+    // Pty4J closes ConPTY's output pipe after closing the pseudoconsole. Closing it
+    // concurrently with ReadFile can block, while stopping reads can stall console shutdown.
+    override val requiresOutputDrainOnClose: Boolean = process is WinConPtyProcess
+
     override fun isAlive(): Boolean = process.isAlive
 
     override fun waitFor(): Int = process.waitFor()
 
     override fun destroy() {
         process.destroy()
+        if (requiresOutputDrainOnClose) {
+            // TerminateProcess is asynchronous. Await the process (not its output
+            // callbacks) so close releases its working directory before returning.
+            try {
+                process.waitFor()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
     }
 
     override fun resize(

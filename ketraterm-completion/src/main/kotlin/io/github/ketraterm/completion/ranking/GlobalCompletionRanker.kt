@@ -88,6 +88,7 @@ internal class GlobalCompletionRanker {
                         localRank = candidateIndex + 1,
                         sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
                         isFallback = sourceResult.isFallback,
+                        isHistoryExpansion = sourceResult.isFallback && resolved?.addsFollowingTokens == true,
                         semanticRelevance = semanticRelevance,
                         matchRelevance = matchRelevance(request, context, candidate, resolved),
                         contextAdjustment =
@@ -110,8 +111,16 @@ internal class GlobalCompletionRanker {
             val rankedOutcomes = outcomes.values.sortedWith(OUTCOME_ORDER)
             val limit = minOf(resultLimit, rankedOutcomes.size)
             val candidates = ArrayList<TerminalCompletionCandidate>(limit)
-            for (i in 0 until limit) {
-                candidates += rankedOutcomes[i].toPublicCandidate()
+            var learnedRows = 0
+            for (outcome in rankedOutcomes) {
+                if (candidates.size == limit) break
+                // Apply the budget after semantic fusion. Learning that enriches
+                // a live result keeps its evidence and does not consume a row.
+                if (outcome.representative.isHistoryExpansion) {
+                    if (learnedRows == 2) continue
+                    learnedRows++
+                }
+                candidates += outcome.toPublicCandidate()
             }
             if (candidates != publishedCandidates) {
                 publishedCandidates = candidates
@@ -184,6 +193,7 @@ internal class GlobalCompletionRanker {
         val localRank: Int,
         val sourcePrior: Int,
         val isFallback: Boolean,
+        val isHistoryExpansion: Boolean,
         val semanticRelevance: Int,
         val matchRelevance: Int,
         val contextAdjustment: Int,

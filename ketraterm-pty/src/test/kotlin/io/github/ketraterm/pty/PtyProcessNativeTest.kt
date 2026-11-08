@@ -26,6 +26,8 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
@@ -42,6 +45,7 @@ import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 @Tag("native")
@@ -56,7 +60,7 @@ class PtyProcessNativeTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `OSC 52 harness validates real PTY request and reply bytes`(deny: Boolean) =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val script = Path.of("../tools/osc52/osc52.mjs").toAbsolutePath().normalize()
             assertTrue(Files.isRegularFile(script), "OSC 52 harness is missing")
             val expectedFile = Files.createTempFile("ketraterm-osc52-", ".txt")
@@ -98,7 +102,7 @@ class PtyProcessNativeTest {
 
     @Test
     fun `real PTY detects a running executable and clears it after exit`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             // macOS /bin/sh can exec a different shell without being a symlink.
             val session = startReadySession(unixShell = "/bin/bash")
             val expected =
@@ -172,6 +176,89 @@ class PtyProcessNativeTest {
         assertNull(session.exitCode)
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [1, 8192])
+    fun `local close releases native workers while a child is awaiting input`(readBufferSize: Int) {
+        val ready = CountDownLatch(1)
+        val outputError = AtomicReference<Throwable?>()
+        val remoteClosures = AtomicInteger()
+        val process =
+            Pty4jProcessFactory.start(
+                PtyOptions.create { draft ->
+                    draft.command =
+                        if (isWindows()) {
+                            listOf("cmd.exe", "/d", "/c") +
+                                powerShellCommand("[Console]::Out.Write([char]7); [void][Console]::ReadLine()")
+                        } else {
+                            listOf("/bin/sh", "-c", "printf '\\007'; read -r release")
+                        }
+                },
+            )
+        val connector = PtyConnector(process, readBufferSize = readBufferSize)
+        connector.use {
+            connector.start(
+                object : TerminalConnectorListener {
+                    override fun onBytes(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if ((offset until offset + length).any { bytes[it] == 7.toByte() }) ready.countDown()
+                    }
+
+                    override fun onError(error: Throwable) {
+                        outputError.set(error)
+                    }
+
+                    override fun onClosed(exitCode: Int?) {
+                        remoteClosures.incrementAndGet()
+                    }
+                },
+            )
+            assertTrue(ready.await(10, TimeUnit.SECONDS), "child did not reach its input-controlled lifetime")
+            connector.close()
+            assertTrue(connector.joinReader(10_000), "native stdout reader remained blocked after local close")
+            assertTrue(connector.joinWatcher(10_000), "process watcher remained blocked after local close")
+            assertFalse(process.isAlive())
+            assertNull(outputError.get())
+            assertEquals(0, remoteClosures.get())
+            assertNull(connector.failure)
+            assertNull(connector.exitCode)
+        }
+    }
+
+    @Test
+    fun `local close releases the process working directory before returning`(
+        @TempDir directory: Path,
+    ) {
+        val workingDirectory = Files.createDirectory(directory.resolve("working-directory"))
+        val ready = CountDownLatch(1)
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions.create { draft ->
+                    draft.command =
+                        if (isWindows()) {
+                            powerShellCommand("[Console]::Out.Write([char]7); [void][Console]::ReadLine()")
+                        } else {
+                            listOf("/bin/sh", "-c", "printf '\\007'; read -r release")
+                        }
+                    draft.workingDirectory = workingDirectory
+                    draft.eventListener =
+                        object : PtyEventListener by PtyEventListener.NONE {
+                            override fun bell(session: TerminalSession) {
+                                ready.countDown()
+                            }
+                        }
+                },
+            )
+        sessions += session
+        assertTrue(ready.await(10, TimeUnit.SECONDS))
+        session.close()
+        Files.delete(workingDirectory)
+        assertFalse(Files.exists(workingDirectory))
+        assertNull(session.exitCode)
+    }
+
     @Test
     fun `real PTY process exit sets session exit code`() {
         val session = startReadySession(exitCode = 7)
@@ -218,7 +305,7 @@ class PtyProcessNativeTest {
                 rows = 80,
                 readBufferSize = 257,
             )
-        try {
+        session.use {
             releaseAndAwaitExit(session)
             val text = session.retainedText()
             assertAll(
@@ -227,8 +314,6 @@ class PtyProcessNativeTest {
                 { assertEquals(expectedCount, text.count { it == 'x' }) },
                 { assertTrue(text.contains(marker), "final marker must be retained before closure") },
             )
-        } finally {
-            session.close()
         }
     }
 

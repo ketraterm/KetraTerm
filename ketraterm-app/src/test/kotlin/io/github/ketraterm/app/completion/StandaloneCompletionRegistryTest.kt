@@ -288,8 +288,13 @@ class StandaloneCompletionRegistryTest {
             val first = registry.openProvider(profileId = "bash") { "file:///repo" }
             val second = registry.openProvider(profileId = "bash") { "file:///repo" }
 
-            assertEquals(listOf("npm test"), first.suggestions(request("npm")).last().map { it.replacementText })
-            assertEquals(listOf("npm test"), second.suggestions(request("npm")).last().map { it.replacementText })
+            val prefix = request("npm t")
+            for (provider in listOf(first, second)) {
+                assertTrue(provider.suggestions(request("npm")).last().isEmpty())
+                val suggestion = provider.suggestions(prefix).last().single()
+                assertEquals("test", suggestion.replacementText)
+                assertEquals("npm test", suggestion.commandTextAfterReplacement(prefix))
+            }
         }
 
     @Test
@@ -477,8 +482,13 @@ class StandaloneCompletionRegistryTest {
                 workingDirectoryUri = null,
             )
 
-            assertEquals(listOf("git status"), first.suggestions(request("git")).last().map { it.replacementText })
-            assertEquals(listOf("git status"), second.suggestions(request("git")).last().map { it.replacementText })
+            val prefix = request("git s")
+            for (provider in listOf(first, second)) {
+                assertTrue(provider.suggestions(request("git")).last().isEmpty())
+                val suggestion = provider.suggestions(prefix).last().single()
+                assertEquals("status", suggestion.replacementText)
+                assertEquals("git status", suggestion.commandTextAfterReplacement(prefix))
+            }
         }
 
     @Test
@@ -493,7 +503,16 @@ class StandaloneCompletionRegistryTest {
             )
 
             val provider = registry.openProvider(profileId = "bash")
-            assertEquals(listOf("git status"), provider.suggestions(request("git")).last().map { it.replacementText })
+            assertTrue(provider.suggestions(request("git")).last().isEmpty())
+            val prefix = request("git s")
+            assertEquals(
+                "git status",
+                provider
+                    .suggestions(prefix)
+                    .last()
+                    .single()
+                    .commandTextAfterReplacement(prefix),
+            )
         }
 
     @Test
@@ -519,13 +538,15 @@ class StandaloneCompletionRegistryTest {
             )
 
             // When in repo-a
-            val repoASuggestions = provider.suggestions(request("git ")).last().map { it.replacementText }
-            assertEquals("checkout feature-a", repoASuggestions.first())
+            assertTrue(provider.suggestions(request("git ")).last().isEmpty())
+            val repoASuggestions = provider.suggestions(request("git ch")).last().map { it.replacementText }
+            assertEquals(listOf("checkout feature-a"), repoASuggestions)
 
             // Seamless OSC 7 directory transition to repo-b
             currentDirectory = "file:///repo-b"
-            val repoBSuggestions = provider.suggestions(request("git ")).last().map { it.replacementText }
-            assertEquals("checkout feature-b", repoBSuggestions.first())
+            assertTrue(provider.suggestions(request("git ")).last().isEmpty())
+            val repoBSuggestions = provider.suggestions(request("git ch")).last().map { it.replacementText }
+            assertEquals(listOf("checkout feature-b"), repoBSuggestions)
         }
 
     @Test
@@ -538,11 +559,13 @@ class StandaloneCompletionRegistryTest {
             registry.recordSuccess("build --release", profileId = "bash", workingDirectoryUri = null)
             registry.recordSuccess("build --debug", profileId = "zsh", workingDirectoryUri = null)
 
-            val bashSuggestions = bashProvider.suggestions(request("build")).last().map { it.replacementText }
-            val zshSuggestions = zshProvider.suggestions(request("build")).last().map { it.replacementText }
+            assertTrue(bashProvider.suggestions(request("build")).last().isEmpty())
+            assertTrue(zshProvider.suggestions(request("build")).last().isEmpty())
+            val bashSuggestions = bashProvider.suggestions(request("build --")).last().map { it.replacementText }
+            val zshSuggestions = zshProvider.suggestions(request("build --")).last().map { it.replacementText }
 
-            assertEquals(listOf("build --release"), bashSuggestions)
-            assertEquals(listOf("build --debug"), zshSuggestions)
+            assertEquals(listOf("--release"), bashSuggestions)
+            assertEquals(listOf("--debug"), zshSuggestions)
         }
 
     @Test

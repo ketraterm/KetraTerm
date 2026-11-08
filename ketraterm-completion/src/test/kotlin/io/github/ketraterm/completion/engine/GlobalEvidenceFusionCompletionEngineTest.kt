@@ -26,6 +26,44 @@ import kotlin.test.assertTrue
 
 class GlobalEvidenceFusionCompletionEngineTest {
     @Test
+    fun `full argument edits normalize the active PowerShell path before appended options`() =
+        runBlocking {
+            val engine =
+                engine(
+                    sources =
+                        listOf(
+                            entry(
+                                source(
+                                    candidate(
+                                        ".\\utf8-extended.txt -Encoding UTF8",
+                                        4,
+                                        4,
+                                        "history-a",
+                                        TerminalCompletionCandidateKind.PATH,
+                                    ),
+                                ),
+                                8,
+                            ),
+                            entry(
+                                source(
+                                    candidate(
+                                        "utf8-extended.txt -Encoding UTF8",
+                                        4,
+                                        4,
+                                        "history-b",
+                                        TerminalCompletionCandidateKind.PATH,
+                                    ),
+                                ),
+                                8,
+                            ),
+                        ),
+                )
+            val candidates = engine.complete(request("cat ").copy(shellCapabilities = TerminalShellCapabilities.POWERSHELL))
+            assertEquals(1, candidates.size)
+            assertEquals("utf8-extended.txt -Encoding UTF8", candidates.single().replacementText)
+        }
+
+    @Test
     fun `learned and path outcomes fuse across quoting and trailing separator`() =
         runBlocking {
             val engine =

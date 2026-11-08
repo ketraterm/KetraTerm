@@ -30,10 +30,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.*
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CancellationException
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
 class PtyConnectorTest {
@@ -558,6 +555,137 @@ class PtyConnectorTest {
         }
     }
 
+    @Test
+    fun `local close leaves backend owned input open and drains shutdown bytes without delivery`() {
+        val readEntered = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+        val inputCloses = AtomicInteger()
+        val input =
+            object : ByteArrayInputStream("shutdown output".ascii()) {
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ): Int {
+                    readEntered.countDown()
+                    releaseRead.await()
+                    return super.read(buffer, offset, length)
+                }
+
+                override fun close() {
+                    inputCloses.incrementAndGet()
+                }
+            }
+        val output = RecordingOutputStream()
+        val process = TestProcess(input = input, output = output, blockWaitFor = true, requiresOutputDrainOnClose = true)
+        val connector = createConnector(process, readBufferSize = 1)
+        val listener = RecordingListener()
+        try {
+            connector.start(listener)
+            assertTrue(readEntered.await(10, TimeUnit.SECONDS), "reader did not reach the pending read")
+            connector.close()
+            assertEquals(0, inputCloses.get(), "closing a backend-owned pipe can block against the pending native read")
+            assertEquals(0, output.closeCount, "the backend owns stdin cleanup as well")
+            releaseRead.countDown()
+            assertTrue(connector.joinReader(10_000), "reader did not finish draining shutdown output")
+            assertTrue(connector.joinWatcher(10_000), "watcher did not finish after shutdown output drained")
+            assertEquals(0, input.available(), "unread shutdown output can prevent backend cleanup")
+            assertTrue(listener.byteEvents.isEmpty())
+            assertTrue(listener.errors.isEmpty())
+            assertTrue(listener.closed.isEmpty())
+            assertNull(connector.exitCode)
+            connector.close()
+            assertEquals(1, process.destroyCount)
+            assertEquals(0, output.closeCount)
+            assertEquals(0, inputCloses.get())
+        } finally {
+            releaseRead.countDown()
+            connector.close()
+            assertTrue(connector.joinReader(10_000))
+            assertTrue(connector.joinWatcher(10_000))
+        }
+    }
+
+    @Test
+    fun `listener failure still drains backend owned output and preserves the original error`() {
+        val failure = IllegalStateException("byte listener failed")
+        val input = ByteArrayInputStream("output to discard".ascii())
+        val process = TestProcess(input = input, blockWaitFor = true, requiresOutputDrainOnClose = true)
+        val connector = createConnector(process, readBufferSize = 1)
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    super.onBytes(bytes, offset, length)
+                    throw failure
+                }
+            }
+        connector.start(listener)
+        assertTrue(connector.joinReader(10_000))
+        assertTrue(connector.joinWatcher(10_000))
+        assertEquals(0, input.available())
+        assertEquals(listOf("o"), listener.byteEvents.map { it.asciiText() })
+        assertEquals(listOf(failure), listener.errors)
+        assertEquals(listOf<Int?>(null), listener.closed)
+        assertSame(failure, connector.failure)
+        assertEquals(1, process.destroyCount)
+    }
+
+    @Test
+    fun `backend owned shutdown does not wait behind a pending native write`() {
+        val writeEntered = CountDownLatch(1)
+        val releaseWrite = CountDownLatch(1)
+        val output =
+            object : OutputStream() {
+                override fun write(value: Int) {
+                    writeEntered.countDown()
+                    releaseWrite.await()
+                }
+
+                override fun close() = fail<Unit>("the backend owns stream cleanup")
+            }
+        val process = TestProcess(input = BlockingInputStream(), output = output, blockWaitFor = true, requiresOutputDrainOnClose = true)
+        val connector = createConnector(process)
+        val listener = RecordingListener()
+        val writer = FutureTask { connector.write(byteArrayOf(1), 0, 1) }
+        val closer = FutureTask { connector.close() }
+        var closerStarted = false
+        try {
+            connector.start(listener)
+            Thread(writer, "test-pty-writer").apply { isDaemon = true }.start()
+            assertTrue(writeEntered.await(10, TimeUnit.SECONDS))
+            Thread(closer, "test-pty-closer").apply { isDaemon = true }.start()
+            closerStarted = true
+            closer.get(10, TimeUnit.SECONDS)
+            assertTrue(process.destroyed)
+            assertTrue(connector.joinReader(10_000))
+            assertTrue(connector.joinWatcher(10_000))
+            assertTrue(listener.errors.isEmpty())
+            assertTrue(listener.closed.isEmpty())
+        } finally {
+            releaseWrite.countDown()
+            writer.get(10, TimeUnit.SECONDS)
+            connector.close()
+            if (closerStarted) closer.get(10, TimeUnit.SECONDS)
+        }
+    }
+
+    @Test
+    fun `unstarted connector closes backend owned input without a reader to drain it`() {
+        val input = GatedInputStream("unread".ascii())
+        val output = RecordingOutputStream()
+        val process = TestProcess(input = input, output = output, requiresOutputDrainOnClose = true)
+        val connector = createConnector(process)
+        connector.close()
+        connector.close()
+        assertEquals(1, input.closeCount)
+        assertEquals(1, output.closeCount)
+        assertEquals(1, process.destroyCount)
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [1, 4, 8192])
     fun `process exit before the final read still delivers every byte before closure`(readBufferSize: Int) {
@@ -676,12 +804,18 @@ class PtyConnectorTest {
         assertTrue(process.destroyed)
     }
 
-    @Test
-    fun `local close releases process while a byte callback still owns its borrowed range`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `local close releases process while a byte callback still owns its borrowed range`(requiresOutputDrainOnClose: Boolean) {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val returned = CountDownLatch(1)
-        val process = TestProcess(input = ByteArrayInputStream("image".ascii()), blockWaitFor = true)
+        val process =
+            TestProcess(
+                input = ByteArrayInputStream("image".ascii()),
+                blockWaitFor = true,
+                requiresOutputDrainOnClose = requiresOutputDrainOnClose,
+            )
         val connector = createConnector(process)
         val listener =
             object : RecordingListener() {
@@ -743,6 +877,7 @@ class PtyConnectorTest {
         private val blockWaitFor: Boolean = false,
         private val waitForRelease: CountDownLatch? = null,
         private val readForegroundName: () -> String? = { null },
+        override val requiresOutputDrainOnClose: Boolean = false,
     ) : PtyProcess {
         private val destroyedSignal = CountDownLatch(1)
 

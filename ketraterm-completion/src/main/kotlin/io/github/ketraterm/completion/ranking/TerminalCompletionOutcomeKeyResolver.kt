@@ -53,9 +53,16 @@ internal class TerminalCompletionOutcomeKeyResolver {
         val tokenIdentities =
             outcomeKey(
                 tokens = tokens,
-                pathTokenIndex = activeIndex,
+                pathTokenIndex =
+                    if (context.activePosition == TerminalCompletionActivePosition.COMMAND &&
+                        candidate.kind == TerminalCompletionCandidateKind.PATH
+                    ) {
+                        activeIndex
+                    } else {
+                        originalActiveIndex
+                    },
                 pathAware = pathAware,
-                attachedOptionValue = context.attachedOptionValue != null && activeIndex == originalActiveIndex,
+                attachedOptionValue = context.attachedOptionValue != null,
                 shellCapabilities = request.shellCapabilities,
             )
         val groupKey =
@@ -72,6 +79,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
                 tokenIdentities?.getOrNull(originalActiveIndex)?.text?.let { value ->
                     if (context.attachedOptionValue == null) value else value.substringAfter('=')
                 } ?: candidate.displayText,
+            addsFollowingTokens = tokens.size > maxOf(context.commandLineContext.tokens.size, originalActiveIndex + 1),
         )
     }
 
@@ -152,4 +160,5 @@ internal data class ResolvedCompletionOutcome(
     val groupKey: List<TerminalCommandLineTokenIdentity>,
     val exactCommandLine: String,
     val activeValue: String?,
+    val addsFollowingTokens: Boolean = false,
 )

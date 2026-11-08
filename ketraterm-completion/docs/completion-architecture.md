@@ -113,7 +113,9 @@ operand count or requiredness, so it does not produce command hints. Opaque doma
 identifiers never become display labels; unnamed values use a path type or `value`.
 Fusion retains hint metadata from the strongest equivalent hint-bearing
 candidate without changing the chosen edit or ranking. Verified native command rows
-can receive catalog hints alongside descriptions; native parameter results are not
+can receive catalog hints alongside descriptions when their edit inserts only a
+command name. Complete command-line suggestions retain their supplied presentation
+without an additional catalog signature. Native parameter results are not
 given potentially incompatible catalog option hints.
 
 After any initial shell query, each request captures one compiled learning-index
@@ -286,6 +288,29 @@ Suggestion feedback never creates replay rows. Explicit dismissal supplies
 negative evidence; passive closure and rejected editing attempts should not be
 recorded as dismissal. Successful command executions are the authority for
 replay. Hosts choose whether to collect data and where to persist it.
+
+### History suggestion policy
+
+Learning contributes ranking evidence independently of whether a separate history
+row is shown. Whole-command replay supplements completion; it does not enumerate
+every successful execution at every prefix.
+
+- At command-name positions, history does not append command tails. Ordinary
+  command discovery remains eligible and retains learned ranking evidence.
+- Full-command replay requires a nonempty argument prefix. An empty argument
+  requests values, rather than an entire previously executed command tail.
+  Single-word learned values remain eligible as ordinary argument completions.
+- Frequency, recency, explicit acceptance, dismissal, and the existing host context
+  affect ranking; execution or acceptance counts never bypass the prefix rule.
+- After equivalent outcomes merge, at most two learned command expansions are
+  shown. Live results and ordinary single-word values do not consume that budget.
+  Budgeted-out histories still contribute their evidence when an equivalent live
+  edit arrives.
+
+Path equivalence applies to the original active operand even when replay appends
+options or more arguments. In PowerShell, `cat file.txt -Encoding UTF8` and
+`cat .\file.txt -Encoding UTF8` therefore share one argument-completion outcome.
+Other operands and expression spellings retain their existing identity rules.
 
 ## Command-Line Context Policy
 
