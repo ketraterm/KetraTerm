@@ -82,16 +82,7 @@ tracks remaining work. Consumer-visible changes are in the [library changelog](C
 
 Use the JetBrains Runtime SDK pinned in the [runtime manifest](gradle/jbr-checksums.properties)
 and the included Gradle wrapper (`gradlew` / `gradlew.bat`). Set `JAVA_HOME` and
-IntelliJ's Gradle JVM to that SDK. The root build requires JBR 25 for the Gradle
-daemon, compilation, tests, and application runs; automatic provisioning may
-select a different patch build.
-
-After switching SDKs, run `./gradlew --stop` (`.\gradlew.bat --stop` on Windows)
-before rebuilding so Gradle cannot reuse a daemon running an older JBR 25 patch.
-
-Shared CI uses the pinned SDK, and native installers bundle its matching runtime.
-The pin includes the [fix for a macOS graphics initialization deadlock](https://github.com/JetBrains/JetBrainsRuntime/commit/0ba3da3aa4bcdc2cbc2ed4d2f07814acf7bd76e6)
-that can freeze startup or desktop tests.
+IntelliJ's Gradle JVM to that SDK.
 
 ```bash
 ./gradlew :ketraterm-app:run

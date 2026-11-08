@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- Updated the bundled JetBrains Runtime to prevent a deadlock during macOS graphics initialization that could freeze startup.
 - Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local paths, and Git references. PowerShell suggestions remain usable across inline-prediction redraws while changed input invalidates acceptance. The popup highlights matches and shows argument hints. Settings control automatic popups and Enter acceptance; saved learning is opt-in and can be reset. See the [completion guide](../docs/features/completion.md) for shell requirements and limitations.
 - Improved shell icon readability on light and dark backgrounds, balanced logo proportions, and replaced the Command Prompt drive lettering with a clean terminal glyph.
 - Added sticky command headers, enabled by default with an independent setting. The overlay repeats the full original prompt/input row with normal terminal typography, colors and cell spacing while its output is at the viewport top. Clicking reveals the command; scrolling, grid dimensions and PTY sizing remain unchanged.
