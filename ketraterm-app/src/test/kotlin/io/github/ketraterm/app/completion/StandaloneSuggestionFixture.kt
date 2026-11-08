@@ -27,15 +27,7 @@ import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionView
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewSnapshot
+import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -72,7 +64,7 @@ internal class StandaloneSuggestionFixture private constructor(
     private var activeSnapshotRevision = -1L
     private val terminal =
         SwingTerminal(
-            settingsProvider = { settings.current(tab.profile.kind) },
+            settingsProvider = settings::current,
             hostServices =
                 SwingHostServices.create { draft ->
                     draft.shellSuggestionViewFactory =
@@ -108,7 +100,7 @@ internal class StandaloneSuggestionFixture private constructor(
                         return SwingShellSuggestionSource(
                             suggestions = source.suggestions,
                             feedbackHandler =
-                                SwingShellSuggestionFeedbackHandler { feedback ->
+                                { feedback ->
                                     originalFeedback.onSuggestionFeedback(feedback)
                                     feedbackEvents.trySend(feedback)
                                 },
@@ -340,7 +332,7 @@ internal class StandaloneSuggestionFixture private constructor(
                 created.start(decorateProvider)
                 if (setup != null) {
                     created.awaitExecution(setup)
-                    created.awaitLine("", requireShellCompletion = profile.kind == TerminalProfileKind.POWERSHELL)
+                    created.awaitLine("", requireShellCompletion = true)
                 }
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.

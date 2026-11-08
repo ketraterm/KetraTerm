@@ -352,7 +352,7 @@ internal class KetraTermTerminalPane private constructor(
             val terminal =
                 SwingTerminal(
                     settingsProvider = {
-                        KetraTermIntellijSettings.getInstance().current(tab.profile.kind).copy { draft ->
+                        KetraTermIntellijSettings.getInstance().current().copy { draft ->
                             draft.osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation()
                         }
                     },

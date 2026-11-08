@@ -37,13 +37,7 @@ internal class NativeCompletionProtocol(
     var commandLinePrefixResetKeys: List<TerminalKeyEvent> = emptyList()
         private set
 
-    fun promptStarted() {
-        canConfirmCommandLine = false
-        commandLinePrefixResetKeys = emptyList()
-        channel.clearPrompt()
-    }
-
-    fun commandStarted() {
+    fun clearPrompt() {
         canConfirmCommandLine = false
         commandLinePrefixResetKeys = emptyList()
         channel.clearPrompt()
@@ -52,29 +46,32 @@ internal class NativeCompletionProtocol(
     fun acceptsPathEpoch(epoch: String): Boolean = inventory.acceptsPathEpoch(epoch)
 
     fun clear() {
-        promptStarted()
+        clearPrompt()
         inventory.clear()
     }
 
     fun outputProcessed() = inventory.expire()
 
+    /** Returns whether an accepted announcement renewed the prompt's editing capability. */
     fun observe(
         command: Int,
         payload: ByteArray,
         offset: Int,
         length: Int,
-    ) {
-        if (command != 633 || length > MAX_PAYLOAD_BYTES) return
-        for (index in offset until offset + length) if (payload[index].toInt() !in 32..126) return
+        promptActive: Boolean,
+    ): Boolean {
+        if (command != 633 || length > MAX_PAYLOAD_BYTES) return false
+        for (index in offset until offset + length) if (payload[index].toInt() !in 32..126) return false
         val fields = String(payload, offset, length, Charsets.US_ASCII).split(';')
         if (fields.firstOrNull() == "KetraTermCommands" || fields.firstOrNull() == "KetraTermShellCommands") {
             inventory.observe(fields)
-            return
+            return false
         }
-        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "2") return
+        if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "2") return false
         val epoch = fields[3]
-        if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return
+        if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return false
         if (fields[2] == "Ready" && (fields.size == 4 || fields.size == 5 && fields[4] == "PrefixReset")) {
+            if (!promptActive) return false
             channel.ready(epoch, listOf(TerminalKeyEvent(key = TerminalKey.F12), TerminalKeyEvent(codepoint = 'e'.code)))
             canConfirmCommandLine = true
             commandLinePrefixResetKeys =
@@ -83,10 +80,10 @@ internal class NativeCompletionProtocol(
                 } else {
                     emptyList()
                 }
-            return
+            return true
         }
-        if (fields[2] != "Result" || fields.size < 6) return
-        val id = fields[4].toLongOrNull()?.takeIf { it > 0L } ?: return
+        if (fields[2] != "Result" || fields.size < 6) return false
+        val id = fields[4].toLongOrNull()?.takeIf { it > 0L } ?: return false
         val result =
             try {
                 decode(fields)
@@ -96,6 +93,7 @@ internal class NativeCompletionProtocol(
                 null
             }
         channel.respond(epoch, id, result)
+        return false
     }
 
     private fun decode(fields: List<String>): TerminalShellCompletionResult? {

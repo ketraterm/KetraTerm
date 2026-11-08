@@ -91,9 +91,7 @@ private class OscShellIntegrationSession(
         offset: Int,
         length: Int,
     ) {
-        val before = shellCompletion.canConfirmCommandLine
-        shellCompletion.observe(command, payload, offset, length)
-        if (before != shellCompletion.canConfirmCommandLine) {
+        if (shellCompletion.observe(command, payload, offset, length, promptActive = readinessPromptStarted)) {
             activeCommandLineContextRevision++
         }
     }
@@ -105,6 +103,7 @@ private class OscShellIntegrationSession(
     private val readinessFrameConsumer =
         TerminalRenderFrameConsumer { frame ->
             if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) {
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = false
                 mutablePromptReady.value = false
             }
@@ -124,6 +123,7 @@ private class OscShellIntegrationSession(
 
     override fun bufferCleared(buffer: TerminalRenderBufferKind) {
         if (buffer != TerminalRenderBufferKind.PRIMARY) return
+        shellCompletion.clearPrompt()
         readinessPromptStarted = false
         mutablePromptReady.value = false
         promptEndLineId = NO_LINE_ID
@@ -150,19 +150,20 @@ private class OscShellIntegrationSession(
         primary: Boolean,
     ) {
         if (!primary) {
+            shellCompletion.clearPrompt()
             readinessPromptStarted = false
             mutablePromptReady.value = false
             return
         }
         when (marker) {
             ShellIntegrationMarker.PROMPT_START -> {
-                shellCompletion.promptStarted()
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = true
                 mutablePromptReady.value = false
             }
             ShellIntegrationMarker.PROMPT_END -> mutablePromptReady.value = readinessPromptStarted
             ShellIntegrationMarker.COMMAND_START, ShellIntegrationMarker.COMMAND_FINISHED -> {
-                shellCompletion.commandStarted()
+                shellCompletion.clearPrompt()
                 readinessPromptStarted = false
                 mutablePromptReady.value = false
             }
@@ -458,6 +459,7 @@ private class OscShellIntegrationSession(
         private var previousRequiresShellConfirmation = false
         private var previousCursorRow = 0
         private var previousCursorColumn = 0
+        private var previousContextRevision = 0L
         private var contextRevision = 0L
         private var promptEndLineId = NO_LINE_ID
         private var promptEndColumn = 0
@@ -562,6 +564,7 @@ private class OscShellIntegrationSession(
                     previousFingerprintAvailable
                 } else {
                     !previousFingerprintAvailable ||
+                        previousContextRevision != contextRevision ||
                         previousRequiresShellConfirmation != requiresShellConfirmation ||
                         previousCursorRow != cursorRow ||
                         previousCursorColumn != cursorColumn ||
@@ -571,6 +574,7 @@ private class OscShellIntegrationSession(
             previousFingerprintAvailable = available
             previousRequiresShellConfirmation = requiresShellConfirmation
             if (available) {
+                previousContextRevision = contextRevision
                 fingerprintScratch.copyInto(previousFingerprint)
                 previousCursorRow = cursorRow
                 previousCursorColumn = cursorColumn

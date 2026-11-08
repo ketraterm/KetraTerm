@@ -35,10 +35,11 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
-    @Test
-    fun `concurrent requests for same buffer share one native query and both receive result`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `concurrent requests for same buffer share one native query and both receive result`(requiresConfirmation: Boolean) =
         runTest {
-            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+            Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation).use { fixture ->
                 val first = async { fixture.session.requestShellCompletions("git s", 5) }
                 val second = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
@@ -48,6 +49,82 @@ class TerminalShellCompletionTest {
                 val result1 = checkNotNull(first.await())
                 val result2 = checkNotNull(second.await())
                 assertSame(result1, result2)
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `cancelling either shared caller leaves the other query and edit confirmation active`(cancelFirst: Boolean) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val first = async { fixture.session.requestShellCompletions("git s", 5) }
+                val second = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                (if (cancelFirst) first else second).cancelAndJoin()
+
+                fixture.reply()
+                runCurrent()
+                assertNotNull((if (cancelFirst) second else first).await())
+                assertEquals("q", fixture.writtenText())
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["equal", "away-and-back", "input", "render"])
+    fun `same text in a changed context waits for the old query then requests its own confirmation`(change: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val old = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                when (change) {
+                    "equal" -> fixture.model.value = fixture.model.value
+                    "away-and-back" -> {
+                        val original = fixture.model.value
+                        fixture.model.value = null
+                        fixture.model.value = original
+                    }
+                    "input" -> fixture.session.submitInput(TerminalKeyEvent.text("x"))
+                    "render" -> fixture.connector.feedFromHost("x".encodeToByteArray())
+                }
+                val latest = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertFalse(latest.isCompleted)
+                assertEquals(if (change == "input") "qx" else "q", fixture.writtenText())
+
+                fixture.reply()
+                runCurrent()
+
+                assertNull(old.await(), "The old query cannot confirm the changed context")
+                assertFalse(latest.isCompleted, "Equal text cannot join an obsolete query")
+                assertEquals(if (change == "input") "qxq" else "qq", fixture.writtenText())
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(latest.await())
+            }
+        }
+
+    @Test
+    fun `duplicate readiness does not reuse request identifiers`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation = false).use { fixture ->
+                val first = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                fixture.reply()
+                runCurrent()
+                assertNotNull(first.await())
+                fixture.ready()
+
+                val next = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                fixture.reply(requestId = 1)
+                runCurrent()
+                assertFalse(next.isCompleted, "A delayed duplicate reply cannot satisfy a later query")
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(next.await())
             }
         }
 
@@ -123,7 +200,7 @@ class TerminalShellCompletionTest {
                 runCurrent()
                 assertFalse(next.isCompleted, "A stale confirmation must not return its cached native candidates")
                 assertEquals(if (change == "input") "qxq" else "qq", fixture.writtenText())
-                fixture.reply(requestId = if (change == "ready") 1 else 2)
+                fixture.reply(requestId = 2)
                 runCurrent()
                 assertNotNull(next.await())
             }
@@ -200,7 +277,7 @@ class TerminalShellCompletionTest {
                 old.cancelAndJoin()
                 val latest = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
-                advanceTimeBy(9_500)
+                advanceTimeBy(9_500.milliseconds)
                 fixture.reply()
                 runCurrent()
                 assertEquals("qq", fixture.writtenText())

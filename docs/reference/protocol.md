@@ -464,7 +464,7 @@ use `customOscPayloadLimitBytes` themselves.
 
 | Message body after `KetraTermCompletion;2;` | Meaning |
 | --- | --- |
-| `Ready;epoch` | New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero. |
+| `Ready;epoch` | Prompt completion hook, with 32 lowercase hexadecimal epoch characters. A new epoch resets the request counter to zero. |
 | `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
 | `Result;epoch;id;Failed` | Correlated failure. |
 | `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
@@ -476,12 +476,20 @@ request ID. They must also match the captured command and cursor; wrong epochs
 or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
 metadata has no editing authority.
 
+`Ready` is accepted only within an active primary-screen OSC 133 prompt, after
+`A`; it may precede `B`. Command start/finish (`C`/`D`), a local primary-buffer
+clear, or an observed alternate-screen transition revoke the completion hook.
+A new `A` also clears the previous epoch and requires a fresh announcement.
+Repeating `Ready` within the same epoch preserves the request counter. Every
+accepted announcement invalidates earlier editing contexts and pending results,
+including announcements that change only `PrefixReset`.
+
 `PrefixReset` lets acceptance clear the text before the real cursor through
 `PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same
 ordered input operation. Text after the cursor is preserved. This avoids relying
 on version-dependent Delete/Backspace behavior. The binding does not execute the
-command and preserves `LASTEXITCODE`. Its capability is cleared at each OSC 133
-prompt start and must be announced again for that prompt.
+command and preserves `LASTEXITCODE`. This capability has the same prompt lifetime
+as the completion hook.
 
 Complete custom OSC collection is capped at 256 KiB with this producer installed;
 built-in command limits remain unchanged. Replies contain at most 128 candidates,
@@ -497,14 +505,11 @@ to the same application/script path and type. Shadowing functions and aliases do
 not authorize that normalization. The command authority and catalog enrichment
 policy belongs to the [completion engine](../../ketraterm-completion/docs/completion-architecture.md#internal-implementation).
 
-Waiting expires after ten seconds, allowing cold PowerShell module discovery.
-Callers can cancel earlier. Cancelled/timed-out requests retain the wire
-slot until their reply or a new prompt, so a late result cannot satisfy a newer
-request. A replacement request can wait for that slot within its own ten-second
-deadline, then revalidate the current command buffer before sending its query.
-Native completers run in the shell and may continue after host cancellation.
-Session closure releases retained state. See [conditional editing](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
-for the validation required before suggestion acceptance.
+Each caller's wait expires after ten seconds, allowing cold PowerShell module
+discovery. Callers can cancel earlier. Native completers run in the shell and may
+continue after host cancellation. See the session's
+[query lifecycle and conditional editing contract](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for shared queries, wire-slot retirement, and validation before suggestion acceptance.
 
 ## Private Bash command inventory
 

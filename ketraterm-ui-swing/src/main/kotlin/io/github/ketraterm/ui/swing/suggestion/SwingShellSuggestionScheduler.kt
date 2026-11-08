@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandInventory
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,12 +59,13 @@ internal class SwingShellSuggestionScheduler(
             stop()
             return
         }
-        start(session::activeShellCommandLine, session.activeShellCommandLineRevision)
+        start(session::activeShellCommandLine, session.activeShellCommandLineRevision, session.shellCommandInventory)
     }
 
     internal fun start(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         shellCommandLineRevisions: StateFlow<Long>,
+        shellCommandInventory: StateFlow<TerminalShellCommandInventory?>? = null,
     ) {
         checkEdt()
         if (observationJob?.isActive == true && this.shellCommandLineRevisions === shellCommandLineRevisions) return
@@ -71,6 +73,7 @@ internal class SwingShellSuggestionScheduler(
         val revision = lifecycleRevision
         this.activeCommandLine = activeCommandLine
         this.shellCommandLineRevisions = shellCommandLineRevisions
+        val initialInventory = shellCommandInventory?.value
         val observation =
             observationScope.launch(edtDispatcher + CoroutineName("swing-shell-suggestions"), start = CoroutineStart.LAZY) {
                 try {
@@ -82,6 +85,17 @@ internal class SwingShellSuggestionScheduler(
                                 .collect { sequence ->
                                     if (lifecycleRevision == revision && sequence != null && sequence == refreshes.value) refreshNow()
                                 }
+                        }
+                        if (shellCommandInventory != null) {
+                            launch {
+                                var previous = initialInventory
+                                shellCommandInventory.collect { inventory ->
+                                    if (lifecycleRevision != revision || inventory === previous) return@collect
+                                    previous = inventory
+                                    cancelAndHide(refreshing = true)
+                                    if (lifecycleRevision == revision) scheduleRefresh()
+                                }
+                            }
                         }
                         shellCommandLineRevisions.collect { commandRevision ->
                             if (lifecycleRevision != revision || commandRevision < 0L) return@collect
@@ -218,7 +232,6 @@ internal class SwingShellSuggestionScheduler(
     private fun isEligibleNow(): Boolean = isFocused() && isEligible()
 
     private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
-        if (snapshot.requiresShellConfirmation) return false
         val text = snapshot.commandText
         val cursorOffset = snapshot.cursorOffset
         var nonWhitespaceCharacters = 0

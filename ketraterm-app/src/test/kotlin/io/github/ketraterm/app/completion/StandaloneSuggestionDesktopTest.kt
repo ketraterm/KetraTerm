@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -39,12 +40,53 @@ import java.awt.event.KeyEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 /** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
 @Tag("desktop")
 class StandaloneSuggestionDesktopTest {
+    @ParameterizedTest(name = "automatic inline prediction [{0}]")
+    @EnumSource(StandaloneSuggestionShell::class, names = ["POWERSHELL"])
+    internal fun `PowerShell automatically confirms inline predictions before showing and accepting suggestions`(
+        shell: StandaloneSuggestionShell,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            withSession(shell.profile(directory), directory) {
+                val setup =
+                    "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView; " +
+                        "[Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory(); " +
+                        "[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory('Get-ChildItem -Name ketra-popup-prediction')"
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(listOf(TerminalPasteEvent(setup), TerminalKeyEvent.key(TerminalKey.ENTER))),
+                )
+                awaitExecution(setup)
+                awaitLine("", requireShellCompletion = true)
+
+                type("Get-Chi")
+                withTimeout(15.seconds) {
+                    session.renderGeneration.first {
+                        val snapshot = session.activeShellCommandLine()
+                        snapshot?.commandText == "Get-Chi" && snapshot.cursorOffset == 7 && snapshot.requiresShellConfirmation
+                    }
+                }
+                awaitPopup("Get-Chi", "Get-ChildItem")
+                selectAndAccept("Get-ChildItem")
+                withTimeout(15.seconds) {
+                    session.renderGeneration.first {
+                        val snapshot = session.activeShellCommandLine()
+                        snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
+                    }
+                }
+                val buffer = assertNotNull(session.requestShellCompletions("Get-ChildItem", 13))
+                assertEquals("Get-ChildItem", buffer.commandLine)
+                assertEquals(13, buffer.cursorOffset)
+            }
+        }
+
     @ParameterizedTest(name = "Unicode acceptance [{0}]")
     @EnumSource(StandaloneSuggestionShell::class, names = ["WINDOWS_POWERSHELL", "POWERSHELL"])
     internal fun `PowerShell accepts a supplementary character replacement through its prefix bridge`(
@@ -83,11 +125,9 @@ class StandaloneSuggestionDesktopTest {
             withSession(shell.profile(directory), directory) {
                 type("git sta")
                 awaitLine("git sta")
-                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("git sta", "status")
                 key(KeyEvent.VK_BACK_SPACE)
                 awaitLine("git st")
-                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("git st", "status")
                 selectAndAccept("status")
                 awaitLine("git status")
@@ -118,7 +158,6 @@ class StandaloneSuggestionDesktopTest {
                 awaitLine("", requireShellCompletion = shell.isPowerShell)
                 type("ketra_smoke_e")
                 awaitLine("ketra_smoke_e")
-                if (shell.isPowerShell) requestSuggestions()
                 awaitPopup("ketra_smoke_e", "ketra_smoke_echo")
                 selectAndAccept("ketra_smoke_echo")
                 awaitLine("ketra_smoke_echo")
@@ -137,9 +176,11 @@ class StandaloneSuggestionDesktopTest {
     ): Unit =
         runBlocking {
             val profile = shell.profile(directory)
-            Files.createDirectories(directory.resolve("alpha").resolve("inside"))
-            Files.createDirectories(directory.resolve("alpine"))
-            Files.writeString(directory.resolve("also.txt"), "not a directory")
+            withContext(Dispatchers.IO) {
+                Files.createDirectories(directory.resolve("alpha").resolve("inside"))
+                Files.createDirectories(directory.resolve("alpine"))
+                Files.writeString(directory.resolve("also.txt"), "not a directory")
+            }
             withSession(profile, directory) {
                 type("cd al")
                 awaitLine("cd al")
@@ -148,7 +189,6 @@ class StandaloneSuggestionDesktopTest {
                     val source = withContext(Dispatchers.Swing) { provider.open(SwingShellSuggestionRequest("cd al", 5)) }
                     assertTrue(withTimeout(15.seconds) { source.suggestions.last() }.isEmpty())
                 } else {
-                    if (shell.isPowerShell) requestSuggestions()
                     val paths = awaitPopup("cd al", "alpha/")
                     assertTrue(paths.visibleSuggestions.none { it.displayText == "also.txt" })
                     val artifacts = Path.of(System.getProperty("terminal.test.artifactsDirectory", "build/test-artifacts/desktopTest"))
@@ -165,7 +205,6 @@ class StandaloneSuggestionDesktopTest {
                     )
                     type("cd in")
                     awaitLine("cd in")
-                    if (shell.isPowerShell) requestSuggestions()
                     awaitPopup("cd in", "inside/")
                 }
             }

@@ -132,7 +132,7 @@ internal class TerminalPane private constructor(
             return try {
                 val terminal =
                     SwingTerminal(
-                        settingsProvider = { settings.current(tab.profile.kind) },
+                        settingsProvider = settings::current,
                         hostServices =
                             SwingHostServices.create { draft ->
                                 draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD

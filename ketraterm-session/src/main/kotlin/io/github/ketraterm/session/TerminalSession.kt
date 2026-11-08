@@ -455,7 +455,7 @@ public class TerminalSession private constructor(
      * not wait for rendering or require reading the grid.
      *
      * Nonnegative values identify changes in command text, cursor offset/anchor,
-     * or snapshot availability. Treat them as opaque revisions;
+     * snapshot availability, or the producer's prompt and editing capabilities. Treat them as opaque revisions;
      * intermediate changes may be conflated. Consumers should debounce this
      * signal and call [activeShellCommandLine] when they need a command snapshot.
      * Session closure cancels tracking; collectors own their collection lifetime.
@@ -693,10 +693,10 @@ public class TerminalSession private constructor(
 
     /**
      * Queries the selected producer's live native completer for an exact buffer and UTF-16 cursor.
-     * One query may be in flight. Unsupported, busy, stale, failed, or timed-out requests return null.
-     * Cancellation propagates; its wire slot stays reserved until the old reply or a new prompt arrives.
-     * A replacement request waits for that cancelled slot within its existing timeout, then revalidates
-     * the current buffer. Concurrent requests wait for in-flight queries and reuse verified confirmation.
+     * One wire query may be in flight. Concurrent callers for the same buffer share its result;
+     * cancelling one caller does not cancel the others. Unsupported, stale, failed, or timed-out requests return null.
+     * After the last caller cancels, the wire slot stays reserved until the reply or prompt invalidation.
+     * A different-buffer request waits for retirement within its own timeout, then revalidates the current buffer.
      * A verified non-editing exchange preserves pre-query edit contexts only until subsequent input/output.
      * Provisional snapshots reuse that verified result while their exact context remains current,
      * so confirmation and candidate collection do not invoke the native completer twice.
@@ -715,39 +715,42 @@ public class TerminalSession private constructor(
         cursorOffset: Int,
     ): TerminalShellCompletionResult? {
         while (true) {
-            var activeQuery: Deferred<Unit>? = null
-            synchronized(mutationLock) {
-                activeQuery = runtime.shellCompletion.pending?.retired
-            }
-            if (activeQuery != null) {
-                activeQuery.await()
-                continue
-            }
-            val expected = captureCommandEdit() ?: return null
-            if (expected.commandLine.commandText != commandLine || expected.commandLine.cursorOffset != cursorOffset) return null
             var confirmedResult: TerminalShellCompletionResult? = null
             var retiring: Deferred<Unit>? = null
             val query =
                 try {
                     synchronized(mutationLock) {
-                        runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                        if (!isAcceptingInput()) return@synchronized null
+                        val channel = runtime.shellCompletion
+                        retiring = channel.pending?.retired
+                        if (processingOutput) return@synchronized null
+                        val integration = runtime.shellIntegration ?: return@synchronized null
+                        integration.withCommandLine { revision, snapshot ->
                             synchronized(outboundWriteLock) {
                                 if (
                                     !isAcceptingInput() ||
-                                    inputRevision != expected.inputRevision ||
-                                    outputRevision != expected.outputRevision ||
-                                    revision != expected.shellRevision ||
-                                    snapshot != expected.commandLine
+                                    snapshot == null ||
+                                    snapshot.commandText != commandLine ||
+                                    snapshot.cursorOffset != cursorOffset
                                 ) {
                                     return@synchronized null
                                 }
-                                confirmedResult = runtime.shellCompletion.confirmedResult(expected)
-                                if (confirmedResult != null) return@synchronized null
-                                retiring = runtime.shellCompletion.pending?.retired
-                                if (retiring != null) return@synchronized null
+                                val expected =
+                                    TerminalCommandEditContext(
+                                        commandLine = snapshot,
+                                        prefixResetKeys = integration.commandLinePrefixResetKeys,
+                                        owner = editContextOwner,
+                                        inputRevision = inputRevision,
+                                        outputRevision = outputRevision,
+                                        shellRevision = revision,
+                                    )
                                 var generation = 0L
                                 renderReader.readRenderFrame { generation = it.frameGeneration }
-                                val pending = runtime.shellCompletion.begin(expected, generation) ?: return@synchronized null
+                                if (channel.pending != null) return@synchronized channel.join(expected, generation)
+                                if (!outboundWriter.isIdle()) return@synchronized null
+                                confirmedResult = channel.confirmedResult(expected)
+                                if (confirmedResult != null) return@synchronized null
+                                val pending = channel.begin(expected, generation) ?: return@synchronized null
                                 outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
                                 inputRevision++
                                 pending
@@ -767,7 +770,7 @@ public class TerminalSession private constructor(
             return try {
                 query.deferred.await()
             } finally {
-                query.deferred.cancel(CancellationException("Shell completion request ended"))
+                runtime.shellCompletion.release(query)
             }
         }
     }
@@ -1431,6 +1434,7 @@ public class TerminalSession private constructor(
      * @throws IllegalStateException on reentry from an output or clear callback.
      */
     public fun clearBuffer(): Boolean {
+        var completedShellQuery: TerminalShellCompletionChannel.Pending? = null
         try {
             mutate {
                 if (isSessionClosed()) return false
@@ -1446,10 +1450,12 @@ public class TerminalSession private constructor(
                     )
                 } finally {
                     processingOutput = false
+                    completedShellQuery = finishShellCompletion()
                 }
             }
             return true
         } finally {
+            completedShellQuery?.complete()
             invalidateRender()
         }
     }
@@ -1535,28 +1541,29 @@ public class TerminalSession private constructor(
                 } finally {
                     synchronized(mutationLock) {
                         processingOutput = false
-                        if (runtime.shellCompletion.pending?.responded == true) {
-                            completedShellQuery =
-                                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
-                                    synchronized(outboundWriteLock) {
-                                        var generation = 0L
-                                        renderReader.readRenderFrame { generation = it.frameGeneration }
-                                        runtime.shellCompletion.finish(inputRevision, outputRevision, revision, snapshot, generation)
-                                    }
-                                }
-                        }
+                        completedShellQuery = finishShellCompletion()
                     }
                 }
                 submitStartupCommand()
             }
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
-        }
-        completedShellQuery?.let {
-            it.deferred.complete(it.response)
-            it.retired.complete(Unit)
+        } finally {
+            completedShellQuery?.complete()
         }
         invalidateRender(immediate = false)
+    }
+
+    // Called under mutation serialization after the complete output or local-clear operation.
+    private fun finishShellCompletion(): TerminalShellCompletionChannel.Pending? {
+        if (runtime.shellCompletion.pending?.responded != true) return null
+        return runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+            synchronized(outboundWriteLock) {
+                var generation = 0L
+                renderReader.readRenderFrame { generation = it.frameGeneration }
+                runtime.shellCompletion.finish(inputRevision, outputRevision, revision, snapshot, generation)
+            }
+        }
     }
 
     private fun submitStartupCommand() {

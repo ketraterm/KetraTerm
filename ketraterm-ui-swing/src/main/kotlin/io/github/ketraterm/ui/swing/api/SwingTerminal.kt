@@ -2170,7 +2170,7 @@ public class SwingTerminal
          * [TerminalShellCommandLineSnapshot.requiresShellConfirmation] through
          * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
          * before collecting a provider; conditional session admission also rejects unconfirmed edits.
-         * Automatic interactions reject provisional session text instead of querying the shell to confirm it.
+         * Automatic and explicit provider requests use the same native confirmation before collecting suggestions.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -2198,7 +2198,6 @@ public class SwingTerminal
                 bound?.activeShellCommandLine()?.takeIf {
                     it.commandText == effectiveRequest.commandText && it.cursorOffset == effectiveRequest.cursorOffset
                 }
-            if (automatic && observed?.requiresShellConfirmation == true) return null
             val revision = suggestionRevision + 1
             cancelAndHideShellSuggestionsOnEdt(
                 "Shell suggestion request replaced",
@@ -3271,7 +3270,6 @@ public class SwingTerminal
                     resizeAnchorRevision = viewportInteractionRevision
                 }
             }
-            var resizedGrid = false
             var anchoring = false
             var completionTransferred = false
             pendingGeometryRequests++
@@ -3296,7 +3294,7 @@ public class SwingTerminal
                             anchoring = !pixelsUpdated || resizeResultPending
                             if (anchoring) resizeResultPending = true
                         }
-                        resizedGrid = !pixelsUpdated
+                        val resizedGrid = !pixelsUpdated
                         val resizedViewport =
                             if (!anchoring) {
                                 null

@@ -26,6 +26,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -258,17 +259,62 @@ class SessionShellCompletionProviderTest {
         }
 
     @Test
-    fun `busy installed hook returns no unverified command candidates`() =
+    fun `concurrent provider requests share the native candidates without a second query`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
                 val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POWERSHELL)
                 val context = TerminalCompletionContext.resolve(request)
                 val first = async { fixture.source.complete(request, context, 10) }
+                val second = async { fixture.source.complete(request, context, 1) }
                 runCurrent()
-                assertEquals(emptyList(), fixture.source.complete(request, context, 10)?.candidates)
-                fixture.respond(TerminalShellCompletionResult("tool", 4, 0, 4, emptyList()))
+                assertFalse(first.isCompleted)
+                assertFalse(second.isCompleted)
+                assertEquals("e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+                fixture.respond(
+                    TerminalShellCompletionResult(
+                        "tool",
+                        4,
+                        0,
+                        4,
+                        listOf(
+                            TerminalShellCompletionCandidate("toolbox", "toolbox", "", TerminalShellCompletionKind.COMMAND),
+                            TerminalShellCompletionCandidate("toolkit", "toolkit", "", TerminalShellCompletionKind.COMMAND),
+                        ),
+                    ),
+                )
                 runCurrent()
-                assertEquals(emptyList(), first.await()?.candidates)
+
+                assertEquals(listOf("toolbox", "toolkit"), assertNotNull(first.await()).candidates.map { it.replacementText })
+                assertEquals(listOf("toolbox"), assertNotNull(second.await()).candidates.map { it.replacementText })
+                assertEquals("e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @Test
+    fun `cancelling the initiating provider does not cancel another consumer of its native query`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), "tool").use { fixture ->
+                val request = TerminalCompletionRequest("tool", 4, shellCapabilities = TerminalShellCapabilities.POWERSHELL)
+                val context = TerminalCompletionContext.resolve(request)
+                val first = async { fixture.source.complete(request, context, 10) }
+                val second = async { fixture.source.complete(request, context, 10) }
+                runCurrent()
+                first.cancelAndJoin()
+                assertFalse(second.isCompleted)
+
+                fixture.respond(
+                    TerminalShellCompletionResult(
+                        "tool",
+                        4,
+                        0,
+                        4,
+                        listOf(TerminalShellCompletionCandidate("toolbox", "toolbox", "", TerminalShellCompletionKind.COMMAND)),
+                    ),
+                )
+                runCurrent()
+
+                assertEquals(listOf("toolbox"), assertNotNull(second.await()).candidates.map { it.replacementText })
+                assertEquals("e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
             }
         }
 

@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.session.TerminalShellCommandInventory
+import io.github.ketraterm.session.TerminalShellCommandInventoryStatus
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,30 +28,89 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
     @Test
-    fun `automatic requests require confirmed command text and resume when it becomes available`() =
+    fun `late inventory changes refresh unchanged text without duplicating the initial request`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
-            fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.inventory.value = TerminalShellCommandInventory(emptyList(), TerminalShellCommandInventoryStatus.PENDING)
             fixture.start()
             runCurrent()
             advanceTimeBy(75.milliseconds)
             runCurrent()
-            assertTrue(fixture.requests.isEmpty())
+            assertEquals(1, fixture.requests.size)
+
+            fixture.inventory.value = TerminalShellCommandInventory(emptyList())
+            runCurrent()
+            advanceTimeBy(74.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+            advanceTimeBy(1.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s"), snapshot("git s")), fixture.requests)
+
+            fixture.inventory.value = null
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(3, fixture.requests.size)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `inventory refresh preserves pending input and explicit dismissal suppression`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            fixture.scheduler.onInvalidated()
+            fixture.inventory.value = TerminalShellCommandInventory(emptyList())
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.requests.size)
+
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.requests.size)
+
+            fixture.scheduler.onInvalidated(dismissed = true)
+            fixture.revisions.value++
+            fixture.inventory.value = TerminalShellCommandInventory(emptyList())
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.requests.size)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `automatic requests schedule provisional prefixes for native confirmation`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            val provisional = snapshot("git s").copy(requiresShellConfirmation = true)
+            fixture.active = provisional
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(provisional), fixture.requests)
 
             fixture.active = snapshot("git s")
             fixture.revisions.value = 1
             runCurrent()
             advanceTimeBy(75.milliseconds)
             runCurrent()
-            assertEquals(listOf(snapshot("git s")), fixture.requests)
+            assertEquals(listOf(provisional, snapshot("git s")), fixture.requests)
 
             fixture.active = snapshot("git s").copy(requiresShellConfirmation = true)
             fixture.revisions.value = 2
             runCurrent()
             advanceTimeBy(75.milliseconds)
             runCurrent()
-            assertEquals(1, fixture.requests.size)
-            assertFalse(fixture.refreshing.last())
+            assertEquals(listOf(provisional, snapshot("git s"), provisional), fixture.requests)
             fixture.scheduler.stop()
         }
 
@@ -390,6 +451,7 @@ class SwingShellSuggestionSchedulerTest {
 
             assertEquals(0, fixture.revisions.subscriptionCount.value)
             assertEquals(hides, fixture.hideCount)
+            assertEquals(0, fixture.inventory.subscriptionCount.value)
             assertTrue(fixture.requests.isEmpty())
             assertTrue(backgroundScope.isActive)
         }
@@ -405,6 +467,7 @@ class SwingShellSuggestionSchedulerTest {
             fixture.scheduler.start({ snapshot("ls -a") }, next)
             runCurrent()
             assertEquals(0, fixture.revisions.subscriptionCount.value)
+            assertEquals(0, fixture.inventory.subscriptionCount.value)
             assertEquals(1, next.subscriptionCount.value)
             fixture.revisions.value = 1
             advanceTimeBy(74.milliseconds)
@@ -598,6 +661,7 @@ class SwingShellSuggestionSchedulerTest {
         minimumNonWhitespaceCharacters: Int = 2,
     ) {
         val revisions = MutableStateFlow(0L)
+        val inventory = MutableStateFlow<TerminalShellCommandInventory?>(null)
         var active: TerminalShellCommandLineSnapshot? = snapshot("git s")
         var focused = true
         var eligible = true
@@ -626,7 +690,7 @@ class SwingShellSuggestionSchedulerTest {
                 minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
             )
 
-        fun start() = scheduler.start({ active }, revisions)
+        fun start() = scheduler.start({ active }, revisions, inventory)
     }
 
     private companion object {

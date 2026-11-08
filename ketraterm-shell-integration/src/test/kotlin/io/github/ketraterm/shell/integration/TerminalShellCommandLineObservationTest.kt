@@ -33,6 +33,25 @@ import org.junit.jupiter.api.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCommandLineObservationTest {
     @Test
+    fun `native epoch and prefix reset changes publish a new editing revision`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                fixture.feed("\u001b]133;A\u0007PS> \u001b]133;B\u0007Get-Chi")
+                runCurrent()
+                val snapshot = fixture.session.activeShellCommandLine()
+                var revision = fixture.session.activeShellCommandLineRevision.value
+                for (capability in listOf("a".repeat(32), "${"a".repeat(32)};PrefixReset", "${"b".repeat(32)};PrefixReset")) {
+                    fixture.feed("\u001b]633;KetraTermCompletion;2;Ready;$capability\u0007")
+                    runCurrent()
+                    assertEquals(snapshot, fixture.session.activeShellCommandLine())
+                    assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+                    revision = fixture.session.activeShellCommandLineRevision.value
+                }
+            }
+        }
+
+    @Test
     fun `prediction visibility changes confirmation state without changing typed text`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
@@ -183,7 +202,7 @@ class TerminalShellCommandLineObservationTest {
         }
 
     @Test
-    fun `revisions change only for command text cursor or availability`() =
+    fun `command text cursor and availability publish revisions while visual styling does not`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 val revisions = mutableListOf<Long>()

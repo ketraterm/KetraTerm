@@ -138,7 +138,7 @@ claim that coverage. Example from the repository root:
 
 The current suggestion scenarios drive component key handlers with live shells;
 they do not verify OS keyboard injection or packaged application installation.
-PowerShell scenarios request suggestions explicitly through the component API;
-POSIX shell scenarios exercise automatic suggestions.
+The suggestion scenarios exercise automatic popups through the product settings,
+including PowerShell profiles with PSReadLine.
 Such tests should use the same desktop execution contract when added, with their
 actual launch and input mechanisms documented in their owning fixture.

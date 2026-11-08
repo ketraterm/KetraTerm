@@ -239,11 +239,12 @@ for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
-Automatic requests require an unambiguous command snapshot and do not perform
-native shell confirmation of screen-derived prefixes. Explicit requests may
-confirm such a prefix through the session. Hosts using a provider that invokes
-the live shell should disable automatic popups for that provider, as the products
-do for PowerShell.
+Late shell-command inventory updates refresh eligible automatic suggestions after
+the normal debounce, even when the typed text is unchanged.
+Automatic and explicit requests both capture the current editing context before
+provider work. A screen-derived prefix requiring shell confirmation is queried
+through the session's installed native hook before collecting suggestions. If
+the hook cannot confirm the exact buffer and cursor, suggestions stay unavailable.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for
 parameter-only automatic requests. The shared completion adapter forwards it

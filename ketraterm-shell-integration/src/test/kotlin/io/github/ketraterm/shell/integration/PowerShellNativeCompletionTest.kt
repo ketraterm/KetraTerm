@@ -38,6 +38,49 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
     @Test
+    fun `completion readiness is accepted only within a primary prompt`() =
+        runTest {
+            for (boundary in listOf("\u001b]133;C\u0007", "\u001b]133;D;0\u0007", "\u001b[?1049h")) {
+                Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                    assertTrue(fixture.session.shellCompletionAvailable)
+                    fixture.feed(boundary)
+                    assertFalse(fixture.session.shellCompletionAvailable)
+                    fixture.feed(ready("b".repeat(32)))
+                    assertFalse(fixture.session.shellCompletionAvailable)
+                    assertNull(fixture.session.requestShellCompletions("Get-Chi", 7))
+                    runCurrent()
+                    assertTrue(fixture.connector.writtenBytes.isEmpty())
+                }
+            }
+        }
+
+    @Test
+    fun `local primary clear retires completion without awaiting further output`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                assertFalse(query.isCompleted)
+                assertTrue(fixture.session.clearBuffer())
+                runCurrent()
+                assertFalse(fixture.session.shellCompletionAvailable)
+                assertTrue(query.isCompleted)
+                assertNull(query.await())
+                fixture.feed(ready("b".repeat(32)))
+                assertFalse(fixture.session.shellCompletionAvailable)
+
+                fixture.feed("\u001b]133;A\u0007PS> \u001b]133;B\u0007Get-Chi")
+                for (byte in ready("c".repeat(32)).toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                assertTrue(fixture.session.shellCompletionAvailable)
+                val next = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi", epoch = "c".repeat(32)))
+                runCurrent()
+                assertNotNull(next.await())
+            }
+        }
+
+    @Test
     fun `visible prediction requires exact native confirmation before editing`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
@@ -323,6 +366,29 @@ class PowerShellNativeCompletionTest {
                 it.feed(reply("Get-Chi", epoch = "b".repeat(32)))
                 runCurrent()
                 assertNotNull(next.await())
+            }
+        }
+
+    @Test
+    fun `repeated readiness for the same epoch never reuses a request id`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val first = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi"))
+                runCurrent()
+                assertNotNull(first.await())
+
+                fixture.feed(ready())
+                val second = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi", id = 1))
+                runCurrent()
+                assertFalse(second.isCompleted)
+                fixture.feed(reply("Get-Chi", id = 2))
+                runCurrent()
+                assertNotNull(second.await())
+                assertEquals("\u001b[24~e\u001b[24~e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
             }
         }
 

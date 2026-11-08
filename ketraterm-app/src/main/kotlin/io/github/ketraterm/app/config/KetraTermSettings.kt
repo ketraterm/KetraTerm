@@ -22,7 +22,6 @@ import io.github.ketraterm.host.TerminalClipboardPolicy
 import io.github.ketraterm.host.TerminalTitlePolicy
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.workspace.TerminalProfileKind
 import java.awt.Font
 import java.nio.file.Path
 import java.util.*
@@ -58,8 +57,8 @@ internal class KetraTermSettings(
     val commandCompletionStatsPath: Path
         get() = configManager.configPath.resolveSibling(TerminalCompletionLearningCoordinator.currentFileName())
 
-    /** PowerShell completion is explicit; deriving pane settings never changes stored preferences. */
-    fun current(profileKind: TerminalProfileKind? = null): SwingSettings {
+    /** Derives pane settings without changing stored preferences. */
+    fun current(): SwingSettings {
         val config = config
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
         return SwingSettings.create { draft ->
@@ -77,7 +76,7 @@ internal class KetraTermSettings(
             draft.stickyCommandHeadersEnabled = config.stickyCommandHeadersEnabled
             draft.lineHeight = config.lineHeight
             draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
-            draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled && profileKind != TerminalProfileKind.POWERSHELL
+            draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled
             draft.shellSuggestionAutomaticMode = config.shellSuggestionAutomaticMode
             draft.acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter
             draft.scrollOnOutput = config.scrollOnOutput

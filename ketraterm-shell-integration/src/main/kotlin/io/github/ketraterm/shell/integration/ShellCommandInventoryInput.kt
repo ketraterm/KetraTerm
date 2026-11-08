@@ -83,7 +83,7 @@ public class ShellCommandInventoryInput : AutoCloseable {
                 current.context.withTerminalState {
                     if (binding !== current || closed.get()) return@withTerminalState true
                     if (!current.protocol.acceptsPathEpoch(epoch)) return@withTerminalState false
-                    current.protocol.observe(633, bytes, offset + OSC_PREFIX_BYTES, end - offset - OSC_PREFIX_BYTES)
+                    current.protocol.observe(633, bytes, offset + OSC_PREFIX_BYTES, end - offset - OSC_PREFIX_BYTES, promptActive = false)
                     true
                 }
             if (!accepted) return false

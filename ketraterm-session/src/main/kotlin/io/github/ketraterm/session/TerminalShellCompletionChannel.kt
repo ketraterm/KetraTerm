@@ -65,7 +65,11 @@ public class TerminalShellCompletionChannel internal constructor(
         }
     }
 
-    /** Installs a prompt-scoped epoch and its non-executing completion key chord. */
+    /**
+     * Installs a prompt-scoped epoch and its non-executing completion key chord.
+     * Refreshing the same epoch invalidates confirmation but preserves its request sequence.
+     * Calls after session closure are ignored.
+     */
     public fun ready(
         epoch: String,
         requestInput: List<TerminalInputEvent>,
@@ -73,9 +77,10 @@ public class TerminalShellCompletionChannel internal constructor(
         require(epoch.length in 1..128 && epoch.all { it.isLetterOrDigit() })
         require(requestInput.isNotEmpty() && requestInput.size <= 4)
         synchronized(lock) {
+            if (closed) return
+            if (this.epoch != epoch) nextRequestId = 0L
             this.epoch = epoch
             this.requestInput = requestInput.toList()
-            nextRequestId = 0L
             receipt = null
             pending?.apply {
                 responded = true
@@ -102,9 +107,36 @@ public class TerminalShellCompletionChannel internal constructor(
         expected: TerminalCommandEditContext,
         frameGeneration: Long,
     ): Pending? {
-        if (epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
+        if (closed || epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
         receipt = null
         return Pending(++nextRequestId, expected, requestInput, frameGeneration).also { pending = it }
+    }
+
+    /** Called under session mutation serialization; cancellation owns a waiter, never another caller's result. */
+    internal fun join(
+        expected: TerminalCommandEditContext,
+        frameGeneration: Long,
+    ): Pending? {
+        val current = pending ?: return null
+        if (current.waiters == 0 ||
+            current.responded ||
+            current.editInvalidated ||
+            expected.inputRevision != current.expected.inputRevision + 1 ||
+            expected.shellRevision != current.expected.shellRevision ||
+            expected.prefixResetKeys != current.expected.prefixResetKeys ||
+            expected.commandLine != current.expected.commandLine ||
+            frameGeneration != current.frameGeneration
+        ) {
+            return null
+        }
+        current.waiters++
+        return current
+    }
+
+    internal fun release(current: Pending) {
+        synchronized(lock) {
+            current.waiters--
+        }
     }
 
     internal fun finish(
@@ -118,7 +150,7 @@ public class TerminalShellCompletionChannel internal constructor(
         pending = null
         val result = current.response
         val expected = current.expected
-        if (current.deferred.isActive &&
+        if (current.waiters > 0 &&
             result != null &&
             !current.editInvalidated &&
             inputRevision == expected.inputRevision + 1 &&
@@ -181,12 +213,19 @@ public class TerminalShellCompletionChannel internal constructor(
         val frameGeneration: Long,
     ) {
         val deferred = CompletableDeferred<TerminalShellCompletionResult?>()
+        var waiters = 1
 
         // Consumer cancellation does not mean that the shell has consumed its request.
         val retired = CompletableDeferred<Unit>()
         var responded = false
         var response: TerminalShellCompletionResult? = null
         var editInvalidated = false
+
+        // Resume consumers only after releasing session locks.
+        fun complete() {
+            deferred.complete(response)
+            retired.complete(Unit)
+        }
     }
 
     private class Receipt(
