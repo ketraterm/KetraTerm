@@ -43,6 +43,8 @@ reads. Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly.</p>
 <p><code>GridPainter</code> owns image composition and its raster cache. Installing a frame
 prepares rasters by immutable resource identity and reserves text-row scratch; paint reuses them.
+Painters share <code>TerminalDeviceGeometry</code>&#39;s device-edge rounding and exact clip
+intersection; see <a href="docs/swing-repaint-optimization.html#device-pixel-alignment">device-pixel alignment</a>.
 <code>TerminalTextRunStyle</code> shares selection precedence with the selection painter and owns
 a bounded primitive contrast cache. See <a href="docs/color-customization.html">color customization</a>.
 Rebinding,
@@ -105,12 +107,12 @@ public consumption and ABI checks are described below.</p>
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
 <h2 id="consumer-and-abi-verification">Consumer and ABI verification</h2>
-<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
+<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/17adeae6480032f7dedf62d2cc0b2a1ef09c6258/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
 <pre><code class="language-shell">./gradlew :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 </code></pre>
 <p>See the <a href="../docs/library/compatibility.html">compatibility contract</a> before updating ABI baselines.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/17adeae6480032f7dedf62d2cc0b2a1ef09c6258/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
