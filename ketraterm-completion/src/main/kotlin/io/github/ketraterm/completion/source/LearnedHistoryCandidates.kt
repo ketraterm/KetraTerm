@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
+import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
@@ -35,16 +36,23 @@ internal fun appendLearnedHistoryCandidates(
     directoryDetail: String,
     pathDetail: String,
 ) {
+    // Executable completion uses live discovery and learned ranking, not full command replay.
+    if (completionContext.activePosition == TerminalCompletionActivePosition.COMMAND) return
     val requestContext = CompletionLearningContextKey.from(request)
     for (indexed in index.matching(lineContext, requestContext)) {
-        val entry = indexed.stats
+        val addsFollowingTokens =
+            indexed.lineContext.tokens.size > lineContext.activeTokenIndex + 1 &&
+                lineContext.tokens.size <= lineContext.activeTokenIndex + 1
+        // An empty argument is a request for values. Usage counts and prior
+        // acceptance cannot turn it into a request for an entire command tail.
+        if (completionContext.activePrefix.isEmpty() && addsFollowingTokens) continue
         projectLearnedCommandCandidate(
             request = request,
             requestLine = lineContext,
             completionContext = completionContext,
             learnedCommand = indexed.replay.commandLine,
             source = SOURCE_LEARNED,
-            score = entry.localScore(nowEpochMillis),
+            score = indexed.stats.localScore(nowEpochMillis),
             commandDetail = commandDetail,
             directoryDetail = directoryDetail,
             pathDetail = pathDetail,

@@ -420,7 +420,17 @@ internal class MergedCompletionEngine(
                 candidate.detail.isBlank() -> description
                 else -> description + "\n" + candidate.detail
             }
-        return candidate.copy(detail = detail, argumentHint = candidate.argumentHint.ifEmpty { spec.argumentHint() })
+        if (candidate.argumentHint.isNotEmpty() || spec.positionalArguments.isEmpty()) return candidate.copy(detail = detail)
+        val replacement =
+            TerminalCommandLineTokenizer.parse(
+                candidate.replacementText,
+                candidate.replacementText.length,
+                request.shellCapabilities.syntax,
+            )
+        // Catalog signatures describe a command name. A complete history edit
+        // already supplies operands and must not appear to require another one.
+        val hint = if (replacement.canReplay && replacement.tokens.size == 1) spec.argumentHint() else ""
+        return candidate.copy(detail = detail, argumentHint = hint)
     }
 
     private fun commandSpec(
