@@ -16,10 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.testing.shellProvider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
@@ -31,6 +28,34 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShellAwareCompletionEngineTest {
+    @Test
+    fun `catalog operand hints describe command names without being appended to full command suggestions`() =
+        runTest {
+            val spec =
+                TerminalCommandSpec(
+                    name = "cat",
+                    positionalArguments = listOf(TerminalArgumentSpec(name = "file", isOptional = true, isVariadic = true)),
+                )
+            for (replacement in listOf("cat", "cat .\\utf8-extended.txt -Encoding UTF8", "cat 'my file.txt'")) {
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        sources =
+                            listOf(
+                                TerminalCompletionSourceEntry({ _, _, _ ->
+                                    listOf(candidate(replacement, 2, "host", TerminalCompletionCandidateKind.COMMAND))
+                                }),
+                            ),
+                        commandSpecs = listOf(spec),
+                        shellProvider =
+                            shellProvider { _, _, _ ->
+                                listOf(candidate("cat", 2, "powershell", TerminalCompletionCandidateKind.COMMAND))
+                            },
+                    )
+                val result = engine.completions(request("ca")).last().single { it.replacementText == replacement }
+                assertEquals(if (replacement == "cat") "[file]" else "", result.argumentHint, replacement)
+            }
+        }
+
     @Test
     fun `unrecognized options use authoritative argument values without filesystem or history guesses`() =
         runTest {

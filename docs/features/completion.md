@@ -31,6 +31,13 @@ arguments, while Ctrl+Space can still complete an executable name. Standalone us
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Library hosts enable and configure their own provider and presentation.
 
+History suggestions are selective: command names use ordinary discovery, and
+full-command replay requires a nonempty argument prefix. Running or accepting a
+command does not make its full history entry appear after an empty argument.
+Whole-command replays have a small row budget; learned ranking continues to
+influence live results. See the
+[history suggestion policy](../../ketraterm-completion/docs/completion-architecture.md#history-suggestion-policy).
+
 Use **Reset learned suggestions...** in settings to clear learned commands and
 ranking preferences. See [saved learning and reset behavior](../reference/storage.md#completion-learning).
 
