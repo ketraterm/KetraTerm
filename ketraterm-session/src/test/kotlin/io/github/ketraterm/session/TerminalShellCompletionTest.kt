@@ -19,14 +19,8 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.TerminalInputAdmission.*
 import io.github.ketraterm.testkit.MockConnector
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -35,6 +29,117 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `context query invalidates its original capture after queued or drained terminal output`(drainedBeforeQuery: Boolean) =
+        runTest {
+            val io = StandardTestDispatcher(TestCoroutineScheduler())
+            Fixture(StandardTestDispatcher(testScheduler), ioDispatcher = io).use { fixture ->
+                io.scheduler.runCurrent()
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                runCurrent()
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val revision = fixture.session.activeShellCommandLineRevision.value
+                fixture.connector.feedFromHost("\u001b[6n".encodeToByteArray())
+                if (drainedBeforeQuery) io.scheduler.runCurrent()
+                val query = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                assertFalse(query.isCompleted)
+
+                io.scheduler.runCurrent()
+                runCurrent()
+                io.scheduler.runCurrent()
+                assertEquals("\u001b[1;1Rq", fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+
+                assertNull(query.await(), "The reply cannot renew an edit captured before unrelated output")
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                val fresh = checkNotNull(fixture.session.captureCommandEdit())
+                val next = async { fixture.session.requestShellCompletions(fresh) }
+                runCurrent()
+                assertNotNull(next.await())
+                assertEquals("\u001b[1;1Rq", fixture.writtenText(), "The fresh context reuses the valid native receipt")
+                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+            }
+            io.scheduler.runCurrent()
+        }
+
+    @Test
+    fun `foreign and cancelled edit contexts cannot start native queries`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            Fixture(dispatcher).use { fixture ->
+                Fixture(dispatcher).use { other ->
+                    val foreign = checkNotNull(other.session.captureCommandEdit())
+                    val cancelled = checkNotNull(fixture.session.captureCommandEdit())
+                    cancelled.cancel()
+                    assertNull(fixture.session.requestShellCompletions(foreign))
+                    assertNull(fixture.session.requestShellCompletions(cancelled))
+                    runCurrent()
+                    assertEquals("", fixture.writtenText())
+                    assertEquals("", other.writtenText())
+                }
+            }
+        }
+
+    @Test
+    fun `native query waits for a queued terminal reply after initial edit capture`() =
+        runTest {
+            val io = StandardTestDispatcher(TestCoroutineScheduler())
+            Fixture(StandardTestDispatcher(testScheduler), ioDispatcher = io).use { fixture ->
+                io.scheduler.runCurrent()
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                fixture.connector.feedFromHost("\u001b[6n".encodeToByteArray())
+                val query = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+
+                assertFalse(query.isCompleted, "A pending terminal response must delay native admission")
+                assertEquals("", fixture.writtenText())
+                io.scheduler.runCurrent()
+                assertEquals("\u001b[1;1R", fixture.writtenText())
+                runCurrent()
+                assertFalse(query.isCompleted)
+                io.scheduler.runCurrent()
+                assertEquals("\u001b[1;1Rq", fixture.writtenText(), "Only one native query follows the terminal reply")
+
+                fixture.reply()
+                runCurrent()
+                assertNotNull(query.await())
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                val fresh = checkNotNull(fixture.session.captureCommandEdit())
+                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+            }
+            io.scheduler.runCurrent()
+        }
+
+    @Test
+    fun `cancelling while admission is busy leaves no native query reserved`() =
+        runTest {
+            val io = StandardTestDispatcher(TestCoroutineScheduler())
+            Fixture(StandardTestDispatcher(testScheduler), ioDispatcher = io).use { fixture ->
+                io.scheduler.runCurrent()
+                fixture.connector.feedFromHost("\u001b[6n".encodeToByteArray())
+                val cancelled = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                assertFalse(cancelled.isCompleted)
+                cancelled.cancelAndJoin()
+                io.scheduler.runCurrent()
+                runCurrent()
+                assertEquals("\u001b[1;1R", fixture.writtenText())
+
+                val next = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                io.scheduler.runCurrent()
+                assertEquals("\u001b[1;1Rq", fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+                assertNotNull(next.await())
+            }
+            io.scheduler.runCurrent()
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `concurrent requests for same buffer share one native query and both receive result`(requiresConfirmation: Boolean) =
@@ -106,6 +211,83 @@ class TerminalShellCompletionTest {
             }
         }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["same", "away-and-back"])
+    fun `rejected native confirmation invalidates an unchanged command after repaint`(repaint: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.connector.feedFromHost("git s".encodeToByteArray())
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                runCurrent()
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val revision = fixture.session.activeShellCommandLineRevision.value
+                val query = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+
+                if (repaint == "away-and-back") {
+                    fixture.connector.feedFromHost("\r\u001b[2Kother".encodeToByteArray())
+                }
+                fixture.connector.feedFromHost("\r\u001b[2Kgit s".encodeToByteArray())
+                runCurrent()
+                assertEquals(original.commandLine, fixture.session.activeShellCommandLine())
+                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+
+                fixture.reply()
+                runCurrent()
+                assertNull(query.await())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+
+                val fresh = checkNotNull(fixture.session.captureCommandEdit())
+                val next = async { fixture.session.requestShellCompletions("git s", 5) }
+                runCurrent()
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(next.await())
+                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["success", "mismatch", "failed", "unavailable", "cancelled", "changed-buffer", "closed"])
+    fun `native query outcomes without a retryable context change do not invalidate suggestions`(outcome: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.connector.feedFromHost("git s".encodeToByteArray())
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                runCurrent()
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val query = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                if (outcome != "success") {
+                    fixture.connector.feedFromHost("\r\u001b[2Kgit s".encodeToByteArray())
+                }
+                when (outcome) {
+                    "cancelled" -> query.cancelAndJoin()
+                    "changed-buffer" -> fixture.model.value = fixture.model.value?.copy(commandText = "git st", cursorOffset = 6)
+                    "closed" -> fixture.session.close()
+                }
+                runCurrent()
+                val revision = fixture.session.activeShellCommandLineRevision.value
+
+                when (outcome) {
+                    "failed" -> fixture.failReply()
+                    "unavailable" -> fixture.clearPrompt()
+                    "mismatch" -> fixture.reply(commandLine = "git status", cursorOffset = 10)
+                    "closed" -> fixture.reply(deliverOutput = false)
+                    else -> fixture.reply()
+                }
+                runCurrent()
+
+                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+                when (outcome) {
+                    "success" -> assertNotNull(query.await())
+                    "cancelled", "closed" -> assertTrue(query.isCancelled)
+                    else -> assertNull(query.await())
+                }
+            }
+        }
+
     @Test
     fun `duplicate readiness does not reuse request identifiers`() =
         runTest {
@@ -134,7 +316,7 @@ class TerminalShellCompletionTest {
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 val original = checkNotNull(fixture.session.captureCommandEdit())
-                val query = async { fixture.session.requestShellCompletions("git s", 5) }
+                val query = async { fixture.session.requestShellCompletions(original) }
                 runCurrent()
                 assertEquals("q", fixture.writtenText())
                 fixture.reply()
@@ -396,6 +578,7 @@ class TerminalShellCompletionTest {
     private class Fixture(
         dispatcher: CoroutineDispatcher,
         requiresConfirmation: Boolean = true,
+        ioDispatcher: CoroutineDispatcher = dispatcher,
     ) : AutoCloseable {
         val connector = MockConnector()
         val model = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot("git s", 5, 5, 0, requiresConfirmation))
@@ -411,7 +594,7 @@ class TerminalShellCompletionTest {
                         host.create(context)
                     },
                 workerDispatcher = dispatcher,
-                ioDispatcher = dispatcher,
+                ioDispatcher = ioDispatcher,
                 cleanupDispatcher = dispatcher,
             )
 
@@ -422,10 +605,21 @@ class TerminalShellCompletionTest {
 
         fun ready() = channel.ready("epoch", listOf(TerminalKeyEvent.text("q")))
 
+        fun clearPrompt() {
+            channel.clearPrompt()
+            feedMetadata()
+        }
+
+        fun failReply() {
+            channel.respond("epoch", 1, null)
+            feedMetadata()
+        }
+
         fun reply(
             commandLine: String = "git s",
             requestId: Long = 1,
             cursorOffset: Int = 5,
+            deliverOutput: Boolean = true,
         ) {
             channel.respond(
                 "epoch",
@@ -438,7 +632,7 @@ class TerminalShellCompletionTest {
                     listOf(TerminalShellCompletionCandidate("status", "status", "", TerminalShellCompletionKind.ARGUMENT)),
                 ),
             )
-            feedMetadata()
+            if (deliverOutput) feedMetadata()
         }
 
         fun feedMetadata() = connector.feedFromHost("\u001b]633;completion metadata\u0007".toByteArray())

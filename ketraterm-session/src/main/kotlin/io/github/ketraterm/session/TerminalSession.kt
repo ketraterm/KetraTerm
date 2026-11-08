@@ -455,21 +455,43 @@ public class TerminalSession private constructor(
      * not wait for rendering or require reading the grid.
      *
      * Nonnegative values identify changes in command text, cursor offset/anchor,
-     * snapshot availability, or the producer's prompt and editing capabilities. Treat them as opaque revisions;
+     * snapshot availability, or the producer's prompt and editing capabilities. For provisional
+     * snapshots, relevant visible suffix text and layout also participate even when the prefix is unchanged.
+     * They also invalidate retained edits when an exact native reply cannot preserve its captured
+     * context, allowing consumers to capture a fresh request even when the command text is unchanged.
+     * Treat values as opaque revisions;
      * intermediate changes may be conflated. Consumers should debounce this
      * signal and call [activeShellCommandLine] when they need a command snapshot.
      * Session closure cancels tracking; collectors own their collection lifetime.
      */
     public val activeShellCommandLineRevision: StateFlow<Long> by lazy {
-        (runtime.shellIntegration?.commandLineChanges ?: emptyFlow()).stateIn(
-            scope = sessionScope,
-            started = SharingStarted.WhileSubscribed(replayExpirationMillis = 0),
-            initialValue = NO_SHELL_COMMAND_LINE_REVISION,
-        )
+        var revision = NO_SHELL_COMMAND_LINE_REVISION
+        (runtime.shellIntegration?.commandLineChanges ?: emptyFlow())
+            .distinctUntilChanged()
+            .combine(runtime.shellCompletion.contextInvalidations) { _, _ ->
+                check(revision != Long.MAX_VALUE) { "Shell command-line revisions exhausted" }
+                ++revision
+            }.stateIn(
+                scope = sessionScope,
+                started = SharingStarted.WhileSubscribed(replayExpirationMillis = 0),
+                initialValue = NO_SHELL_COMMAND_LINE_REVISION,
+            )
     }
 
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
+
+    /**
+     * Conflated opportunities to retry [captureCommandEdit], including an initial sample.
+     * Observes output publication, producer revisions, outbound write retirement, and lifecycle.
+     * A wakeup neither guarantees capture will succeed nor invalidates a retained edit context;
+     * callers must perform the atomic capture or admission check again. In particular, a native
+     * query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement.
+     * Collectors own cancellation and should stop waiting when [isClosed] becomes true.
+     */
+    public val commandEditChanges: Flow<Unit> by lazy {
+        merge<Any>(renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
+    }
 
     private val outboundJob: Job
 
@@ -710,6 +732,53 @@ public class TerminalSession private constructor(
         return withTimeoutOrNull(10_000.milliseconds) { awaitShellCompletions(commandLine, cursorOffset) }
     }
 
+    /**
+     * Queries native completions only for this session's uncancelled [expected] context and verifies
+     * that the reply preserves that original edit authority before returning candidates.
+     * Uses the same query sharing and deadline as the command-line overload.
+     *
+     * If intervening input or output made [expected] stale while its exact command and cursor remain
+     * current, returns null and advances [activeShellCommandLineRevision]. Consumers can then replace
+     * the old interaction and capture a fresh context. This never renews [expected]; final edits must
+     * still pass [submitInput]. Failed or mismatched replies do not request another interaction.
+     */
+    public suspend fun requestShellCompletions(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
+        currentCoroutineContext().ensureActive()
+        if (expected.owner !== editContextOwner || expected.isCancelled) return null
+        val result = requestShellCompletions(expected.commandLine.commandText, expected.commandLine.cursorOffset) ?: return null
+        currentCoroutineContext().ensureActive()
+        val channel = runtime.shellCompletion
+        var invalidation = 0L
+        val confirmed =
+            synchronized(mutationLock) {
+                val integration = runtime.shellIntegration ?: return@synchronized false
+                integration.withCommandLine { revision, snapshot ->
+                    synchronized(outboundWriteLock) {
+                        if (!isAcceptingInput() ||
+                            expected.isCancelled ||
+                            snapshot?.commandText != expected.commandLine.commandText ||
+                            snapshot.cursorOffset != expected.commandLine.cursorOffset
+                        ) {
+                            return@synchronized false
+                        }
+                        if (!processingOutput &&
+                            revision == expected.shellRevision &&
+                            snapshot == expected.commandLine &&
+                            integration.commandLinePrefixResetKeys == expected.prefixResetKeys &&
+                            channel.permits(expected, inputRevision, outputRevision)
+                        ) {
+                            true
+                        } else {
+                            invalidation = channel.markContextInvalidated()
+                            false
+                        }
+                    }
+                } == true
+            }
+        channel.publishContextInvalidation(invalidation)
+        return result.takeIf { confirmed }
+    }
+
     private suspend fun awaitShellCompletions(
         commandLine: String,
         cursorOffset: Int,
@@ -717,13 +786,17 @@ public class TerminalSession private constructor(
         while (true) {
             var confirmedResult: TerminalShellCompletionResult? = null
             var retiring: Deferred<Unit>? = null
+            var waitingForAdmission = false
             val query =
                 try {
                     synchronized(mutationLock) {
                         if (!isAcceptingInput()) return@synchronized null
                         val channel = runtime.shellCompletion
                         retiring = channel.pending?.retired
-                        if (processingOutput) return@synchronized null
+                        if (processingOutput) {
+                            waitingForAdmission = true
+                            return@synchronized null
+                        }
                         val integration = runtime.shellIntegration ?: return@synchronized null
                         integration.withCommandLine { revision, snapshot ->
                             synchronized(outboundWriteLock) {
@@ -747,7 +820,10 @@ public class TerminalSession private constructor(
                                 var generation = 0L
                                 renderReader.readRenderFrame { generation = it.frameGeneration }
                                 if (channel.pending != null) return@synchronized channel.join(expected, generation)
-                                if (!outboundWriter.isIdle()) return@synchronized null
+                                if (!outboundWriter.isIdle()) {
+                                    waitingForAdmission = true
+                                    return@synchronized null
+                                }
                                 confirmedResult = channel.confirmedResult(expected)
                                 if (confirmedResult != null) return@synchronized null
                                 val pending = channel.begin(expected, generation) ?: return@synchronized null
@@ -759,12 +835,25 @@ public class TerminalSession private constructor(
                     }
                 } catch (failure: OutboundCapacityException) {
                     failWrite(failure)
-                    return null
+                    null
                 }
             if (query == null) {
-                val previous = retiring ?: return confirmedResult
-                previous.await()
-                continue
+                val previous = retiring
+                if (previous != null) {
+                    previous.await()
+                    continue
+                }
+                if (waitingForAdmission) {
+                    commandEditChanges.first {
+                        synchronized(mutationLock) {
+                            synchronized(outboundWriteLock) {
+                                !isAcceptingInput() || (!processingOutput && outboundWriter.isIdle())
+                            }
+                        }
+                    }
+                    continue
+                }
+                return confirmedResult
             }
             outboundWriter.signalPending()
             return try {

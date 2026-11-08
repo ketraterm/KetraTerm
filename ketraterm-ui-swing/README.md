@@ -242,9 +242,17 @@ Automatic refreshes cannot replace an active explicit request.
 Late shell-command inventory updates refresh eligible automatic suggestions after
 the normal debounce, even when the typed text is unchanged.
 Automatic and explicit requests both capture the current editing context before
-provider work. A screen-derived prefix requiring shell confirmation is queried
-through the session's installed native hook before collecting suggestions. If
-the hook cannot confirm the exact buffer and cursor, suggestions stay unavailable.
+provider work. Automatic requests that cannot yet capture retry on session
+[admission wakeups](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits),
+without cancelling an already captured request or requiring another keystroke.
+A screen-derived prefix requiring shell confirmation is queried
+through the session's installed native hook before collecting suggestions. The
+default session target passes its original captured context to
+`requestShellCompletions(expected)`; confirmation must preserve that context as
+well as match the buffer and cursor. A stale automatic request is replaced with a
+new interaction and handler. The old handler is cancelled, never renewed. Custom
+edit targets own their editing authority. If the hook cannot confirm the buffer,
+suggestions stay unavailable.
 Custom providers must honor `SwingShellSuggestionRequest.includeCommandNames`
 using their shell-aware command context; the terminal sets it to `false` for
 parameter-only automatic requests. The shared completion adapter forwards it

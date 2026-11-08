@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
@@ -199,6 +200,79 @@ class SwingTerminalCompletionLifecycleTest {
             }
         }
 
+    @Test
+    fun `automatic confirmation recaptures after a matching reply cannot validate a repainted frame`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            val target =
+                RecordingTarget { interaction ->
+                    terminal.presentShellSuggestions(interaction)
+                    terminal.requestShellSuggestions(interaction, provider)
+                }
+            val confirmed = TerminalShellCompletionResult("git s", 5, 4, 5, emptyList())
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val first = target.interactions.single()
+                val original = fixture.model.value
+                val revision = fixture.session.activeShellCommandLineRevision.value
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                assertEquals(0, collections)
+
+                fixture.feed("x\b\u001b[K")
+                fixture.session.requestRender(0)
+                runCurrent()
+                assertSame(original, fixture.model.value)
+                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+                fixture.respond(confirmed)
+                runCurrent()
+                assertTrue(first.isClosed)
+                assertFalse(first.publish(listOf(suggestion)))
+                assertEquals(0, collections)
+                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(2, target.interactions.size)
+                val refreshed = target.interactions.last()
+                assertEquals(first.request, refreshed.request)
+                assertEquals("\u001b[24~\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                fixture.respond(confirmed, requestId = 2)
+                runCurrent()
+                assertEquals(1, collections)
+                assertTrue(target.visible)
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
+                runCurrent()
+                assertEquals(
+                    "\u001b[24~\u001b[24~\u007f\u007f\u007f\u007f\u007freplacement",
+                    fixture.connector.output.toString(Charsets.UTF_8),
+                )
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
     @ParameterizedTest
     @EnumSource(SwingShellSuggestionTrigger::class)
     fun `cancelling a pending shell confirmation ignores its late reply`(trigger: SwingShellSuggestionTrigger) =
@@ -243,10 +317,92 @@ class SwingTerminalCompletionLifecycleTest {
             }
         }
 
-    @Test
-    fun `automatic provisional requests without a native hook send no input or collect provider results`() =
+    @ParameterizedTest(name = "output after capture [writerDrained={0}]")
+    @ValueSource(booleans = [false, true])
+    fun `output during provider opening replaces the original editing context before publication`(writerDrained: Boolean) =
         onEdtTest {
-            val fixture = SessionFixture(StandardTestDispatcher(testScheduler))
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var opened = 0
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                        opened++
+                        if (opened == 1) {
+                            fixture.feed("\u001b[6n")
+                            if (writerDrained) runCurrent()
+                        }
+                        return SwingShellSuggestionSource(suggestions(request))
+                    }
+                }
+            val target =
+                RecordingTarget { interaction ->
+                    terminal.presentShellSuggestions(interaction)
+                    terminal.requestShellSuggestions(interaction, provider)
+                }
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val first = target.interactions.single()
+                val originalContext = assertNotNull(first.sessionEditContext)
+                assertFalse(originalContext.isCancelled)
+                assertEquals(1, opened)
+                assertEquals(0, collections)
+                assertEquals("\u001b[1;1R\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+
+                fixture.respond(TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))
+                runCurrent()
+                assertTrue(first.isClosed)
+                assertTrue(originalContext.isCancelled)
+                assertSame(originalContext, first.sessionEditContext)
+                assertFalse(first.publish(listOf(suggestion)))
+                assertEquals(0, collections)
+                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(2, target.interactions.size)
+                val refreshed = target.interactions.last()
+                assertNotSame(originalContext, assertNotNull(refreshed.sessionEditContext))
+                assertEquals(2, opened)
+                assertEquals(1, collections)
+                assertTrue(target.visible)
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                assertEquals(
+                    "\u001b[1;1R\u001b[24~",
+                    fixture.connector.output.toString(Charsets.UTF_8),
+                    "The fresh interaction can reuse the verified reply for its current context",
+                )
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
+                runCurrent()
+                assertEquals(
+                    "\u001b[1;1R\u001b[24~\u007f\u007f\u007f\u007f\u007freplacement",
+                    fixture.connector.output.toString(Charsets.UTF_8),
+                )
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @ParameterizedTest(name = "unconfirmable automatic prefix [nativeHook={0}]")
+    @ValueSource(booleans = [false, true])
+    fun `automatic unconfirmable prefixes do not retry on unrelated admission wakeups`(nativeHook: Boolean) =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = nativeHook)
             fixture.model.value = snapshot.copy(requiresShellConfirmation = true)
             val view = RecordingView()
             val terminal = terminal(testScheduler, view)
@@ -272,11 +428,27 @@ class SwingTerminalCompletionLifecycleTest {
                 runCurrent()
                 advanceTimeBy(75.milliseconds)
                 runCurrent()
+                if (nativeHook) {
+                    fixture.respond(TerminalShellCompletionResult("git status", 5, 4, 10, emptyList()))
+                    runCurrent()
+                }
 
                 assertEquals(1, opened, "The scheduler must attempt the eligible provisional request")
                 assertEquals(0, collections, "No candidate source can consume an unconfirmed prefix")
-                assertEquals("", fixture.connector.output.toString(Charsets.UTF_8))
+                val query = if (nativeHook) "\u001b[24~" else ""
+                assertEquals(query, fixture.connector.output.toString(Charsets.UTF_8))
                 assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                repeat(3) { wake ->
+                    fixture.feed("\u001b]999;wake\u0007\u001b[6n")
+                    fixture.session.requestRender(0)
+                    runCurrent()
+                    advanceTimeBy(75.milliseconds)
+                    runCurrent()
+                    assertEquals(1, opened)
+                    assertEquals(0, collections)
+                    assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+                    assertEquals(query + "\u001b[1;1R".repeat(wake + 1), fixture.connector.output.toString(Charsets.UTF_8))
+                }
             } finally {
                 terminal.dispose()
                 fixture.close()
@@ -1058,9 +1230,16 @@ class SwingTerminalCompletionLifecycleTest {
             session.start(30, 4)
         }
 
-        fun respond(result: TerminalShellCompletionResult) {
-            completion.respond("test", 1, result)
-            val bytes = "\u001b]999;reply\u0007".toByteArray()
+        fun respond(
+            result: TerminalShellCompletionResult,
+            requestId: Long = 1,
+        ) {
+            completion.respond("test", requestId, result)
+            feed("\u001b]999;reply\u0007")
+        }
+
+        fun feed(text: String) {
+            val bytes = text.toByteArray(Charsets.UTF_8)
             connector.listener.onBytes(bytes, 0, bytes.size)
         }
 
@@ -1095,7 +1274,9 @@ class SwingTerminalCompletionLifecycleTest {
         override fun close() = Unit
     }
 
-    private class RecordingTarget : SwingShellSuggestionTarget {
+    private class RecordingTarget(
+        private val onRequest: (SwingShellSuggestionInteraction) -> Unit = {},
+    ) : SwingShellSuggestionTarget {
         val interactions = ArrayList<SwingShellSuggestionInteraction>()
         var visible = false
         var onHide: (() -> Unit)? = null
@@ -1104,6 +1285,7 @@ class SwingTerminalCompletionLifecycleTest {
             assertTrue(SwingUtilities.isEventDispatchThread())
             interactions += interaction
             visible = true
+            onRequest(interaction)
         }
 
         override fun hideSuggestions() {

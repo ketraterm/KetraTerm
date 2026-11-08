@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.KeyEvent
 import java.nio.file.Files
 import java.nio.file.Path
@@ -47,16 +48,29 @@ import kotlin.time.Duration.Companion.seconds
 /** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
 @Tag("desktop")
 class StandaloneSuggestionDesktopTest {
-    @ParameterizedTest(name = "automatic inline prediction [{0}]")
-    @EnumSource(StandaloneSuggestionShell::class, names = ["POWERSHELL"])
+    @ParameterizedTest(name = "automatic inline prediction [wrapped={0}]")
+    @ValueSource(booleans = [false, true])
     internal fun `PowerShell automatically confirms inline predictions before showing and accepting suggestions`(
-        shell: StandaloneSuggestionShell,
+        wrappedPrediction: Boolean,
         @TempDir directory: Path,
     ): Unit =
         runBlocking {
-            withSession(shell.profile(directory), directory) {
+            withSession(StandaloneSuggestionShell.POWERSHELL.profile(directory), directory) {
+                val location =
+                    if (wrappedPrediction) {
+                        var nameLength = 0
+                        session.readRenderFrame { frame ->
+                            // Leave ten columns for the editable prefix, forcing prediction text onto the next row.
+                            nameLength =
+                                (frame.columns - 11 - frame.cursor.column).mod(frame.columns).takeUnless { it == 0 } ?: frame.columns
+                        }
+                        val nested = withContext(Dispatchers.IO) { Files.createDirectory(directory.resolve("p".repeat(nameLength))) }
+                        "Set-Location -LiteralPath '${nested.toString().replace("'", "''")}'; "
+                    } else {
+                        ""
+                    }
                 val setup =
-                    "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView; " +
+                    location + "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView; " +
                         "[Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory(); " +
                         "[Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory('Get-ChildItem -Name ketra-popup-prediction')"
                 assertEquals(
@@ -70,7 +84,14 @@ class StandaloneSuggestionDesktopTest {
                 withTimeout(15.seconds) {
                     session.renderGeneration.first {
                         val snapshot = session.activeShellCommandLine()
-                        snapshot?.commandText == "Get-Chi" && snapshot.cursorOffset == 7 && snapshot.requiresShellConfirmation
+                        var predictionWrapped = !wrappedPrediction
+                        if (snapshot != null && wrappedPrediction) {
+                            session.readRenderFrame { frame -> predictionWrapped = frame.lineWrapped(snapshot.cursorRow) }
+                        }
+                        snapshot?.commandText == "Get-Chi" &&
+                            snapshot.cursorOffset == 7 &&
+                            snapshot.requiresShellConfirmation &&
+                            predictionWrapped
                     }
                 }
                 awaitPopup("Get-Chi", "Get-ChildItem")

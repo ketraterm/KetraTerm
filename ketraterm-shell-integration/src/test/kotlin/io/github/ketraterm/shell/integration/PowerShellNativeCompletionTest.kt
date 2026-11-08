@@ -23,10 +23,7 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCompletionKind
 import io.github.ketraterm.testkit.MockConnector
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -96,6 +93,42 @@ class PowerShellNativeCompletionTest {
                 runCurrent()
                 assertNotNull(query.await())
                 assertEquals(TerminalInputAdmission.ACCEPTED, fixture.session.submitInput(expected, edit))
+            }
+        }
+
+    @Test
+    fun `changed wrapped prediction retires confirmation and publishes a retryable editing revision`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), columns = 16).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                fixture.feed("ldItem -Name old\u001b[1;12H")
+                fixture.session.requestRender(0)
+                runCurrent()
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertEquals("Get-Chi", expected.commandLine.commandText)
+                assertTrue(expected.commandLine.requiresShellConfirmation)
+                val previousRevision = fixture.session.activeShellCommandLineRevision.value
+                val query = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+
+                // The later packet changes only the prediction's wrapped continuation.
+                fixture.feed("\u001b[2;1Hm -Name new\u001b[1;12H")
+                fixture.feed(reply("Get-Chi"))
+                fixture.session.requestRender(0)
+                runCurrent()
+                assertNull(query.await())
+                assertEquals(expected.commandLine, fixture.session.activeShellCommandLine())
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > previousRevision)
+                assertEquals(
+                    TerminalInputAdmission.STALE_CONTEXT,
+                    fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
+                )
+
+                val refreshed = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
+                runCurrent()
+                fixture.feed(reply("Get-Chi", id = 2))
+                runCurrent()
+                assertNotNull(refreshed.await())
             }
         }
 
@@ -454,11 +487,12 @@ class PowerShellNativeCompletionTest {
     private class Fixture(
         dispatcher: CoroutineDispatcher,
         ready: Boolean = true,
+        columns: Int = 80,
     ) : AutoCloseable {
         val connector = MockConnector()
         val session =
             TerminalSession.create(
-                TerminalBuffers.create(80, 4),
+                TerminalBuffers.create(columns, 4),
                 connector,
                 shellIntegration = OscShellIntegration,
                 workerDispatcher = dispatcher,

@@ -17,11 +17,7 @@ package io.github.ketraterm.workspace
 
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.render.api.TerminalRenderAttrs
-import io.github.ketraterm.session.TerminalCommandEditContext
-import io.github.ketraterm.session.TerminalInputAdmission
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellCompletionKind
-import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.session.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -90,7 +86,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         try {
             var captured: TerminalCommandEditContext? = null
             withTimeout(15.seconds) {
-                renderGeneration.first {
+                commandEditChanges.first {
                     val edit = captureCommandEdit() ?: return@first false
                     if (requireShellCompletion && (!shellCompletionAvailable || edit.prefixResetKeys.isEmpty())) {
                         return@first false

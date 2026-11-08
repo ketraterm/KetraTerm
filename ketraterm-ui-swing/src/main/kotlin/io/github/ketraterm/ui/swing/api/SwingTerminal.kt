@@ -2144,6 +2144,7 @@ public class SwingTerminal
                                 requestShellSuggestions(interaction, provider)
                             }
                         }
+                        interaction != null
                     },
                     hideSuggestions = { refreshing ->
                         if (activeSuggestionIsAutomatic || shellSuggestionController?.isRefreshing == true) {
@@ -2205,10 +2206,14 @@ public class SwingTerminal
                 retainPresentation = automatic,
             )
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
+            var sessionEditContext: TerminalCommandEditContext? = null
             val captured =
                 when {
                     editTarget != null -> editTarget.capture(effectiveRequest)
-                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest)
+                    bound != null -> {
+                        sessionEditContext = bound.captureCommandEdit()
+                        SwingShellSuggestionEditTarget.captureSessionEdit(bound, effectiveRequest, sessionEditContext)
+                    }
                     else -> SwingShellSuggestionHandler.NONE
                 } ?: run {
                     if (suggestionRevision == revision) shellSuggestionController?.hide()
@@ -2235,6 +2240,7 @@ public class SwingTerminal
                     override fun close() = captured.close()
                 }
             val interaction = SwingShellSuggestionInteraction(effectiveRequest, handler, feedbackHandler)
+            interaction.sessionEditContext = sessionEditContext
             if (bound != null && observed != null) {
                 interaction.contextIsCurrent = { !bound.isClosed && bound.activeShellCommandLine() == observed }
             }
@@ -2352,7 +2358,9 @@ public class SwingTerminal
          * This does not mount UI. Its request-specific observer is captured before collection.
          * Closing the interaction cancels collection; final visible results survive stream completion.
          * Each interaction accepts one provider collection. Combine independent sources in the provider.
-         * Provisional session input is confirmed by the shell before collecting provider results.
+         * Provisional session input is confirmed against the original captured edit context before
+         * collecting provider results. A stale context requires a new interaction; confirmation never
+         * replaces the existing handler's editing authority. Custom edit targets own that contract.
          */
         @ExperimentalShellSuggestionsApi
         public fun requestShellSuggestions(
@@ -2363,7 +2371,8 @@ public class SwingTerminal
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
             val scope = suggestionScope ?: return
             val bound = session
-            val snapshot = bound?.activeShellCommandLine()
+            val sessionEditContext = interaction.sessionEditContext
+            val snapshot = sessionEditContext?.commandLine ?: bound?.activeShellCommandLine()
             val requiresConfirmation =
                 snapshot?.requiresShellConfirmation == true &&
                     snapshot.commandText == interaction.request.commandText &&
@@ -2387,16 +2396,22 @@ public class SwingTerminal
             val publications = source.suggestions.flowOn(Dispatchers.Default).conflate()
             scope.launch {
                 try {
-                    if (requiresConfirmation &&
-                        bound.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset) == null
-                    ) {
-                        if (activeSuggestionInteraction === interaction) {
-                            cancelAndHideShellSuggestionsOnEdt(
-                                "Shell could not confirm suggestion input",
-                                SwingShellSuggestionCloseReason.INVALIDATED,
-                            )
+                    if (requiresConfirmation) {
+                        val confirmed =
+                            if (sessionEditContext != null) {
+                                bound?.requestShellCompletions(sessionEditContext)
+                            } else {
+                                bound?.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset)
+                            }
+                        if (confirmed == null) {
+                            if (activeSuggestionInteraction === interaction) {
+                                cancelAndHideShellSuggestionsOnEdt(
+                                    "Shell could not confirm suggestion input",
+                                    SwingShellSuggestionCloseReason.INVALIDATED,
+                                )
+                            }
+                            return@launch
                         }
-                        return@launch
                     }
                     ensureActive()
                     if (activeSuggestionInteraction !== interaction || !interaction.validateContext()) return@launch

@@ -19,6 +19,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandInventory
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
@@ -31,7 +32,7 @@ internal class SwingShellSuggestionScheduler(
     private val edtDispatcher: CoroutineDispatcher,
     private val isFocused: () -> Boolean,
     private val isEligible: () -> Boolean,
-    private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Unit,
+    private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Boolean,
     private val hideSuggestions: (refreshing: Boolean) -> Unit,
     private val debounceMillis: Int = 75,
     private val minimumNonWhitespaceCharacters: Int = 2,
@@ -59,13 +60,19 @@ internal class SwingShellSuggestionScheduler(
             stop()
             return
         }
-        start(session::activeShellCommandLine, session.activeShellCommandLineRevision, session.shellCommandInventory)
+        start(
+            session::activeShellCommandLine,
+            session.activeShellCommandLineRevision,
+            session.shellCommandInventory,
+            session.commandEditChanges,
+        )
     }
 
     internal fun start(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         shellCommandLineRevisions: StateFlow<Long>,
         shellCommandInventory: StateFlow<TerminalShellCommandInventory?>? = null,
+        commandEditChanges: Flow<Unit>? = null,
     ) {
         checkEdt()
         if (observationJob?.isActive == true && this.shellCommandLineRevisions === shellCommandLineRevisions) return
@@ -83,7 +90,10 @@ internal class SwingShellSuggestionScheduler(
                             refreshes
                                 .debounce { if (it == null) 0L else debounceMillis.toLong() }
                                 .collect { sequence ->
-                                    if (lifecycleRevision == revision && sequence != null && sequence == refreshes.value) refreshNow()
+                                    if (lifecycleRevision == revision && sequence != null && sequence == refreshes.value) {
+                                        refreshes.value = null
+                                        refreshNow()
+                                    }
                                 }
                         }
                         if (shellCommandInventory != null) {
@@ -94,6 +104,14 @@ internal class SwingShellSuggestionScheduler(
                                     previous = inventory
                                     cancelAndHide(refreshing = true)
                                     if (lifecycleRevision == revision) scheduleRefresh()
+                                }
+                            }
+                        }
+                        if (commandEditChanges != null) {
+                            launch {
+                                commandEditChanges.collect {
+                                    // An admission opportunity must not postpone a pending editing refresh.
+                                    if (lifecycleRevision == revision && refreshes.value == null) scheduleRefresh()
                                 }
                             }
                         }
@@ -214,7 +232,7 @@ internal class SwingShellSuggestionScheduler(
         }
         if (snapshot == lastRequest) return
         lastRequest = snapshot
-        requestSuggestions(snapshot, feedbackHandler)
+        if (!requestSuggestions(snapshot, feedbackHandler) && lifecycleRevision == revision && lastRequest === snapshot) lastRequest = null
     }
 
     private fun scheduleRefresh() {

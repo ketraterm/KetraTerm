@@ -119,6 +119,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public fun encodePaste (Lio/github/ketraterm/input/event/TerminalPasteEvent;)V
 	public fun encodeTextReplacement (Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
 	public final fun getActiveShellCommandLineRevision ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getCommandEditChanges ()Lkotlinx/coroutines/flow/Flow;
 	public final fun getExitCode ()Ljava/lang/Integer;
 	public final fun getFailure ()Ljava/lang/Throwable;
 	public final fun getForegroundProcessName ()Lkotlinx/coroutines/flow/StateFlow;
@@ -149,6 +150,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun requestClose ()V
 	public final fun requestRender (I)V
 	public final fun requestRender (II)V
+	public final fun requestShellCompletions (Lio/github/ketraterm/session/TerminalCommandEditContext;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun requestShellCompletions (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun resize (III)Lkotlin/Pair;
 	public static synthetic fun resize$default (Lio/github/ketraterm/session/TerminalSession;IIIILjava/lang/Object;)Lkotlin/Pair;

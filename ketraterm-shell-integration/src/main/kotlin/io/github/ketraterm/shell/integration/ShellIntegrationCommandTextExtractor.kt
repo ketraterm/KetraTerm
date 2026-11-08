@@ -133,8 +133,10 @@ internal class ShellIntegrationCommandTextExtractor(
      * Computes an allocation-free fingerprint for one active command line.
      *
      * The fingerprint covers the exact code-point sequence reconstructed by
-     * [extract], including hard row-boundary newlines. [destination] receives
-     * two independent hashes and the UTF-16 text length. Callers compare all
+     * [extract], including hard row-boundary newlines, and the visible suffix
+     * that a native hook must confirm. Suffix text and wrap boundaries affect
+     * the hashes; colors and styles do not. [destination] receives two
+     * independent hashes and the UTF-16 prefix length. Callers compare all
      * three values together with cursor coordinates before publishing a new
      * shell-edit revision.
      *
@@ -218,14 +220,6 @@ internal class ShellIntegrationCommandTextExtractor(
             return TerminalShellCommandFingerprintStatus.INVALID
         }
 
-        var requiresShellConfirmation = false
-        if (cursorAtNextLineStart) {
-            copyFingerprintLine(frame, cache, cursorRow, columns)
-            if (!validClusterData) return TerminalShellCommandFingerprintStatus.INVALID
-            requiresShellConfirmation = lastTextColumnExclusive(columns) > 0
-            if (requiresShellConfirmation && !allowVisibleSuffix) return TerminalShellCommandFingerprintStatus.INVALID
-        }
-
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_A_INDEX] = FINGERPRINT_HASH_A_SEED
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_B_INDEX] = FINGERPRINT_HASH_B_SEED
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX] = 0L
@@ -234,11 +228,6 @@ internal class ShellIntegrationCommandTextExtractor(
         while (row <= endRow) {
             copyFingerprintLine(frame, cache, row, columns)
             if (!validClusterData) return TerminalShellCommandFingerprintStatus.INVALID
-            if (!cursorAtNextLineStart && row == cursorRow) {
-                requiresShellConfirmation = cursorColumn.coerceIn(0, columns) < lastTextColumnExclusive(columns)
-                if (requiresShellConfirmation && !allowVisibleSuffix) return TerminalShellCommandFingerprintStatus.INVALID
-            }
-
             val wrapped = frame?.lineWrapped(row) ?: cache!!.lineWrapped[row]
             val fromColumn = if (row == startRow) startColumn else 0
             val toColumn =
@@ -247,41 +236,8 @@ internal class ShellIntegrationCommandTextExtractor(
                     row < endRow || cursorAtNextLineStart -> lastTextColumnExclusive(columns, preserveWrapColumns = wrapped)
                     else -> cursorColumn.coerceIn(0, columns)
                 }
-            if (toColumn < fromColumn) return TerminalShellCommandFingerprintStatus.INVALID
-
-            var column = fromColumn
-            while (column < toColumn) {
-                val cellFlags = flags[column]
-                if (!TerminalRenderCellFlags.isValidCombination(cellFlags)) return TerminalShellCommandFingerprintStatus.INVALID
-                when {
-                    cellFlags == TerminalRenderCellFlags.EMPTY -> {
-                        if (!hashCodePoint(' '.code, destination)) return TerminalShellCommandFingerprintStatus.INVALID
-                    }
-                    cellFlags and TerminalRenderCellFlags.WRAP_PADDING != 0 -> Unit
-                    cellFlags and TerminalRenderCellFlags.WIDE_TRAILING != 0 -> Unit
-                    cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 -> {
-                        if (!hashCodePoint(codeWords[column], destination)) {
-                            return TerminalShellCommandFingerprintStatus.INVALID
-                        }
-                    }
-                    cellFlags and TerminalRenderCellFlags.CLUSTER != 0 -> {
-                        val offset = clusterOffsets[column]
-                        val length = clusterLengths[column]
-                        if (offset == NO_CLUSTER_OFFSET || length <= 0) {
-                            return TerminalShellCommandFingerprintStatus.INVALID
-                        }
-                        var index = offset
-                        val end = offset + length
-                        while (index < end) {
-                            if (!hashCodePoint(clusterCodePoints[index], destination)) {
-                                return TerminalShellCommandFingerprintStatus.INVALID
-                            }
-                            index++
-                        }
-                    }
-                    else -> return TerminalShellCommandFingerprintStatus.INVALID
-                }
-                column++
+            if (toColumn < fromColumn || !hashCopiedRange(fromColumn, toColumn, destination)) {
+                return TerminalShellCommandFingerprintStatus.INVALID
             }
 
             if (row < endRow && !wrapped) {
@@ -291,10 +247,54 @@ internal class ShellIntegrationCommandTextExtractor(
             }
             row++
         }
-        return if (requiresShellConfirmation) {
-            TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION
+        val suffix = inspectVisibleSuffix(frame, cache, cursorRow, cursorColumn, destination)
+        return if (suffix == TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION && !allowVisibleSuffix) {
+            TerminalShellCommandFingerprintStatus.INVALID
         } else {
-            TerminalShellCommandFingerprintStatus.COMPLETE
+            suffix
+        }
+    }
+
+    private fun inspectVisibleSuffix(
+        frame: TerminalRenderFrame?,
+        cache: TerminalRenderCache?,
+        cursorRow: Int,
+        cursorColumn: Int,
+        destination: LongArray? = null,
+    ): TerminalShellCommandFingerprintStatus {
+        val rows = frame?.rows ?: cache?.rows ?: return TerminalShellCommandFingerprintStatus.INVALID
+        val columns = frame?.columns ?: cache?.columns ?: return TerminalShellCommandFingerprintStatus.INVALID
+        if (cursorRow !in 0 until rows) return TerminalShellCommandFingerprintStatus.INVALID
+        val prefixLength = if (destination != null) destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX] else 0L
+        var row = cursorRow
+        var fromColumn = cursorColumn.coerceIn(0, columns)
+        var requiresConfirmation = false
+        if (destination != null) mixFingerprint(FINGERPRINT_SUFFIX_START, destination)
+        try {
+            while (row < rows && row - cursorRow < maxRows) {
+                copyFingerprintLine(frame, cache, row, columns)
+                if (!validClusterData) return TerminalShellCommandFingerprintStatus.INVALID
+                val visibleEnd = lastTextColumnExclusive(columns)
+                requiresConfirmation = requiresConfirmation || visibleEnd > fromColumn
+                val wrapped = frame?.lineWrapped(row) ?: cache!!.lineWrapped[row]
+                if (destination != null) {
+                    val endColumn = if (wrapped) lastTextColumnExclusive(columns, preserveWrapColumns = true) else visibleEnd
+                    if (!hashCopiedRange(fromColumn, endColumn, destination)) return TerminalShellCommandFingerprintStatus.INVALID
+                }
+                if (!wrapped) {
+                    return if (requiresConfirmation) {
+                        TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION
+                    } else {
+                        TerminalShellCommandFingerprintStatus.COMPLETE
+                    }
+                }
+                if (destination != null) mixFingerprint(FINGERPRINT_SUFFIX_WRAP, destination)
+                row++
+                fromColumn = 0
+            }
+            return TerminalShellCommandFingerprintStatus.INVALID
+        } finally {
+            if (destination != null) destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX] = prefixLength
         }
     }
 
@@ -359,7 +359,8 @@ internal class ShellIntegrationCommandTextExtractor(
     }
 
     /**
-     * Returns whether [cursorColumn] is at the visible text end of [cursorRow].
+     * Returns whether the logical line has no visible text after the cursor,
+     * including its soft-wrapped continuation rows.
      *
      * Active command-line suggestions currently require this guard because the
      * terminal can reconstruct the prompt-to-cursor prefix from OSC 133 markers,
@@ -375,11 +376,7 @@ internal class ShellIntegrationCommandTextExtractor(
         frame: TerminalRenderFrame,
         cursorRow: Int,
         cursorColumn: Int,
-    ): Boolean {
-        if (cursorRow !in 0 until frame.rows) return false
-        copyLine(frame, cursorRow)
-        return validClusterData && cursorColumn.coerceIn(0, frame.columns) >= lastTextColumnExclusive(frame.columns)
-    }
+    ): Boolean = inspectVisibleSuffix(frame, null, cursorRow, cursorColumn) == TerminalShellCommandFingerprintStatus.COMPLETE
 
     private fun findLine(
         frame: TerminalRenderFrame,
@@ -508,7 +505,47 @@ internal class ShellIntegrationCommandTextExtractor(
         val utf16Length = destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX].toInt()
         val charCount = Character.charCount(codePoint)
         if (utf16Length > maxTextLength - charCount) return false
-        val value = codePoint.toLong() and 0xffff_ffffL
+        mixFingerprint(codePoint.toLong() and 0xffff_ffffL, destination)
+        destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX] = (utf16Length + charCount).toLong()
+        return true
+    }
+
+    private fun hashCopiedRange(
+        startColumn: Int,
+        endColumn: Int,
+        destination: LongArray,
+    ): Boolean {
+        var column = startColumn
+        while (column < endColumn) {
+            val cellFlags = flags[column]
+            if (!TerminalRenderCellFlags.isValidCombination(cellFlags)) return false
+            when {
+                cellFlags == TerminalRenderCellFlags.EMPTY -> if (!hashCodePoint(' '.code, destination)) return false
+                cellFlags and TerminalRenderCellFlags.WRAP_PADDING != 0 -> Unit
+                cellFlags and TerminalRenderCellFlags.WIDE_TRAILING != 0 -> Unit
+                cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 -> if (!hashCodePoint(codeWords[column], destination)) return false
+                cellFlags and TerminalRenderCellFlags.CLUSTER != 0 -> {
+                    val offset = clusterOffsets[column]
+                    val length = clusterLengths[column]
+                    if (offset == NO_CLUSTER_OFFSET || length <= 0) return false
+                    var index = offset
+                    val end = offset + length
+                    while (index < end) {
+                        if (!hashCodePoint(clusterCodePoints[index], destination)) return false
+                        index++
+                    }
+                }
+                else -> return false
+            }
+            column++
+        }
+        return true
+    }
+
+    private fun mixFingerprint(
+        value: Long,
+        destination: LongArray,
+    ) {
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_A_INDEX] =
             (destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_A_INDEX] xor value) * FINGERPRINT_HASH_A_PRIME
         destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_B_INDEX] =
@@ -516,14 +553,14 @@ internal class ShellIntegrationCommandTextExtractor(
                 destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_HASH_B_INDEX] xor (value + FINGERPRINT_HASH_B_MIX),
                 27,
             ) * FINGERPRINT_HASH_B_PRIME
-        destination[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX] = (utf16Length + charCount).toLong()
-        return true
     }
 
     private companion object {
         private const val NO_LINE_ID = 0L
         private const val NO_CLUSTER_OFFSET = -1
         private const val MIN_CLUSTER_CAPACITY = 16
+        private const val FINGERPRINT_SUFFIX_START = 0x110000L
+        private const val FINGERPRINT_SUFFIX_WRAP = 0x110001L
         private const val FINGERPRINT_HASH_A_SEED = -0x340d631b7bdddcdbL
         private const val FINGERPRINT_HASH_A_PRIME = 0x100000001b3L
         private const val FINGERPRINT_HASH_B_SEED = -0x61c8864680b583ebL

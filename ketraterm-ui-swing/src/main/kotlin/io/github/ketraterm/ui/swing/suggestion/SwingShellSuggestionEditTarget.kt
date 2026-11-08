@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.session.TerminalCommandEditContext
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 
@@ -46,8 +47,9 @@ public fun interface SwingShellSuggestionEditTarget {
         internal fun captureSessionEdit(
             session: TerminalSession,
             request: SwingShellSuggestionRequest,
+            expected: TerminalCommandEditContext? = session.captureCommandEdit(),
         ): SwingShellSuggestionHandler? {
-            val expected = session.captureCommandEdit() ?: return null
+            if (expected == null) return null
             if (expected.commandLine.commandText != request.commandText ||
                 expected.commandLine.cursorOffset != request.cursorOffset
             ) {

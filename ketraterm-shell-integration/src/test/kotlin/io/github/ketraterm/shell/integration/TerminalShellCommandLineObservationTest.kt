@@ -52,7 +52,7 @@ class TerminalShellCommandLineObservationTest {
         }
 
     @Test
-    fun `prediction visibility changes confirmation state without changing typed text`() =
+    fun `prediction text changes publish editing revisions while cosmetic repaint preserves them`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
@@ -72,12 +72,18 @@ class TerminalShellCommandLineObservationTest {
                 fixture.feed("witch\u001b[5D")
                 runCurrent()
                 assertEquals(predicted, fixture.session.activeShellCommandLine())
-                assertEquals(withPrediction, fixture.session.activeShellCommandLineRevision.value)
+                val changedPrediction = fixture.session.activeShellCommandLineRevision.value
+                assertTrue(changedPrediction > withPrediction)
+
+                fixture.feed("\u001b[90mwitch\u001b[0m\u001b[5D")
+                runCurrent()
+                assertEquals(predicted, fixture.session.activeShellCommandLine())
+                assertEquals(changedPrediction, fixture.session.activeShellCommandLineRevision.value)
 
                 fixture.feed("\u001b[K")
                 runCurrent()
                 assertEquals(initial, fixture.session.activeShellCommandLine())
-                assertTrue(fixture.session.activeShellCommandLineRevision.value > withPrediction)
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > changedPrediction)
             }
         }
 
@@ -143,7 +149,9 @@ class TerminalShellCommandLineObservationTest {
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect { revisions += it } }
                 runCurrent()
 
-                assertEquals(listOf(-1L, rendered), revisions)
+                assertEquals(2, revisions.size)
+                assertEquals(-1L, revisions.first())
+                assertTrue(revisions.last() >= 0L)
                 assertEquals(1, fixture.terminal.historyReads)
                 assertEquals(rendered, fixture.session.renderGeneration.value)
             }
@@ -159,13 +167,16 @@ class TerminalShellCommandLineObservationTest {
                 val second = backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
                 runCurrent()
                 assertEquals(1, fixture.terminal.historyReads)
+                val revision = fixture.session.activeShellCommandLineRevision.value
+                val rendered = fixture.session.renderGeneration.value
 
                 first.cancelAndJoin()
                 runCurrent()
                 fixture.feed("x")
                 runCurrent()
                 assertEquals(2, fixture.terminal.historyReads)
-                assertEquals(fixture.session.renderGeneration.value, fixture.session.activeShellCommandLineRevision.value)
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+                assertTrue(fixture.session.renderGeneration.value > rendered)
 
                 second.cancelAndJoin()
                 runCurrent()
@@ -182,21 +193,32 @@ class TerminalShellCommandLineObservationTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 fixture.feed(MULTILINE_PROMPT)
                 runCurrent()
+                var previousRevision = -1L
                 repeat(3) {
+                    val rendered = fixture.session.renderGeneration.value
+                    val historyReads = fixture.terminal.historyReads
                     val revisions = mutableListOf<Long>()
                     val observer =
                         backgroundScope.launch {
                             fixture.session.activeShellCommandLineRevision.collect { revisions += it }
                         }
                     runCurrent()
-                    assertEquals(listOf(-1L, fixture.session.renderGeneration.value), revisions)
-                    assertEquals(it + 1, fixture.terminal.historyReads)
+                    assertEquals(2, revisions.size)
+                    assertEquals(-1L, revisions.first())
+                    assertTrue(revisions.last() > previousRevision)
+                    previousRevision = revisions.last()
+                    assertEquals(rendered, fixture.session.renderGeneration.value)
+                    assertEquals(historyReads + 1, fixture.terminal.historyReads)
+                    assertEquals("one\ntwo\nthree" + "x".repeat(it), fixture.session.activeShellCommandLine()?.commandText)
+                    // The explicit snapshot read above performs its own bounded history lookup.
+                    assertEquals(historyReads + 2, fixture.terminal.historyReads)
 
                     observer.cancelAndJoin()
                     runCurrent()
+                    assertEquals(-1L, fixture.session.activeShellCommandLineRevision.value)
                     fixture.feed("x")
                     runCurrent()
-                    assertEquals(it + 1, fixture.terminal.historyReads)
+                    assertEquals(historyReads + 2, fixture.terminal.historyReads)
                 }
             }
         }
@@ -286,15 +308,18 @@ class TerminalShellCommandLineObservationTest {
                 runCurrent()
                 fixture.session.requestRender(1)
                 runCurrent()
-                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                val revisions = mutableListOf<Long>()
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect { revisions += it } }
                 runCurrent()
 
-                assertEquals(-1L, fixture.session.activeShellCommandLineRevision.value)
+                assertEquals(listOf(-1L), revisions)
                 assertEquals(0, fixture.terminal.historyReads)
 
                 fixture.session.requestRender(0)
                 runCurrent()
-                assertEquals(fixture.session.renderGeneration.value, fixture.session.activeShellCommandLineRevision.value)
+                assertEquals(2, revisions.size)
+                assertEquals(-1L, revisions.first())
+                assertTrue(revisions.last() >= 0L)
                 assertEquals(1, fixture.terminal.historyReads)
             }
         }
@@ -317,11 +342,12 @@ class TerminalShellCommandLineObservationTest {
                 }
                 runCurrent()
                 val previous = received.await()
+                val rendered = fixture.session.renderGeneration.value
                 fixture.feed("x")
                 runCurrent()
 
-                assertTrue(fixture.session.renderGeneration.value > previous)
-                assertEquals(fixture.session.renderGeneration.value, fixture.session.activeShellCommandLineRevision.value)
+                assertTrue(fixture.session.renderGeneration.value > rendered)
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > previous)
                 release.complete(Unit)
             }
         }

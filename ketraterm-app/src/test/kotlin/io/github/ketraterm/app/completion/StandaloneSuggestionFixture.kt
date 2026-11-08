@@ -171,8 +171,13 @@ internal class StandaloneSuggestionFixture private constructor(
                 awaitEditableLine(session, line, requireShellCompletion)
             }
         } catch (failure: TimeoutCancellationException) {
+            val edit = session.captureCommandEdit()
+            val admission =
+                "capturable=${edit != null}, completionAvailable=${session.shellCompletionAvailable}, " +
+                    "prefixReset=${edit?.prefixResetKeys?.isNotEmpty()}"
+            edit?.cancel()
             throw AssertionError(
-                "Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}\n${screenText()}",
+                "Expected '$line', observed ${session.activeShellCommandLine()}, session ${session.state.value}; $admission\n${screenText()}",
                 failure,
             )
         }
@@ -278,7 +283,7 @@ internal class StandaloneSuggestionFixture private constructor(
             line: String,
             requireShellCompletion: Boolean = false,
         ) {
-            session.renderGeneration.first {
+            session.commandEditChanges.first {
                 val edit = session.captureCommandEdit() ?: return@first false
                 val snapshot = edit.commandLine
                 val ready =
@@ -339,7 +344,7 @@ internal class StandaloneSuggestionFixture private constructor(
                 // Closing the workspace requests termination but does not await the OS process.
                 withContext(Dispatchers.Swing) { created.terminal.setShellSuggestionProvider(null) }
                 withTimeout(15.seconds) {
-                    tab.session.renderGeneration.first {
+                    tab.session.commandEditChanges.first {
                         // A shell redraw can temporarily invalidate the context after the scenario.
                         val edit = tab.session.captureCommandEdit() ?: return@first false
                         val line = edit.commandLine

@@ -453,6 +453,63 @@ class OscShellIntegrationTest {
         }
     }
 
+    @Test
+    fun `wide prediction beyond right margin padding participates in frame and cache fingerprints`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 16, rows = 4).use { session ->
+            val prefix = "x".repeat(11)
+            connector.feedFromHost(
+                (
+                    "\u001b]133;A\u0007PS> \u001b]633;KetraTermCompletion;2;Ready;${"a".repeat(32)}\u0007" +
+                        "\u001b]133;B\u0007${prefix}界\u001b[1;16H"
+                ).toByteArray(Charsets.UTF_8),
+            )
+            val active = requireNotNull(session.activeShellCommandLine())
+            assertEquals(prefix, active.commandText)
+            assertTrue(active.requiresShellConfirmation)
+            assertEquals(15, active.cursorColumn)
+
+            val extractor = ShellIntegrationCommandTextExtractor()
+            val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+            session.readRenderFrame { frame ->
+                assertTrue(frame.lineWrapped(0))
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION,
+                    extractor.fingerprint(frame, frame.lineId(0), 4, 0, 15, frameFingerprint, allowVisibleSuffix = true),
+                )
+            }
+            val cache = TerminalRenderCache(16, 4).also { it.updateFrom(session) }
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.REQUIRES_SHELL_CONFIRMATION,
+                extractor.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint, allowVisibleSuffix = true),
+            )
+            assertEquals(prefix.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+            assertArrayEquals(frameFingerprint, cacheFingerprint)
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.INVALID,
+                extractor.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint),
+            )
+            for (bounded in listOf(
+                ShellIntegrationCommandTextExtractor(maxTextLength = prefix.length),
+                ShellIntegrationCommandTextExtractor(maxRows = 1),
+            )) {
+                session.readRenderFrame { frame ->
+                    assertEquals(
+                        TerminalShellCommandFingerprintStatus.INVALID,
+                        bounded.fingerprint(frame, frame.lineId(0), 4, 0, 15, frameFingerprint, allowVisibleSuffix = true),
+                    )
+                }
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.INVALID,
+                    bounded.fingerprint(cache, cache.lineIds[0], 4, 0, 15, cacheFingerprint, allowVisibleSuffix = true),
+                )
+                assertEquals(prefix.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+                assertArrayEquals(frameFingerprint, cacheFingerprint)
+            }
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [19, 20])
     fun `Fish cross-row redraw without a fresh prompt boundary leaves editing context unavailable`(promptWidth: Int) {

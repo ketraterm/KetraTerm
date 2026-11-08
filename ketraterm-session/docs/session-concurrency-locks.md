@@ -93,6 +93,28 @@ an editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 `submitInput(expected, events)` using that same context.
 
+Use `commandEditChanges` to await another capture opportunity. This conflated
+flow includes an initial sample and observes render publication, producer
+revisions, outbound write retirement, and session lifecycle. Recheck the desired
+command and perform `captureCommandEdit()` on each wakeup; the notification
+does not reserve input or guarantee that capture succeeds. Rendering and editor
+revisions alone are insufficient: the final prompt can be rendered while a
+connector write is still active, with no later screen change when it retires.
+Collectors own cancellation and must stop waiting when the session closes.
+
+Admission wakeups are separate from semantic editor invalidation. They do not
+invalidate retained contexts or cancel in-flight native queries; a query's own
+write retirement is an opportunity to recheck capture, not evidence that its
+buffer changed. Writer idleness never acknowledges remote shell processing.
+
+`activeShellCommandLineRevision` also invalidates retained edit authority when
+a correlated native reply matches the current command and cursor but cannot
+preserve the request's context, for example after a same-text repaint. Consumers
+must start a fresh interaction and capture a new context; they cannot renew the
+old handler. The session publishes this invalidation outside its locks and retains
+its generation. Successful queries, mismatched buffers, unavailable hooks, failed
+replies, and replies with no remaining callers do not trigger retries.
+
 Final validation and queue reservation share mutation, producer, and outbound
 serialization. Intervening input, output, resize, or host-model assignment makes
 an older context stale. Equal assignments and changes away from and back to the
@@ -125,6 +147,15 @@ Waiting and query execution share each caller's
 [native completion deadline](../../docs/reference/protocol.md#private-powershell-completion-metadata).
 Local primary-buffer clear retires an invalidated native query without waiting
 for further shell output. Closure cancels both response and retirement waiters.
+
+Interactive consumers use `requestShellCompletions(expected)` with the same context
+captured before provider work. This overload verifies that native confirmation
+preserves that original context; unrelated output between capture and query admission
+cannot silently renew it, even if its terminal response has already drained.
+An exact current buffer with stale original authority publishes the semantic
+invalidation described above and returns null. A newly captured interaction may
+reuse a still-valid native receipt. Callers that only collect candidates can use
+the command-line and cursor overload.
 
 A screen-derived snapshot with `requiresShellConfirmation` contains only the
 prompt-to-cursor prefix: visible text after the cursor may be a shell prediction

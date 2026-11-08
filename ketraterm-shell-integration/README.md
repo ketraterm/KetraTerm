@@ -82,7 +82,8 @@ PowerShell bridge, a visible suffix instead produces a provisional prefix marked
 [conditional-edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
 before using it for suggestions. Use
 `session.activeShellCommandLineRevision` to observe text, cursor, availability,
-prompt context, and native editing capability changes. Session shares one
+prompt context, native editing capabilities, and the visible suffix of a provisional
+snapshot. Session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session's conditional-edit APIs when admitting asynchronous suggestions.

@@ -19,6 +19,7 @@ import io.github.ketraterm.session.TerminalShellCommandInventory
 import io.github.ketraterm.session.TerminalShellCommandInventoryStatus
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
 import javax.swing.SwingUtilities
@@ -27,6 +28,118 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
+    @Test
+    fun `admission wakeups do not postpone a pending editing refresh`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(16.milliseconds)
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(59.milliseconds)
+            runCurrent()
+
+            assertEquals(2, fixture.attempts)
+            assertEquals(listOf(snapshot("git s"), snapshot("git s")), fixture.requests)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `reentrant refresh during capture keeps unchanged text eligible for the new context`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.onRequest = {
+                fixture.onRequest = null
+                fixture.scheduler.refresh()
+            }
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.attempts)
+            assertEquals(listOf(snapshot("git s"), snapshot("git s")), fixture.requests)
+
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.attempts)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `admission wakeup retries a failed capture without invalidating an accepted request`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.captureAvailable = false
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+            assertTrue(fixture.requests.isEmpty())
+
+            fixture.captureAvailable = true
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.attempts)
+            assertEquals(listOf(snapshot("git s")), fixture.requests)
+
+            val hides = fixture.hideCount
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.attempts, "A native query's own write completion must not restart it")
+            assertEquals(hides, fixture.hideCount)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `admission wakeups preserve explicit requests dismissal and pending input suppression`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            fixture.scheduler.onExplicitRequest()
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+
+            fixture.scheduler.onInvalidated()
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+
+            fixture.scheduler.onInvalidated(dismissed = true)
+            fixture.revisions.value++
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+            fixture.scheduler.stop()
+        }
+
     @Test
     fun `late inventory changes refresh unchanged text without duplicating the initial request`() =
         onEdtTest {
@@ -452,6 +565,7 @@ class SwingShellSuggestionSchedulerTest {
             assertEquals(0, fixture.revisions.subscriptionCount.value)
             assertEquals(hides, fixture.hideCount)
             assertEquals(0, fixture.inventory.subscriptionCount.value)
+            assertEquals(0, fixture.admissionChanges.subscriptionCount.value)
             assertTrue(fixture.requests.isEmpty())
             assertTrue(backgroundScope.isActive)
         }
@@ -468,6 +582,7 @@ class SwingShellSuggestionSchedulerTest {
             runCurrent()
             assertEquals(0, fixture.revisions.subscriptionCount.value)
             assertEquals(0, fixture.inventory.subscriptionCount.value)
+            assertEquals(0, fixture.admissionChanges.subscriptionCount.value)
             assertEquals(1, next.subscriptionCount.value)
             fixture.revisions.value = 1
             advanceTimeBy(74.milliseconds)
@@ -662,6 +777,9 @@ class SwingShellSuggestionSchedulerTest {
     ) {
         val revisions = MutableStateFlow(0L)
         val inventory = MutableStateFlow<TerminalShellCommandInventory?>(null)
+        val admissionChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        var captureAvailable = true
+        var attempts = 0
         var active: TerminalShellCommandLineSnapshot? = snapshot("git s")
         var focused = true
         var eligible = true
@@ -670,6 +788,7 @@ class SwingShellSuggestionSchedulerTest {
         var hideCount = 0
         val refreshing = ArrayList<Boolean>()
         var onHide: (() -> Unit)? = null
+        var onRequest: (() -> Unit)? = null
         val scheduler =
             SwingShellSuggestionScheduler(
                 observationScope = scope,
@@ -678,8 +797,13 @@ class SwingShellSuggestionSchedulerTest {
                 isEligible = { eligible },
                 requestSuggestions = { snapshot, feedback ->
                     assertTrue(SwingUtilities.isEventDispatchThread())
-                    requests += snapshot
-                    feedbackHandler = feedback
+                    attempts++
+                    if (captureAvailable) {
+                        requests += snapshot
+                        feedbackHandler = feedback
+                    }
+                    onRequest?.invoke()
+                    captureAvailable
                 },
                 hideSuggestions = { retain ->
                     assertTrue(SwingUtilities.isEventDispatchThread())
@@ -690,7 +814,7 @@ class SwingShellSuggestionSchedulerTest {
                 minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
             )
 
-        fun start() = scheduler.start({ active }, revisions, inventory)
+        fun start() = scheduler.start({ active }, revisions, inventory, admissionChanges)
     }
 
     private companion object {
