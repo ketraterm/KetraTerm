@@ -4,6 +4,26 @@ Painting, damage planning, and pointer hit testing use the same installed
 viewport geometry. The following types are internal implementation details;
 public viewport and selection APIs are on `SwingTerminal`.
 
+## Device-pixel alignment
+
+Cell metrics, padding, hit testing, and repaint requests use Swing logical pixels.
+`TerminalDeviceGeometry` converts the current paint transform into shared device
+edges for backgrounds, selection/search/link fills, text clips, primitive glyphs,
+and cursors. It rounds absolute edges with `ceil(edge - 0.5)`, matching Swing's
+fractional-scale damage copies. Adjacent spans therefore share one half-open
+boundary, including at half-pixel ties and negative scroll translations.
+Widths are derived from those edges; bar and underline cursor thickness is
+rounded independently of position. Inactive block outlines remain one device
+pixel thick and blend each corner once.
+
+Painters retain and intersect clips in device space, preserving holes and shaped edges
+without inverse-transform rounding drift.
+The grid constrains rectangular damage to the same device edges before clearing
+or compositing translucent overlays. Partial repaints must reproduce a full
+render, including the pixels beneath a hidden or moved cursor. Rotated,
+reflected, and sheared graphics retain ordinary Java2D transformed geometry.
+Font advances and terminal cell coordinates are not quantized to device pixels.
+
 ## 1. Minimal Repaint Planning (`SwingRepaintPlanner`)
 
 The EDT-owned planner remembers the state for which it last scheduled a repaint,
@@ -39,6 +59,9 @@ scrollbar and visual-bell overlays paint afterward. This is the current overlap
 behavior when an image obscures selected or matched text.
 
 Image positions use physical viewport cells and the installed row geometry.
+Fractional placement coordinates remain precise through the Java2D image transform;
+they are not first rounded to logical pixels. Placement clipping uses device-aligned
+edges while source cropping and sampling retain the full image transform.
 Contiguous rows share one image draw; prompt dividers split it into separate
 runs. Fractional scrolling and content padding use the same translation as text.
 Image pixels are copied into EDT-owned rasters during frame installation, never

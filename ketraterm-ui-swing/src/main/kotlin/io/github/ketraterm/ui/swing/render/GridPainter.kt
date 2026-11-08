@@ -32,6 +32,7 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.RenderingHints
+import java.awt.geom.Rectangle2D
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -58,6 +59,7 @@ internal class GridPainter(
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
     private val clipScratch = Rectangle()
     private val graphicsPainter = GraphicsPainter()
+    private val pixels = TerminalDeviceGeometry()
 
     fun prepareFrame(cache: TerminalRenderCache) {
         graphicsPainter.prepare(cache.images)
@@ -121,15 +123,18 @@ internal class GridPainter(
         g.font = textPainter.font(Font.PLAIN)
         val fontRenderContext = g.fontRenderContext
 
-        val clip = g.getClipBounds(clipScratch)
-        backgroundPainter.clear(g, palette, width, height)
-
+        // Java2D can leave the supplied rectangle unchanged when there is no user clip.
+        clipScratch.setBounds(0, 0, -1, -1)
+        val clip = g.getClipBounds(clipScratch)?.takeIf { it.width >= 0 && it.height >= 0 }
         val paddingLeft = chrome.left(settings, cache.activeBuffer)
         val paddingTop = chrome.top(settings, cache.activeBuffer)
         val paddingBottom = chrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
         val contentWidth = width - paddingLeft - chrome.right(settings, cache.activeBuffer)
-        if (gridPaintHeight <= 0) return
+        if (gridPaintHeight <= 0) {
+            backgroundPainter.clear(g, palette, width, height)
+            return
+        }
 
         val promptGutterWidth = chrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
         val geometry = visualGeometry?.takeIf { it.rowCount == cache.rows }
@@ -143,7 +148,15 @@ internal class GridPainter(
         val firstRow = firstPaintRow(clip, metrics, contentOriginY, paddingTop, geometry)
         val rows = lastPaintRowExclusive(clip, cache, metrics, height, contentOriginY, paddingTop, paddingBottom, geometry)
         val originalClip = g.clip
-        g.clipRect(0, paddingTop, width, gridPaintHeight)
+        pixels.update(g)
+        // Java2D's transformed user clip can include a fringe pixel that Swing's
+        // device damage copy excludes. Constrain rectangular damage before clears
+        // and overlays so every layer owns the same half-open pixel range.
+        if (originalClip is Rectangle2D) {
+            pixels.alignClip(g, originalClip)
+        }
+        backgroundPainter.clear(g, palette, width, height)
+        pixels.clipRect(g, 0, paddingTop, width, gridPaintHeight)
         g.translate(paddingLeft.toDouble(), paddingTop.toDouble() + contentOriginY)
         try {
             if (cache.images.size != 0) {
@@ -286,6 +299,7 @@ internal class GridPainter(
         hover: TerminalHyperlinkHover?,
         blinkVisible: Boolean,
     ) {
+        pixels.update(g)
         val offset = cache.rowOffset(row)
         val bidi = cellGeometry.row(cache, row)
         var column = 0
@@ -315,7 +329,13 @@ internal class GridPainter(
             }
             g.color = colorCache.color(background)
             forEachVisualCellSpan(bidi, start, column) { first, end ->
-                g.fillRect(first * metrics.cellWidth, row * metrics.cellHeight, (end - first) * metrics.cellWidth, metrics.cellHeight)
+                pixels.fillRect(
+                    g,
+                    first * metrics.cellWidth,
+                    row * metrics.cellHeight,
+                    (end - first) * metrics.cellWidth,
+                    metrics.cellHeight,
+                )
             }
         }
     }

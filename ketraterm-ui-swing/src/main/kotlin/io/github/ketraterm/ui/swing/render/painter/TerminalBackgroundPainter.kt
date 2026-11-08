@@ -21,10 +21,10 @@ import io.github.ketraterm.render.api.TerminalRenderColorKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.SwingColors
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
+import io.github.ketraterm.ui.swing.render.TerminalDeviceGeometry
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
-import java.awt.geom.AffineTransform
 
 /**
  * Paints terminal default clears and row background runs.
@@ -32,6 +32,8 @@ import java.awt.geom.AffineTransform
 internal class TerminalBackgroundPainter(
     private val colorCache: AwtColorCache,
 ) {
+    private val pixels = TerminalDeviceGeometry()
+
     /**
      * Clears a rectangular component area with the palette default background.
      */
@@ -59,16 +61,7 @@ internal class TerminalBackgroundPainter(
         val attrWords = cache.attrWords
         val rowOffset = cache.rowOffset(row)
 
-        val transform = g.transform
-        val scaleX = transform.scaleX
-        val scaleY = transform.scaleY
-        val transX = transform.translateX
-        val transY = transform.translateY
-
-        val top = row * metrics.cellHeight
-        val bottom = (row + 1) * metrics.cellHeight
-        val y1 = kotlin.math.round(top * scaleY + transY).toInt()
-        val y2 = kotlin.math.round(bottom * scaleY + transY).toInt()
+        pixels.update(g)
 
         var column = 0
         while (column < cache.columns) {
@@ -89,19 +82,14 @@ internal class TerminalBackgroundPainter(
             }
 
             if (skipDefault && defaultBackground) continue
-            val left = start * metrics.cellWidth
-            val right = column * metrics.cellWidth
-            val x1 = kotlin.math.round(left * scaleX + transX).toInt()
-            val x2 = kotlin.math.round(right * scaleX + transX).toInt()
-
-            val oldTransform = g.transform
-            g.transform = IDENTITY_TRANSFORM
-            try {
-                g.color = colorCache.color(background)
-                g.fillRect(x1, y1, x2 - x1, y2 - y1)
-            } finally {
-                g.transform = oldTransform
-            }
+            g.color = colorCache.color(background)
+            pixels.fillRect(
+                g,
+                start * metrics.cellWidth,
+                row * metrics.cellHeight,
+                (column - start) * metrics.cellWidth,
+                metrics.cellHeight,
+            )
         }
     }
 
@@ -117,10 +105,7 @@ internal class TerminalBackgroundPainter(
         argb: Int,
     ) {
         g.color = colorCache.color(argb)
-        g.fillRect(x, y, width, height)
-    }
-
-    private companion object {
-        private val IDENTITY_TRANSFORM = AffineTransform()
+        pixels.update(g)
+        pixels.fillRect(g, x, y, width, height)
     }
 }

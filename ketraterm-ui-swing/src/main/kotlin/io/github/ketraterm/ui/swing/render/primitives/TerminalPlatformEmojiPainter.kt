@@ -22,6 +22,8 @@ import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
+import kotlin.math.ceil
+import kotlin.math.hypot
 import kotlin.math.min
 
 /**
@@ -47,7 +49,7 @@ internal class TerminalPlatformEmojiPainter(
     ): Boolean {
         if (!TerminalEmojiPresentation.usesEmojiPresentation(codePoint)) return false
         val pixelSize = pixelSize(metrics, columnSpan)
-        val image = cache.codePointImage(codePoint, pixelSize) ?: return false
+        val image = cache.codePointImage(codePoint, rasterSize(g, pixelSize)) ?: return false
         return paintImage(g, image, pixelSize, column, row, columnSpan, metrics)
     }
 
@@ -63,8 +65,19 @@ internal class TerminalPlatformEmojiPainter(
     ): Boolean {
         if (!TerminalEmojiPresentation.usesEmojiPresentation(codepoints, offset, length)) return false
         val pixelSize = pixelSize(metrics, columnSpan)
-        val image = cache.clusterImage(codepoints, offset, length, pixelSize) ?: return false
+        val image = cache.clusterImage(codepoints, offset, length, rasterSize(g, pixelSize)) ?: return false
         return paintImage(g, image, pixelSize, column, row, columnSpan, metrics)
+    }
+
+    // Rasterize at device resolution before fitting into the unchanged logical cell.
+    // Translation does not affect resolution, so scrolling reuses the cached bitmap.
+    private fun rasterSize(
+        g: Graphics2D,
+        logicalSize: Int,
+    ): Int {
+        val transform = g.transform
+        val scale = maxOf(hypot(transform.scaleX, transform.shearY), hypot(transform.shearX, transform.scaleY))
+        return ceil(logicalSize * scale).toInt().coerceAtLeast(1)
     }
 
     private fun pixelSize(

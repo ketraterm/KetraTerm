@@ -46,6 +46,7 @@ internal class TerminalShapedTextRunPainter(
     private val runStyle: TerminalTextRunStyle,
     private val cellPrimitives: TerminalCellPrimitivePainter,
 ) {
+    private val pixels = TerminalDeviceGeometry()
     private val glyphVectors = TerminalShapedGlyphVectorCache()
     private var chars = CharArray(INITIAL_TEXT_RUN_CAPACITY)
     private var charColumns = IntArray(INITIAL_TEXT_RUN_CAPACITY)
@@ -334,9 +335,16 @@ internal class TerminalShapedTextRunPainter(
         styleColumns: Int,
         foreground: Int,
     ) {
-        val oldClip = g.clip
+        pixels.update(g)
+        val oldClip = pixels.saveClip(g)
         try {
-            g.clipRect(styleVisualStart * metrics.cellWidth, row * metrics.cellHeight, styleColumns * metrics.cellWidth, metrics.cellHeight)
+            pixels.clipRect(
+                g,
+                styleVisualStart * metrics.cellWidth,
+                row * metrics.cellHeight,
+                styleColumns * metrics.cellWidth,
+                metrics.cellHeight,
+            )
             g.color = colorCache.color(foreground)
             val clipStart = (styleVisualStart - runVisualStart) * metrics.cellWidth.toFloat()
             shapedRun.draw(
@@ -347,7 +355,7 @@ internal class TerminalShapedTextRunPainter(
                 clipStart + styleColumns * metrics.cellWidth,
             )
         } finally {
-            g.clip = oldClip
+            pixels.restoreClip(g, oldClip)
         }
     }
 

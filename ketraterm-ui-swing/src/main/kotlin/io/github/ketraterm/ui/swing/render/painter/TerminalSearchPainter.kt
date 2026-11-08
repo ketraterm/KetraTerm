@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
+import io.github.ketraterm.ui.swing.render.TerminalDeviceGeometry
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
@@ -29,6 +30,8 @@ import java.awt.Graphics2D
 internal class TerminalSearchPainter(
     private val colorCache: AwtColorCache,
 ) {
+    private val pixels = TerminalDeviceGeometry()
+
     fun paint(
         g: Graphics2D,
         metrics: SwingMetrics,
@@ -42,7 +45,8 @@ internal class TerminalSearchPainter(
         val count = highlights.segmentCountForRow(row)
         if (count == 0) return
 
-        val originalClip = g.clip
+        pixels.update(g)
+        val originalClip = pixels.saveClip(g)
         var segment = highlights.firstSegmentForRow(row)
         val end = segment + count
         while (segment < end) {
@@ -55,11 +59,11 @@ internal class TerminalSearchPainter(
                 val width = (visualEnd - visualStart) * metrics.cellWidth
                 // Translucent fills can rasterize outside Swing's rounded dirty-region
                 // edges at fractional scales. Clip to the cells that own the overlay.
-                g.clipRect(x, y, width, metrics.cellHeight)
+                pixels.clipRect(g, x, y, width, metrics.cellHeight)
                 try {
                     if (style.background ushr 24 != 0) {
                         g.color = colorCache.color(style.background)
-                        g.fillRect(x, y, width, metrics.cellHeight)
+                        pixels.fillRect(g, x, y, width, metrics.cellHeight)
                     }
                     val border = style.border
                     if (border != null && border ushr 24 != 0 && width > 0) {
@@ -67,7 +71,7 @@ internal class TerminalSearchPainter(
                         paintBorder(g, x, y, width, metrics.cellHeight)
                     }
                 } finally {
-                    g.clip = originalClip
+                    pixels.restoreClip(g, originalClip)
                 }
             }
             segment++
@@ -82,11 +86,6 @@ internal class TerminalSearchPainter(
         width: Int,
         height: Int,
     ) {
-        g.fillRect(x, y, width, 1)
-        if (height > 1) g.fillRect(x, y + height - 1, width, 1)
-        if (height > 2) {
-            g.fillRect(x, y + 1, 1, height - 2)
-            if (width > 1) g.fillRect(x + width - 1, y + 1, 1, height - 2)
-        }
+        pixels.border(g, x, y, width, height)
     }
 }

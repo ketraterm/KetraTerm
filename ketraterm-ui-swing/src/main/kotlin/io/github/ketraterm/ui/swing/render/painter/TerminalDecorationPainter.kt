@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.render.api.*
+import io.github.ketraterm.ui.swing.render.TerminalDeviceGeometry
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
@@ -26,6 +27,8 @@ import java.awt.Graphics2D
 internal class TerminalDecorationPainter(
     private val colorCache: AwtColorCache,
 ) {
+    private val pixels = TerminalDeviceGeometry()
+
     /**
      * Paints terminal and hyperlink decorations using the style retained by the run scanner.
      */
@@ -69,6 +72,7 @@ internal class TerminalDecorationPainter(
         thickness: Int,
     ) {
         if (start >= end) return
+        pixels.update(g)
         val x = start * metrics.cellWidth
         val limit = end * metrics.cellWidth
         val y = row * metrics.cellHeight + metrics.underlineY
@@ -79,7 +83,7 @@ internal class TerminalDecorationPainter(
                 val period = thickness + 2
                 var pixel = x + (period - x % period) % period
                 while (pixel < limit) {
-                    g.fillRect(pixel, y, minOf(thickness, limit - pixel), height)
+                    pixels.fillRect(g, pixel, y, minOf(thickness, limit - pixel), height)
                     pixel += period
                 }
             }
@@ -87,22 +91,22 @@ internal class TerminalDecorationPainter(
                 var pixel = x
                 while (pixel < limit) {
                     val waveY = minOf((row + 1) * metrics.cellHeight - height, y + if (pixel % 4 < 2) 0 else 1)
-                    g.fillRect(pixel, waveY, 1, height)
+                    pixels.fillRect(g, pixel, waveY, 1, height)
                     pixel++
                 }
             }
             TerminalRenderUnderline.DASHED -> {
                 var pixel = x + (4 - x % 4) % 4
                 while (pixel < limit) {
-                    g.fillRect(pixel, y, minOf(2, limit - pixel), height)
+                    pixels.fillRect(g, pixel, y, minOf(2, limit - pixel), height)
                     pixel += 4
                 }
             }
             TerminalRenderUnderline.DOUBLE -> {
-                g.fillRect(x, y, limit - x, 1)
-                g.fillRect(x, minOf((row + 1) * metrics.cellHeight - 1, y + 2), limit - x, 1)
+                pixels.fillRect(g, x, y, limit - x, 1)
+                pixels.fillRect(g, x, minOf((row + 1) * metrics.cellHeight - 1, y + 2), limit - x, 1)
             }
-            else -> g.fillRect(x, y, limit - x, height)
+            else -> pixels.fillRect(g, x, y, limit - x, height)
         }
     }
 
@@ -125,6 +129,7 @@ internal class TerminalDecorationPainter(
         val overline = TerminalRenderExtraAttrs.isOverline(extraAttr)
         if (underline == TerminalRenderUnderline.NONE && !strikethrough && !overline) return
 
+        pixels.update(g)
         val x = startColumn * metrics.cellWidth
         val width = (endColumn - startColumn) * metrics.cellWidth
         val rowY = row * metrics.cellHeight
@@ -132,23 +137,23 @@ internal class TerminalDecorationPainter(
         if (underline != TerminalRenderUnderline.NONE) {
             g.color = colorCache.color(underlineColor(palette, extraAttr, foreground))
             val y = rowY + metrics.underlineY
-            g.fillRect(x, y, width, DECORATION_THICKNESS)
+            pixels.fillRect(g, x, y, width, DECORATION_THICKNESS)
             if (underline == TerminalRenderUnderline.DOUBLE) {
                 val secondY = minOf(rowY + metrics.cellHeight - 1, y + DOUBLE_UNDERLINE_OFFSET)
-                g.fillRect(x, secondY, width, DECORATION_THICKNESS)
+                pixels.fillRect(g, x, secondY, width, DECORATION_THICKNESS)
             }
         }
 
         if (strikethrough) {
             g.color = colorCache.color(foreground)
             val y = rowY + metrics.strikethroughY
-            g.fillRect(x, y, width, DECORATION_THICKNESS)
+            pixels.fillRect(g, x, y, width, DECORATION_THICKNESS)
         }
 
         if (overline) {
             g.color = colorCache.color(foreground)
             val y = rowY + metrics.overlineY
-            g.fillRect(x, y, width, DECORATION_THICKNESS)
+            pixels.fillRect(g, x, y, width, DECORATION_THICKNESS)
         }
     }
 

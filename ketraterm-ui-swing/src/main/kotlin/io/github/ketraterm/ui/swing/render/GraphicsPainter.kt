@@ -22,7 +22,6 @@ import java.awt.Rectangle
 import java.awt.Shape
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.roundToInt
 
 /**
  * EDT-owned compositor for image placements in physical viewport cells.
@@ -36,6 +35,7 @@ import kotlin.math.roundToInt
 internal class GraphicsPainter {
     private val rasters = GraphicsRasterCache()
     private val clip = Rectangle()
+    private val pixels = TerminalDeviceGeometry()
 
     /** Installs raster references in the same order as the borrowed placement set. */
     fun prepare(images: TerminalRenderImages) = rasters.prepare(images)
@@ -58,6 +58,12 @@ internal class GraphicsPainter {
         rows: Int,
     ) {
         if (images.size == 0) return
+        val transform = pixels.update(g)
+        val fractionalTransform =
+            transform.scaleX % 1.0 != 0.0 ||
+                transform.scaleY % 1.0 != 0.0 ||
+                transform.translateX % 1.0 != 0.0 ||
+                transform.translateY % 1.0 != 0.0
         // SunGraphics2D leaves the supplied rectangle unchanged when no user clip exists.
         clip.setBounds(0, 0, -1, -1)
         val hasClip = g.getClipBounds(clip) != null && clip.width >= 0 && clip.height >= 0
@@ -75,8 +81,8 @@ internal class GraphicsPainter {
                     2
                 }
             if (layer != band) continue
-            val x1 = (images.column(i) * metrics.cellWidth).roundToInt()
-            val x2 = ((images.column(i) + images.width(i)) * metrics.cellWidth).roundToInt()
+            val x1 = images.column(i) * metrics.cellWidth
+            val x2 = (images.column(i) + images.width(i)) * metrics.cellWidth
             if (x2 <= 0 ||
                 x1 >= gridWidth ||
                 x2 <= x1 ||
@@ -105,30 +111,39 @@ internal class GraphicsPainter {
                 }
                 val logicalTop = maxOf(row.toDouble(), images.row(i), images.clipTop(i))
                 val logicalBottom = minOf(endRow.toDouble(), images.row(i) + images.height(i), images.clipBottom(i))
-                val top = (rowTop + (logicalTop - row) * metrics.cellHeight).roundToInt()
-                val bottom = (rowTop + (logicalBottom - row) * metrics.cellHeight).roundToInt()
+                val top = rowTop + (logicalTop - row) * metrics.cellHeight
+                val bottom = rowTop + (logicalBottom - row) * metrics.cellHeight
                 if (bottom > top && (!hasClip || bottom > clip.y && top < clip.y + clip.height)) {
-                    val imageTop = (images.row(i) * metrics.cellHeight + shift).roundToInt()
-                    val imageBottom = ((images.row(i) + images.height(i)) * metrics.cellHeight + shift).roundToInt()
+                    val imageTop = images.row(i) * metrics.cellHeight + shift
+                    val imageBottom = (images.row(i) + images.height(i)) * metrics.cellHeight + shift
                     val needsClip =
-                        (if (hasClip) maxOf(x1, clip.x) else x1) < 0 ||
-                            (if (hasClip) minOf(x2, clip.x + clip.width) else x2) > gridWidth ||
-                            (if (hasClip) maxOf(imageTop, clip.y) else imageTop) < top ||
-                            (if (hasClip) minOf(imageBottom, clip.y + clip.height) else imageBottom) > bottom
+                        fractionalTransform ||
+                            x1 % 1.0 != 0.0 ||
+                            x2 % 1.0 != 0.0 ||
+                            imageTop % 1.0 != 0.0 ||
+                            imageBottom % 1.0 != 0.0 ||
+                            (if (hasClip) maxOf(x1, clip.x.toDouble()) else x1) < 0 ||
+                            (if (hasClip) minOf(x2, (clip.x + clip.width).toDouble()) else x2) > gridWidth ||
+                            (if (hasClip) maxOf(imageTop, clip.y.toDouble()) else imageTop) < top ||
+                            (if (hasClip) minOf(imageBottom, (clip.y + clip.height).toDouble()) else imageBottom) > bottom
                     if (needsClip) {
                         if (!savedClip) {
-                            originalClip = g.clip
+                            originalClip = pixels.saveClip(g)
                             savedClip = true
                         }
-                        g.clipRect(0, top, gridWidth, bottom - top)
+                        val left = maxOf(0.0, x1)
+                        val right = minOf(gridWidth.toDouble(), x2)
+                        pixels.clipRect(g, left, top, right - left, bottom - top)
                     }
                     try {
+                        g.translate(x1, imageTop)
+                        g.scale((x2 - x1) / images.sourceWidth(i), (imageBottom - imageTop) / images.sourceHeight(i))
                         g.drawImage(
                             rasters.image(i),
-                            x1,
-                            imageTop,
-                            x2,
-                            imageBottom,
+                            0,
+                            0,
+                            images.sourceWidth(i),
+                            images.sourceHeight(i),
                             images.sourceX(i),
                             images.sourceY(i),
                             images.sourceX(i) + images.sourceWidth(i),
@@ -136,7 +151,8 @@ internal class GraphicsPainter {
                             null,
                         )
                     } finally {
-                        if (needsClip) g.clip = originalClip
+                        g.transform = transform
+                        if (needsClip) pixels.restoreClip(g, originalClip)
                     }
                 }
                 row = endRow

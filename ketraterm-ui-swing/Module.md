@@ -26,6 +26,8 @@ and revision checks; they never access Swing state directly.
 
 `GridPainter` owns image composition and its raster cache. Installing a frame
 prepares rasters by immutable resource identity and reserves text-row scratch; paint reuses them.
+Painters share `TerminalDeviceGeometry`'s device-edge rounding and exact clip
+intersection; see [device-pixel alignment](docs/swing-repaint-optimization.md#device-pixel-alignment).
 `TerminalTextRunStyle` shares selection precedence with the selection painter and owns
 a bounded primitive contrast cache. See [color customization](docs/color-customization.md).
 Rebinding,

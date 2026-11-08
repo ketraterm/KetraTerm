@@ -73,6 +73,11 @@ reusable keys and borrowed cluster slices. Misses snapshot the content and creat
 text for rasterization. Borrowed slices are released after lookup, and negative
 results share the same bounded LRU as images.
 
+The requested raster size includes the current graphics scale, rounded upward to
+cover device resolution, while placement and fitting retain logical cell metrics.
+Translation does not change raster identity, so fractional scrolling reuses the
+bitmap. A display-scale change requests a raster at the new resolution.
+
 The current platform rasterizer reads installed Segoe UI Emoji COLR/CPAL data on
 Windows. Other platforms use Java2D fallback. Native painting does not depend on
 JetBrains Runtime detection. Initialization and misses are synchronous: the first

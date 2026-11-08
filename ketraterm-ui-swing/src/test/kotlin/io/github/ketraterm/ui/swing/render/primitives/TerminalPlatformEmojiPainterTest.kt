@@ -31,6 +31,31 @@ import kotlin.test.*
 
 class TerminalPlatformEmojiPainterTest {
     @ParameterizedTest
+    @ValueSource(doubles = [1.25, 1.5, 1.75, 2.0])
+    fun `native emoji uses device resolution and reuses its raster while scrolling`(scale: Double) {
+        val rasterizer = FakeEmojiRasterizer()
+        val painter = TerminalPlatformEmojiPainter(rasterizer)
+        val image = BufferedImage(100, 100, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val cluster = intArrayOf(0x2764, 0xFE0F)
+        try {
+            g.scale(scale, scale)
+            repeat(2) {
+                assertTrue(painter.paintCodePoint(g, 0x1F600, 0, 0, 2, METRICS))
+                assertTrue(painter.paintCluster(g, cluster, 0, cluster.size, 0, 0, 2, METRICS))
+                g.translate(0.5, -0.35)
+            }
+            val size = kotlin.math.ceil(20 * scale).toInt()
+            assertEquals(listOf(size, size), rasterizer.pixelSizes)
+            g.scale(1.0, 1.25)
+            assertTrue(painter.paintCodePoint(g, 0x1F600, 0, 0, 2, METRICS))
+            assertEquals(listOf(size, size, kotlin.math.ceil(20 * scale * 1.25).toInt()), rasterizer.pixelSizes)
+        } finally {
+            g.dispose()
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [0x41, 0xE9, 0x5D0, 0x6F22, 0x2764, 0x1D11E])
     fun `ordinary code point does not initialize native emoji rasterizer`(codePoint: Int) {
         assertFalse(TerminalEmojiPresentation.usesEmojiPresentation(codePoint))

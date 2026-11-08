@@ -54,6 +54,7 @@ internal class TerminalTextPainter(
     private val cellPrimitives = TerminalCellPrimitivePainter()
     private val textRun = TerminalTextRunBuffer(INITIAL_TEXT_RUN_CAPACITY)
     private val asciiClipBounds = Rectangle()
+    private val pixels = TerminalDeviceGeometry()
     private val runStyle = TerminalTextRunStyle()
     private var settings: SwingSettings? = null
     private val shapedTextRuns =
@@ -105,6 +106,7 @@ internal class TerminalTextPainter(
         selectionBackground: Int = selectionStyle.background,
         searchHighlights: TerminalSearchViewportHighlights? = null,
     ) {
+        pixels.update(g)
         val bidi = cellGeometry.row(cache, row)
         runStyle.configureRow(
             textBlinkVisible = textBlinkVisible,
@@ -204,9 +206,11 @@ internal class TerminalTextPainter(
         val flags = cache.flags[index]
         if (!hasDrawableText(flags) || isTextHidden(cache.attrWords[index], textBlinkVisible)) return
 
-        val oldClip = g.clip
+        pixels.update(g)
+        val oldClip = pixels.saveClip(g)
         try {
-            g.clipRect(
+            pixels.clipRect(
+                g,
                 visualColumn * metrics.cellWidth,
                 row * metrics.cellHeight,
                 metrics.cellWidth * maxOf(1, columnSpan),
@@ -245,7 +249,7 @@ internal class TerminalTextPainter(
                 )
             }
         } finally {
-            g.clip = oldClip
+            pixels.restoreClip(g, oldClip)
         }
     }
 
@@ -297,15 +301,15 @@ internal class TerminalTextPainter(
                 clip.y.toLong() + clip.height > y.toLong() + metrics.cellHeight
         // A caller's narrower clip already enforces the boundary, including
         // nonrectangular clips. Avoid copying/intersecting Java2D clip state.
-        val oldClip = if (needsClip) g.clip else null
+        val oldClip = if (needsClip) pixels.saveClip(g) else null
         try {
-            if (needsClip) g.clipRect(x, y, width, metrics.cellHeight)
+            if (needsClip) pixels.clipRect(g, x, y, width, metrics.cellHeight)
             g.font = fontCache.font(runStyle.fontStyle)
             g.color = colorCache.color(runStyle.foreground)
             drawAsciiRun(g, metrics, visualStartColumn, baselineY, runStyle.fontStyle, fontRenderContext)
             decorationPainter.paintTextRun(g, palette, runStyle, visualStartColumn, visualStartColumn + column - startColumn, row, metrics)
         } finally {
-            if (needsClip) g.clip = oldClip
+            if (needsClip) pixels.restoreClip(g, oldClip)
         }
         return column
     }
@@ -326,9 +330,10 @@ internal class TerminalTextPainter(
         runStyle.begin(cache, palette, rowOffset, column)
         if (runStyle.textHidden) return endColumn
 
-        val oldClip = g.clip
+        val oldClip = pixels.saveClip(g)
         try {
-            g.clipRect(
+            pixels.clipRect(
+                g,
                 visualColumn * metrics.cellWidth,
                 row * metrics.cellHeight,
                 metrics.cellWidth * (endColumn - column),
@@ -357,7 +362,7 @@ internal class TerminalTextPainter(
                 metrics,
             )
         } finally {
-            g.clip = oldClip
+            pixels.restoreClip(g, oldClip)
         }
         return endColumn
     }

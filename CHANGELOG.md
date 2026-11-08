@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## Unreleased
 
+- Fixed fractional-scale seams and cursor repaint artifacts by aligning cell fills, text clips, selection/search/link overlays, and cursor shapes to Swing's device-pixel boundaries. Primitive glyphs preserve shaped caller clips. Image placements retain fractional coordinates, and native emoji rasters use display resolution.
 - Added font-independent rendering for all Braille patterns, 60 sextants, 230 octants, and geometric Powerline separators (`U+E0B0–U+E0BF`). Device-aligned geometry preserves segment colors, translucent coverage, and cursor repainting across display scales; the extended UTF-8 corpus includes complete glyph tables and tiling samples.
 - Added Kitty ED 22 (`CSI 22 J`) to retain visible text and images in bounded primary scrollback before clearing the screen. Custom core writers must implement `moveScreenToHistory`; see the [protocol contract](docs/reference/protocol.md#screen-to-history-clear).
 - Added REP (`CSI Ps b`) to repeat the preceding grapheme with the current pen, preserving wide text, wrapping, margins, insert mode, and scrollback. Custom command sinks and core writers must implement `writeRepeatedCluster`; see the [REP contract](docs/reference/protocol.md#repeat-character).
