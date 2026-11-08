@@ -984,6 +984,23 @@ class SwingSettingsTest {
     }
 
     @Test
+    fun fallbackPolicyPrefersInstalledMonospaceAndScriptFontsBeforeLogicalFonts() {
+        val families =
+            SwingSettings.fallbackFontFamiliesForInstalledFonts(
+                arrayOf("Dialog", "Courier New", "Consolas", "Noto Sans Devanagari", "Segoe UI Emoji"),
+            )
+
+        assertEquals(
+            listOf("Segoe UI Emoji", "Consolas", "Courier New", "Noto Sans Devanagari", Font.MONOSPACED, Font.DIALOG, Font.SANS_SERIF),
+            families,
+        )
+        assertEquals(
+            listOf(Font.MONOSPACED, Font.DIALOG, Font.SANS_SERIF),
+            SwingSettings.fallbackFontFamiliesForInstalledFonts(emptyArray()),
+        )
+    }
+
+    @Test
     fun fallbackPolicyPrefersInstalledColorEmojiBeforeSymbolFonts() {
         val families =
             SwingSettings.fallbackFontFamiliesForInstalledFonts(

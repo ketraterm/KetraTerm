@@ -875,6 +875,78 @@ class TerminalTextPainterTest {
     @Nested
     inner class ComplexTextRendering {
         @ParameterizedTest
+        @CsvSource("λ, 1.0, 9", "λ, 1.5, 4", "j́, 1.0, 5", "j́, 1.5, 12")
+        fun `isolated glyph fitting includes both ink edges in rows and cursor repaint`(
+            text: String,
+            deviceScale: Double,
+            cellWidth: Int,
+        ) {
+            val font = TerminalCacheTestFonts.fallback(18f).deriveFont(Font.ITALIC)
+            val settings =
+                antialiasedSettings(true).copy {
+                    it.font = font
+                    it.fallbackFonts = emptyList()
+                    it.useSystemFallbackFonts = false
+                }
+            val actual = fixture(settings = settings)
+            val expected = fixture(settings = settings)
+            val metrics = actual.metrics.copy(cellWidth = cellWidth, fontCellWidth = cellWidth)
+            val cluster = text.codePointCount(0, text.length) > 1
+            val cell =
+                TestCell(
+                    codeWord = text.codePointAt(0),
+                    flags = if (cluster) TerminalRenderCellFlags.CLUSTER else TerminalRenderCellFlags.CODEPOINT,
+                    attr = TerminalRenderAttrs.pack(italic = true),
+                    cluster = if (cluster) text else null,
+                )
+            val cache = renderCache(TestRenderFrame(arrayOf(arrayOf(cell))))
+            try {
+                for (graphics in arrayOf(actual.g, expected.g)) {
+                    graphics.scale(deviceScale, deviceScale)
+                    graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
+                    graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
+                }
+                val layout = TextLayout(text, font, expected.g.fontRenderContext)
+                val ink = layout.bounds
+                assertTrue(ink.minX < 0, "The fixture must exercise a negative bearing")
+                val left = minOf(0.0, ink.minX)
+                val scale = minOf(1.0, cellWidth / (maxOf(layout.advance.toDouble(), ink.maxX) - left))
+                expected.g.clipRect(0, 0, cellWidth, metrics.cellHeight)
+                expected.g.color = Color(settings.palette.defaultForeground, true)
+                expected.g.translate(0.0, metrics.baseline.toDouble())
+                expected.g.scale(scale, scale)
+                layout.draw(expected.g, -left.toFloat(), 0f)
+
+                val transform = actual.g.transform
+                actual.painter.paintRow(actual.g, cache, settings.palette, metrics, 0, actual.g.fontRenderContext)
+                val width = (cellWidth * deviceScale).toInt()
+                val height = minOf(actual.image.height, (metrics.cellHeight * deviceScale).toInt())
+                val pixels = expected.image.getRGB(0, 0, width, height, null, 0, width)
+                assertTrue(pixels.any { it != 0 })
+                assertContentEquals(pixels, actual.image.getRGB(0, 0, width, height, null, 0, width))
+                assertEquals(transform, actual.g.transform)
+
+                actual.g.composite = AlphaComposite.Clear
+                actual.g.fillRect(0, 0, actual.image.width, actual.image.height)
+                actual.g.composite = AlphaComposite.SrcOver
+                actual.painter.paintCellForeground(
+                    actual.g,
+                    cache,
+                    metrics,
+                    column = 0,
+                    row = 0,
+                    foreground = settings.palette.defaultForeground,
+                    fontRenderContext = actual.g.fontRenderContext,
+                )
+                assertContentEquals(pixels, actual.image.getRGB(0, 0, width, height, null, 0, width))
+                assertEquals(transform, actual.g.transform)
+            } finally {
+                actual.g.dispose()
+                expected.g.dispose()
+            }
+        }
+
+        @ParameterizedTest
         @CsvSource(
             "\u2764\uFE0E, false, 1.0",
             "\u2615\uFE0E, false, 1.0",

@@ -23,6 +23,22 @@ import java.awt.font.FontRenderContext
 
 class TerminalComplexTextLayoutCacheTest {
     @Test
+    fun `fitting geometry retains negative bearings and ink beyond the advance`() {
+        val font = TerminalCacheTestFonts.fallback(18f).deriveFont(Font.ITALIC)
+        val fonts = FontCache().apply { update(font, emptyList(), useSystemFallbackFonts = false) }
+        val cache = TerminalComplexTextLayoutCache()
+        val context = FontRenderContext(null, true, false)
+        val layout = cache.codePointLayout(0x03BB, Font.ITALIC, context, fonts)
+        val ink = layout.textLayout.bounds
+
+        assertTrue(ink.minX < 0, "The fixture must have a negative bearing")
+        assertTrue(ink.maxX > layout.textLayout.advance, "The fixture must also extend past its advance")
+        assertEquals(ink.minX.toFloat(), layout.fitLeft)
+        assertEquals((ink.maxX - ink.minX).toFloat(), layout.fitWidth)
+        assertSame(layout, cache.codePointLayout(0x03BB, Font.ITALIC, context, fonts))
+    }
+
+    @Test
     fun `constructor rejects non-positive capacities`() {
         assertThrows<IllegalArgumentException> {
             TerminalComplexTextLayoutCache(codePointCapacity = 0)
@@ -67,7 +83,7 @@ class TerminalComplexTextLayoutCacheTest {
 
         val layout = layoutCache.codePointLayout(0x10FFFF, Font.PLAIN, frc, fontCache)
 
-        assertEquals(2, layout.characterCount)
+        assertEquals(2, layout.textLayout.characterCount)
         assertSame(layout, layoutCache.codePointLayout(0x10FFFF, Font.PLAIN, frc, fontCache))
     }
 
@@ -194,7 +210,7 @@ class TerminalComplexTextLayoutCacheTest {
 
         val layout = layoutCache.clusterLayout(cluster, 0, cluster.size, Font.PLAIN, frc, fontCache)
 
-        assertEquals(3, layout.characterCount)
+        assertEquals(3, layout.textLayout.characterCount)
         assertSame(layout, layoutCache.clusterLayout(cluster, 0, cluster.size, Font.PLAIN, frc, fontCache))
     }
 
@@ -332,7 +348,7 @@ class TerminalComplexTextLayoutCacheTest {
         val replacementLayout = layoutCache.clusterLayout("\uFFFD", Font.PLAIN, frc, fontCache)
 
         // Assert
-        assertEquals(TerminalComplexTextLayoutCache.MAX_CLUSTER_LENGTH, layout.characterCount)
+        assertEquals(TerminalComplexTextLayoutCache.MAX_CLUSTER_LENGTH, layout.textLayout.characterCount)
         assertNotSame(
             replacementLayout,
             layout,

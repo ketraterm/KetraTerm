@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## Unreleased
 
+- Fixed clipping of isolated fallback glyphs whose visible ink extends left of the origin or beyond the advance. Fitting now uses cached ink bounds without changing rendering paths. Default text fallbacks prefer installed monospace and script fonts before generic logical fonts; explicit host ordering and emoji priority are preserved.
 - Fixed Windows ConPTY shutdown hanging when a terminal closes during a pending stdout read. Shutdown output is discarded while the backend releases its pipe, without delivering bytes or remote-exit events to the closed session.
 - Fixed fractional-scale seams and cursor repaint artifacts by aligning cell fills, text clips, selection/search/link overlays, and cursor shapes to Swing's device-pixel boundaries. Primitive glyphs preserve shaped caller clips. Image placements retain fractional coordinates, and native emoji rasters use display resolution.
 - Added font-independent rendering for all Braille patterns, 60 sextants, 230 octants, and geometric Powerline separators (`U+E0B0–U+E0BF`). Device-aligned geometry preserves segment colors, translucent coverage, and cursor repainting across display scales; the extended UTF-8 corpus includes complete glyph tables and tiling samples.

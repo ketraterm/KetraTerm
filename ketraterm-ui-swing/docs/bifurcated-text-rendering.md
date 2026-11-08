@@ -126,6 +126,11 @@ resolver and configured/system emoji fonts before the ordinary pipeline. Resolve
 fonts use the configured size. Fallback and unsupported lookups use bounded
 caches. System scanning is outside the ASCII path.
 
+Default text fallbacks prefer installed monospace families, then installed script
+fonts, before Java's logical `Monospaced`, `Dialog`, and `SansSerif` families.
+Emoji fonts retain their presentation priority. Explicit fallback lists keep their
+configured order, and hosts can supply their own resolver.
+
 Native dispatch and font preference share `TerminalEmojiPresentation` for
 scalars, cluster slices, and UTF-16 text. An emoji base is required; a joiner or
 variation selector alone does not classify ordinary script text as emoji. VS15
@@ -134,6 +139,9 @@ including primary and host-resolved candidates. Text-font coverage checks ignore
 VS15 itself while retaining the selector in the shaping input; the base and other
 cluster code points still require coverage. Oversized fallback layouts scale
 equally in both dimensions around the text baseline and keep the owning cell clip.
+Fitting includes visible ink on both sides of the advance, shifting negative
+bearings inside the cell before scaling. These bounds are cached with each layout,
+so repeated paints do not measure glyph bounds again.
 Contextual script groups retain their existing positioning and fitting policy.
 Platform font substitution must not give an emoji font precedence over a capable
 primary font for ordinary text. Actual glyph coverage and substitution within
