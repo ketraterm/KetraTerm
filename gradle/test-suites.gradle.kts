@@ -69,7 +69,11 @@ subprojects {
                     testClassesDirs = testSources.get().output.classesDirs
                     classpath = testSources.get().runtimeClasspath
                     useJUnitPlatform { includeTags(suite) }
-                    testLogging { exceptionFormat = TestExceptionFormat.FULL }
+                    testLogging {
+                        events("started", "passed", "skipped", "failed")
+                        exceptionFormat = TestExceptionFormat.FULL
+                        showStandardStreams = true
+                    }
                     // Many modules legitimately have no tests in one of the environment-dependent suites.
                     failOnNoDiscoveredTests.set(false)
                     onlyIf("Module declares $suite tests") { ownsSuite }
@@ -78,6 +82,9 @@ subprojects {
                     outputs.doNotCacheIf("Tests depend on the host environment") { true }
                     maxParallelForks = 1
                     systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+                    systemProperty("junit.jupiter.execution.timeout.default", "5 m")
+                    systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SAME_THREAD")
+                    systemProperty("junit.jupiter.execution.timeout.threaddump.enabled", "true")
                     systemProperty("java.awt.headless", (suite != "desktop").toString())
                     systemProperty("terminal.pty.wsl.distribution", providers.systemProperty("terminal.pty.wsl.distribution").getOrElse(""))
                     systemProperty("terminal.test.requiredShells", providers.systemProperty("terminal.test.requiredShells").getOrElse(""))

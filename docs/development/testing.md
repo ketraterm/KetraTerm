@@ -52,6 +52,15 @@ Fixtures can write diagnostics under `terminal.test.artifactsDirectory`, supplie
 by these tasks as `build/test-artifacts/<task>/`. Use a feature/scenario subdirectory;
 CI retains the common directory without needing a new upload rule for each feature.
 
+Native and desktop tasks log each test's start and outcome, including standard
+output and error. Each test invocation and lifecycle method has a default
+five-minute JUnit timeout on its existing execution thread. Before interrupting a
+timed-out invocation, JUnit prints all JVM thread stacks to standard output so the
+build log identifies the active test and blocked threads. Blocking code may ignore
+interruption; this diagnostic deadline does not guarantee process termination or
+cover Gradle and test-worker startup or shutdown. Fixture-specific waits should
+still use shorter deadlines and controlled synchronization.
+
 ## Test and fixture structure
 
 - Use descriptive behavior names for methods; keep expected outcomes in the tests.
