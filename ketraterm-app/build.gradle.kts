@@ -27,7 +27,7 @@ dependencies {
     val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
 
     implementation("com.formdev:flatlaf:3.7.2")
-    implementation("com.formdev:flatlaf-extras:3.7.2")
+    implementation("com.formdev:flatlaf-extras:3.8")
     implementation(project(":ketraterm-completion"))
     implementation(project(":ketraterm-completion-host"))
     implementation(project(":ketraterm-completion-persistence"))
