@@ -48,6 +48,12 @@ learning persistence. Automatic popups can appear <strong>Always</strong> (the d
 arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set <code>smart_suggestions_enabled</code>
 in the <a href="https://ketraterm.github.io/KetraTerm/settings.html">TOML configuration</a>.
 Library hosts enable and configure their own provider and presentation.</p>
+<p>History suggestions are selective: command names use ordinary discovery, and
+full-command replay requires a nonempty argument prefix. Running or accepting a
+command does not make its full history entry appear after an empty argument.
+Whole-command replays have a small row budget; learned ranking continues to
+influence live results. See the
+<a href="../../ketraterm-completion/docs/completion-architecture.html#history-suggestion-policy">history suggestion policy</a>.</p>
 <p>Use <strong>Reset learned suggestions...</strong> in settings to clear learned commands and
 ranking preferences. See <a href="../reference/storage.html#completion-learning">saved learning and reset behavior</a>.</p>
 <p>Terminal suggestions require an editable command context, normally supplied by
@@ -386,7 +392,7 @@ for location, retention, and encoding.</p>
 <p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
 <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
 and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/17adeae6480032f7dedf62d2cc0b2a1ef09c6258/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b22aeeeb5a4efa1707804b10d52b10b59b5f729f/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

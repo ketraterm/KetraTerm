@@ -123,8 +123,11 @@ parameter. Hosts record authoritative command results and explicit suggestion
 feedback. The store performs no I/O; persistence consumes its immutable
 <code>snapshot()</code> and hydrates through <code>mergeSnapshot()</code> once per distinct aggregate
 event set.</p>
-<p>Replay preserves supported shell-expression spelling. Commands whose syntax
-cannot be replayed safely are omitted; the rules are described in the learning contract below.</p>
+<p>Replay preserves supported shell-expression spelling and selectively supplements
+live completion with useful past commands. See the
+<a href="docs/completion-architecture.html#history-suggestion-policy">history suggestion policy</a>
+for prefix and row-budget rules. Commands whose syntax cannot be replayed
+safely are omitted; the rules are described in the learning contract below.</p>
 <p>The optional <code>replayFilter</code> constructor argument adds a host restriction to the
 built-in plaintext policy. <code>TerminalCompletionLearningStore(replayFilter = { false })</code>
 retains opaque ranking evidence while disabling plaintext replay. The filter
@@ -145,7 +148,7 @@ unchanged; descriptions supplied by shells or custom providers remain provider-o
 <li><a href="../docs/terminal-feature-map.html">Supported behavior</a> and
 <a href="../docs/terminal-feature-gap-map.html">deferred work</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/17adeae6480032f7dedf62d2cc0b2a1ef09c6258/ketraterm-completion/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b22aeeeb5a4efa1707804b10d52b10b59b5f729f/ketraterm-completion/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

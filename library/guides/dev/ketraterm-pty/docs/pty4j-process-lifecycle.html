@@ -62,17 +62,26 @@ waits only for process exit; it is not an output-drain boundary.</p>
 to release native resources.</p>
 <h2 id="failure-and-local-close">Failure and local close</h2>
 <p>A reader or byte-listener exception is retained in <code>PtyConnector.failure</code> and
-reported through <code>onError</code>. The connector closes the process and both streams,
-then invokes <code>onClosed(null)</code>. It does not retry the failed chunk or replace the
+reported through <code>onError</code>. The connector requests process and stream cleanup,
+then invokes <code>onClosed(null)</code>; backend-owned pipe cleanup can finish afterward.
+It does not retry the failed chunk or replace the
 original failure with a later process exit. Connector callbacks may close
 reentrantly.</p>
 <p>Local close cancels pending delivery rather than draining it. It does not emit a
 remote <code>onClosed</code> callback; the session records its own local termination.
 Exceptions arriving after local close are teardown and do not become remote
 failures.</p>
-<p>Cleanup requests process destruction and closes both streams without waiting
+<p>Cleanup requests process destruction and stream closure without waiting
 for an active byte callback. The reader retains its borrowed buffer until that
 callback returns, then stops delivery; the watcher exits after the reader.
+For a started ConPTY connector, Pty4J owns both pipes&#39; closure. The reader
+discards shutdown output through EOF so
+<a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">pseudoconsole cleanup</a> can finish;
+local close never closes that pipe concurrently with its pending native read.
+It also avoids waiting for a pending stdin write before stdout can drain.
+ConPTY close awaits process termination to release the child&#39;s working directory;
+it does not wait for byte callbacks or pipe cleanup to finish.
+An unstarted connector closes the pipes directly because no reader owns stdout.
 Close is idempotent, but native destruction and stream cleanup can block. Keep
 it off a UI thread.</p>
 <h2 id="writes-and-resize">Writes and resize</h2>
@@ -109,7 +118,7 @@ Unix, or <code>cmd.exe</code> and <code>powershell.exe</code> on Windows. Its OS
 requires <code>node</code> on PATH and the repository&#39;s <code>tools/osc52/osc52.mjs</code>.
 Tests use explicit output/readiness signals and deadlines; skipped native tests
 do not establish platform support for the current environment.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/17adeae6480032f7dedf62d2cc0b2a1ef09c6258/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b22aeeeb5a4efa1707804b10d52b10b59b5f729f/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
