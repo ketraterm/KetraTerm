@@ -880,7 +880,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     val queryStarted =
                         kotlin.time.TimeSource.Monotonic
                             .markNow()
-                    val response = session.requestShellCompletions(prefix, prefix.length)
+                    val response = session.requestShellCompletions(edit)
                     val result =
                         assertNotNull(
                             response,
@@ -992,12 +992,12 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 val historyRecord = session.shellIntegrationState.latestCommandRecordId()
                 assertEquals(0, session.shellIntegrationState.commandMetadata(historyRecord)?.exitCode, "History setup failed")
                 val emptyContext = session.awaitLine("", "test history setup", requireShellCompletion = true)
-                val emptyResult = assertNotNull(session.requestShellCompletions("", 0))
+                val emptyResult = assertNotNull(session.requestShellCompletions(emptyContext))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(emptyContext, listOf(TerminalPasteEvent("Get-Chi"))))
                 val expected = session.awaitLine("Get-Chi", "typing after empty-buffer completion")
-                val result = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
+                val result = assertNotNull(session.requestShellCompletions(expected))
                 assertTrue(result.candidates.any { it.replacementText == "Get-ChildItem" })
                 val replacement = TerminalTextReplacementEvent(result.replacementStartOffset, result.replacementEndOffset, "Get-ChildItem")
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(expected, listOf(replacement)))
@@ -1017,7 +1017,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     )
                     val afterDeletion = session.awaitLine("Get-Chi", "deletion in acceptance cycle $iteration")
-                    val refreshed = assertNotNull(session.requestShellCompletions("Get-Chi", 7))
+                    val refreshed = assertNotNull(session.requestShellCompletions(afterDeletion))
                     assertTrue(refreshed.candidates.any { it.replacementText == "Get-ChildItem" })
                     assertEquals(
                         TerminalInputAdmission.ACCEPTED,
@@ -1053,7 +1053,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     session.submitInput(emptyPostExecution, listOf(TerminalPasteEvent(encodingLine))),
                 )
                 val encodingEdit = session.awaitLine(encodingLine, "typing encoding argument")
-                val encodings = assertNotNull(session.requestShellCompletions(encodingLine, encodingLine.length))
+                val encodings = assertNotNull(session.requestShellCompletions(encodingEdit))
                 assertTrue(encodings.candidates.any { it.replacementText.equals("Unicode", ignoreCase = true) })
                 val utf8 = encodings.candidates.first { it.replacementText.equals("UTF8", ignoreCase = true) }
                 assertTrue(encodings.candidates.all { it.kind == TerminalShellCompletionKind.ARGUMENT })
@@ -1087,7 +1087,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         ),
                     )
                     val edit = session.awaitLine(line, "typing parameter case '$line'")
-                    val answer = assertNotNull(session.requestShellCompletions(line, line.length))
+                    val answer = assertNotNull(session.requestShellCompletions(edit))
                     assertNull(answer.externalCommandName)
                     val candidate = answer.candidates.first { it.replacementText.equals(expectedText, ignoreCase = true) }
                     assertEquals(

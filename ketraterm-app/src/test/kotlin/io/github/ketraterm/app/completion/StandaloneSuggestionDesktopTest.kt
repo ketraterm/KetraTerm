@@ -136,8 +136,6 @@ class StandaloneSuggestionDesktopTest {
                 }
             }) {
                 type(line)
-                awaitLine(line)
-                requestSuggestions()
                 awaitPopup(line, "accepted")
                 selectAndAccept("accepted")
                 awaitLine("echo accepted")
@@ -153,10 +151,8 @@ class StandaloneSuggestionDesktopTest {
         runBlocking {
             withSession(shell.profile(directory), directory) {
                 type("git sta")
-                awaitLine("git sta")
                 awaitPopup("git sta", "status")
                 key(KeyEvent.VK_BACK_SPACE)
-                awaitLine("git st")
                 awaitPopup("git st", "status")
                 selectAndAccept("status")
                 awaitLine("git status")
@@ -186,7 +182,6 @@ class StandaloneSuggestionDesktopTest {
                 awaitExecution(definition)
                 awaitLine("", requireShellCompletion = shell.isPowerShell)
                 type("ketra_smoke_e")
-                awaitLine("ketra_smoke_e")
                 awaitPopup("ketra_smoke_e", "ketra_smoke_echo")
                 selectAndAccept("ketra_smoke_echo")
                 awaitLine("ketra_smoke_echo")
@@ -212,8 +207,8 @@ class StandaloneSuggestionDesktopTest {
             }
             withSession(profile, directory) {
                 type("cd al")
-                awaitLine("cd al")
                 if (shell.isGuest) {
+                    awaitLine("cd al")
                     // Guest metadata must not accidentally select these Windows host directories.
                     val source = withContext(Dispatchers.Swing) { provider.open(SwingShellSuggestionRequest("cd al", 5)) }
                     assertTrue(withTimeout(15.seconds) { source.suggestions.last() }.isEmpty())
@@ -233,7 +228,6 @@ class StandaloneSuggestionDesktopTest {
                         tab.currentWorkingDirectoryUri,
                     )
                     type("cd in")
-                    awaitLine("cd in")
                     awaitPopup("cd in", "inside/")
                 }
             }

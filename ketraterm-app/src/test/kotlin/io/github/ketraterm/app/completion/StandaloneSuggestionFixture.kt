@@ -81,7 +81,7 @@ internal class StandaloneSuggestionFixture private constructor(
                                 override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
                                     view.update(snapshot)
                                     latestSnapshot = snapshot
-                                    publications.trySend(session.activeShellCommandLine()?.commandText to snapshot).getOrThrow()
+                                    publications.trySend(latestRequest?.commandText to snapshot).getOrThrow()
                                 }
                             }
                         }
@@ -168,7 +168,7 @@ internal class StandaloneSuggestionFixture private constructor(
                         "current projection=${session.activeShellCommandLine()}"
                 }
             throw AssertionError(
-                "Expected '$replacement' for '$line'; $state; last update (projection text, popup)=$lastUpdate\n${screenText()}",
+                "Expected '$replacement' for '$line'; $state; last update (request text, popup)=$lastUpdate\n${screenText()}",
                 failure,
             )
         }
@@ -234,8 +234,6 @@ internal class StandaloneSuggestionFixture private constructor(
         }
 
     suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
-
-    suspend fun requestSuggestions() = withContext(Dispatchers.Swing) { terminal.requestActiveShellSuggestions() }
 
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
