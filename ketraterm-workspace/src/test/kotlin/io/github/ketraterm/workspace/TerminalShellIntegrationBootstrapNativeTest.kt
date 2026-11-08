@@ -1230,7 +1230,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 .firstOrNull { it.startsWith("APPLICATION=") }
                 ?.substringAfter('=')
                 ?.split(';')
-        assertEquals(if (application == null) 10 else 18, messages.size, visibleEscapes(result.stdout))
+        assertEquals(if (application == null) 13 else 21, messages.size, visibleEscapes(result.stdout))
 
         fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 
@@ -1267,6 +1267,14 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals("9", fields(offset + 2)[6])
         assertEquals("14", fields(offset + 3)[6])
         assertTrue(messages[offset + 4].contains(";ProviderContainer;"))
+        for (index in offset + 5..offset + 7) {
+            assertEquals(
+                "Failed",
+                fields(index)[4],
+                "A completer changed the editor's text or cursor: ${visibleEscapes(messages[index])}",
+            )
+            assertEquals(5, fields(index).size, "A failed confirmation must not publish stale candidates")
+        }
         assertTrue(result.stdout.contains("EXIT=77"), visibleEscapes(result.stdout))
     }
 

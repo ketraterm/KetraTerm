@@ -102,70 +102,91 @@ revisions alone are insufficient: the final prompt can be rendered while a
 connector write is still active, with no later screen change when it retires.
 Collectors own cancellation and must stop waiting when the session closes.
 
-Admission wakeups are separate from semantic editor invalidation. They do not
-invalidate retained contexts or cancel in-flight native queries; a query's own
-write retirement is an opportunity to recheck capture, not evidence that its
-buffer changed. Writer idleness never acknowledges remote shell processing.
+Admission wakeups do not invalidate retained contexts or cancel in-flight native
+queries. A query's own write retirement is an opportunity to recheck capture,
+not evidence that the buffer changed. Writer idleness never acknowledges remote
+shell processing.
 
-`activeShellCommandLineRevision` also invalidates retained edit authority when
-a correlated native reply matches the current command and cursor but cannot
-preserve the request's context, for example after a same-text repaint. Consumers
-must start a fresh interaction and capture a new context; they cannot renew the
-old handler. The session publishes this invalidation outside its locks and retains
-its generation. Successful queries, mismatched buffers, unavailable hooks, failed
-replies, and replies with no remaining callers do not trigger retries.
+The producer distinguishes editing authority from command observation.
+`withCommandLine` guards its authoritative editing revision, current snapshot,
+prefix-reset keys, and `commandLineObservationRevision`. Host-owned state advances
+the authoritative revision on every assignment, including equal assignments and
+changes away from and back to the same value. The OSC producer advances authority
+for prompt, lifecycle, and editing-capability changes; its observation revision
+tracks the command projection reconstructed from terminal cells. Observation must
+update under the same guard before a conditional check uses the new snapshot. Notifications are
+published afterward and may be conflated; delivery is not the authority boundary.
+The OSC producer starts synchronous observation tracking at its first conditional
+capture, then updates it after each processed output batch and guarded editing
+read. This tracking does not depend on a UI subscriber or render publication.
 
 Final validation and queue reservation share mutation, producer, and outbound
-serialization. Intervening input, output, resize, or host-model assignment makes
-an older context stale. Equal assignments and changes away from and back to the
-same snapshot still invalidate it. Semantic input revisions conservatively
-advance even when modes suppress its bytes, except for a single key-release event
-that emits no bytes. Such a release cannot edit the shell buffer and must not
-invalidate suggestions captured after the preceding key press. Encoded releases
-still invalidate contexts. Empty input has the event-specific rules described by
-the API.
+serialization. Without native confirmation, a context must retain its input and
+geometry revisions, producer authority, observation revision, snapshot, and
+prefix-reset keys. Metadata that leaves this command observation unchanged does
+not invalidate it. A changed observation cannot become current again merely
+because later output reconstructs equal text.
 
-`requestShellCompletions(commandLine, cursorOffset)` is the bounded exception for
-an installed native producer's non-editing request/reply exchange. Pending-query
-selection, current-buffer capture, and key-chord admission share the same mutation,
-producer, and outbound serialization. Concurrent callers share one in-flight
-query only while its editor context remains current: the producer revision,
-snapshot, prefix-reset keys, and render generation must match, with no intervening
-input beyond the query itself. Equal command text alone does not identify that
-context. A correlated result preserves pre-query contexts only
-when the producer revision/snapshot and render frame generation stay unchanged,
-no other input was admitted, and no viewport mutation occurred. The session
-records the resulting input/output revisions; any later input/output invalidates
-that permission. Changed-away-and-back rendered text cannot renew an old context.
-Results complete outside session locks. Each caller owns its wait; cancelling one
-caller does not cancel a shared query while another caller still awaits it. If all
+Semantic input revisions conservatively advance for ordinary input even when
+modes suppress its bytes, except for a single key-release event that emits no
+bytes. Such a release cannot edit the shell buffer; encoded releases still
+invalidate contexts. Native completion chords and terminal protocol replies do
+not advance the editing input revision. Empty input has the event-specific rules
+described by the API.
+
+Interactive consumers use `requestShellCompletions(expected)` with the context
+captured before provider work. The native reply must confirm that context's exact
+buffer and cursor without intervening input, producer-authority or geometry
+changes. A successful receipt preserves that authority across repainting, cursor
+redraw packets, title changes, and unrelated metadata. Render generations, output
+packet boundaries, and screen-observation revisions do not identify the native
+editor's buffer. Real input, a new prompt or editing capability, resize, local
+clear, cancellation, or closure still invalidates the context. A custom producer's
+authoritative assignments also invalidate it.
+
+`isCommandEditCurrent(expected)` checks retained authority without reserving input
+or sending a query. A provisional context can be current before confirmation;
+`submitInput` still requires its successful native receipt. Never recapture merely
+to make an old replacement pass. A caller that only collects candidates can use
+`requestShellCompletions(commandLine, cursorOffset)`.
+
+Starting a native query clears the earlier receipt and requires a successful
+confirmation for that editing generation: custom completers can change the shell
+buffer. Conditional edits are blocked while any native query is pending. A failed,
+mismatched, or abandoned query cannot fall back to ordinary screen-derived
+admission, even when the screen snapshot looks complete. Recapturing or observing
+different text does not remove this requirement. A successful receipt must
+confirm the requested buffer; new input, producer authority, geometry, or reset
+capability starts a different editing generation. `isCommandEditCurrent` describes
+request viability: pending confirmation remains viable, but an earlier complete
+context becomes invalid after its confirmation fails. A fresh request can capture
+a context marked `requiresShellConfirmation` even when the raw screen snapshot
+looks complete. It must obtain a successful native reply before publishing or
+admitting an edit; recapture alone does not restore permission.
+
+Pending-query selection and key-chord admission share mutation, producer, and
+outbound serialization. Concurrent callers share one native query only for the
+same current editing authority and command/cursor. The query itself does not
+consume that authority. Results complete outside session locks. Each caller owns
+its wait; cancelling one caller does not cancel another's shared query. If all
 callers cancel before the reply, it can no longer confirm an edit, but the pending
 wire slot remains reserved until a reply or prompt invalidation. A request for a
-different context, or one following an abandoned query, waits for that retirement
-and then captures and validates its current buffer before sending another query.
-Waiting and query execution share each caller's
-[native completion deadline](../../docs/reference/protocol.md#private-powershell-completion-metadata).
-Local primary-buffer clear retires an invalidated native query without waiting
-for further shell output. Closure cancels both response and retirement waiters.
-
-Interactive consumers use `requestShellCompletions(expected)` with the same context
-captured before provider work. This overload verifies that native confirmation
-preserves that original context; unrelated output between capture and query admission
-cannot silently renew it, even if its terminal response has already drained.
-An exact current buffer with stale original authority publishes the semantic
-invalidation described above and returns null. A newly captured interaction may
-reuse a still-valid native receipt. Callers that only collect candidates can use
-the command-line and cursor overload.
+different context, or one following an abandoned query, waits for retirement and
+revalidates before sending another query. Waiting and execution share each
+caller's [native completion deadline](../../docs/reference/protocol.md#private-powershell-completion-metadata).
+Local primary-buffer clear retires an invalidated query without waiting for
+further shell output. Closure cancels both response and retirement waiters.
 
 A screen-derived snapshot with `requiresShellConfirmation` contains only the
 prompt-to-cursor prefix: visible text after the cursor may be a shell prediction
 or a real editable suffix. Query the native completer before publishing suggestions.
 Only an exact buffer and cursor match confirms the prefix; real suffixes, including
 whitespace, fail confirmation. Conditional admission rejects unconfirmed contexts.
-The session reuses the confirmed native result for an unchanged provisional
-snapshot, avoiding a second query during candidate collection. A later explicit
-request for a complete snapshot invokes the completer again. Confirmation also
-permits a fresh capture of that same context and expires under the checks above.
+The session reuses the confirmed native result for a provisional capture with
+the same editing authority and buffer, avoiding a second query during candidate
+collection. A later explicit request for a complete snapshot invokes the completer
+again. Confirmation also permits a fresh capture of that same context and expires
+under the checks above.
 
 Rejection returns `STALE_CONTEXT`, `UNSUPPORTED_CONTEXT`, `CANCELLED`, or the
 usual lifecycle result, with no edit prefix or capacity reservation. Valid edits
@@ -197,7 +218,9 @@ and pastes the edited prefix as one compound input. The resulting prefix must be
 single-line and control-free; unsafe replay is rejected without sending input.
 Other contexts use the existing
 grapheme-based Delete/Backspace plan. Accepted feedback means admission, not shell
-acknowledgement. A host-managed popup must capture its own context. Calling the
+acknowledgement or an atomic remote compare-and-replace. Shell-side changes after
+confirmation are outside the local admission transaction. A host-managed popup
+must capture its own context. Calling the
 default handler without its captured Swing request throws `IllegalStateException`;
 custom handlers own their editing and feedback contract.
 
@@ -404,15 +427,18 @@ cancelling host flows.
 
 `activeShellCommandLine` reads the selected producer's snapshot; host snapshots
 need no terminal mutation lock, while protocol producers may use serialized grid
-reads. Null is authoritative. Host text bounds and remote acknowledgement remain
-host responsibilities. Every versioned host assignment advances its guarded
-revision, even if equal; intermediate observed revisions may conflate.
+reads. A null host assignment invalidates its editing authority. A transient null
+screen observation alone does not revoke a native-confirmed buffer; use
+`isCommandEditCurrent` for a retained request. Host text bounds and remote
+acknowledgement remain host responsibilities. Every versioned host assignment
+advances its guarded revision, even if equal; intermediate observed revisions may
+conflate.
 
-`activeShellCommandLineRevision` invalidates on text, cursor, availability, and
+`activeShellCommandLineRevision` reports changes to text, cursor, availability, and
 producer context changes. The OSC producer includes prompt authority and native
 editing capabilities, even when the visible command is unchanged. The flow shares
 one session-worker subscription while collected. The last collector leaving stops
-observation and resets the retained revision; a later collector samples the
+that notification subscription and resets the retained revision; a later collector samples the
 current source. Reading `value` alone
 does not start tracking. Closure makes active editing unavailable and cancels
 session tracking, but consumer state-flow collection does not complete.

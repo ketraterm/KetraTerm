@@ -97,7 +97,7 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `changed wrapped prediction retires confirmation and publishes a retryable editing revision`() =
+    fun `changed wrapped prediction preserves native buffer confirmation`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), columns = 16).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
@@ -116,19 +116,13 @@ class PowerShellNativeCompletionTest {
                 fixture.feed(reply("Get-Chi"))
                 fixture.session.requestRender(0)
                 runCurrent()
-                assertNull(query.await())
+                assertNotNull(query.await())
                 assertEquals(expected.commandLine, fixture.session.activeShellCommandLine())
                 assertTrue(fixture.session.activeShellCommandLineRevision.value > previousRevision)
                 assertEquals(
-                    TerminalInputAdmission.STALE_CONTEXT,
+                    TerminalInputAdmission.ACCEPTED,
                     fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
                 )
-
-                val refreshed = async { fixture.session.requestShellCompletions("Get-Chi", 7) }
-                runCurrent()
-                fixture.feed(reply("Get-Chi", id = 2))
-                runCurrent()
-                assertNotNull(refreshed.await())
             }
         }
 
@@ -286,7 +280,7 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `user input and visually changed output cannot renew old edits`() =
+    fun `user input invalidates native authority while repaint preserves it`() =
         runTest {
             for (input in listOf(true, false)) {
                 Fixture(StandardTestDispatcher(testScheduler)).use {
@@ -300,9 +294,9 @@ class PowerShellNativeCompletionTest {
                     }
                     it.feed(reply("Get-Chi"))
                     runCurrent()
-                    assertNull(query.await())
+                    if (input) assertNull(query.await()) else assertNotNull(query.await())
                     assertEquals(
-                        TerminalInputAdmission.STALE_CONTEXT,
+                        if (input) TerminalInputAdmission.STALE_CONTEXT else TerminalInputAdmission.ACCEPTED,
                         it.session.submitInput(expected, listOf(TerminalKeyEvent(codepoint = 'y'.code))),
                     )
                 }
@@ -310,7 +304,7 @@ class PowerShellNativeCompletionTest {
         }
 
     @Test
-    fun `output after a valid response still invalidates pre-query editing authority`() =
+    fun `title output after a valid response preserves editing authority`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use {
                 val expected = assertNotNull(it.session.captureCommandEdit())
@@ -321,9 +315,41 @@ class PowerShellNativeCompletionTest {
                 assertNotNull(query.await())
                 it.feed("\u001b]0;changed title\u0007")
                 assertEquals(
-                    TerminalInputAdmission.STALE_CONTEXT,
+                    TerminalInputAdmission.ACCEPTED,
                     it.session.submitInput(expected, listOf(TerminalKeyEvent(codepoint = 'y'.code))),
                 )
+            }
+        }
+
+    @Test
+    fun `native confirmation is independent of reply position within a fragmented redraw`() =
+        runTest {
+            val redraw = listOf("\r", "\u001b[1;5H", "\u001b[K", "Get-", "Chi", "ldItem -Name prediction", "\u001b[1;12H")
+            for (replyPosition in 0..redraw.size) {
+                Fixture(StandardTestDispatcher(testScheduler), columns = 16).use { fixture ->
+                    fixture.feed("ldItem -Name old\u001b[1;12H")
+                    val expected = assertNotNull(fixture.session.captureCommandEdit())
+                    val query = async { fixture.session.requestShellCompletions(expected) }
+                    runCurrent()
+                    for (index in 0..redraw.size) {
+                        if (index == replyPosition) {
+                            for (byte in reply("Get-Chi").toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                            runCurrent()
+                            assertNotNull(query.await(), "reply at redraw offset $replyPosition")
+                        }
+                        if (index < redraw.size) {
+                            for (byte in redraw[index].toByteArray()) fixture.connector.feedFromHost(byteArrayOf(byte))
+                        }
+                        runCurrent()
+                    }
+                    assertEquals("Get-Chi", fixture.session.activeShellCommandLine()?.commandText)
+                    assertTrue(fixture.session.isCommandEditCurrent(expected))
+                    assertEquals(
+                        TerminalInputAdmission.ACCEPTED,
+                        fixture.session.submitInput(expected, listOf(TerminalTextReplacementEvent(0, 7, "Get-ChildItem"))),
+                        "reply at redraw offset $replyPosition",
+                    )
+                }
             }
         }
 

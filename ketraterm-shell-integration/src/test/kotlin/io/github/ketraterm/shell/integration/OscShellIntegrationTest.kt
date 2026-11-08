@@ -133,7 +133,7 @@ class OscShellIntegrationTest {
     }
 
     @Test
-    fun `OSC command context supports conditional admission and rejects later output`() {
+    fun `OSC command context preserves editing authority across unrelated output`() {
         val connector = MockConnector()
         createStartedSession(connector, columns = 30, rows = 4).use { session ->
             connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
@@ -148,9 +148,35 @@ class OscShellIntegrationTest {
             assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
             connector.feedFromHost("\u007fstatus".ascii())
             val next = checkNotNull(session.captureCommandEdit())
-            connector.feedFromHost("\u001b[?2004h".ascii())
-            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(next, edit))
-            assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+            connector.feedFromHost("\u001b]0;changed title\u0007".ascii())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED, session.submitInput(next, edit))
+            assertEquals("\u007fstatus\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test
+    fun `screen derived edits reject observed changes away and back without a render subscriber`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
+            val expected = checkNotNull(session.captureCommandEdit())
+            connector.feedFromHost("x".ascii())
+            connector.feedFromHost("\b \b".ascii())
+            assertEquals(expected.commandLine, session.activeShellCommandLine())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(expected, emptyList()))
+            assertTrue(connector.writtenBytes.isEmpty())
+        }
+    }
+
+    @Test
+    fun `screen derived edits survive identical redraw and metadata without a render subscriber`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
+            val expected = checkNotNull(session.captureCommandEdit())
+            connector.feedFromHost("\u001b]0;title\u0007\u001b[?25h\u001b[1;3Hgit s".ascii())
+            assertEquals(expected.commandLine, session.activeShellCommandLine())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED, session.submitInput(expected, emptyList()))
         }
     }
 

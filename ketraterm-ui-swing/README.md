@@ -249,7 +249,10 @@ A screen-derived prefix requiring shell confirmation is queried
 through the session's installed native hook before collecting suggestions. The
 default session target passes its original captured context to
 `requestShellCompletions(expected)`; confirmation must preserve that context as
-well as match the buffer and cursor. A stale automatic request is replaced with a
+well as match the buffer and cursor. Pending and confirmed native requests retain
+their original editing authority across partial redraws and prediction layout
+changes; the session validates input, prompt, and geometry revisions independently
+of the rendered observation. A stale automatic request is replaced with a
 new interaction and handler. The old handler is cancelled, never renewed. Custom
 edit targets own their editing authority. If the hook cannot confirm the buffer,
 suggestions stay unavailable.

@@ -30,8 +30,158 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["failed", "mismatch", "cancelled"])
+    fun `ordinary contexts need native proof after their editor state enters a completer`(outcome: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation = false, observationBacked = true).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val query = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                assertTrue(fixture.session.isCommandEditCurrent(original), "An in-flight request remains viable")
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                when (outcome) {
+                    "failed" -> fixture.failReply()
+                    "mismatch" -> fixture.reply(commandLine = "git status", cursorOffset = 10)
+                    "cancelled" -> {
+                        query.cancelAndJoin()
+                        fixture.reply()
+                    }
+                }
+                runCurrent()
+                if (outcome == "cancelled") assertTrue(query.isCancelled) else assertNull(query.await())
+                assertFalse(fixture.session.isCommandEditCurrent(original), "Missing proof cannot publish ordinary provider results")
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                fixture.observe(original.commandLine.copy(commandText = "git st", cursorOffset = 6))
+                val differentObservation = checkNotNull(fixture.session.captureCommandEdit())
+                assertFalse(checkNotNull(fixture.session.activeShellCommandLine()).requiresShellConfirmation)
+                assertTrue(
+                    differentObservation.commandLine.requiresShellConfirmation,
+                    "Fresh capture must request the missing native proof",
+                )
+                assertTrue(fixture.session.isCommandEditCurrent(differentObservation))
+                assertEquals(
+                    STALE_CONTEXT,
+                    fixture.session.submitInput(differentObservation, listOf(TerminalKeyEvent.text("never"))),
+                    "Another screen observation cannot bypass the same editor state's missing proof",
+                )
+                fixture.observe(original.commandLine)
+
+                val confirmed = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                assertEquals("qq", fixture.writtenText())
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertNotNull(confirmed.await())
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
+                runCurrent()
+                assertEquals("qqt", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["input", "producer", "resize", "prompt", "ready"])
+    fun `new editor authority supersedes an earlier native proof requirement`(change: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation = false).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
+                val query = async { fixture.session.requestShellCompletions(original) }
+                runCurrent()
+                fixture.failReply()
+                runCurrent()
+                assertNull(query.await())
+                when (change) {
+                    "input" -> fixture.session.submitInput(TerminalKeyEvent.text("x"))
+                    "producer" -> fixture.model.value = fixture.model.value
+                    "resize" -> fixture.session.resizeViewport(81, 4)
+                    "prompt" -> {
+                        fixture.model.value = fixture.model.value
+                        fixture.clearPrompt()
+                    }
+                    "ready" -> {
+                        fixture.model.value = fixture.model.value
+                        fixture.ready()
+                    }
+                }
+                runCurrent()
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                val current = checkNotNull(fixture.session.captureCommandEdit())
+                assertEquals(ACCEPTED, fixture.session.submitInput(current, listOf(TerminalKeyEvent.text("t"))))
+                runCurrent()
+                assertEquals(if (change == "input") "qxt" else "qt", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `context query invalidates its original capture after queued or drained terminal output`(drainedBeforeQuery: Boolean) =
+    fun `native authority and ordinary observation revisions have distinct lifetimes`(confirmed: Boolean) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation = false, observationBacked = true).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                if (confirmed) {
+                    val query = async { fixture.session.requestShellCompletions(expected) }
+                    runCurrent()
+                    fixture.reply()
+                    runCurrent()
+                    assertNotNull(query.await())
+                }
+                fixture.observe(expected.commandLine.copy(cursorColumn = 2, cursorRow = 1, requiresShellConfirmation = true))
+                assertEquals(confirmed, fixture.session.isCommandEditCurrent(expected))
+                fixture.observe(null)
+                assertEquals(confirmed, fixture.session.isCommandEditCurrent(expected))
+                fixture.observe(expected.commandLine)
+                assertEquals(confirmed, fixture.session.isCommandEditCurrent(expected), "An ordinary observation cannot survive ABA")
+                assertEquals(
+                    if (confirmed) ACCEPTED else STALE_CONTEXT,
+                    fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("t"))),
+                )
+            }
+        }
+
+    @Test
+    fun `a provisional request can confirm while its screen observation is unavailable`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), observationBacked = true).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                fixture.observe(null)
+                assertTrue(fixture.session.isCommandEditCurrent(expected))
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
+                val query = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertTrue(fixture.session.isCommandEditCurrent(expected))
+                assertEquals("q", fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+                assertNotNull(query.await())
+                assertNull(fixture.session.captureCommandEdit(), "A confirmed token does not fabricate a screen anchor")
+                assertTrue(fixture.session.isCommandEditCurrent(expected))
+                assertEquals(ACCEPTED, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @Test
+    fun `late metadata preserves a confirmed receipt and original edit`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val query = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                fixture.reply()
+                runCurrent()
+                val result = checkNotNull(query.await())
+                fixture.feedMetadata()
+                fixture.connector.feedFromHost("\u001b]0;changed title\u0007\u001b[?25h".toByteArray())
+                runCurrent()
+                assertTrue(fixture.session.isCommandEditCurrent(expected))
+                assertSame(result, fixture.session.requestShellCompletions(expected))
+                assertEquals("q", fixture.writtenText())
+                assertEquals(ACCEPTED, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("t"))))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `context query preserves its original capture across queued or drained terminal output`(drainedBeforeQuery: Boolean) =
         runTest {
             val io = StandardTestDispatcher(TestCoroutineScheduler())
             Fixture(StandardTestDispatcher(testScheduler), ioDispatcher = io).use { fixture ->
@@ -53,15 +203,16 @@ class TerminalShellCompletionTest {
                 fixture.reply()
                 runCurrent()
 
-                assertNull(query.await(), "The reply cannot renew an edit captured before unrelated output")
-                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
-                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                assertNotNull(query.await())
+                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+                assertTrue(fixture.session.isCommandEditCurrent(original))
                 val fresh = checkNotNull(fixture.session.captureCommandEdit())
                 val next = async { fixture.session.requestShellCompletions(fresh) }
                 runCurrent()
                 assertNotNull(next.await())
                 assertEquals("\u001b[1;1Rq", fixture.writtenText(), "The fresh context reuses the valid native receipt")
-                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
+                assertFalse(fixture.session.isCommandEditCurrent(fresh))
             }
             io.scheduler.runCurrent()
         }
@@ -107,9 +258,7 @@ class TerminalShellCompletionTest {
                 fixture.reply()
                 runCurrent()
                 assertNotNull(query.await())
-                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
-                val fresh = checkNotNull(fixture.session.captureCommandEdit())
-                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
             }
             io.scheduler.runCurrent()
         }
@@ -178,7 +327,7 @@ class TerminalShellCompletionTest {
         }
 
     @ParameterizedTest
-    @ValueSource(strings = ["equal", "away-and-back", "input", "render"])
+    @ValueSource(strings = ["equal", "away-and-back", "input"])
     fun `same text in a changed context waits for the old query then requests its own confirmation`(change: String) =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
@@ -192,7 +341,6 @@ class TerminalShellCompletionTest {
                         fixture.model.value = original
                     }
                     "input" -> fixture.session.submitInput(TerminalKeyEvent.text("x"))
-                    "render" -> fixture.connector.feedFromHost("x".encodeToByteArray())
                 }
                 val latest = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
@@ -213,7 +361,7 @@ class TerminalShellCompletionTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["same", "away-and-back"])
-    fun `rejected native confirmation invalidates an unchanged command after repaint`(repaint: String) =
+    fun `native confirmation preserves editing authority across repaint`(repaint: String) =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 fixture.connector.feedFromHost("git s".encodeToByteArray())
@@ -234,17 +382,17 @@ class TerminalShellCompletionTest {
 
                 fixture.reply()
                 runCurrent()
-                assertNull(query.await())
-                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
-                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
+                assertNotNull(query.await())
+                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+                assertTrue(fixture.session.isCommandEditCurrent(original))
 
                 val fresh = checkNotNull(fixture.session.captureCommandEdit())
                 val next = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
-                fixture.reply(requestId = 2)
-                runCurrent()
                 assertNotNull(next.await())
-                assertEquals(ACCEPTED, fixture.session.submitInput(fresh, listOf(TerminalKeyEvent.text("t"))))
+                assertEquals("q", fixture.writtenText())
+                assertTrue(fixture.session.isCommandEditCurrent(fresh))
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
             }
         }
 
@@ -353,7 +501,7 @@ class TerminalShellCompletionTest {
         }
 
     @ParameterizedTest
-    @ValueSource(strings = ["input", "output", "resize", "equal", "ready"])
+    @ValueSource(strings = ["input", "resize", "clear", "equal", "ready"])
     fun `confirmation and its cached result expire after intervening state`(change: String) =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
@@ -367,8 +515,8 @@ class TerminalShellCompletionTest {
 
                 when (change) {
                     "input" -> assertEquals(ACCEPTED, fixture.session.submitInput(TerminalKeyEvent.text("x")))
-                    "output" -> fixture.feedMetadata()
                     "resize" -> fixture.session.resizeViewport(81, 4)
+                    "clear" -> fixture.session.clearBuffer()
                     "equal" -> fixture.model.value = fixture.model.value
                     "ready" -> fixture.ready()
                 }
@@ -559,6 +707,7 @@ class TerminalShellCompletionTest {
     fun `ordinary complete snapshots still invoke the completer for each explicit request`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), requiresConfirmation = false).use { fixture ->
+                val original = checkNotNull(fixture.session.captureCommandEdit())
                 val first = async { fixture.session.requestShellCompletions("git s", 5) }
                 runCurrent()
                 fixture.reply()
@@ -569,9 +718,11 @@ class TerminalShellCompletionTest {
                 runCurrent()
                 assertFalse(next.isCompleted)
                 assertEquals("qq", fixture.writtenText())
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("never"))))
                 fixture.reply(requestId = 2)
                 runCurrent()
                 assertNotNull(next.await())
+                assertEquals(ACCEPTED, fixture.session.submitInput(original, listOf(TerminalKeyEvent.text("t"))))
             }
         }
 
@@ -579,9 +730,12 @@ class TerminalShellCompletionTest {
         dispatcher: CoroutineDispatcher,
         requiresConfirmation: Boolean = true,
         ioDispatcher: CoroutineDispatcher = dispatcher,
+        private val observationBacked: Boolean = false,
     ) : AutoCloseable {
         val connector = MockConnector()
         val model = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot("git s", 5, 5, 0, requiresConfirmation))
+        private var observation = model.value
+        private var observationRevision = 0L
         private lateinit var channel: TerminalShellCompletionChannel
         private val host = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
         val session =
@@ -591,7 +745,18 @@ class TerminalShellCompletionTest {
                 shellIntegration =
                     TerminalShellIntegrationFactory { context ->
                         channel = context.shellCompletion
-                        host.create(context)
+                        val integration = host.create(context)
+                        object : TerminalShellIntegration by integration {
+                            override val commandLineObservationRevision: Long get() = observationRevision
+
+                            override fun activeCommandLine(): TerminalShellCommandLineSnapshot? =
+                                if (observationBacked) observation else integration.activeCommandLine()
+
+                            override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T? =
+                                integration.withCommandLine { revision, snapshot ->
+                                    action(revision, if (observationBacked) observation else snapshot)
+                                }
+                        }
                     },
                 workerDispatcher = dispatcher,
                 ioDispatcher = ioDispatcher,
@@ -604,6 +769,12 @@ class TerminalShellCompletionTest {
         }
 
         fun ready() = channel.ready("epoch", listOf(TerminalKeyEvent.text("q")))
+
+        fun observe(snapshot: TerminalShellCommandLineSnapshot?) {
+            check(observationBacked)
+            observation = snapshot
+            observationRevision++
+        }
 
         fun clearPrompt() {
             channel.clearPrompt()

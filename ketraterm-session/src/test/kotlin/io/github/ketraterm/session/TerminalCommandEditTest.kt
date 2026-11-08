@@ -182,7 +182,7 @@ class TerminalCommandEditTest {
         }
 
     @ParameterizedTest
-    @ValueSource(strings = ["text", "cursor", "anchor", "unavailable", "equal", "aba", "raw", "key", "paste", "output", "resize"])
+    @ValueSource(strings = ["text", "cursor", "anchor", "unavailable", "equal", "aba", "raw", "key", "paste", "resize"])
     fun `intervening state rejects an entire edit without publishing its prefix`(change: String) =
         runTest {
             val connector = MockConnector()
@@ -213,7 +213,6 @@ class TerminalCommandEditTest {
                         session.encodePaste(TerminalPasteEvent("x"))
                         allowedBytes = "x"
                     }
-                    "output" -> connector.feedFromHost("\u001b[?2004h".toByteArray())
                     "resize" -> session.resizeViewport(11, 3)
                 }
                 // A stale check must precede work/budget validation too.
@@ -221,6 +220,22 @@ class TerminalCommandEditTest {
                 assertFalse(session.isClosed)
                 runCurrent()
                 assertEquals(allowedBytes, connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["\u001b[?2004h", "\u001b]0;changed title\u0007", "\u001b]633;ignored\u0007", "paint"])
+    fun `terminal output does not revoke authoritative host editing state`(output: String) =
+        runTest {
+            val connector = MockConnector()
+            session(connector, TerminalShellCommandLineState(snapshot())).use { session ->
+                session.start(10, 3)
+                val expected = checkNotNull(session.captureCommandEdit())
+                connector.feedFromHost(output.toByteArray())
+                assertTrue(session.isCommandEditCurrent(expected))
+                assertEquals(ACCEPTED, session.submitInput(expected, listOf(TerminalKeyEvent.text("x"))))
+                runCurrent()
+                assertEquals("x", connector.writtenBytes.toString(Charsets.UTF_8))
             }
         }
 

@@ -60,8 +60,8 @@ internal class StandaloneSuggestionFixture private constructor(
     private val focused = CompletableDeferred<Unit>()
     private var popup: JComponent? = null
     private var window: JFrame? = null
-    private var invalidationRevision = 0L
-    private var activeSnapshotRevision = -1L
+    private var latestSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var viewListener: SwingShellSuggestionViewListener? = null
     private val terminal =
         SwingTerminal(
             settingsProvider = settings::current,
@@ -69,16 +69,13 @@ internal class StandaloneSuggestionFixture private constructor(
                 SwingHostServices.create { draft ->
                     draft.shellSuggestionViewFactory =
                         SwingShellSuggestionViewFactory { listener ->
+                            viewListener = listener
                             val view = SwingShellSuggestionViewFactory.DEFAULT.create(listener)
                             popup = view.component
                             object : SwingShellSuggestionView by view {
                                 override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
                                     view.update(snapshot)
-                                    if (snapshot.visibleSuggestions.isNotEmpty()) {
-                                        activeSnapshotRevision = invalidationRevision
-                                    } else {
-                                        activeSnapshotRevision = -1L
-                                    }
+                                    latestSnapshot = snapshot
                                     publications.trySend(session.activeShellCommandLine()?.commandText to snapshot).getOrThrow()
                                 }
                             }
@@ -108,9 +105,6 @@ internal class StandaloneSuggestionFixture private constructor(
                     }
                 }
             terminal.setShellSuggestionProvider(fixtureProvider)
-            terminal.addShellSuggestionInvalidationListener {
-                invalidationRevision++
-            }
             terminal.bind(session) { failure ->
                 if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
             }
@@ -229,29 +223,28 @@ internal class StandaloneSuggestionFixture private constructor(
         replacement: String,
         execute: Boolean = false,
     ) = withTimeout(15.seconds) {
-        while (withContext(Dispatchers.Swing) {
-                invalidationRevision > activeSnapshotRevision ||
-                    terminal.currentShellSuggestionState().count == 0
-            }
-        ) {
-            val update = publications.receive()
-            if (update.second.visibleSuggestions.any { it.replacementText == replacement }) {
-                break
-            }
+        var attempted: SwingShellSuggestionViewSnapshot? = null
+        while (true) {
+            val accepted =
+                withContext(Dispatchers.Swing) {
+                    val snapshot = latestSnapshot
+                    val index = snapshot.visibleSuggestions.indexOfFirst { it.replacementText == replacement }
+                    if (popup?.isVisible != true || index < 0 || snapshot === attempted) return@withContext false
+                    attempted = snapshot
+                    assertNotNull(viewListener).onSuggestionClicked(snapshot, index)
+                    // A retained or replaced publication rejects the click without touching the shell.
+                    val feedback = feedbackEvents.tryReceive().getOrNull() ?: return@withContext false
+                    assertEquals(
+                        SwingShellSuggestionFeedbackKind.ACCEPTED,
+                        feedback.kind,
+                        "Suggestion acceptance failed: ${feedback.acceptanceResult}",
+                    )
+                    if (execute) press(KeyEvent.VK_ENTER)
+                    true
+                }
+            if (accepted) return@withTimeout
+            publications.receive()
         }
-        withContext(Dispatchers.Swing) {
-            val count = terminal.currentShellSuggestionState().count
-            assertTrue(count > 0)
-            var remaining = count
-            while (terminal.currentShellSuggestionState().selectedSuggestion?.replacementText != replacement && remaining-- > 0) {
-                press(KeyEvent.VK_DOWN)
-            }
-            assertEquals(replacement, terminal.currentShellSuggestionState().selectedSuggestion?.replacementText)
-            press(KeyEvent.VK_TAB)
-            if (execute) press(KeyEvent.VK_ENTER)
-        }
-        val feedback = feedbackEvents.receive()
-        assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.kind, "Suggestion acceptance failed: ${feedback.acceptanceResult}")
     }
 
     suspend fun capturePopup(output: Path) {

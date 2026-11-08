@@ -28,9 +28,7 @@ function global:__KetraTermResetCompletionPrefix {
 }
 
 function global:__KetraTermComplete {
-    # Module discovery and registered completers may draw progress over PSReadLine.
-    # This query must not repaint the terminal: the session rejects changed frames.
-    # A local preference leaves the user's interactive preference unchanged.
+    # Suppress discovery/completer progress without changing the user's interactive preference.
     $ProgressPreference = 'SilentlyContinue'
     $savedExitCode = $global:LASTEXITCODE
     $global:__KetraTermCompletionSequence++
@@ -146,6 +144,20 @@ function global:__KetraTermComplete {
     } catch {
         # Fail without printing errors, command text, or candidate data to the terminal.
     } finally {
+        try {
+            if ($body.StartsWith($prefix + 'Ok;', [StringComparison]::Ordinal)) {
+                # Registered completers can mutate the editor. Confirm the sampled buffer,
+                # not an earlier state that happened to produce these candidates.
+                $currentLine = ''
+                $currentCursor = 0
+                [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$currentLine, [ref]$currentCursor)
+                if ($currentLine -cne $line -or $currentCursor -ne $cursor) {
+                    $body = $prefix + 'Failed'
+                }
+            }
+        } catch {
+            $body = $prefix + 'Failed'
+        }
         $global:LASTEXITCODE = $savedExitCode
     }
     [Console]::Write(([string][char]27) + ']633;' + $body + ([string][char]7))

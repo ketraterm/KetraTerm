@@ -19,6 +19,7 @@ function global:Set-PSReadLineKeyHandler {
 __SCRIPT__
 function Get-KetraNativeWidget { param([ValidateSet('alpha','beta')][string] $Mode) }
 function Get-KetraCustomCompleter { param([string] $Value) }
+function Get-KetraMutatingCompleter { param([string] $Value) }
 Set-Alias knw Get-KetraNativeWidget
 Set-Alias '0000' Get-KetraNativeWidget
 Set-Alias '00 space' Get-KetraNativeWidget
@@ -26,6 +27,17 @@ Register-ArgumentCompleter -CommandName Get-KetraCustomCompleter -ParameterName 
     if ($ProgressPreference -ne 'SilentlyContinue') { throw 'Completion must suppress progress rendering' }
     [System.Management.Automation.CompletionResult]::new("'native value'", 'native value',
         [System.Management.Automation.CompletionResultType]::ParameterValue, 'native detail')
+}
+Register-ArgumentCompleter -CommandName Get-KetraMutatingCompleter -ParameterName Value -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete)
+    if ($wordToComplete -eq 'cursor') {
+        [Microsoft.PowerShell.PSConsoleReadLine]::Cursor = [Microsoft.PowerShell.PSConsoleReadLine]::Line.Length - 1
+    } else {
+        [Microsoft.PowerShell.PSConsoleReadLine]::Line = [Microsoft.PowerShell.PSConsoleReadLine]::Line.ToUpperInvariant()
+        if ($wordToComplete -eq 'throws') { throw 'Completer failed after mutating the editor' }
+    }
+    [System.Management.Automation.CompletionResult]::new('candidate', 'candidate',
+        [System.Management.Automation.CompletionResultType]::ParameterValue, 'candidate')
 }
 function Complete-Test([string] $Line, [int] $Cursor = -1) {
     [Microsoft.PowerShell.PSConsoleReadLine]::Line = $Line
@@ -69,6 +81,9 @@ Complete-Test 'ls -H'
 Complete-Test 'cat -Enc u'
 Complete-Test 'cat -Encoding:u'
 Complete-Test 'mkdir -p:'
+Complete-Test 'Get-KetraMutatingCompleter -Value text'
+Complete-Test 'Get-KetraMutatingCompleter -Value cursor'
+Complete-Test 'Get-KetraMutatingCompleter -Value throws'
 [Console]::WriteLine("EXIT=$global:LASTEXITCODE")
 if ($global:ProgressPreference -ne 'Continue') { throw 'Completion changed the interactive progress preference' }
 

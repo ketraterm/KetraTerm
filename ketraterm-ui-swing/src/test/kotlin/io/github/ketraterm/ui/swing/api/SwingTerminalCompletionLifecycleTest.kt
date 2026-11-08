@@ -201,9 +201,9 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
-    fun `automatic confirmation recaptures after a matching reply cannot validate a repainted frame`() =
+    fun `native confirmation preserves the original interaction across partial repaint observations`() =
         onEdtTest {
-            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
             val view = RecordingView()
             val terminal = terminal(testScheduler, view)
             var collections = 0
@@ -231,39 +231,114 @@ class SwingTerminalCompletionLifecycleTest {
                 advanceTimeBy(75.milliseconds)
                 runCurrent()
                 val first = target.interactions.single()
-                val original = fixture.model.value
+                val original = assertNotNull(first.sessionEditContext)
                 val revision = fixture.session.activeShellCommandLineRevision.value
                 assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
                 assertEquals(0, collections)
 
                 fixture.feed("x\b\u001b[K")
+                fixture.observeCommandLine(null)
                 fixture.session.requestRender(0)
                 runCurrent()
-                assertSame(original, fixture.model.value)
-                assertEquals(revision, fixture.session.activeShellCommandLineRevision.value)
+                assertTrue(first.isActive)
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
+                assertFalse(original.isCancelled)
+                assertEquals(0, collections)
                 fixture.respond(confirmed)
                 runCurrent()
-                assertTrue(first.isClosed)
-                assertFalse(first.publish(listOf(suggestion)))
-                assertEquals(0, collections)
-                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
-                assertTrue(fixture.session.activeShellCommandLineRevision.value > revision)
-
+                assertTrue(first.isActive)
+                fixture.observeCommandLine(snapshot.copy(cursorColumn = 1, cursorRow = 2))
+                runCurrent()
                 advanceTimeBy(75.milliseconds)
                 runCurrent()
-                assertEquals(2, target.interactions.size)
-                val refreshed = target.interactions.last()
-                assertEquals(first.request, refreshed.request)
-                assertEquals("\u001b[24~\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
-                fixture.respond(confirmed, requestId = 2)
-                runCurrent()
+                assertSame(first, target.interactions.single())
+                assertSame(original, first.sessionEditContext)
+                assertFalse(original.isCancelled)
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
                 assertEquals(1, collections)
                 assertTrue(target.visible)
                 assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, first.tryAccept(first.snapshot, 0))
+                runCurrent()
+                assertEquals(
+                    "\u001b[24~\u007f\u007f\u007f\u007f\u007freplacement",
+                    fixture.connector.output.toString(Charsets.UTF_8),
+                )
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
+    fun `failed confirmation reconsiders an echo completed while the request was pending`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion.copy(replacementEndOffset = request.cursorOffset)))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            val target =
+                RecordingTarget { interaction ->
+                    terminal.presentShellSuggestions(interaction)
+                    terminal.requestShellSuggestions(interaction, provider)
+                }
+            val completed =
+                snapshot.copy(
+                    commandText = "git status",
+                    cursorOffset = 10,
+                    cursorColumn = 10,
+                    requiresShellConfirmation = true,
+                )
+            val actualBuffer = TerminalShellCompletionResult("git status", 10, 4, 10, emptyList())
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val first = target.interactions.single()
+                assertEquals("git s", first.request.commandText)
+                assertEquals("\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+
+                fixture.observeCommandLine(completed)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertTrue(first.isActive)
+                assertEquals(1, target.interactions.size)
+                assertEquals(0, collections)
+
+                fixture.respond(actualBuffer)
+                runCurrent()
+                assertTrue(first.isClosed)
+                assertEquals(0, collections)
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val refreshed = target.interactions.last()
+                assertEquals(2, target.interactions.size)
+                assertEquals("git status", refreshed.request.commandText)
+                assertEquals("\u001b[24~\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+
+                fixture.respond(actualBuffer, requestId = 2)
+                runCurrent()
+                assertEquals(1, collections)
+                assertEquals(listOf(suggestion.copy(replacementEndOffset = 10)), view.snapshot.visibleSuggestions)
                 assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
                 runCurrent()
                 assertEquals(
-                    "\u001b[24~\u001b[24~\u007f\u007f\u007f\u007f\u007freplacement",
+                    "\u001b[24~\u001b[24~" + "\u007f".repeat(10) + "replacement",
                     fixture.connector.output.toString(Charsets.UTF_8),
                 )
             } finally {
@@ -319,7 +394,7 @@ class SwingTerminalCompletionLifecycleTest {
 
     @ParameterizedTest(name = "output after capture [writerDrained={0}]")
     @ValueSource(booleans = [false, true])
-    fun `output during provider opening replaces the original editing context before publication`(writerDrained: Boolean) =
+    fun `terminal replies during provider opening preserve the original editing context`(writerDrained: Boolean) =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true)
             val view = RecordingView()
@@ -364,28 +439,23 @@ class SwingTerminalCompletionLifecycleTest {
 
                 fixture.respond(TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()))
                 runCurrent()
-                assertTrue(first.isClosed)
-                assertTrue(originalContext.isCancelled)
+                assertTrue(first.isActive)
+                assertFalse(originalContext.isCancelled)
                 assertSame(originalContext, first.sessionEditContext)
-                assertFalse(first.publish(listOf(suggestion)))
-                assertEquals(0, collections)
-                assertTrue(view.snapshot.visibleSuggestions.isEmpty())
 
                 advanceTimeBy(75.milliseconds)
                 runCurrent()
-                assertEquals(2, target.interactions.size)
-                val refreshed = target.interactions.last()
-                assertNotSame(originalContext, assertNotNull(refreshed.sessionEditContext))
-                assertEquals(2, opened)
+                assertSame(first, target.interactions.single())
+                assertEquals(1, opened)
                 assertEquals(1, collections)
                 assertTrue(target.visible)
                 assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
                 assertEquals(
                     "\u001b[1;1R\u001b[24~",
                     fixture.connector.output.toString(Charsets.UTF_8),
-                    "The fresh interaction can reuse the verified reply for its current context",
+                    "A terminal reply does not edit the native buffer or require another interaction",
                 )
-                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, refreshed.tryAccept(refreshed.snapshot, 0))
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, first.tryAccept(first.snapshot, 0))
                 runCurrent()
                 assertEquals(
                     "\u001b[1;1R\u001b[24~\u007f\u007f\u007f\u007f\u007freplacement",
@@ -1198,12 +1268,15 @@ class SwingTerminalCompletionLifecycleTest {
         legacySource: MutableStateFlow<TerminalShellCommandLineSnapshot?>? = null,
         command: String = "git s",
         nativeCompletion: Boolean = false,
+        private val screenDerived: Boolean = false,
     ) : AutoCloseable {
         val connector = RecordingConnector()
         val model =
             TerminalShellCommandLineState(
                 TerminalShellCommandLineSnapshot(command, command.length, command.length, 0, requiresShellConfirmation = nativeCompletion),
             )
+        private val observations = MutableStateFlow(0L)
+        private var observedCommandLine = model.value
         private lateinit var completion: TerminalShellCompletionChannel
         val session =
             TerminalSession.create(
@@ -1222,7 +1295,20 @@ class SwingTerminalCompletionLifecycleTest {
                             } else {
                                 TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), legacySource)
                             }
-                        host.create(context)
+                        val producer = host.create(context)
+                        if (screenDerived) {
+                            object : TerminalShellIntegration by producer {
+                                override val commandLineChanges = observations
+                                override val commandLineObservationRevision: Long get() = observations.value
+
+                                override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = observedCommandLine
+
+                                override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
+                                    action(0L, observedCommandLine)
+                            }
+                        } else {
+                            producer
+                        }
                     },
             )
 
@@ -1244,6 +1330,12 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
         fun publishCommands(inventory: TerminalShellCommandInventory?) = completion.publishCommands(inventory)
+
+        fun observeCommandLine(snapshot: TerminalShellCommandLineSnapshot?) {
+            check(screenDerived)
+            observedCommandLine = snapshot
+            observations.value++
+        }
 
         override fun close() = session.close()
     }

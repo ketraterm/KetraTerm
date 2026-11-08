@@ -2123,6 +2123,9 @@ public class SwingTerminal
                     edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
                     isFocused = { terminalFocused },
                     isEligible = { isAutomaticShellSuggestionEligible() },
+                    isRequestCurrent = {
+                        activeSuggestionInteraction?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
+                    },
                     requestSuggestions = { _, feedback ->
                         val provider = shellSuggestionProvider
                         val target = shellSuggestionTarget
@@ -2172,6 +2175,8 @@ public class SwingTerminal
          * [TerminalSession.requestShellCompletions]. [requestShellSuggestions] performs that check
          * before collecting a provider; conditional session admission also rejects unconfirmed edits.
          * Automatic and explicit provider requests use the same native confirmation before collecting suggestions.
+         * Session-backed interactions retain their original edit authority across native-query redraws;
+         * presentation changes alone do not replace a pending or confirmed interaction.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -2219,10 +2224,17 @@ public class SwingTerminal
                     if (suggestionRevision == revision) shellSuggestionController?.hide()
                     return null
                 }
+            val expected = sessionEditContext
+            val contextIsCurrent: (() -> Boolean)? =
+                when {
+                    bound != null && expected != null -> ({ bound.isCommandEditCurrent(expected) })
+                    bound != null && observed != null -> ({ !bound.isClosed && bound.activeShellCommandLine() == observed })
+                    else -> null
+                }
             if (disposed ||
                 suggestionRevision != revision ||
                 session !== bound ||
-                (observed != null && bound.activeShellCommandLine() != observed)
+                contextIsCurrent?.invoke() == false
             ) {
                 captured.close()
                 if (suggestionRevision == revision) shellSuggestionController?.hide()
@@ -2241,9 +2253,7 @@ public class SwingTerminal
                 }
             val interaction = SwingShellSuggestionInteraction(effectiveRequest, handler, feedbackHandler)
             interaction.sessionEditContext = sessionEditContext
-            if (bound != null && observed != null) {
-                interaction.contextIsCurrent = { !bound.isClosed && bound.activeShellCommandLine() == observed }
-            }
+            interaction.contextIsCurrent = contextIsCurrent
             val scope = CoroutineScope(componentScope.coroutineContext + Job(componentJob) + CoroutineName("shell-suggestions"))
             activeSuggestionInteraction = interaction
             activeSuggestionIsAutomatic = automatic
@@ -2284,20 +2294,19 @@ public class SwingTerminal
                 },
             )
             if (!automatic) suggestionScheduler?.onExplicitRequest()
-            if (bound != null && observed != null) {
+            if (bound != null && contextIsCurrent != null) {
                 scope.launch {
-                    combine(bound.activeShellCommandLineRevision, bound.state) { _, _ -> }
-                        .collect {
-                            if (activeSuggestionInteraction === interaction &&
-                                (bound.isClosed || session !== bound || bound.activeShellCommandLine() != observed)
-                            ) {
-                                cancelAndHideShellSuggestionsOnEdt(
-                                    "Active shell command changed",
-                                    SwingShellSuggestionCloseReason.INVALIDATED,
-                                    retainPresentation = automatic,
-                                )
-                            }
+                    bound.commandEditChanges.collect {
+                        if (activeSuggestionInteraction === interaction &&
+                            (session !== bound || !contextIsCurrent())
+                        ) {
+                            cancelAndHideShellSuggestionsOnEdt(
+                                "Active shell command changed",
+                                SwingShellSuggestionCloseReason.INVALIDATED,
+                                retainPresentation = automatic,
+                            )
                         }
+                    }
                 }
             }
             return interaction.takeIf { activeSuggestionInteraction === it && it.isActive }
@@ -2432,6 +2441,10 @@ public class SwingTerminal
                 } catch (failure: Exception) {
                     ensureActive()
                     reportSuggestionFailure(interaction, failure)
+                } finally {
+                    if (!interaction.isActive && activeSuggestionInteraction == null && session === bound) {
+                        suggestionScheduler?.onRequestFinished()
+                    }
                 }
             }
         }

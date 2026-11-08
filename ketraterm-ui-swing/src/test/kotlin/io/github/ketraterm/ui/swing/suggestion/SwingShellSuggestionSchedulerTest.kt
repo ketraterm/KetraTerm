@@ -200,6 +200,72 @@ class SwingShellSuggestionSchedulerTest {
         }
 
     @Test
+    fun `observation changes preserve current editing authority without another request`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+            fixture.requestCurrent = true
+            val hides = fixture.hideCount
+
+            fixture.active = null
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            fixture.active = snapshot("git s").copy(cursorColumn = 1, cursorRow = 3)
+            fixture.revisions.value++
+            fixture.admissionChanges.emit(Unit)
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+            assertEquals(hides, fixture.hideCount)
+
+            fixture.requestCurrent = false
+            fixture.active = snapshot("git st")
+            fixture.revisions.value++
+            runCurrent()
+            assertEquals(hides + 1, fixture.hideCount)
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s"), snapshot("git st")), fixture.requests)
+            fixture.scheduler.stop()
+        }
+
+    @Test
+    fun `finished requests reconsider changed observations without retrying an unchanged failed buffer`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            fixture.requestCurrent = true
+            fixture.active = snapshot("git status")
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, fixture.attempts)
+
+            fixture.requestCurrent = false
+            fixture.scheduler.onRequestFinished()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s"), snapshot("git status")), fixture.requests)
+
+            fixture.scheduler.onRequestFinished()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(2, fixture.attempts)
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `automatic requests schedule provisional prefixes for native confirmation`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)
@@ -783,6 +849,7 @@ class SwingShellSuggestionSchedulerTest {
         var active: TerminalShellCommandLineSnapshot? = snapshot("git s")
         var focused = true
         var eligible = true
+        var requestCurrent = false
         val requests = ArrayList<TerminalShellCommandLineSnapshot>()
         var feedbackHandler: SwingShellSuggestionFeedbackHandler? = null
         var hideCount = 0
@@ -795,6 +862,7 @@ class SwingShellSuggestionSchedulerTest {
                 edtDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
                 isFocused = { focused },
                 isEligible = { eligible },
+                isRequestCurrent = { requestCurrent },
                 requestSuggestions = { snapshot, feedback ->
                     assertTrue(SwingUtilities.isEventDispatchThread())
                     attempts++

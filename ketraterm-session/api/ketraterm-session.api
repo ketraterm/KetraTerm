@@ -138,6 +138,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun hyperlinkUri (I)Ljava/lang/String;
 	public final fun isClosed ()Z
+	public final fun isCommandEditCurrent (Lio/github/ketraterm/session/TerminalCommandEditContext;)Z
 	public fun onBytes ([BII)V
 	public fun onClosed (Ljava/lang/Integer;)V
 	public fun onError (Ljava/lang/Throwable;)V
@@ -369,6 +370,7 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 	public abstract fun activeCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public fun bufferCleared (Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
 	public abstract fun getCommandLineChanges ()Lkotlinx/coroutines/flow/Flow;
+	public fun getCommandLineObservationRevision ()J
 	public fun getCommandLinePrefixResetKeys ()Ljava/util/List;
 	public fun getCustomOscPayloadLimitBytes ()I
 	public fun getPromptMarkersExpected ()Z
@@ -384,6 +386,7 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 
 public final class io/github/ketraterm/session/TerminalShellIntegration$DefaultImpls {
 	public static fun bufferCleared (Lio/github/ketraterm/session/TerminalShellIntegration;Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
+	public static fun getCommandLineObservationRevision (Lio/github/ketraterm/session/TerminalShellIntegration;)J
 	public static fun getCommandLinePrefixResetKeys (Lio/github/ketraterm/session/TerminalShellIntegration;)Ljava/util/List;
 	public static fun getCustomOscPayloadLimitBytes (Lio/github/ketraterm/session/TerminalShellIntegration;)I
 	public static fun getPromptMarkersExpected (Lio/github/ketraterm/session/TerminalShellIntegration;)Z

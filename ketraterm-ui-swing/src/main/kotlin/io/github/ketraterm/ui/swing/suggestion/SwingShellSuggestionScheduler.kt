@@ -32,6 +32,7 @@ internal class SwingShellSuggestionScheduler(
     private val edtDispatcher: CoroutineDispatcher,
     private val isFocused: () -> Boolean,
     private val isEligible: () -> Boolean,
+    private val isRequestCurrent: () -> Boolean,
     private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Boolean,
     private val hideSuggestions: (refreshing: Boolean) -> Unit,
     private val debounceMillis: Int = 75,
@@ -131,7 +132,7 @@ internal class SwingShellSuggestionScheduler(
                             }
                             invalidatedRevision = null
                             invalidatedSnapshot = null
-                            if (!initialRevision) cancelAndHide(refreshing = true)
+                            if (!initialRevision && !isRequestCurrent()) cancelAndHide(refreshing = true)
                             if (lifecycleRevision == revision) scheduleRefresh()
                         }
                     }
@@ -184,6 +185,12 @@ internal class SwingShellSuggestionScheduler(
         scheduleRefresh()
     }
 
+    /** Reconsiders an observation that changed during a request, while deduplicating an unchanged failed buffer. */
+    fun onRequestFinished() {
+        checkEdt()
+        if (refreshes.value == null) scheduleRefresh()
+    }
+
     fun onFocusLost() {
         checkEdt()
         if (observationJob != null) cancelAndHide()
@@ -222,6 +229,7 @@ internal class SwingShellSuggestionScheduler(
             return
         }
         val revision = lifecycleRevision
+        if (isRequestCurrent()) return
         val snapshot = activeCommandLine?.invoke()
         if (lifecycleRevision != revision) return
         if (dismissedCommandText != null && snapshot?.commandText == dismissedCommandText) return

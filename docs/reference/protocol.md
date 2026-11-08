@@ -476,6 +476,15 @@ request ID. They must also match the captured command and cursor; wrong epochs
 or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
 metadata has no editing authority.
 
+The hook samples PSReadLine's input buffer and cursor before invoking completers,
+then checks both again immediately before emitting a successful result. If either
+differs, or the final read fails, it emits `Failed` without candidates. This also
+applies when a completer throws after changing the editor. Terminal repainting
+does not itself change that buffer. The host treats this correlated buffer
+confirmation separately from its screen-derived command observation; see the
+[conditional-edit contract](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
+for its lifetime and final admission checks.
+
 `Ready` is accepted only within an active primary-screen OSC 133 prompt, after
 `A`; it may precede `B`. Command start/finish (`C`/`D`), a local primary-buffer
 clear, or an observed alternate-screen transition revoke the completion hook.
@@ -483,6 +492,9 @@ A new `A` also clears the previous epoch and requires a fresh announcement.
 Repeating `Ready` within the same epoch preserves the request counter. Every
 accepted announcement invalidates earlier editing contexts and pending results,
 including announcements that change only `PrefixReset`.
+Readiness advertises the prompt's hook, not completion of prompt rendering or
+PSReadLine initialization. The query handler reads the editor when the shell
+processes the requested key chord.
 
 `PrefixReset` lets acceptance clear the text before the real cursor through
 `PSConsoleReadLine.Replace(0, cursor, "")`, then paste the edited prefix in the same
