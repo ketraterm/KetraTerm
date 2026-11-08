@@ -24,8 +24,8 @@ import javax.swing.Timer
 
 /**
  * One visibility-bound animation clock for a host's progress icons. All calls are
- * EDT-confined. [frame] receives a normalized clockwise phase approximately 30 times per
- * second while [active] and [component] is showing. It should update only visible
+ * EDT-confined. `frame` receives a normalized clockwise phase approximately 30 times per
+ * second while [active] and `component` is showing. It should update only visible
  * indeterminate icons and request repaint. The component and sessions are borrowed.
  * Close on owner disposal to stop the clock and detach its hierarchy listener.
  */

@@ -19,14 +19,46 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
+buildscript {
+    dependencies {
+        classpath(platform("com.fasterxml.jackson:jackson-bom:${providers.gradleProperty("buildJacksonVersion").get()}"))
+    }
+}
+
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     id("com.diffplug.spotless") version "8.10.3"
-    id("org.jetbrains.dokka") version "2.2.0"
+    id("org.jetbrains.dokka") version "2.3.0"
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
 apply(from = "gradle/test-suites.gradle.kts")
+
+val buildJacksonVersion = providers.gradleProperty("buildJacksonVersion").get()
+
+allprojects {
+    plugins.withId("org.jetbrains.dokka") {
+        // Dokka workers resolve separately from the Gradle plugin classpath.
+        dependencies.constraints {
+            listOf("dokkaHtmlGeneratorRuntime", "dokkaHtmlPublicationPlugin").forEach { configuration ->
+                add(configuration, "com.fasterxml.jackson.core:jackson-databind:$buildJacksonVersion") {
+                    because("Dokka's Jackson version predates the deserialization security fixes")
+                }
+            }
+        }
+    }
+
+    configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+        val configurationName = name
+        project.dependencies.constraints {
+            listOf("bcpkix", "bcpg", "bcutil", "bcprov").forEach { artifact ->
+                add(configurationName, "org.bouncycastle:$artifact-jdk18on:1.85") {
+                    because("Publishing validation needs the certificate and ASN.1 security fixes")
+                }
+            }
+        }
+    }
+}
 
 // Keep shared libraries compatible with IntelliJ 2026.2's bundled 1.10.2-intellij-1 runtime.
 // The IDE plugin excludes our coroutines dependency; newer compiled calls can fail at runtime.
