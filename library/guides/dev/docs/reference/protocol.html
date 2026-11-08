@@ -548,9 +548,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -674,22 +674,23 @@ and <a href="#streaming-grapheme-placement">streaming placement</a>.</p>
 <h2 id="private-powershell-completion-metadata">Private PowerShell completion metadata</h2>
 <p>The same optional producer also accepts the bounded Bash command inventory
 <a href="#private-bash-command-inventory">described below</a>.</p>
-<p>The optional OSC shell producer accepts <code>OSC 633;KetraTermCompletion;2;... BEL</code>
+<p>The optional OSC shell producer accepts <code>OSC 633;KetraTermCompletion;3;... BEL</code>
 (ST is also accepted) from the workspace&#39;s PSReadLine hook. All envelope fields
 are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+Other completion protocol versions are ignored.
 The session&#39;s default parser forwards unknown OSC bodies synchronously to the
 selected producer. Custom parser factories must forward <code>observeCustomOsc</code> and
 use <code>customOscPayloadLimitBytes</code> themselves.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
-<th>Message body after <code>KetraTermCompletion;2;</code></th>
+<th>Message body after <code>KetraTermCompletion;3;</code></th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody><tr>
 <td><code>Ready;epoch</code></td>
-<td>New prompt, 32 lowercase hexadecimal epoch characters; request counter resets to zero.</td>
+<td>Prompt completion hook, with 32 lowercase hexadecimal epoch characters.</td>
 </tr>
 <tr>
 <td><code>Ready;epoch;PrefixReset</code></td>
@@ -704,18 +705,50 @@ use <code>customOscPayloadLimitBytes</code> themselves.</p>
 <td>Exact live buffer and UTF-16 replacement range, with Base64 <code>line</code> and <code>externalCommandName</code>. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip.</td>
 </tr>
 </tbody></table></div>
-<p>The host admits at most one request per session, sending the semantic <code>F12,e</code>
-chord through ordinary ordered input. Host and hook increment their counters for
-each request. Replies must match the current prompt epoch and pending positive
-request ID. They must also match the captured command and cursor; wrong epochs
-or IDs are ignored. A matched malformed reply fails its query. Unsolicited result
-metadata has no editing authority.</p>
+<p>The session assigns each query a positive signed 64-bit request ID, never reused during
+that session, including across prompt changes. It admits at most one query at a
+time and sends the ID through ordered semantic input as one frame:</p>
+<ol>
+<li><code>F12,q</code> starts the frame.</li>
+<li>Nineteen <code>F12,digit</code> chords carry the decimal ID, padded with leading zeroes.</li>
+<li><code>F12,e</code> commits the frame and invokes the completer.</li>
+</ol>
+<p>The hook echoes the supplied ID and its current prompt epoch; it keeps no
+independent request counter. Missing, incomplete, zero, overflowing, or otherwise
+invalid frames are ignored without editing the buffer or invoking completion.
+Starting a new frame or announcing <code>Ready</code> discards any partial frame. Commit
+consumes the frame once, including when validation fails, and invalid frames emit
+no reply.
+Replies must match the active prompt epoch and pending request ID, as well as
+the captured command and cursor. A request processed after a prompt change cannot
+satisfy a later query because its ID remains distinct. Wrong epochs or IDs are
+ignored; a matched malformed reply fails its query. Unsolicited result metadata
+has no editing authority.</p>
+<p>The hook samples PSReadLine&#39;s input buffer and cursor before invoking completers,
+then checks both again immediately before emitting a successful result. If either
+differs, or the final read fails, it emits <code>Failed</code> without candidates. This also
+applies when a completer throws after changing the editor. Terminal repainting
+does not itself change that buffer. The host treats this correlated buffer
+confirmation separately from its screen-derived command observation; see the
+<a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional-edit contract</a>
+for its lifetime and final admission checks.</p>
+<p><code>Ready</code> is accepted only within an active primary-screen OSC 133 prompt, after
+<code>A</code>; it may precede <code>B</code>. Command start/finish (<code>C</code>/<code>D</code>), a local primary-buffer
+clear, or an observed alternate-screen transition revoke the completion hook.
+A new <code>A</code> also clears the previous epoch and requires a fresh announcement.
+Prompt announcements never reset the session&#39;s request IDs. Every accepted
+announcement invalidates earlier editing contexts and pending results,
+including announcements that change only <code>PrefixReset</code>.
+The hook reinstalls its private PSReadLine bindings before each <code>Ready</code> announcement.
+Readiness advertises the prompt&#39;s hook, not completion of prompt rendering or
+PSReadLine initialization. The query handler reads the editor when the shell
+processes the completed request frame.</p>
 <p><code>PrefixReset</code> lets acceptance clear the text before the real cursor through
 <code>PSConsoleReadLine.Replace(0, cursor, &quot;&quot;)</code>, then paste the edited prefix in the same
 ordered input operation. Text after the cursor is preserved. This avoids relying
 on version-dependent Delete/Backspace behavior. The binding does not execute the
-command and preserves <code>LASTEXITCODE</code>. Its capability is cleared at each OSC 133
-prompt start and must be announced again for that prompt.</p>
+command and preserves <code>LASTEXITCODE</code>. This capability has the same prompt lifetime
+as the completion hook.</p>
 <p>Complete custom OSC collection is capped at 256 KiB with this producer installed;
 built-in command limits remain unchanged. Replies contain at most 128 candidates,
 a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
@@ -728,14 +761,11 @@ names it removes an extension only after resolving the long and short invocation
 to the same application/script path and type. Shadowing functions and aliases do
 not authorize that normalization. The command authority and catalog enrichment
 policy belongs to the <a href="../../ketraterm-completion/docs/completion-architecture.html#internal-implementation">completion engine</a>.</p>
-<p>Waiting expires after ten seconds, allowing cold PowerShell module discovery.
-Callers can cancel earlier. Cancelled/timed-out requests retain the wire
-slot until their reply or a new prompt, so a late result cannot satisfy a newer
-request. A replacement request can wait for that slot within its own ten-second
-deadline, then revalidate the current command buffer before sending its query.
-Native completers run in the shell and may continue after host cancellation.
-Session closure releases retained state. See <a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional editing</a>
-for the validation required before suggestion acceptance.</p>
+<p>Each caller&#39;s wait expires after ten seconds, allowing cold PowerShell module
+discovery. Callers can cancel earlier. Native completers run in the shell and may
+continue after host cancellation. See the session&#39;s
+<a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">query lifecycle and conditional editing contract</a>
+for shared queries, wire-slot retirement, and validation before suggestion acceptance.</p>
 <h2 id="private-bash-command-inventory">Private Bash command inventory</h2>
 <p>Bash and zsh share a versioned snapshot protocol. Each message uses
 <code>OSC 633;KetraTermCommands;3;... BEL</code> for PATH executables and
@@ -863,7 +893,7 @@ Protection does not prevent this ordinary erase. The selective form <code>CSI ? 
 is unsupported and ignored. Colon subparameters and extra parameters on ED 22
 are rejected without erasing or admitting history.</p>
 <p>Reference: <a href="https://sw.kovidgoyal.net/kitty/misc-protocol/#an-escape-code-to-move-the-contents-of-the-screen-into-the-scrollback">Kitty&#39;s screen-to-scrollback extension</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

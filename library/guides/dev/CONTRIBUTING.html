@@ -33,6 +33,7 @@ Keep pull request branches free of merge commits.</p>
 expected result. For an API change, describe the consumer workflow, ownership,
 threading, failure behavior, and compatibility impact. Avoid unrelated refactors.</p>
 <h2 id="building--running">Building &amp; Running</h2>
+<p>Follow the <a href="README.html#development">development JDK setup</a> before running the builds.</p>
 <h3 id="standalone-application-ketraterm-app">Standalone Application (<code>ketraterm-app</code>)</h3>
 <p>Run these commands from the repository root:</p>
 <pre><code class="language-bash">./gradlew :ketraterm-app:run
@@ -44,7 +45,7 @@ threading, failure behavior, and compatibility impact. Avoid unrelated refactors
 ./gradlew runIde
 ./gradlew test
 </code></pre>
-<p>Its <a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-intellij-plugin/README.md">README</a> describes IDE requirements and
+<p>Its <a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-intellij-plugin/README.md">README</a> describes IDE requirements and
 library integration. Root build commands do not run the plugin&#39;s checks.</p>
 <h3 id="code-formatting">Code Formatting</h3>
 <p>Run <code>./gradlew spotlessApply</code> in the owning build before submitting Kotlin or
@@ -74,7 +75,7 @@ feature and gap maps when supported behavior or scope changes.</p>
 <p>Use a short imperative subject that identifies the change. Explain its reason
 and relevant tradeoffs in the body, and reference an issue when one exists.
 Describe the final implementation rather than the sequence of experiments.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/CONTRIBUTING.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/CONTRIBUTING.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

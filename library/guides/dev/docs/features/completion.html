@@ -38,16 +38,15 @@ errors. The Swing completion adapter uses both markers. Opt-in acknowledges the
 experimental contract; suggestions are enabled separately. Java callers follow
 the same stability contract.</p>
 <h2 id="availability">Availability</h2>
-<p>Completion is <strong>enabled by default in both products</strong>. Automatic suggestions are
-enabled for eligible non-PowerShell profiles. <strong>PowerShell completion is explicit
-only:</strong> press Ctrl+Space (or the configured IDE action shortcut). Automatic-popup
-preferences do not enable background PowerShell completion requests.
+<p>Completion and automatic suggestions are <strong>enabled by default in both products</strong>
+for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
+Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
+explicitly, including when automatic popups are disabled.
 Settings expose the master switch, automatic popups, Enter acceptance, and optional
 learning persistence. Automatic popups can appear <strong>Always</strong> (the default) or
 <strong>Only for parameters</strong>. Parameter-only mode includes subcommands, options, and
 arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set <code>smart_suggestions_enabled</code>
 in the <a href="https://ketraterm.github.io/KetraTerm/settings.html">TOML configuration</a>.
-Saved preferences remain effective within this shell policy.
 Library hosts enable and configure their own provider and presentation.</p>
 <p>Use <strong>Reset learned suggestions...</strong> in settings to clear learned commands and
 ranking preferences. See <a href="../reference/storage.html#completion-learning">saved learning and reset behavior</a>.</p>
@@ -192,7 +191,7 @@ itself; symbolic remote aliases are omitted. Wildcard, negative, and malformed
 multi-colon refspecs are left untouched. Remaining Git coverage is listed in the
 <a href="../terminal-feature-gap-map.html">gap map</a>.</p>
 <h3 id="powershell-suggestions">PowerShell suggestions</h3>
-<p>An explicit request with prompt hooks and PSReadLine installed uses <code>TabExpansion2</code> in
+<p>With prompt hooks and PSReadLine installed, completion uses <code>TabExpansion2</code> in
 the running shell. This includes available commands, session functions, aliases,
 and installed argument completers. Catalog descriptions enrich commands verified
 by the shell. Bare names and executable extensions merge when they resolve to
@@ -211,8 +210,9 @@ precede history-only results, while learning can still influence their order.</p
 restores the edited command prefix through PSReadLine&#39;s exact replacement API,
 preserving text after the cursor. Slow native completers
 can time out. Cancelling a request cannot stop a completer already running inside
-PowerShell. The products do not run these native requests automatically while typing.
-Explicit suggestions use the confirmed editor buffer even when inline history
+PowerShell. Automatic requests follow the popup settings and use the same native
+confirmation and edit validation as explicit requests.
+Suggestions use the confirmed editor buffer even when inline history
 predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
 real editable suffix text. See the <a href="../reference/protocol.html#private-powershell-completion-metadata">bridge protocol</a>
 for request limits and validation.</p>
@@ -386,7 +386,7 @@ for location, retention, and encoding.</p>
 <p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
 <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
 and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

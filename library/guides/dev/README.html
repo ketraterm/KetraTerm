@@ -106,10 +106,9 @@ protocol references, and contributor resources. The <a href="docs/terminal-featu
 describes supported capabilities; the <a href="docs/terminal-feature-gap-map.html">gap map</a>
 tracks remaining work. Consumer-visible changes are in the <a href="CHANGELOG.html">library changelog</a>.</p>
 <h2 id="development">Development</h2>
-<p>Use JetBrains JDK (JBR) 25 and the included Gradle wrapper (<code>gradlew</code> /
-<code>gradlew.bat</code>). The root build selects JBR 25 for the Gradle daemon, compilation,
-tests, and application runs. Gradle can download it when needed. In IntelliJ,
-select JBR 25 as the Gradle JVM to match command-line builds.</p>
+<p>Use the JetBrains Runtime SDK pinned in the <a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/gradle/jbr-checksums.properties">runtime manifest</a>
+and the included Gradle wrapper (<code>gradlew</code> / <code>gradlew.bat</code>). Set <code>JAVA_HOME</code> and
+IntelliJ&#39;s Gradle JVM to that SDK.</p>
 <pre><code class="language-bash">./gradlew :ketraterm-app:run
 ./gradlew test
 ./gradlew publicationChecks
@@ -135,8 +134,8 @@ checks and product development commands.</p>
 <hr>
 <h2 id="license">License</h2>
 <p>Copyright 2026 Gagik Sargsyan. Licensed under the
-<a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/LICENSE">Apache License, Version 2.0</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/README.md">View source on GitHub ↗</a></div></div></main></div>
+<a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/LICENSE">Apache License, Version 2.0</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -159,8 +159,9 @@ They require shell integration and are unavailable for WSL launchers.</p>
 <p>PowerShell command-start/finish tracking requires a <code>PSConsoleHostReadLine</code>
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell directory reports cover filesystem locations only.</p>
-<p>When PSReadLine is loaded, the PowerShell bootstrap also installs the private
-<code>F12,e</code> chord for <a href="completion.html#sources-by-host">native suggestions</a>. The handler
+<p>When PSReadLine is loaded, the PowerShell bootstrap also installs private
+<a href="../reference/protocol.html#private-powershell-completion-metadata">request bindings</a>
+for <a href="completion.html#sources-by-host">native suggestions</a>. The handler
 reads the live editing buffer and calls <code>TabExpansion2</code> without submitting or
 replacing the command. Each prompt announces a fresh completion epoch.</p>
 <p>Direct interactive Bash launches load the user&#39;s startup files before installing
@@ -240,7 +241,7 @@ Native standalone profiles also receive the <code>ketra version</code>, <code>ke
 <code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
 <p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
 and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

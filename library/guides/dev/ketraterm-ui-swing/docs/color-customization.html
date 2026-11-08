@@ -260,7 +260,8 @@ val exactColors = settings.copy { it.minimumContrastRatio = 1.0 }
 <p>Configured selection/search colors and permitted terminal selection overrides are inputs
 to the same contrast policy. Disable contrast adjustment when their exact
 foreground colors must be retained. Concealed/blink-hidden text remains hidden.
-Box drawing, block elements, geometric shading, Braille, and geometric Powerline separators retain their color
+Box drawing, block elements, geometric shading, Braille, sextants, octants, and
+geometric Powerline separators retain their color
 relationships; intrinsic color emoji and image pixels are not recolored. Cursor
 colors and explicit underline colors retain their separate presentation rules.
 Contrast uses the terminal cell background and UI fills. It does not sample image
@@ -281,7 +282,7 @@ This intentionally improves faint text on light themes. Selection and color-poli
 changes are local UI settings; reloading them alone preserves application palette
 overrides. A deliberate host palette change follows the existing session palette
 replacement contract.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-ui-swing/docs/color-customization.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-ui-swing/docs/color-customization.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

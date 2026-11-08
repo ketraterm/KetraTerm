@@ -90,7 +90,9 @@ PowerShell bridge, a visible suffix instead produces a provisional prefix marked
 <code>requiresShellConfirmation</code>; follow the session&#39;s
 <a href="../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional-edit contract</a>
 before using it for suggestions. Use
-<code>session.activeShellCommandLineRevision</code> to observe edits; session shares one
+<code>session.activeShellCommandLineRevision</code> to observe text, cursor, availability,
+prompt context, native editing capabilities, and the visible suffix of a provisional
+snapshot. Session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session&#39;s conditional-edit APIs when admitting asynchronous suggestions.</p>
@@ -99,9 +101,12 @@ the session&#39;s conditional-edit APIs when admitting asynchronous suggestions.
 <a href="../docs/reference/protocol.html#private-powershell-completion-metadata">native completion metadata</a>.
 Call <code>session.requestShellCompletions(commandLine, cursorOffset)</code> from a caller-owned
 coroutine, or install <code>SessionShellCompletionProvider</code> from <code>ketraterm-ui-swing-host</code>
-in a completion engine. Unsupported, busy, stale, failed, or timed-out requests
-return null; caller cancellation propagates. The native handler reads the current
-buffer and does not submit the command. Custom parser factories must explicitly
+in a completion engine. Concurrent requests for the same current editor context
+share one native query; each caller can cancel its own wait. Unsupported, stale,
+failed, or timed-out requests return null. See the session&#39;s
+<a href="../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">query lifecycle</a>.
+The native handler reads the current buffer and does not submit the command.
+Custom parser factories must explicitly
 forward the selected producer&#39;s custom OSC callback and collection limit.</p>
 <p>A prompt becomes ready after an ordered <code>A</code>/<code>B</code> pair in the primary screen.
 Command markers, alternate-screen output, and a local primary-buffer clear
@@ -122,7 +127,7 @@ defines notification, frame borrowing, and observation lifetime.</p>
 <p>Hosts using their own shell integration depend on <code>ketraterm-session</code> and supply
 <code>TerminalShellIntegrationFactory.host</code>. That selected model remains authoritative;
 OSC metadata does not supplement it. Such hosts do not need this module.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/89f6791edde254a0c143594b2c561b11973dd29a/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/b9a774b7c6c34cbdbba645bfba1296331b3483ff/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
