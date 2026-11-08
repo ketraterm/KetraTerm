@@ -8,8 +8,8 @@ with [ketraterm-swing](../ketraterm-swing/README.md) and the
 
 ## Run from source
 
-Use a JDK 25 installation and the repository's Gradle wrapper. From the
-repository root:
+Follow the [development JDK setup](../README.md#development) and use the
+repository's Gradle wrapper. From the repository root:
 
 ```shell
 ./gradlew :ketraterm-app:run

@@ -7,10 +7,37 @@ inputs:
 runs:
   using: composite
   steps:
+    # JBR-10507 is fixed in this release; setup-java's JetBrains resolver skips
+    # four-part versions. Use its local-archive installer with the shared pins.
+    - name: Download verified JBR SDK
+      id: jbr
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $manifest = Get-Content 'gradle/jbr-checksums.properties' -Raw | ConvertFrom-StringData
+        $platform = switch ("$env:RUNNER_OS/$env:RUNNER_ARCH") {
+          'Windows/X64' { 'windows-x64' }
+          'Linux/X64' { 'linux-x64' }
+          'macOS/X64' { 'macos-x64' }
+          'macOS/ARM64' { 'macos-aarch64' }
+          default { throw "Unsupported JBR platform: $env:RUNNER_OS/$env:RUNNER_ARCH" }
+        }
+        $filename = $manifest["jbrsdk.$platform.filename"]
+        $expected = $manifest["jbrsdk.$platform.sha512"]
+        if (!$filename -or $expected -notmatch '^[0-9a-f]{128}$') {
+          throw "Missing JBR SDK archive or SHA-512 pin for $platform"
+        }
+        $archive = Join-Path $env:RUNNER_TEMP $filename
+        Invoke-WebRequest -Uri "$($manifest['jbr.base-url'])/$filename" -OutFile $archive -MaximumRetryCount 3 -RetryIntervalSec 2 -TimeoutSec 300
+        $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash
+        if ($actual -ne $expected) { throw "JBR SDK checksum mismatch for $filename" }
+        "archive=$archive" | Add-Content $env:GITHUB_OUTPUT
+        "version=$($manifest['jbr.version'] -replace 'b', '+')" | Add-Content $env:GITHUB_OUTPUT
     - uses: actions/setup-java@v6
       with:
-        distribution: jetbrains
-        java-version: '25'
+        distribution: jdkfile
+        java-version: ${{ steps.jbr.outputs.version }}
+        jdk-file: ${{ steps.jbr.outputs.archive }}
     - uses: gradle/actions/setup-gradle@v4
       with:
         cache-encryption-key: ${{ inputs.cache-encryption-key }}

@@ -15,6 +15,8 @@ threading, failure behavior, and compatibility impact. Avoid unrelated refactors
 
 ## Building & Running
 
+Follow the [development JDK setup](README.md#development) before running the builds.
+
 ### Standalone Application (`ketraterm-app`)
 
 Run these commands from the repository root:
