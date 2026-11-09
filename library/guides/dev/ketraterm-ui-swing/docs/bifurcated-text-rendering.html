@@ -95,7 +95,7 @@ retain the same contrast exemption as other terminal graphics. Mapping follows
 Unicode 17 character names; the pinned test data checks all 60 sextants and 230
 octants independently of the renderer&#39;s mask representation. Other legacy
 computing characters continue through font fallback.</p>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/182caf754efef7238719f4999aeea95dc1e68a27/utf8-extended.txt">extended UTF-8 corpus</a> includes all Braille patterns,
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/90d152482647fe6e84483ff025f8cfdce89f127a/utf8-extended.txt">extended UTF-8 corpus</a> includes all Braille patterns,
 repeated graph rows, all 16 geometric Powerline separators, and complete sextant/octant tables for manual checks
 with different fonts, line heights, column spacing, and display scales. Colored
 segment joins, clipping, bidi placement, and cursor repainting also have automated
@@ -151,6 +151,10 @@ fonts, then enabled system fallbacks. Emoji presentation prefers the host
 resolver and configured/system emoji fonts before the ordinary pipeline. Resolved
 fonts use the configured size. Fallback and unsupported lookups use bounded
 caches. System scanning is outside the ASCII path.</p>
+<p>Default text fallbacks prefer installed monospace families, then installed script
+fonts, before Java&#39;s logical <code>Monospaced</code>, <code>Dialog</code>, and <code>SansSerif</code> families.
+Emoji fonts retain their presentation priority. Explicit fallback lists keep their
+configured order, and hosts can supply their own resolver.</p>
 <p>Native dispatch and font preference share <code>TerminalEmojiPresentation</code> for
 scalars, cluster slices, and UTF-16 text. An emoji base is required; a joiner or
 variation selector alone does not classify ordinary script text as emoji. VS15
@@ -159,6 +163,9 @@ including primary and host-resolved candidates. Text-font coverage checks ignore
 VS15 itself while retaining the selector in the shaping input; the base and other
 cluster code points still require coverage. Oversized fallback layouts scale
 equally in both dimensions around the text baseline and keep the owning cell clip.
+Fitting includes visible ink on both sides of the advance, shifting negative
+bearings inside the cell before scaling. These bounds are cached with each layout,
+so repeated paints do not measure glyph bounds again.
 Contextual script groups retain their existing positioning and fitting policy.
 Platform font substitution must not give an emoji font precedence over a capable
 primary font for ordinary text. Actual glyph coverage and substitution within
@@ -227,7 +234,7 @@ Erase the old cursor region before comparing a repaint; repeated <code>SrcOver</
 drawing is not idempotent. Keep joiners in Arabic reference text: removing a ZWJ
 can change ligature formation. Compare caches with direct shaping of the same
 text and painter output with the complete contextual input.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/182caf754efef7238719f4999aeea95dc1e68a27/ketraterm-ui-swing/docs/bifurcated-text-rendering.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/90d152482647fe6e84483ff025f8cfdce89f127a/ketraterm-ui-swing/docs/bifurcated-text-rendering.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
