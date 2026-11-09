@@ -56,8 +56,10 @@ Ordinary checkout and release API calls use `GITHUB_TOKEN`; they do not inherit
 the release app's bypass access. Existing Maven Central and signing secrets are
 still required.
 
-For the next development cycle, add a new `## [Unreleased]` section to both
-changelogs and bump `VERSION` before the next release.
+At the start of the next development cycle, bump `VERSION` to the next intended
+release and add a new `## [Unreleased]` section to both changelogs in the same
+change, before adding new release notes. Development builds append `-SNAPSHOT`
+to `VERSION`; keep that suffix out of the file itself.
 
 ## Prereleases
 

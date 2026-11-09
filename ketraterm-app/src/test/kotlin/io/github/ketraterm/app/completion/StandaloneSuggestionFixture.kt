@@ -227,16 +227,45 @@ internal class StandaloneSuggestionFixture private constructor(
 
     suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
+        focusTerminal()
         withContext(Dispatchers.Swing) { terminal.reloadSettings() }
     }
 
-    suspend fun type(text: String) =
+    private suspend fun focusTerminal() =
+        withTimeout(15.seconds) {
+            val acquired = CompletableDeferred<Unit>()
+            val listener =
+                object : FocusAdapter() {
+                    override fun focusGained(event: FocusEvent) {
+                        acquired.complete(Unit)
+                    }
+                }
+            try {
+                withContext(Dispatchers.Swing) {
+                    if (terminal.isFocusOwner) {
+                        acquired.complete(Unit)
+                    } else {
+                        terminal.addFocusListener(listener)
+                        window?.toFront()
+                        window?.requestFocus()
+                        terminal.requestFocusInWindow()
+                    }
+                }
+                acquired.await()
+            } finally {
+                withContext(NonCancellable + Dispatchers.Swing) { terminal.removeFocusListener(listener) }
+            }
+        }
+
+    suspend fun type(text: String) {
+        focusTerminal()
         withContext(Dispatchers.Swing) {
             for (character in text) {
                 val event = KeyEvent(terminal, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, character)
                 terminal.keyListeners.forEach { it.keyTyped(event) }
             }
         }
+    }
 
     suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
 

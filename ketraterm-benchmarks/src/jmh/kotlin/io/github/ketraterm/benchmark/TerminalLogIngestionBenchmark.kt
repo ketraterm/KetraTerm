@@ -49,6 +49,9 @@ open class TerminalLogIngestionBenchmark {
     @Param("80", "240")
     var columns: Int = 0
 
+    @Param("24")
+    var rows: Int = 0
+
     @Param("13107", "1000")
     var maxHistory: Int = 0
 
@@ -97,7 +100,7 @@ open class TerminalLogIngestionBenchmark {
 
     @Setup(Level.Iteration)
     open fun createPipeline() {
-        buffer = if (pipeline == "parser") null else TerminalBuffers.create(columns, ROWS, maxHistory)
+        buffer = if (pipeline == "parser") null else TerminalBuffers.create(columns, rows, maxHistory)
         parser =
             when (pipeline) {
                 "core" -> null
@@ -135,13 +138,13 @@ open class TerminalLogIngestionBenchmark {
     @TearDown(Level.Iteration)
     open fun verifyRetainedOutput() {
         val terminal = buffer ?: return
-        val history = minOf(maxHistory, maxOf(0, expectedRows.size - ROWS))
-        val discarded = maxOf(0, expectedRows.size - ROWS - history)
+        val history = minOf(maxHistory, maxOf(0, expectedRows.size - rows))
+        val discarded = maxOf(0, expectedRows.size - rows - history)
         check(terminal.historySize == history)
-        check(terminal.cursorRow == ROWS - 1 && terminal.cursorCol == MARKER.length)
+        check(terminal.cursorRow == rows - 1 && terminal.cursorCol == MARKER.length)
         terminal.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE) { frame ->
             check(frame.discardedCount == discarded.toLong())
-            check(frame.rows == history + ROWS)
+            check(frame.rows == history + rows)
             for (row in 0 until frame.rows) {
                 val expected = expectedRows[discarded + row]
                 check(frame.lineWrapped(row) == expectedWraps[discarded + row]) { "Wrap mismatch at row $row" }
@@ -157,7 +160,6 @@ open class TerminalLogIngestionBenchmark {
     }
 
     private companion object {
-        const val ROWS = 24
         const val MARKER = "PERFDONE0"
     }
 }

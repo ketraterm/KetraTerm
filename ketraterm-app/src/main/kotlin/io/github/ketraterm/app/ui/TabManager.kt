@@ -153,7 +153,9 @@ internal class TabManager(
 
     private val keyEventDispatcher =
         KeyEventDispatcher { event ->
-            if (shutdownStarted.get() || SwingUtilities.getWindowAncestor(event.component) !== frame) return@KeyEventDispatcher false
+            if (shutdownStarted.get() || event.component !== frame && SwingUtilities.getWindowAncestor(event.component) !== frame) {
+                return@KeyEventDispatcher false
+            }
             if (event.id == KeyEvent.KEY_PRESSED) {
                 val keyCode = event.keyCode
                 val modifiers = event.modifiersEx

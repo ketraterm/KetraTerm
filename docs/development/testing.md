@@ -153,3 +153,35 @@ The suggestion scenarios exercise automatic popups through the product settings,
 including PowerShell profiles with PSReadLine.
 Such tests should use the same desktop execution contract when added, with their
 actual launch and input mechanisms documented in their owning fixture.
+
+## Real TUI integration tests
+
+`TerminalTuiDesktopTest` in `ketraterm-app` binds a real PTY session to a real
+Swing window. Neovim covers Unicode copying, alternate-screen entry/exit,
+editing, resize, and render captures at 100–200% scales. `less` covers pager
+navigation and resize; `tmux` checks input and the resized nested pane dimensions.
+Every case requires clean process exit and restoration of the primary screen.
+These tests submit input through session APIs, not OS keyboard injection.
+
+Run the existing desktop suite; no scripts from `build/` are needed:
+
+```shell
+./gradlew :ketraterm-app:desktopTest --tests '*TerminalTuiDesktopTest' '-Dterminal.test.requiredTuis=NEOVIM,LESS,TMUX'
+```
+
+Tools are discovered on PATH. Native `less` and `tmux` cases run on Unix;
+Windows can run Neovim directly and guest tools through a configured WSL distro:
+
+```powershell
+./gradlew.bat :ketraterm-app:desktopTest --tests '*TerminalTuiDesktopTest' '-Dterminal.pty.wsl.distribution=Ubuntu' '-Dterminal.test.requiredTuis=NEOVIM,WSL_LESS,WSL_TMUX'
+```
+
+Accepted requirement names are `NEOVIM`, `LESS`, `TMUX`, `WSL_NEOVIM`,
+`WSL_LESS`, and `WSL_TMUX`. Missing optional tools skip with a reason; missing
+required tools or unknown names fail. CI installs and requires all native tools
+on Linux/macOS and Neovim on Windows. WSL remains a configured-host check.
+
+Tests isolate editor configuration, pager history, and tmux sockets. Teardown
+disposes the view/window, closes the PTY, and removes only the test's tmux server,
+including on failure. PNG captures go under the desktop suite's `tui/` artifact
+directory and are not committed. The source tests survive `clean`.

@@ -188,6 +188,9 @@ ingests a fixed 6,000-line ASCII log into a fresh fixture for each shot. Its
 ingestion. Core and host variants verify retained cells, wrapping, history
 eviction, and the final cursor during teardown.
 
+The `rows` parameter defaults to 24. Override it alongside `columns` to measure
+a host's launch geometry, such as `-p columns=100 -p rows=28`.
+
 ```text
 java -jar <jmh-jar> ".*TerminalLogIngestionBenchmark.ingest" -p pipeline=host -p columns=80 -p maxHistory=13107 -p chunkBytes=4096 -bm ss -wi 60 -i 30 -f 3 -t 1 -tu ms -prof gc -rf json -rff log-ingestion.json
 ```

@@ -88,6 +88,7 @@ subprojects {
                     systemProperty("java.awt.headless", (suite != "desktop").toString())
                     systemProperty("terminal.pty.wsl.distribution", providers.systemProperty("terminal.pty.wsl.distribution").getOrElse(""))
                     systemProperty("terminal.test.requiredShells", providers.systemProperty("terminal.test.requiredShells").getOrElse(""))
+                    systemProperty("terminal.test.requiredTuis", providers.systemProperty("terminal.test.requiredTuis").getOrElse(""))
                     systemProperty(
                         "terminal.test.artifactsDirectory",
                         layout.buildDirectory
