@@ -12,7 +12,7 @@
   <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
   <script type="module" src="assets/site.js"></script>
 </head>
-<body data-product="app" data-version="v0.4.0 · Stable release">
+<body data-product="app" data-version="v0.5.0 · Stable release">
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="site-identity">
@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a aria-current="page"  href="guide.html">Guide</a><a   href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a aria-current="page" href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App guide</span></li></ol></nav><div class="doc-version"><span>v0.4.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shells-and-sessions">Shells and sessions</a><a class="depth-2" href="#commands-and-output">Commands and output</a><a class="depth-2" href="#appearance-and-settings">Appearance and settings</a><a class="depth-2" href="#completion">Completion</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a></nav></details><div class="article-content"><div class="prose"><h1 id="using-ketraterm">Using KetraTerm</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a aria-current="page" href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App guide</span></li></ol></nav><div class="doc-version"><span>v0.5.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shells-and-sessions">Shells and sessions</a><a class="depth-2" href="#commands-and-output">Commands and output</a><a class="depth-2" href="#appearance-and-settings">Appearance and settings</a><a class="depth-2" href="#completion">Completion</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a></nav></details><div class="article-content"><div class="prose"><h1 id="using-ketraterm">Using KetraTerm</h1>
 <p>KetraTerm runs your local shells in tabs and split panes. Platform packages
 include a Java runtime; the Java-preinstalled archive requires Java 25.</p>
 <h2 id="shells-and-sessions">Shells and sessions</h2>
@@ -60,15 +60,16 @@ ketra config
 the helper&#39;s editor selection. WSL and Ubuntu launcher profiles do not receive
 the native helper.</p>
 <h2 id="completion">Completion</h2>
-<p>KetraTerm suggestions are disabled by default. To enable them, add or change
-this setting in <code>config.toml</code>, then restart the app:</p>
+<p>KetraTerm suggestions are enabled by default. Use the Shell Suggestions section
+in settings to change automatic popups, Enter acceptance, and learning persistence.
+The master switch is also available in <code>config.toml</code>; restart the app after
+editing the file directly:</p>
 <pre><code class="language-toml">[behavior]
 smart_suggestions_enabled = true
 </code></pre>
-<p>The settings dialog does not currently expose this switch. Suggestions need
-an editable command context from shell integration. Press Ctrl+Space to request
-them, use arrows or Page Up/Page Down to navigate, Tab to accept, and Escape to
-dismiss. Enter accepts an already selected suggestion by default. Shell-native
+<p>Suggestions need an editable command context from shell integration. Press
+Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
+accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
 Tab completion is separate.</p>
 <p>Suggestions combine built-in command specifications, local files and directories,
 and bounded learning. WSL or remote directory reports do not provide a remote
@@ -83,7 +84,7 @@ including nested SSH sessions. They are separate from your explicit copy and
 paste actions. New configurations allow clipboard writes and ask before reads;
 you can change this in settings. Window manipulation is disabled by default.</p>
 <p>See the <a href="changelog.html">app changelog</a> for changes by release.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ee6cc3bc5da46c56ff992e869a096b02796c97ad/ketraterm-app/docs/user-guide.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-app/docs/user-guide.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
     <p>Open source · Apache 2.0</p>
