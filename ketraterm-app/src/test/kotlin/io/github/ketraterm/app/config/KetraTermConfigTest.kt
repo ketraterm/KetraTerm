@@ -318,7 +318,14 @@ class KetraTermConfigTest {
         val directory = Files.createTempDirectory("ketraterm-config-unreadable")
         val existing = Files.writeString(directory.resolve("existing"), "preserve me")
         try {
-            assertEquals(KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY), KetraTermConfigManager(directory).load())
+            assertEquals(
+                KetraTermConfig(
+                    clipboardRead = TerminalClipboardPermission.DENY,
+                    clipboardWrite = TerminalClipboardPermission.DENY,
+                    titlePermission = TerminalTitlePermission.DENY,
+                ),
+                KetraTermConfigManager(directory).load(),
+            )
             assertEquals("preserve me", Files.readString(existing))
             assertFalse(Files.exists(directory.resolveSibling("${directory.fileName}.broken")))
         } finally {
@@ -610,15 +617,19 @@ class KetraTermConfigTest {
     }
 
     @Test
-    fun `invalid and removed permission values use field defaults and save canonical values`() {
+    fun `invalid explicit permissions deny and report their keys without discarding other settings`() {
         val directory = Files.createTempDirectory("ketraterm-config-security-defaults")
         val file = directory.resolve("config.toml")
-        val manager = KetraTermConfigManager(file)
+        val diagnostics = mutableListOf<String>()
+        val manager = KetraTermConfigManager(file, diagnostics::add)
         try {
-            for (value in listOf("invalid", "allowlist")) {
+            for (value in listOf("invalid", "allowlist", "", "sensitive-invalid-value")) {
+                diagnostics.clear()
                 Files.writeString(
                     file,
                     """
+                    [font]
+                    size = 22
                     [security]
                     clipboard_write = "$value"
                     clipboard_read = "$value"
@@ -626,20 +637,64 @@ class KetraTermConfigTest {
                     """.trimIndent(),
                 )
                 val loaded = manager.load()
-                assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
+                assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardWrite)
                 assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
-                assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
+                assertEquals(TerminalTitlePermission.DENY, loaded.titlePermission)
+                assertEquals(22, loaded.fontSize)
+                assertFalse(Files.exists(directory.resolve("config.toml.broken")))
+                assertEquals(listOf("security.clipboard_write", "security.clipboard_read", "security.title_permission"), diagnostics)
                 manager.save(loaded)
                 val saved = Files.readString(file)
-                assertFalse(saved.contains(value))
-                assertContains(saved, "clipboard_write = \"allow\"")
+                if (value.isNotEmpty()) assertFalse(saved.contains(value))
+                assertContains(saved, "clipboard_write = \"deny\"")
                 assertContains(saved, "clipboard_read = \"deny\"")
+                assertContains(saved, "title_permission = \"deny\"")
+                diagnostics.clear()
                 assertEquals(loaded, manager.load())
+                assertTrue(diagnostics.isEmpty())
             }
         } finally {
             Files.deleteIfExists(file)
             Files.deleteIfExists(directory)
         }
+    }
+
+    @Test
+    fun `missing permission fields retain defaults while invalid fields do not override valid neighbors`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val diagnostics = mutableListOf<String>()
+        val manager = KetraTermConfigManager(file, diagnostics::add)
+        Files.writeString(file, "[security]\n")
+        val missing = manager.load()
+        assertEquals(TerminalClipboardPermission.ALLOW, missing.clipboardWrite)
+        assertEquals(TerminalClipboardPermission.DENY, missing.clipboardRead)
+        assertEquals(TerminalTitlePermission.ALLOW, missing.titlePermission)
+        assertTrue(diagnostics.isEmpty())
+        Files.writeString(file, "[security]\nclipboard_write = true\nclipboard_read = \" AlLoW \"\ntitle_permission = \" DeNy \"\n")
+        val mixed = manager.load()
+        assertEquals(TerminalClipboardPermission.DENY, mixed.clipboardWrite)
+        assertEquals(TerminalClipboardPermission.ALLOW, mixed.clipboardRead)
+        assertEquals(TerminalTitlePermission.DENY, mixed.titlePermission)
+        assertEquals(listOf("security.clipboard_write"), diagnostics)
+    }
+
+    @Test
+    fun `failed malformed configuration backup retains the file and denies clipboard and title access`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val invalid = "invalid toml [[[["
+        Files.writeString(file, invalid)
+        val backup = Files.createDirectory(directory.resolve("config.toml.broken"))
+        Files.writeString(backup.resolve("existing"), "preserve backup")
+        val loaded = KetraTermConfigManager(file).load()
+        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardWrite)
+        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+        assertEquals(TerminalTitlePermission.DENY, loaded.titlePermission)
+        assertEquals(invalid, Files.readString(file))
+        assertEquals("preserve backup", Files.readString(backup.resolve("existing")))
     }
 
     @Test
@@ -703,7 +758,9 @@ class KetraTermConfigTest {
         assertEquals(100, loaded.columns)
         assertEquals(28, loaded.rows)
         assertEquals(10_000, loaded.scrollbackLines)
+        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardWrite)
         assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+        assertEquals(TerminalTitlePermission.DENY, loaded.titlePermission)
         assertEquals(loaded, manager.load())
 
         // Verify it backed up the broken file and generated a new valid file

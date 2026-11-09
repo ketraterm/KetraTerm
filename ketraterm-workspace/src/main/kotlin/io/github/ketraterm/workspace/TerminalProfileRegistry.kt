@@ -286,7 +286,7 @@ public class TerminalProfileRegistry(
     }
 
     private fun windowsPowerShellCommand(): List<String> {
-        val systemRoot = environment["SystemRoot"]
+        val systemRoot = environmentValue("SystemRoot")
         if (!systemRoot.isNullOrBlank()) {
             val powershell =
                 Path.of(
@@ -304,7 +304,7 @@ public class TerminalProfileRegistry(
     }
 
     private fun commandPromptExecutable(): String {
-        val comspec = environment["COMSPEC"]
+        val comspec = environmentValue("COMSPEC")
         return if (comspec.isNullOrBlank()) "cmd.exe" else comspec
     }
 
@@ -312,7 +312,7 @@ public class TerminalProfileRegistry(
         val wsl = executableOnPath("wsl.exe")
         if (wsl != null) return wsl
 
-        val systemRoot = environment["SystemRoot"]
+        val systemRoot = environmentValue("SystemRoot")
         if (!systemRoot.isNullOrBlank()) {
             val candidate = Path.of(systemRoot, "System32", "wsl.exe")
             if (executableExists(candidate)) return candidate
@@ -375,13 +375,13 @@ public class TerminalProfileRegistry(
         key: String,
         vararg segments: String,
     ): Path? {
-        val root = environment[key]
+        val root = environmentValue(key)
         if (root.isNullOrBlank()) return null
         return Path.of(root, *segments)
     }
 
     private fun executableOnPath(executableName: String): Path? {
-        val path = environment["PATH"] ?: return null
+        val path = environmentValue("PATH") ?: return null
         val segments = path.split(pathSeparator)
         for (segment in segments) {
             if (segment.isBlank()) continue
@@ -390,6 +390,9 @@ public class TerminalProfileRegistry(
         }
         return null
     }
+
+    private fun environmentValue(name: String): String? =
+        environment[name] ?: if (isWindows()) environment.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value else null
 
     private fun isWindows(): Boolean = osName.lowercase(Locale.ROOT).contains("windows")
 

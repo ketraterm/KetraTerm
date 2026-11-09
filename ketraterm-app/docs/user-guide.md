@@ -15,6 +15,12 @@ Use tabs for separate sessions and split panes to keep sessions side by side.
 Tabs can have custom names and accent colors. The app does not restore sessions
 after a restart.
 
+When a process exits unsuccessfully, the terminal retains its output and shows
+an exit-status banner with a Close button. Transport failures and exits without
+a reported status are retained too. You can still scroll, select, copy, and
+search; the ended session accepts no input. Closing it does not ask to kill a
+process. Successful exits keep the normal automatic close behavior.
+
 ## Commands and output
 
 Interactive PowerShell, Bash, zsh, and fish launches receive prompt hooks.
@@ -87,5 +93,9 @@ Clipboard permissions control requests from programs running in a terminal,
 including nested SSH sessions. They are separate from your explicit copy and
 paste actions. New configurations allow clipboard writes and ask before reads;
 you can change this in settings. Window manipulation is disabled by default.
+
+Invalid explicit clipboard or title permissions deny access and report the
+affected key and configuration file. If the whole file cannot be loaded, these
+permissions are denied in the recovery configuration as well.
 
 See the [app changelog](../CHANGELOG.md) for changes by release.

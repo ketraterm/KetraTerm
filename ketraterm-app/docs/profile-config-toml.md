@@ -122,7 +122,7 @@ command replay, and privacy limits.
 
 | `[shell]` key | Default | Meaning |
 | --- | --- | --- |
-| `path` | Platform shell | One executable path or command name. Windows: `powershell.exe`; elsewhere: `$SHELL`, falling back to `/bin/bash`. A blank value uses this default. |
+| `path` | Platform shell | One executable path or command name. Windows: discovered `pwsh.exe`, falling back to `powershell.exe`; elsewhere: `$SHELL`, falling back to `/bin/bash`. A blank value uses this default. |
 | `start_directory` | User home | Working directory for new terminals. |
 | `startup_command` | `""` | One shell command line to submit after the first complete interactive prompt; blank disables it. |
 
@@ -162,6 +162,12 @@ The settings dialog labels `prompt` as Ask. These permissions govern terminal
 requests, rather than the user's explicit copy or paste actions. Removed
 local/remote permission keys are ignored; use the session-wide keys above.
 
+Explicit invalid or empty `clipboard_write`, `clipboard_read`, and
+`title_permission` values use `deny` and report the affected key and file path
+on standard error, without echoing the invalid value. Other valid preferences
+remain effective. Omitted write/title fields use their defaults; omitted read
+permissions in existing files remain denied.
+
 ## 2. Directory Resolution Hierarchy
 
 The first nonblank override wins:
@@ -191,7 +197,8 @@ WSL or Ubuntu launcher profiles.
   Existing files use `deny` for missing or invalid clipboard-read permissions.
 - A parse or configuration-validation failure moves the existing file to
   `<filename>.broken`, replacing any previous backup, then attempts to write a
-  default file. These recovery defaults deny clipboard reads. A failed backup
+  default file. These recovery defaults deny clipboard reads, clipboard writes,
+  and title changes. A failed backup
   leaves the original file in place and returns the recovery defaults.
 - An I/O read failure is reported and uses recovery defaults without backing up
   or replacing the unreadable file.

@@ -24,14 +24,23 @@ import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
+import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.util.*
 
-private fun defaultShellPath(): String {
-    val os = System.getProperty("os.name").lowercase(Locale.ROOT)
+internal fun defaultShellPath(
+    osName: String = System.getProperty("os.name"),
+    environment: Map<String, String> = System.getenv(),
+    profileRegistry: TerminalProfileRegistry = TerminalProfileRegistry(osName = osName, environment = environment),
+): String {
+    val os = osName.lowercase(Locale.ROOT)
     return if (os.contains("windows")) {
-        "powershell.exe"
+        profileRegistry
+            .availableProfiles()
+            .firstOrNull { it.id == "powershell" }
+            ?.command
+            ?.first() ?: "powershell.exe"
     } else {
-        System.getenv("SHELL").takeIf { !it.isNullOrBlank() } ?: "/bin/bash"
+        environment["SHELL"].takeIf { !it.isNullOrBlank() } ?: "/bin/bash"
     }
 }
 

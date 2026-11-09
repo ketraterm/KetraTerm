@@ -184,6 +184,7 @@ for reply and cancellation behavior.
 
 ## Sub-Documentation
 
+- [Shell discovery and startup hooks](../docs/features/shells.md)
 - [Module structure and maintenance](Module.md)
 - [Configuration construction and ownership](../docs/library/configuration.md)
 - [Standalone profile persistence](../ketraterm-app/docs/profile-config-toml.md)

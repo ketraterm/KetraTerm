@@ -2,6 +2,10 @@
 
 Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
+## [Unreleased]
+
+- Shell-profile discovery now honors case-insensitive Windows environment names, including `Path`, `ProgramFiles`, and `COMSPEC`, while preserving case-sensitive lookup on Unix platforms.
+
 ## [0.5.0] - 2026-11-09
 
 - Added Maven publications and BOM alignment for `ketraterm-workspace` and `ketraterm-completion-persistence`, with public API baselines and isolated Kotlin/Java consumer verification. Completion persistence remains experimental.

@@ -39,14 +39,18 @@ private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_per
  */
 internal class KetraTermConfigManager(
     val configPath: Path,
+    private val reportInvalidPermission: (String) -> Unit = { key ->
+        System.err.println(appMessages.text("config.permission.invalid", key, configPath))
+    },
 ) {
     /**
      * Loads the configuration from the TOML file.
      *
      * If the file does not exist, it creates a default configuration file with comments
      * and returns the default settings. If the file is invalid or unreadable, it falls back
-     * gracefully to default settings with clipboard reads denied. Existing files
-     * with a missing or invalid read permission retain the legacy Deny behavior.
+     * to defaults with terminal clipboard and title permissions denied. Invalid explicit
+     * permissions deny access and report the affected key. Missing read permissions
+     * in existing files retain the legacy Deny behavior.
      *
      * @return the loaded [KetraTermConfig] instance.
      */
@@ -58,6 +62,7 @@ internal class KetraTermConfigManager(
         }
 
         val default = KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY)
+        val recovery = default.copy(clipboardWrite = TerminalClipboardPermission.DENY, titlePermission = TerminalTitlePermission.DENY)
         return try {
             val content = Files.readString(configPath)
             val parsed = TomlParser.parse(content)
@@ -158,11 +163,13 @@ internal class KetraTermConfigManager(
                 )
             val clipboardWrite =
                 parseClipboardPermission(
+                    key = "security.clipboard_write",
                     raw = security["clipboard_write"],
                     defaultValue = default.clipboardWrite,
                 )
             val clipboardRead =
                 parseClipboardPermission(
+                    key = "security.clipboard_read",
                     raw = security["clipboard_read"],
                     defaultValue = default.clipboardRead,
                 )
@@ -232,7 +239,7 @@ internal class KetraTermConfigManager(
             )
         } catch (failure: IOException) {
             System.err.println(appMessages.text("config.read.error", configPath, failure.message))
-            default
+            recovery
         } catch (_: IllegalArgumentException) {
             try {
                 val backupPath = configPath.resolveSibling("${configPath.fileName}.broken")
@@ -240,10 +247,10 @@ internal class KetraTermConfigManager(
                 System.err.println(appMessages.text("config.backup.success", backupPath))
             } catch (ioe: IOException) {
                 System.err.println(appMessages.text("config.backup.error", ioe.message))
-                return default
+                return recovery
             }
-            saveDefaults(default)
-            default
+            saveDefaults(recovery)
+            recovery
         }
     }
 
@@ -425,14 +432,16 @@ internal class KetraTermConfigManager(
         }
 
     private fun parseClipboardPermission(
+        key: String,
         raw: String?,
         defaultValue: TerminalClipboardPermission,
     ): TerminalClipboardPermission =
         when (raw?.trim()?.lowercase(Locale.ROOT)) {
+            null -> defaultValue
             "deny" -> TerminalClipboardPermission.DENY
             "prompt" -> TerminalClipboardPermission.PROMPT
             "allow" -> TerminalClipboardPermission.ALLOW
-            else -> defaultValue
+            else -> TerminalClipboardPermission.DENY.also { reportInvalidPermission(key) }
         }
 
     private fun parseTitlePermission(
@@ -440,9 +449,10 @@ internal class KetraTermConfigManager(
         defaultValue: TerminalTitlePermission,
     ): TerminalTitlePermission =
         when (raw?.trim()?.lowercase(Locale.ROOT)) {
+            null -> defaultValue
             "deny" -> TerminalTitlePermission.DENY
             "allow" -> TerminalTitlePermission.ALLOW
-            else -> defaultValue
+            else -> TerminalTitlePermission.DENY.also { reportInvalidPermission("security.title_permission") }
         }
 
     companion object {

@@ -25,6 +25,8 @@ a pane releases those UI resources; closing its workspace tab closes the session
 `TerminalPasteClipboard` reviews unsafe explicit paste before returning captured
 text to the view. `TerminalBellDispatcher` bounds and coalesces per-window feedback
 before the EDT applies current preferences and pane-lifetime checks.
+`TerminalExitBanner` presents unsuccessful or unknown session termination beside
+the retained terminal view; process cleanup remains session-owned.
 
 `KetraTermConfigManager` loads and replaces settings files.
 `KetraTermSettings` publishes saved immutable preferences to EDT consumers.

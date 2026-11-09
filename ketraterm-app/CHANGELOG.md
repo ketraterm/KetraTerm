@@ -6,6 +6,9 @@
 - Added review of explicit pastes containing line breaks or control characters, with an escaped preview and Cancel selected by default.
 - Coalesced bell bursts and limited audible, visual, and desktop-attention feedback to one delivery every 500 ms per window.
 - Ctrl+Space now passes through to the running application when shell completion cannot start.
+- Invalid explicit clipboard and title permissions now deny access and report the affected key. Malformed or unreadable configuration recovery also denies these permissions.
+- Failed sessions retain their final output with an exit-status banner and Close button. Transport failures and unknown exit statuses are retained too; successful exits still close normally.
+- Fresh Windows configurations prefer discovered modern PowerShell (`pwsh.exe`), falling back to Windows PowerShell. Saved shell choices remain effective.
 
 ## [0.5.0] - 2026-11-09
 

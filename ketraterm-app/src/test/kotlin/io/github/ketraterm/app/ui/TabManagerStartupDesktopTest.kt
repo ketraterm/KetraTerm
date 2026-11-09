@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
@@ -59,14 +60,193 @@ import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.nio.file.Path
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.JButton
 import javax.swing.JFrame
 import javax.swing.JPanel
+import javax.swing.JTextArea
 import javax.swing.SwingUtilities
 import kotlin.test.*
 
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
 class TabManagerStartupDesktopTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["nonzero", "negative", "transport", "unknown", "success", "closedBeforeDelivery", "split"])
+    fun `failed sessions retain output while successful and explicitly closed panes are retired`(
+        mode: String,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(cursorBlinkMillis = 0, smartSuggestionsEnabled = false, showForegroundProcessName = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("exit", "Exit", listOf("unused"), workingDirectory = directory)
+        val connections = LinkedBlockingQueue<TerminalConnectorListener>()
+        val queued = CompletableFuture<Unit>()
+        val presented = CompletableFuture<Unit>()
+        val firstCloseCount = AtomicInteger()
+        val created = AtomicInteger()
+        val opened = CompletableFuture<Boolean>()
+        val state = TerminalShellIntegrationState().apply { recordCommandStart(1, includeLine = true, commandText = "running") }
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                    isVisible = true
+                }
+            }
+        var manager: TabManager? = null
+        try {
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        closeConfirmation = { error("A stopped process must not require a kill confirmation") },
+                        workspaceFactory = { delegate ->
+                            val listener =
+                                object : TerminalWorkspaceListener by delegate {
+                                    override fun sessionClosed(
+                                        tab: io.github.ketraterm.workspace.TerminalWorkspaceTab,
+                                        exitCode: Int?,
+                                        failure: Throwable?,
+                                    ) {
+                                        delegate.sessionClosed(tab, exitCode, failure)
+                                        queued.complete(Unit)
+                                        SwingUtilities.invokeLater { presented.complete(Unit) }
+                                    }
+                                }
+                            workspace(listener) { options ->
+                                val first = created.getAndIncrement() == 0
+                                TerminalSession.create(
+                                    TerminalBuffers.create(options.columns, options.rows, options.maxHistory),
+                                    object : TerminalConnector {
+                                        override fun start(listener: TerminalConnectorListener) {
+                                            connections.put(listener)
+                                        }
+
+                                        override fun resize(
+                                            columns: Int,
+                                            rows: Int,
+                                        ) = Unit
+
+                                        override fun write(
+                                            bytes: ByteArray,
+                                            offset: Int,
+                                            length: Int,
+                                        ) = Unit
+
+                                        override fun close() {
+                                            if (first) firstCloseCount.incrementAndGet()
+                                        }
+                                    },
+                                    shellIntegration = TerminalShellIntegrationFactory.host(state, TerminalShellCommandLineState()),
+                                )
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            val origin = onEdt { requireNotNull(manager.selectedPane) }
+            val connection = requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+            if (mode == "split") {
+                onEdt { manager.splitPane(origin, isVertical = true) }
+                requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+            }
+            val output = "first diagnostic\r\nfinal diagnostic".encodeToByteArray()
+            connection.onBytes(output, 0, output.size)
+            val exitCode =
+                when (mode) {
+                    "success" -> 0
+                    "unknown", "transport" -> null
+                    "negative" -> -1
+                    else -> 7
+                }
+            val terminate = {
+                if (mode == "transport") connection.onError(IllegalStateException("connection lost")) else connection.onClosed(exitCode)
+            }
+            if (mode == "closedBeforeDelivery") {
+                onEdt {
+                    terminate()
+                    queued.get(10, TimeUnit.SECONDS)
+                    manager.closePane(origin)
+                }
+            } else {
+                terminate()
+            }
+            presented.get(10, TimeUnit.SECONDS)
+            assertTrue(origin.tab.session.isClosed)
+            assertEquals(1, firstCloseCount.get(), "Resources must be released before retaining the view")
+            when (mode) {
+                "success" -> {
+                    requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+                    onEdt { assertNotSame(origin, manager.selectedPane) }
+                    assertEquals(2, created.get())
+                }
+                "closedBeforeDelivery" ->
+                    onEdt {
+                        assertNull(manager.selectedPane)
+                        assertEquals(1, created.get())
+                    }
+                else -> {
+                    onEdt {
+                        if (mode != "split") assertSame(origin, manager.selectedPane)
+                        assertTrue(origin.terminal.selectAll())
+                        assertContains(assertNotNull(origin.terminal.selectedText()), "final diagnostic")
+                        val banner =
+                            origin.component.components
+                                .filterIsInstance<TerminalExitBanner>()
+                                .single()
+                        assertTrue(banner.isVisible)
+                        val expected =
+                            when (mode) {
+                                "transport" -> appMessages.text("session.exit.error", "connection lost")
+                                "unknown" -> appMessages.text("session.exit.unknown")
+                                else -> appMessages.text("session.exit.failed", exitCode)
+                            }
+                        assertEquals(
+                            expected,
+                            banner.components
+                                .filterIsInstance<JTextArea>()
+                                .single()
+                                .text,
+                        )
+                        assertEquals(TerminalInputAdmission.CLOSED, origin.tab.session.submitInput(TerminalPasteEvent("ignored")))
+                    }
+                    settings.update(settings.config.copy(fontSize = 18))
+                    onEdt {
+                        if (mode != "split") assertSame(origin, manager.selectedPane)
+                        assertTrue(origin.terminal.selectAll())
+                        assertContains(assertNotNull(origin.terminal.selectedText()), "final diagnostic")
+                        origin.component.components
+                            .filterIsInstance<TerminalExitBanner>()
+                            .single()
+                            .components
+                            .filterIsInstance<JButton>()
+                            .single()
+                            .doClick(0)
+                        if (mode == "split") {
+                            val remaining = assertNotNull(manager.selectedPane)
+                            assertNotSame(origin, remaining)
+                            assertFalse(remaining.tab.session.isClosed)
+                            assertEquals(2, created.get())
+                        } else {
+                            assertNull(manager.selectedPane)
+                        }
+                    }
+                }
+            }
+        } finally {
+            close(manager, frame)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `Ctrl Space reaches the application unless a shell completion interaction starts`(

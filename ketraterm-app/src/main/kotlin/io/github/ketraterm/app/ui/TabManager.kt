@@ -707,9 +707,9 @@ internal class TabManager(
                 settings = settings,
                 completionProvider = completionProvider,
                 onBound = onBound,
-            ) { pane, request ->
-                showPaneContextMenu(pane, request)
-            }
+                onContextMenu = ::showPaneContextMenu,
+                onClose = ::closePane,
+            )
         } catch (failure: Throwable) {
             val cleanupFailure = captureCleanupFailure(failure) { retireUnpublishedTab(workspaceTab) }
             throw requireNotNull(cleanupFailure)
@@ -842,6 +842,7 @@ internal class TabManager(
             }
         val pasteItem =
             JMenuItem(appMessages.text("menu.paste")).apply {
+                isEnabled = !pane.tab.session.isClosed
                 addActionListener { request.pasteClipboard() }
             }
         val selectAllItem =
@@ -854,6 +855,7 @@ internal class TabManager(
             }
         val clearItem =
             JMenuItem(appMessages.text("menu.clear")).apply {
+                isEnabled = !pane.tab.session.isClosed
                 addActionListener { request.clearScreen() }
             }
 
@@ -984,7 +986,7 @@ internal class TabManager(
 
     private fun refreshWindowResizeTarget() {
         val pane = (tabRoots[tabBar.selectedId()] as? LeafNode)?.pane
-        if (shutdownStarted.get() || !settings.config.shellRequestResizeWindow || pane == null) {
+        if (shutdownStarted.get() || !settings.config.shellRequestResizeWindow || pane == null || pane.tab.session.isClosed) {
             windowResizeController.clearTarget()
         } else {
             windowResizeController.setTarget(pane.tab.session, pane.terminal)
@@ -1001,8 +1003,9 @@ internal class TabManager(
     private fun confirmClose(panesToClose: List<TerminalPane>): Boolean {
         val liveProcessCount =
             panesToClose.count {
-                it.tab.session.shellIntegrationState
-                    .hasRunningCommand()
+                !it.tab.session.isClosed &&
+                    it.tab.session.shellIntegrationState
+                        .hasRunningCommand()
             }
         if (liveProcessCount == 0) return true
         val displayName = closeDisplayName(panesToClose)
@@ -1014,8 +1017,9 @@ internal class TabManager(
         val liveProcessCount =
             tabIds.sumOf { tabId ->
                 tabRoots[tabId]?.allPanes()?.count {
-                    it.tab.session.shellIntegrationState
-                        .hasRunningCommand()
+                    !it.tab.session.isClosed &&
+                        it.tab.session.shellIntegrationState
+                            .hasRunningCommand()
                 } ?: 0
             }
         return liveProcessCount == 0 ||
@@ -1231,7 +1235,12 @@ internal class TabManager(
         ) {
             SwingUtilities.invokeLater {
                 val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
-                closePane(pane, openReplacementWhenLastPane = true)
+                if (failure != null || exitCode != 0) {
+                    pane.showExitStatus(exitCode, failure)
+                    refreshWindowResizeTarget()
+                } else {
+                    closePane(pane, openReplacementWhenLastPane = true)
+                }
             }
         }
 
@@ -1447,6 +1456,10 @@ internal class TabManager(
         registry.setPersistenceEnabled(settings.config.persistentSuggestionLearningEnabled)
         if (previous === registry && !refreshProviders) return
         panes.forEach { pane ->
+            if (pane.tab.session.isClosed) {
+                pane.setCompletionProvider(null)
+                return@forEach
+            }
             pane.setCompletionProvider(
                 registry.createProvider(
                     session = pane.tab.session,

@@ -65,15 +65,15 @@ class TerminalProfileRegistryTest {
     }
 
     @Test
-    fun windowsProfilesPreferWindowsPowerShellThenPowerShellThenCommandPrompt() {
+    fun windowsProfilesHonorEnvironmentNameCasingAndPreserveMenuOrder() {
         val registry =
             TerminalProfileRegistry(
                 osName = "Windows 11",
                 environment =
                     mapOf(
-                        "SystemRoot" to "C:\\Windows",
-                        "PATH" to "C:\\Program Files\\PowerShell\\7",
-                        "COMSPEC" to "C:\\Windows\\System32\\cmd.exe",
+                        "sYsTeMrOoT" to "C:\\Windows",
+                        "Path" to "C:\\Program Files\\PowerShell\\7",
+                        "comspec" to "C:\\Windows\\System32\\cmd.exe",
                     ),
                 pathSeparator = ";",
                 executableExists = { path ->
@@ -116,6 +116,21 @@ class TerminalProfileRegistryTest {
         assertEquals("/bin/zsh", profile.displayName)
         assertEquals(listOf("/bin/zsh", "-l"), profile.command)
         assertEquals(TerminalProfileKind.ZSH, profile.kind)
+    }
+
+    @Test
+    fun unixDiscoveryKeepsEnvironmentNamesCaseSensitive() {
+        val executable = Path.of("/custom", "bash")
+        for ((key, expectedId) in listOf("Path" to "default-shell", "PATH" to "bash")) {
+            val registry =
+                TerminalProfileRegistry(
+                    osName = "Linux",
+                    environment = mapOf(key to "/custom"),
+                    pathSeparator = ":",
+                    executableExists = { it == executable },
+                )
+            assertEquals(listOf(expectedId), registry.availableProfiles().map { it.id })
+        }
     }
 
     @Test

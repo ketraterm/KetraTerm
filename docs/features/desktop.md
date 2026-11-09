@@ -45,6 +45,7 @@ See the [Swing guide](../../ketraterm-ui-swing/README.md) for configuration.
 | Tab titles | Custom, application, foreground-process, directory, and profile titles. | Same title sources. |
 | Tab colors | User-selected tab accent colors with reset. | No corresponding product control. |
 | Close confirmation | Confirms termination when shell metadata reports a running command, including grouped pane/window closure. | Confirms tab closure when shell metadata reports a running command. |
+| Failed-session presentation | Retains output with a status banner after nonzero or unknown-status exits and transport failure; scrolling, copy, search, and explicit close remain available after process cleanup. Successful exits close normally. | Host-owned closed-session presentation. |
 | Tab restoration | No persisted workspace restoration. | Remembers order, selected tab, profile, custom title, and local directory; starts restored shells lazily. |
 | Project JDK | Uses the configured process environment. | Optional project JDK `JAVA_HOME` and `PATH` injection for new local sessions. |
 | Link navigation | Host URL/file actions. | IDE console filters, project files, and editor navigation. |

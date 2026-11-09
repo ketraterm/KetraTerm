@@ -28,6 +28,7 @@ import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import java.awt.BorderLayout
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JPanel
 
@@ -45,6 +46,7 @@ internal class TerminalPane private constructor(
     private val searchBar: SwingTerminalSearchBar,
     val clipboardReadPrompt: SwingClipboardReadPrompt,
     private var completionProvider: SwingShellSuggestionProvider?,
+    private val exitBanner: TerminalExitBanner,
 ) : TerminalPaneActionTarget {
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
@@ -57,7 +59,19 @@ internal class TerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
-        terminal.setHostPolicy(settings.createHostPolicy())
+        exitBanner.refreshColors()
+        if (!tab.session.isClosed) terminal.setHostPolicy(settings.createHostPolicy())
+    }
+
+    fun showExitStatus(
+        exitCode: Int?,
+        failure: Throwable?,
+    ) {
+        if (closed.get()) return
+        setCompletionProvider(null)
+        exitBanner.showExitStatus(exitCode, failure)
+        component.revalidate()
+        component.repaint()
     }
 
     fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
@@ -130,6 +144,7 @@ internal class TerminalPane private constructor(
             completionProvider: SwingShellSuggestionProvider?,
             onBound: (Throwable?) -> Unit,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
+            onClose: (TerminalPane) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
@@ -174,7 +189,13 @@ internal class TerminalPane private constructor(
                         SwingMessageDialogs.showModeless(terminal, message, decide)
                     }
                 ownedClipboardReadPrompt = clipboardReadPrompt
-                val component = terminalPanel(terminal, searchBar)
+                val exitBanner = TerminalExitBanner { paneRef[0]?.let(onClose) }
+                val component =
+                    JPanel(BorderLayout()).apply {
+                        background = terminal.background
+                        add(terminalPanel(terminal, searchBar), BorderLayout.CENTER)
+                        add(exitBanner, BorderLayout.SOUTH)
+                    }
                 val pane =
                     TerminalPane(
                         tab = tab,
@@ -184,6 +205,7 @@ internal class TerminalPane private constructor(
                         searchBar = searchBar,
                         clipboardReadPrompt = clipboardReadPrompt,
                         completionProvider = completionProvider,
+                        exitBanner = exitBanner,
                     )
                 ownedPane = pane
                 pane.shortcutController = TerminalPaneShortcutController(pane, settings)
