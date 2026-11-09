@@ -86,7 +86,7 @@ class StandaloneSuggestionDesktopTest {
                 type("Get-Chi")
                 if (predictionAlreadyVisible) {
                     withTimeout(15.seconds) {
-                        session.renderGeneration.first {
+                        session.commandEditChanges.first {
                             val snapshot = session.activeShellCommandLine()
                             var predictionWrapped = !wrappedPrediction
                             if (snapshot != null && wrappedPrediction) {
@@ -103,7 +103,7 @@ class StandaloneSuggestionDesktopTest {
                 awaitPopup("Get-Chi", "Get-ChildItem")
                 selectAndAccept("Get-ChildItem")
                 withTimeout(15.seconds) {
-                    session.renderGeneration.first {
+                    session.commandEditChanges.first {
                         val snapshot = session.activeShellCommandLine()
                         snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
                     }
