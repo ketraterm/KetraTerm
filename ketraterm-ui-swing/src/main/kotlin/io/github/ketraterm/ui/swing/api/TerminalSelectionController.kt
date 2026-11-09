@@ -478,7 +478,8 @@ internal class TerminalSelectionController(
                 }
             val beforeAnchor =
                 caretAbsRow < originalRow ||
-                    caretAbsRow == originalRow && target.anchorColumn < originalStart
+                    caretAbsRow == originalRow &&
+                    target.anchorColumn < originalStart
             selectionAnchorAbsoluteRow = originalRow
             selectionCaretAbsoluteRow = caretAbsRow
             if (beforeAnchor) {
