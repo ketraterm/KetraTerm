@@ -18,7 +18,9 @@ package io.github.ketraterm.app.config
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
@@ -450,13 +452,14 @@ class KetraTermConfigTest {
 
         assertTrue(Files.exists(configFile))
         assertEquals("one-dark", config.theme)
-        assertEquals(100, config.columns)
-        assertEquals(30, config.rows)
+        assertEquals(120, config.columns)
+        assertEquals(32, config.rows)
+        assertEquals(10_000, config.scrollbackLines)
         val expectedFont =
             when {
                 System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows") -> "Cascadia Mono"
                 System.getProperty("os.name").lowercase(Locale.ROOT).contains("mac") -> "Menlo"
-                else -> "Monospaced"
+                else -> SwingSettings.defaultTerminalFont().family
             }
         assertEquals(expectedFont, config.fontFamily)
         assertEquals(16, config.fontSize)
@@ -479,6 +482,14 @@ class KetraTermConfigTest {
         assertEquals(1024 * 1024, config.clipboardMaxDecodedBytes)
         assertEquals(TerminalTitlePermission.ALLOW, config.titlePermission)
 
+        val paneSettings = KetraTermSettings(manager).current()
+        assertEquals(120, paneSettings.columns)
+        assertEquals(32, paneSettings.rows)
+        assertEquals(SwingSettings.resolveFontFamily(expectedFont), paneSettings.font.family)
+        assertEquals(16, paneSettings.font.size)
+        assertEquals(TerminalRenderCursorShape.BLOCK, paneSettings.cursorShape)
+        assertEquals(600, paneSettings.cursorBlinkMillis)
+
         // Clean up
         Files.deleteIfExists(configFile)
         Files.deleteIfExists(tempDir)
@@ -499,6 +510,7 @@ class KetraTermConfigTest {
                 fontSize = 18,
                 columns = 110,
                 rows = 35,
+                scrollbackLines = 1000,
                 cursorBlinkMillis = 500,
                 useSystemFallbackFonts = true,
                 cursorShape = "beam",
@@ -688,7 +700,9 @@ class KetraTermConfigTest {
         val loaded = manager.load()
         // Should return default config instead of crashing
         assertEquals("one-dark", loaded.theme)
-        assertEquals(100, loaded.columns)
+        assertEquals(120, loaded.columns)
+        assertEquals(32, loaded.rows)
+        assertEquals(10_000, loaded.scrollbackLines)
         assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
         assertEquals(loaded, manager.load())
 

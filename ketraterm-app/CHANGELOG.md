@@ -1,5 +1,9 @@
 # KetraTerm Standalone Changelog
 
+## [Unreleased]
+
+- New configurations start at 120 × 32 cells with 10,000 scrollback lines. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
+
 ## [0.5.0] - 2026-11-09
 
 - Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local paths, and Git references. PowerShell suggestions remain usable across inline-prediction redraws while changed input invalidates acceptance. The popup highlights matches and shows argument hints. Settings control automatic popups and Enter acceptance; saved learning is opt-in and can be reset. See the [completion guide](../docs/features/completion.md) for shell requirements and limitations.

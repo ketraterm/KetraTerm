@@ -42,10 +42,10 @@ title_permission = "allow"
 
 | Section | Key | Default | Accepted values |
 | --- | --- | --- | --- |
-| `window` | `columns` | `100` | Integer, 10..1000. |
-| `window` | `rows` | `30` | Integer, 10..500. |
-| `window` | `scrollback_lines` | `1000` | Integer, 0..1000000. |
-| `font` | `family` | Platform default | Installed family name. Windows: `Cascadia Mono`; macOS: `Menlo`; elsewhere: `Monospaced`. |
+| `window` | `columns` | `120` | Integer, 10..1000. |
+| `window` | `rows` | `32` | Integer, 10..500. |
+| `window` | `scrollback_lines` | `10000` | Integer, 0..1000000. |
+| `font` | `family` | Platform default | Installed family name. Windows: `Cascadia Mono`; macOS: `Menlo`; elsewhere: the first installed family in Swing's curated monospace list, falling back to `Monospaced`. |
 | `font` | `size` | `16` | Integer points, 10..56. |
 | `font` | `line_height` | `1.0` | Multiplier, 0.7..1.5. |
 | `font` | `use_system_fallback_fonts` | `true` | Boolean; permits installed system fonts as fallback. |
@@ -55,6 +55,10 @@ Unknown theme identifiers use `one-dark` at rendering time. Font selection uses
 Swing's font-family resolution and fallback rules. Window and scrollback values
 are initial settings for new terminals, rather than requests to replace an
 existing process or history buffer.
+
+Defaults apply to new configuration files and omitted preferences. Explicitly
+saved window dimensions, scrollback capacity, fonts, and cursor preferences are
+preserved when the application is upgraded.
 
 ### Behavior
 
