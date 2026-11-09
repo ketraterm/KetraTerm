@@ -66,6 +66,8 @@ Transport failures are reflected in session lifecycle state.
 | [ui-swing](ketraterm-ui-swing/README.md) | Reusable Java2D rendering and Swing interaction. |
 | [completion](ketraterm-completion/README.md) | Completion context, source evaluation, ranking, and bounded learning. |
 | [completion-host](ketraterm-completion-host/README.md) | Host-neutral directory/path access for completion. |
+| [completion-persistence](ketraterm-completion-persistence/README.md) | Optional sanitized, versioned learning persistence with host-owned paths and lifecycle. |
+| [workspace](ketraterm-workspace/README.md) | Host-neutral profiles, local sessions, tabs, and workspace lifecycle. |
 | [ui-swing-host](ketraterm-ui-swing-host/README.md) | Host actions, popup presentation, and completion adapters. |
 
 [ketraterm-headless](ketraterm-headless/README.md) exposes session dependencies;
@@ -79,8 +81,6 @@ for the publication boundary.
 
 | Module | Responsibility |
 | --- | --- |
-| [completion-persistence](ketraterm-completion-persistence/README.md) | Product-owned sanitized, versioned learning persistence. |
-| [workspace](ketraterm-workspace/README.md) | Profiles, local sessions, tabs, and workspace lifecycle. |
 | [app](ketraterm-app/README.md) | Standalone desktop product, configuration, and window wiring. |
 | [intellij-plugin](ketraterm-intellij-plugin/README.md) | IntelliJ-specific product integration in a separate build. |
 | [testkit](ketraterm-testkit/README.md) | Reusable connector fakes, test fixtures, and verification campaigns. |

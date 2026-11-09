@@ -12,7 +12,8 @@ major version preserve supported source, binary, and behavioral contracts.
 | Headless pipeline | protocol, parser, core, host, input, render-api, render-cache, transport-api, session |
 | Swing view | ui-swing |
 | Local processes and shell metadata | pty, shell-integration |
-| Completion | completion, completion-host |
+| Completion | completion, completion-host, completion-persistence |
+| Local terminal workspaces | workspace |
 | Swing host controls | ui-swing-host |
 
 Names have the `ketraterm-` prefix. The constraints-only BOM and dependency-only
@@ -22,8 +23,8 @@ and [Maven setup](../../ketraterm-bom/README.md#maven).
 
 Public/protected declarations in published libraries are supported contracts.
 Kotlin internal/private declarations are excluded, except published inline
-bridges that already-compiled callers can reference. Workspace, completion
-persistence, app, testkit, benchmarks, and IntelliJ product implementation APIs
+bridges that already-compiled callers can reference. App, testkit, benchmarks,
+and IntelliJ product implementation APIs
 are outside the supported publication boundary.
 
 Kotlin 2.4 and JDK 25 are the minimum supported consumer versions. The build uses

@@ -19,15 +19,15 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 
 /** Shared product policy; hosts own preferences, focus queries, dispatch, and notification delivery. */
-object TerminalCommandFinishedAlerts {
+public object TerminalCommandFinishedAlerts {
     /** Smallest configurable command runtime, in seconds. */
-    const val MINIMUM_DURATION_SECONDS: Int = 1
+    public const val MINIMUM_DURATION_SECONDS: Int = 1
 
     /** Largest configurable command runtime, in seconds (one day). */
-    const val MAXIMUM_DURATION_SECONDS: Int = 86_400
+    public const val MAXIMUM_DURATION_SECONDS: Int = 86_400
 
     /** Initial threshold for the opt-in product preference, in seconds. */
-    const val DEFAULT_MINIMUM_DURATION_SECONDS: Int = 10
+    public const val DEFAULT_MINIMUM_DURATION_SECONDS: Int = 10
 
     /**
      * Returns whether this explicit completion qualifies for a product alert.
@@ -44,7 +44,7 @@ object TerminalCommandFinishedAlerts {
      * @param notificationsAllowed current host notification permission and product master setting.
      * @throws IllegalArgumentException when the threshold is outside the supported range.
      */
-    fun shouldNotify(
+    public fun shouldNotify(
         metadata: TerminalShellIntegrationCommandMetadata,
         durationMillis: Long?,
         enabled: Boolean,

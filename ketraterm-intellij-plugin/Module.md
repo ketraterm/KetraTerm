@@ -65,7 +65,7 @@ the bundled Git and Gradle integrations declared in `plugin.xml`.
 `includeBuild("..")`. Dependencies in [build.gradle.kts](build.gradle.kts) use
 `io.github.ketraterm` coordinates with the repository-derived version; the
 composite substitutes local projects. No Maven publication is needed for local
-plugin development, including the product-only workspace and persistence modules.
+plugin development. Workspace and persistence are also published libraries.
 
 The plugin relies on IntelliJ's Kotlin and coroutine runtime, and its Pty4J/JNA
 native stack. The build excludes duplicate runtime artifacts from the plugin

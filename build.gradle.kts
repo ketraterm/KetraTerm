@@ -75,6 +75,7 @@ val publishedLibraryNames =
         "ketraterm-input",
         "ketraterm-completion",
         "ketraterm-completion-host",
+        "ketraterm-completion-persistence",
         "ketraterm-render-api",
         "ketraterm-render-cache",
         "ketraterm-transport-api",
@@ -83,6 +84,7 @@ val publishedLibraryNames =
         "ketraterm-ui-swing",
         "ketraterm-ui-swing-host",
         "ketraterm-pty",
+        "ketraterm-workspace",
     )
 extra["publishedLibraryNames"] = publishedLibraryNames
 val publishedEntryPointNames = setOf("ketraterm-headless", "ketraterm-swing")

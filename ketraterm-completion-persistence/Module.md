@@ -1,6 +1,6 @@
 # Module ketraterm-completion-persistence
 
-Internal product storage for bounded completion-learning snapshots. Dependencies
+Published optional storage for bounded completion-learning snapshots. Dependencies
 are `ketraterm-completion` and coroutines; products own paths, settings, diagnostics,
 and lifecycle scopes. The [README](README.md) covers integration and lifecycle.
 

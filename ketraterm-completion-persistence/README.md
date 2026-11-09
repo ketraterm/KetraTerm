@@ -2,9 +2,21 @@
 
 **Experimental.** See the [completion stability contract](../docs/features/completion.md#stability-experimental).
 
-This internal module saves completion learning for the standalone app and
-IntelliJ plugin. It is outside the supported Maven publication, entry points,
-and BOM. Library embedders choose their own storage for learning snapshots.
+This optional library saves bounded completion learning for embedding hosts,
+the standalone app, and the IntelliJ plugin. Hosts choose the file path and
+persistence lifecycle.
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.ketraterm:ketraterm-bom:{version}"))
+    implementation("io.github.ketraterm:ketraterm-completion-persistence")
+}
+```
+
+Use the repositories in the [library setup](../README.md#using-the-libraries).
+The module is included in the BOM. Kotlin callers opt in with
+`@OptIn(ExperimentalTerminalCompletionApi::class)` from
+`io.github.ketraterm.completion.api`.
 
 ## Integration
 

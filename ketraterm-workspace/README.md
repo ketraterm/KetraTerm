@@ -1,12 +1,24 @@
 # KetraTerm Workspace
 
-`ketraterm-workspace` is shared product infrastructure for local terminal
+`ketraterm-workspace` is a host-neutral library for local terminal
 profiles, tabs, and session ownership. It has no UI toolkit dependency. The
 standalone application and IntelliJ plugin adapt its events to their own views
 and settings.
 
-This is product infrastructure. External embedders should use the
-[library entry points](../README.md#using-the-libraries) and [PTY API](../ketraterm-pty/README.md).
+Add it when your host needs shell-profile discovery and ownership of multiple
+local terminal tabs. For a single process, the [PTY API](../ketraterm-pty/README.md)
+also provides direct session creation.
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.ketraterm:ketraterm-bom:{version}"))
+    implementation("io.github.ketraterm:ketraterm-workspace")
+}
+```
+
+Use the repositories in the [library setup](../README.md#using-the-libraries).
+The module is included in the BOM and follows the
+[library compatibility contract](../docs/library/compatibility.md).
 
 ## How to Use
 

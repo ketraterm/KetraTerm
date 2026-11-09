@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.persistence
 
+import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
@@ -32,7 +33,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Reset bypasses enablement and the checkpoint interval so persisted learning
  * is replaced promptly. Shutdown awaits the final required write.
  */
-class TerminalCompletionLearningCoordinator
+@ExperimentalTerminalCompletionApi
+public class TerminalCompletionLearningCoordinator
     internal constructor(
         private val learningStore: TerminalCompletionLearningStore,
         private val fileStore: CompletionLearningSnapshotFileStore,
@@ -43,7 +45,7 @@ class TerminalCompletionLearningCoordinator
         private val onPersistenceLoadFailure: (Throwable) -> Unit = {},
     ) {
         /** Creates a learning owner using [Dispatchers.IO] for blocking snapshot file access. */
-        constructor(
+        public constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
@@ -69,7 +71,7 @@ class TerminalCompletionLearningCoordinator
          * @param onPersistenceLoadFailure invoked once when an existing file is rejected or cannot be read.
          * Exceptions thrown by this diagnostic callback are ignored.
          */
-        constructor(
+        public constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
@@ -123,7 +125,7 @@ class TerminalCompletionLearningCoordinator
          * @param workingDirectoryUri optional working-directory URI captured for the command.
          * @param usedAtEpochMillis non-negative completion timestamp.
          */
-        fun recordCommandResult(
+        public fun recordCommandResult(
             commandLine: String,
             successful: Boolean,
             profileId: String?,
@@ -154,7 +156,7 @@ class TerminalCompletionLearningCoordinator
          * @param workingDirectoryUri optional working-directory URI captured for the event.
          * @param feedbackAtEpochMillis non-negative feedback timestamp.
          */
-        fun recordSuggestionFeedback(
+        public fun recordSuggestionFeedback(
             commandLine: String,
             feedback: TerminalCompletionFeedbackKind,
             profileId: String?,
@@ -187,7 +189,7 @@ class TerminalCompletionLearningCoordinator
          * saved data, or fails with the write error. Overlapping resets share the
          * completion of the latest reset. Cancelling a waiter does not cancel storage.
          */
-        fun resetLearning(): Deferred<Unit> =
+        public fun resetLearning(): Deferred<Unit> =
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
                 val completion = pendingReset?.takeUnless { it.isCompleted } ?: CompletableDeferred<Unit>().also { pendingReset = it }
@@ -210,7 +212,7 @@ class TerminalCompletionLearningCoordinator
          *
          * @param enabled whether the fixed snapshot may be read and written.
          */
-        fun setPersistenceEnabled(enabled: Boolean) {
+        public fun setPersistenceEnabled(enabled: Boolean) {
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
                 if (persistenceEnabled == enabled) return
@@ -225,7 +227,7 @@ class TerminalCompletionLearningCoordinator
          * Calling this method more than once is safe. An unrecovered final
          * write failure is rethrown after the worker stops.
          */
-        suspend fun closeAndFlush() {
+        public suspend fun closeAndFlush() {
             synchronized(stateLock) {
                 if (acceptingEvents) {
                     acceptingEvents = false
@@ -240,7 +242,7 @@ class TerminalCompletionLearningCoordinator
         }
 
         /** Stops learning and awaits the worker without loading or saving pending state. */
-        suspend fun closeWithoutFlush() {
+        public suspend fun closeWithoutFlush() {
             synchronized(stateLock) {
                 acceptingEvents = false
                 closeRequested = true
@@ -420,7 +422,7 @@ class TerminalCompletionLearningCoordinator
             STOP,
         }
 
-        companion object {
+        public companion object {
             private const val DEFAULT_CHECKPOINT_INTERVAL_MILLIS = 30_000L
 
             /**
@@ -432,6 +434,6 @@ class TerminalCompletionLearningCoordinator
              * @return current completion-learning filename.
              */
             @JvmStatic
-            fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
+            public fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
         }
     }

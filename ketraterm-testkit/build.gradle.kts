@@ -259,7 +259,19 @@ tasks.test {
 // Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
 val consumerClasspathsDirectory = layout.buildDirectory.dir("consumer-classpaths")
 val prepareConsumerClasspaths =
-    listOf("core", "host", "input", "parser", "completion", "completion-host", "ui-swing", "ui-swing-host", "pty").map { module ->
+    listOf(
+        "core",
+        "host",
+        "input",
+        "parser",
+        "completion",
+        "completion-host",
+        "completion-persistence",
+        "ui-swing",
+        "ui-swing-host",
+        "pty",
+        "workspace",
+    ).map { module ->
         val consumerClasspath =
             configurations.create("${module}ConsumerCompileClasspath") {
                 isCanBeConsumed = false
