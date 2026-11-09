@@ -60,7 +60,7 @@ and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release 
 </tr>
 <tr>
 <td><code>TODO(host/profile)</code></td>
-<td>Add supported-IDE Plugin Verifier runs and installed-product smoke tests to release verification. <a href="development/testing.html#ci">Full CI</a> gates publication on the exact release revision&#39;s JVM, native PTY, desktop, ABI, consumer, package-metadata, and IDE test checks; those checks do not verify installed products or the supported IDE compatibility range.</td>
+<td>Add installed standalone-product smoke tests to release verification. <a href="development/testing.html#ci">Full CI</a> gates publication on the exact release revision&#39;s JVM, native PTY, desktop, ABI, consumer, and package-metadata checks; those checks do not verify installed products. IDE verification is owned by the <a href="https://github.com/ketraterm/KetraTerm-IntelliJ">plugin repository</a>.</td>
 </tr>
 <tr>
 <td><code>TODO(policy)</code></td>
@@ -306,7 +306,7 @@ Frame publication does not prove screen presentation.</li>
 <td><strong>Resolved 2026-10-30.</strong> Documented OSC 9;4 states now drive retained, permission-controlled session progress and both products, with percentage/spinning shell-icon rings and five-minute stale expiry. Products always enable progress independently of title permission; embedders can control progress separately. See the <a href="reference/protocol.html#progress-reporting">contract</a> and <a href="development/osc-progress-reporting.html">verification record</a>.</td>
 </tr>
 </tbody></table></div>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

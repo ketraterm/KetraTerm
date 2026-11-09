@@ -23,17 +23,19 @@
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
   <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#release-bot-setup">Release bot setup</a><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
-<p><code>VERSION</code> on <code>master</code> is the release version for libraries, the standalone app,
-and the IntelliJ plugin. Set it to the desired version and merge the change
-before releasing. No manual tag or version input is needed.</p>
+<p><code>VERSION</code> on <code>master</code> is the release version for libraries and the standalone app.
+Set it to the desired version and merge the change before releasing. No manual
+tag or version input is needed. The
+<a href="https://github.com/ketraterm/KetraTerm-IntelliJ">IntelliJ plugin</a> owns its version
+and release workflow in its separate repository.</p>
 <p>In GitHub Actions, select <strong>Release</strong>, then <strong>Run workflow</strong> on <code>master</code>.
 The workflow:</p>
 <ol>
 <li>Reads <code>VERSION</code> and compares it with all published GitHub releases,
 including prereleases. An already published version is skipped; a downgrade
 or an alias of an existing version fails.</li>
-<li>Replaces the leading <code>Unreleased</code> heading in each of the three changelogs
-with the version and the current UTC date. Older entries and already
+<li>Replaces the leading <code>Unreleased</code> heading in the library and standalone
+changelogs with the version and the current UTC date. Older entries and already
 finalized dates are preserved. A finalized section with additional
 Unreleased changes is rejected to avoid ambiguous release contents.</li>
 <li>Runs formatting, ABI, tests, local publication checks, and native version
@@ -42,10 +44,10 @@ validation before creating the release commit.</li>
 in one atomic push. If <code>master</code> advances during verification, the push
 fails; rerun against the updated branch. Existing tags are never moved.</li>
 <li>Runs the full <a href="testing.html#ci">CI validation set</a> on the exact tagged revision,
-including native/desktop suites, three-platform consumers, and IDE tests.
+including native/desktop suites and three-platform consumers.
 Publication waits for this verification to succeed.</li>
 <li>Publishes Maven artifacts, builds application binaries, and creates the
-GitHub release with notes from all three versioned changelog sections.
+GitHub release with notes from both versioned changelog sections.
 Relative links in those notes point to the tagged source.</li>
 <li>Triggers website/documentation publication through the existing
 <code>workflow_run</code> hook after successful completion, so downloads reflect the
@@ -73,8 +75,8 @@ only for the atomic commit/tag push. The token is revoked at the end of the job.
 Ordinary checkout and release API calls use <code>GITHUB_TOKEN</code>; they do not inherit
 the release app&#39;s bypass access. Existing Maven Central and signing secrets are
 still required.</p>
-<p>For the next development cycle, add a new <code>## [Unreleased]</code> section to each
-changelog and bump <code>VERSION</code> before the next release.</p>
+<p>For the next development cycle, add a new <code>## [Unreleased]</code> section to both
+changelogs and bump <code>VERSION</code> before the next release.</p>
 <h2 id="prereleases">Prereleases</h2>
 <p>Use the native packager&#39;s existing formats: <code>0.5.0-alpha01</code>, <code>0.5.0-beta02</code>,
 or <code>0.5.0-rc01</code>. Stage numbers are 1–19; unpadded forms such as <code>alpha1</code>
@@ -94,7 +96,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
