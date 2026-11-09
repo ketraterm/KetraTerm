@@ -2,7 +2,7 @@
 
 Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](ketraterm-intellij-plugin/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-09
 
 - Added Maven publications and BOM alignment for `ketraterm-workspace` and `ketraterm-completion-persistence`, with public API baselines and isolated Kotlin/Java consumer verification. Completion persistence remains experimental.
 - Fixed clipping of isolated fallback glyphs whose visible ink extends left of the origin or beyond the advance. Fitting now uses cached ink bounds without changing rendering paths. Default text fallbacks prefer installed monospace and script fonts before generic logical fonts; explicit host ordering and emoji priority are preserved.

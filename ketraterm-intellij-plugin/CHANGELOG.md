@@ -1,6 +1,6 @@
 # KetraTerm IntelliJ Plugin Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-11-09
 
 - Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local filesystem paths, and IDE project-file, Git, and Gradle sources. The shared popup follows the IDE theme, highlights matches, and shows argument hints. Settings control automatic popups, Enter acceptance, and optional saved learning with reset; shortcuts follow the IDE keymap. See the [completion guide](../docs/features/completion.md) for supported behavior and limitations.
 - Improved shell icon readability on light and dark backgrounds, balanced logo proportions, and replaced the Command Prompt drive lettering with a clean terminal glyph.
