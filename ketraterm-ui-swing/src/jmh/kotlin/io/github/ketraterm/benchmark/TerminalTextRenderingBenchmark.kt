@@ -68,6 +68,7 @@ open class TerminalTextRenderingBenchmark {
     private lateinit var asciiPainter: TerminalTextPainter
     private lateinit var styledPainter: TerminalTextPainter
     private lateinit var asciiCache: TerminalRenderCache
+    private lateinit var symbolCache: TerminalRenderCache
     private lateinit var styledCache: TerminalRenderCache
     private lateinit var styleCache: TerminalRenderCache
     private val runStyle = TerminalTextRunStyle()
@@ -90,6 +91,9 @@ open class TerminalTextRenderingBenchmark {
     private lateinit var shapingFonts: FontCache
     private lateinit var clippedRun: TerminalShapedGlyphVectorCache.Run
     private lateinit var directBatch: GlyphVector
+    private val coldLayouts = TerminalComplexTextLayoutCache(codePointCapacity = 2)
+    private val coldScalars = intArrayOf(0x03A9, 0x03BB, 0x03C6, 0x03B1)
+    private var coldScalarIndex = 0
 
     @Setup(Level.Trial)
     open fun setup() {
@@ -114,6 +118,8 @@ open class TerminalTextRenderingBenchmark {
         metrics = SwingMetrics.from(asciiGraphics.getFontMetrics(settings.font), settings.lineHeight, settings.columnSpacing)
         context = asciiGraphics.fontRenderContext
         asciiCache = TerminalRenderCache(asciiChars.size, 1).apply { accept(TerminalRenderBenchmarkFrame(listOf(String(asciiChars)))) }
+        val symbols = "\u2194 \u21D0 \u21D2 \u21D4".repeat(4)
+        symbolCache = TerminalRenderCache(symbols.length, 1).apply { accept(TerminalRenderBenchmarkFrame(listOf(symbols))) }
         val attrs =
             LongArray(styledText.length) { column ->
                 TerminalRenderAttrs.pack(
@@ -136,6 +142,7 @@ open class TerminalTextRenderingBenchmark {
         asciiGraphics.clipRect(0, 0, asciiChars.size * metrics.cellWidth, metrics.cellHeight)
         styledGraphics.setClip(0, 0, 500, 40)
         paintAscii()
+        paintSymbols()
         paintStyledHebrew()
         val font = asciiPainter.font(Font.PLAIN)
         asciiUsesDrawChars = TerminalAsciiDrawCharsCache().canDrawChars(font, Font.PLAIN, metrics.cellWidth, context)
@@ -198,6 +205,20 @@ open class TerminalTextRenderingBenchmark {
         asciiGraphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
         asciiGraphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
         asciiPainter.paintRow(asciiGraphics, asciiCache, settings.palette, metrics, 0, asciiGraphics.fontRenderContext)
+    }
+
+    @Benchmark
+    open fun paintSymbols() {
+        asciiPainter.paintRow(styledGraphics, symbolCache, settings.palette, metrics, 0, context)
+    }
+
+    /** Four scalars in a two-entry cache force layout misses while font resolution remains warm. */
+    @Benchmark
+    open fun createAndDrawComplexLayout() {
+        val codePoint = coldScalars[coldScalarIndex]
+        coldScalarIndex = (coldScalarIndex + 1) % coldScalars.size
+        val layout = coldLayouts.codePointLayout(codePoint, Font.PLAIN, context, shapingFonts)
+        layout.textLayout.draw(styledGraphics, 0f, 26f)
     }
 
     @Benchmark

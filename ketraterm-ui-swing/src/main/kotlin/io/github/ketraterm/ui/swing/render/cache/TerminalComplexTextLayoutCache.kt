@@ -76,14 +76,14 @@ internal class TerminalComplexTextLayoutCache(
      * @param style The packed integer bitmask specifying the target font style.
      * @param fontRenderContext The active Java2D graphics context for metrics tracking.
      * @param fontCache The stateful font resolver for fallback execution.
-     * @return An immutable, single-character [TextLayout].
+     * @return a cached single-character layout with its fitting bounds.
      */
     fun codePointLayout(
         codePoint: Int,
         style: Int,
         fontRenderContext: FontRenderContext,
         fontCache: FontCache,
-    ): TextLayout {
+    ): Layout {
         fontCache.refreshSystemFallbackFonts()
         prepare(fontRenderContext, fontCache.generation)
 
@@ -96,7 +96,7 @@ internal class TerminalComplexTextLayoutCache(
         // Convert the code point directly to a transient char array on cache misses to minimize
         // object lifecycle footprints prior to layout shaping.
         val text = String(Character.toChars(safeCodePoint))
-        val layout = TextLayout(text, fontCache.fontForCodePoint(safeCodePoint, normalizedStyle), fontRenderContext)
+        val layout = Layout(TextLayout(text, fontCache.fontForCodePoint(safeCodePoint, normalizedStyle), fontRenderContext))
         codePointLayouts.put(key, layout)
         return layout
     }
@@ -112,7 +112,7 @@ internal class TerminalComplexTextLayoutCache(
      * @param style The packed integer bitmask specifying the target font style (Bold/Italic variants).
      * @param fontRenderContext The active Java2D graphics context specifying scaling and anti-aliasing configurations.
      * @param fontCache The stateful primary and fallback font resolver for typography resolution.
-     * @return An immutable, shaped [TextLayout]; callers fit it to the owning cell span.
+     * @return a cached shaped layout with fitting bounds for the owning cell span.
      */
     fun clusterLayout(
         codepoints: IntArray,
@@ -121,7 +121,7 @@ internal class TerminalComplexTextLayoutCache(
         style: Int,
         fontRenderContext: FontRenderContext,
         fontCache: FontCache,
-    ): TextLayout {
+    ): Layout {
         require(length >= 0) { "length must be >= 0, was $length" }
         require(offset >= 0 && codepoints.size - offset >= length) {
             "cluster source has insufficient capacity: size=${codepoints.size}, offset=$offset, length=$length"
@@ -155,7 +155,7 @@ internal class TerminalComplexTextLayoutCache(
         // them only on cache misses; repeated paint passes compare primitive
         // codepoint slices directly.
         val text = String(safeCodepoints, safeOffset, shapedLength)
-        val layout = TextLayout(text, fontCache.fontForText(text, normalizedStyle), fontRenderContext)
+        val layout = Layout(TextLayout(text, fontCache.fontForText(text, normalizedStyle), fontRenderContext))
         styleLayouts.put(safeCodepoints, safeOffset, shapedLength, hash, layout)
         return layout
     }
@@ -171,9 +171,23 @@ internal class TerminalComplexTextLayoutCache(
         style: Int,
         fontRenderContext: FontRenderContext,
         fontCache: FontCache,
-    ): TextLayout {
+    ): Layout {
         val length = copyStringCodepoints(text)
         return clusterLayout(stringClusterScratch, 0, length, style, fontRenderContext, fontCache)
+    }
+
+    /** Cached fitting geometry includes negative bearings and ink beyond the advance. */
+    internal class Layout(
+        val textLayout: TextLayout,
+    ) {
+        val fitLeft: Float
+        val fitWidth: Float
+
+        init {
+            val ink = textLayout.bounds
+            fitLeft = minOf(0f, ink.minX.toFloat())
+            fitWidth = maxOf(textLayout.advance, ink.maxX.toFloat()) - fitLeft
+        }
     }
 
     private fun prepare(
@@ -248,7 +262,7 @@ internal class TerminalComplexTextLayoutCache(
         capacity: Int,
     ) {
         private val entryKeys = LongArray(capacity)
-        private val entryLayouts = arrayOfNulls<TextLayout>(capacity)
+        private val entryLayouts = arrayOfNulls<Layout>(capacity)
         private val previous = IntArray(capacity) { EMPTY }
         private val next = IntArray(capacity) { EMPTY }
         private val freeEntries = IntArray(capacity)
@@ -261,7 +275,7 @@ internal class TerminalComplexTextLayoutCache(
         private var head = EMPTY
         private var tail = EMPTY
 
-        operator fun get(key: Long): TextLayout? {
+        operator fun get(key: Long): Layout? {
             var slot = hashSlot(key)
             while (true) {
                 val entry = hashEntries[slot]
@@ -276,7 +290,7 @@ internal class TerminalComplexTextLayoutCache(
 
         fun put(
             key: Long,
-            layout: TextLayout,
+            layout: Layout,
         ) {
             val entry = allocateEntry()
 
@@ -420,7 +434,7 @@ internal class TerminalComplexTextLayoutCache(
         private val entryCodepoints = arrayOfNulls<IntArray>(capacity)
         private val entryLengths = IntArray(capacity)
         private val entryHashes = IntArray(capacity)
-        private val entryLayouts = arrayOfNulls<TextLayout>(capacity)
+        private val entryLayouts = arrayOfNulls<Layout>(capacity)
         private val previous = IntArray(capacity) { EMPTY }
         private val next = IntArray(capacity) { EMPTY }
         private val freeEntries = IntArray(capacity)
@@ -452,7 +466,7 @@ internal class TerminalComplexTextLayoutCache(
             offset: Int,
             length: Int,
             hash: Int,
-        ): TextLayout? {
+        ): Layout? {
             var slot = hashSlot(hash)
             while (true) {
                 val entry = hashEntries[slot]
@@ -470,7 +484,7 @@ internal class TerminalComplexTextLayoutCache(
             offset: Int,
             length: Int,
             hash: Int,
-            layout: TextLayout,
+            layout: Layout,
         ) {
             val entry = allocateEntry()
 

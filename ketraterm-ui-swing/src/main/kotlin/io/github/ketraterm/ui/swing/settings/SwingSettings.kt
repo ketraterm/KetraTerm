@@ -813,8 +813,8 @@ public class SwingSettings private constructor(
         public fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
 
         /**
-         * Returns conservative logical and common platform fonts for complex
-         * script fallback. Color emoji fonts are preferred ahead of symbol fonts
+         * Returns installed monospace and script fonts before generic logical
+         * text fallbacks. Color emoji fonts are preferred ahead of symbol fonts
          * so emoji cells do not degrade to monochrome dingbat glyphs when a
          * native color emoji family is installed.
          *
@@ -855,11 +855,15 @@ public class SwingSettings private constructor(
             for (family in preferredColorEmojiFallbackFamilies) {
                 addInstalled(family)
             }
-            addIfAbsent(Font.DIALOG)
-            addIfAbsent(Font.SANS_SERIF)
+            for (family in curatedMonospaceFontFamilies) {
+                if (family != Font.MONOSPACED) addInstalled(family)
+            }
             for (family in preferredTextFallbackFamilies) {
                 addInstalled(family)
             }
+            addIfAbsent(Font.MONOSPACED)
+            addIfAbsent(Font.DIALOG)
+            addIfAbsent(Font.SANS_SERIF)
             return result
         }
 

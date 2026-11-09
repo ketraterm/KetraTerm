@@ -35,7 +35,6 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.font.FontRenderContext
-import java.awt.font.TextLayout
 
 /**
  * Paints terminal cell text runs and text-only cursor foreground.
@@ -479,7 +478,7 @@ internal class TerminalTextPainter(
             complexTextLayouts
                 .clusterLayout(codepoints, offset, shapedLength, fontStyle, fontRenderContext, fontCache)
         drawFittedLayout(g, layout, drawX, baseline, x + textPixelWidth)
-        drawX += minOf(layout.advance, textPixelWidth)
+        drawX += minOf(layout.textLayout.advance, textPixelWidth)
 
         var index = offset + shapedLength
         val end = offset + length
@@ -488,7 +487,7 @@ internal class TerminalTextPainter(
                 complexTextLayouts
                     .codePointLayout(codepoints[index], fontStyle, fontRenderContext, fontCache)
             drawFittedLayout(g, codePointLayout, drawX, baseline, x + textPixelWidth)
-            drawX += minOf(codePointLayout.advance, maxOf(0f, x + textPixelWidth - drawX))
+            drawX += minOf(codePointLayout.textLayout.advance, maxOf(0f, x + textPixelWidth - drawX))
             index++
         }
     }
@@ -510,25 +509,27 @@ internal class TerminalTextPainter(
 
     private fun drawFittedLayout(
         g: Graphics2D,
-        layout: TextLayout,
+        layout: TerminalComplexTextLayoutCache.Layout,
         x: Float,
         baselineY: Float,
         spanEndX: Float,
     ) {
         val available = spanEndX - x
-        val advance = layout.advance
+        val text = layout.textLayout
+        val advance = text.advance
         if (available <= 0f || advance <= 0f) return
-        if (advance <= available) {
-            layout.draw(g, x, baselineY)
+        val width = layout.fitWidth
+        if (width <= available) {
+            text.draw(g, x - layout.fitLeft, baselineY)
             return
         }
 
         val oldTransform = g.transform
         try {
-            val scale = (available / advance).toDouble()
+            val scale = (available / width).toDouble()
             g.translate(x.toDouble(), baselineY.toDouble())
             g.scale(scale, scale)
-            layout.draw(g, 0f, 0f)
+            text.draw(g, -layout.fitLeft, 0f)
         } finally {
             g.transform = oldTransform
         }
