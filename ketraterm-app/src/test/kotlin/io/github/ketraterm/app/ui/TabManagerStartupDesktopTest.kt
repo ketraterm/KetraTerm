@@ -98,7 +98,10 @@ class TabManagerStartupDesktopTest {
         val frame =
             onEdt {
                 KeyboardFocusManager.setCurrentKeyboardFocusManager(focusManager)
-                JFrame().apply { pack() }
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                }
             }
         var manager: TabManager? = null
         try {
@@ -421,7 +424,13 @@ class TabManagerStartupDesktopTest {
         val received = CompletableFuture<String>()
         val output = ByteArrayOutputStream()
         val opened = CompletableFuture<Boolean>()
-        val frame = onEdt { JFrame().apply { pack() } }
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                }
+            }
         var manager: TabManager? = null
         var providerOpens = 0
         try {

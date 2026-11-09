@@ -214,16 +214,26 @@ internal class StandaloneSuggestionFixture private constructor(
             }
         }
 
-    suspend fun awaitExecution(line: String) =
-        withTimeout(15.seconds) {
-            session.shellIntegrationState.revision.first {
+    suspend fun awaitExecution(line: String) {
+        try {
+            withTimeout(15.seconds) {
+                session.shellIntegrationState.revision.first {
+                    val state = session.shellIntegrationState
+                    val metadata = state.commandMetadata(state.latestCommandRecordId())
+                    metadata?.commandText == line && metadata.finishedAtEpochMillis != null
+                }
                 val state = session.shellIntegrationState
-                val metadata = state.commandMetadata(state.latestCommandRecordId())
-                metadata?.commandText == line && metadata.finishedAtEpochMillis != null
+                assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
             }
+        } catch (failure: TimeoutCancellationException) {
             val state = session.shellIntegrationState
-            assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
+            throw AssertionError(
+                "Expected execution '$line', latest=${state.commandMetadata(state.latestCommandRecordId())}; " +
+                    "projection=${session.activeShellCommandLine()}, session=${session.state.value}\n${screenText()}",
+                failure,
+            )
         }
+    }
 
     suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
@@ -378,6 +388,8 @@ internal class StandaloneSuggestionFixture private constructor(
                         workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                     )
                 val settings = KetraTermSettings(KetraTermConfigManager(directory.resolve("config.toml")))
+                // Session-submitted setup bypasses UI Enter handling and must not open completion requests.
+                withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = false)) }
                 val created =
                     withContext(Dispatchers.Swing) {
                         StandaloneSuggestionFixture(tab, provider, settings).also { fixture = it }
@@ -387,6 +399,7 @@ internal class StandaloneSuggestionFixture private constructor(
                     created.awaitExecution(setup)
                     created.awaitLine("", requireShellCompletion = true)
                 }
+                created.setAutomaticSuggestionsEnabled(true)
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.

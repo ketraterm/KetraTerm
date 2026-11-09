@@ -57,10 +57,7 @@ class StandaloneSuggestionDesktopTest {
     ): Unit =
         runBlocking {
             withSession(StandaloneSuggestionShell.POWERSHELL.profile(directory), directory) {
-                if (predictionAlreadyVisible) {
-                    // Establish the rendered prediction before enabling the automatic completion interaction.
-                    setAutomaticSuggestionsEnabled(false)
-                }
+                setAutomaticSuggestionsEnabled(false)
                 val location =
                     if (wrappedPrediction) {
                         var nameLength = 0
@@ -85,6 +82,7 @@ class StandaloneSuggestionDesktopTest {
                 awaitExecution(setup)
                 awaitLine("", requireShellCompletion = true)
 
+                if (!predictionAlreadyVisible) setAutomaticSuggestionsEnabled(true)
                 type("Get-Chi")
                 if (predictionAlreadyVisible) {
                     withTimeout(15.seconds) {
@@ -169,6 +167,7 @@ class StandaloneSuggestionDesktopTest {
             val profile = shell.profile(directory)
             assumeTrue(shell.supportsLiveCommands(profile), "Live command discovery is unsupported or its shell prerequisites are missing")
             withSession(profile, directory) {
+                setAutomaticSuggestionsEnabled(false)
                 val definition =
                     if (shell.isPowerShell) {
                         "Set-Alias ketra_smoke_echo Write-Output"
@@ -181,6 +180,7 @@ class StandaloneSuggestionDesktopTest {
                 )
                 awaitExecution(definition)
                 awaitLine("", requireShellCompletion = shell.isPowerShell)
+                setAutomaticSuggestionsEnabled(true)
                 type("ketra_smoke_e")
                 awaitPopup("ketra_smoke_e", "ketra_smoke_echo")
                 selectAndAccept("ketra_smoke_echo")
