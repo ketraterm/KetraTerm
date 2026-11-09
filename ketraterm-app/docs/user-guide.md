@@ -27,6 +27,10 @@ Use terminal search to find text in the visible screen and retained history.
 Copying reconstructs soft-wrapped lines. Hold Shift to use local mouse selection
 when a terminal application has enabled mouse reporting.
 
+Pasting text with line breaks or control characters opens a review dialog.
+Controls appear as escapes in a shortened preview. Choose Paste to submit the
+captured clipboard text, or Cancel to leave the running application untouched.
+
 ## Appearance and settings
 
 Open the settings dialog to choose a theme and font, adjust line height and
@@ -65,7 +69,8 @@ smart_suggestions_enabled = true
 Suggestions need an editable command context from shell integration. Press
 Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
 accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
-Tab completion is separate.
+Tab completion is separate. When no editable shell context is available,
+Ctrl+Space reaches the running application instead.
 
 Suggestions combine built-in command specifications, local files and directories,
 and bounded learning. WSL or remote directory reports do not provide a remote

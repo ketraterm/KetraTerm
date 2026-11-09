@@ -53,8 +53,17 @@ class TerminalPaneShortcutControllerTest {
         assertEquals(1, target.requestSuggestionsCount)
     }
 
+    @Test
+    fun `installed provider without an editable shell context does not claim completion`() {
+        val target = RecordingActionTarget(contextAvailable = false)
+        assertTrue(TerminalPaneActionRegistry.isEnabled(SwingTerminalHostAction.REQUEST_SUGGESTIONS, target))
+        assertFalse(TerminalPaneActionRegistry.perform(SwingTerminalHostAction.REQUEST_SUGGESTIONS, target))
+        assertEquals(1, target.requestSuggestionsCount)
+    }
+
     private class RecordingActionTarget(
         val enabled: Boolean = true,
+        val contextAvailable: Boolean = true,
     ) : TerminalPaneActionTarget {
         var openSearchCount: Int = 0
             private set
@@ -93,8 +102,9 @@ class TerminalPaneShortcutControllerTest {
             return true
         }
 
-        override fun requestShellSuggestions() {
+        override fun requestShellSuggestions(): Boolean {
             requestSuggestionsCount++
+            return contextAvailable
         }
 
         override fun openSearch() {

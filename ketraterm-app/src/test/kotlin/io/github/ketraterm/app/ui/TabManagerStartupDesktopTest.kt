@@ -23,16 +23,23 @@ import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -46,6 +53,9 @@ import java.awt.Container
 import java.awt.Dimension
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
+import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.nio.file.Path
 import java.util.concurrent.*
@@ -57,6 +67,72 @@ import kotlin.test.*
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
 class TabManagerStartupDesktopTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `Ctrl Space reaches the application unless a shell completion interaction starts`(
+        editable: Boolean,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(shellSuggestionsEnabled = false, cursorBlinkMillis = 0, showForegroundProcessName = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("keys", "Keys", listOf("unused"), workingDirectory = directory)
+        val commandLine = TerminalShellCommandLineState(if (editable) TerminalShellCommandLineSnapshot("", 0, 0, 0) else null)
+        val integration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
+        val received = CompletableFuture<String>()
+        val output = ByteArrayOutputStream()
+        val opened = CompletableFuture<Boolean>()
+        val frame = onEdt { JFrame().apply { pack() } }
+        var manager: TabManager? = null
+        var providerOpens = 0
+        try {
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            workspace(listener) { options ->
+                                idleSession(options, shellIntegration = integration, onWrite = { bytes, offset, length ->
+                                    output.write(bytes, offset, length)
+                                    val written = output.toString(Charsets.UTF_8)
+                                    if (written.endsWith("barrier")) received.complete(written)
+                                })
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            onEdt {
+                val pane = requireNotNull(manager.selectedPane)
+                pane.setCompletionProvider(
+                    object : SwingShellSuggestionProvider {
+                        override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                            error("Use captured source")
+
+                        override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                            providerOpens++
+                            return SwingShellSuggestionSource(flowOf(emptyList()))
+                        }
+                    },
+                )
+                val event = KeyEvent(pane.terminal, KeyEvent.KEY_PRESSED, 0, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_SPACE, ' ')
+                pane.terminal.keyListeners.forEach { it.keyPressed(event) }
+                assertEquals(if (editable) 1 else 0, providerOpens)
+                assertEquals(TerminalInputAdmission.ACCEPTED, pane.tab.session.submitInput(TerminalPasteEvent("barrier")))
+            }
+            assertEquals(if (editable) "barrier" else "\u0000barrier", received.get(10, TimeUnit.SECONDS))
+        } finally {
+            close(manager, frame)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(
         strings = [
@@ -475,8 +551,8 @@ class TabManagerStartupDesktopTest {
     }
 
     @ParameterizedTest
-    @CsvSource("110, 32", "133, 37")
-    fun `initial window waits for its pane and packs the configured grid`(
+    @CsvSource("110, 32", "133, 37", "1000, 500")
+    fun `initial window waits for its pane and fits the configured grid to the monitor`(
         columns: Int,
         rows: Int,
         @TempDir directory: Path,
@@ -500,27 +576,9 @@ class TabManagerStartupDesktopTest {
         val frame =
             onEdt {
                 object : JFrame() {
-                    private var packedSize: Dimension? = null
-
-                    override fun pack() {
-                        // Even hidden native Windows peers cap pack() to the desktop's tracking
-                        // bounds. Exercise pane installation and layout without creating a peer.
-                        contentPane.size = contentPane.preferredSize
-
-                        fun layoutTree(container: Container) {
-                            container.doLayout()
-                            container.components.filterIsInstance<Container>().forEach(::layoutTree)
-                        }
-                        layoutTree(contentPane)
-                        packedSize = preferredSize
-                    }
-
-                    override fun isDisplayable(): Boolean = packedSize != null
-
-                    override fun setLocationRelativeTo(component: Component?) = Unit
-
                     override fun setVisible(visible: Boolean) {
-                        if (visible) shown.complete(checkNotNull(packedSize)) else super.setVisible(false)
+                        super.setVisible(visible)
+                        if (visible) shown.complete(size)
                     }
                 }.apply { minimumSize = Dimension(720, 420) }
             }
@@ -557,11 +615,30 @@ class TabManagerStartupDesktopTest {
             val packed = shown.get(10, TimeUnit.SECONDS)
             assertTrue(outputStarted.get(10, TimeUnit.SECONDS), "Shell output must start after initial window packing")
             onEdt {
-                assertEquals(frame.preferredSize, packed)
+                val screen = frame.graphicsConfiguration
+                val available =
+                    screen.bounds.apply {
+                        val insets = frame.toolkit.getScreenInsets(screen)
+                        x += insets.left
+                        y += insets.top
+                        width -= insets.left + insets.right
+                        height -= insets.top + insets.bottom
+                    }
+                assertTrue(available.contains(frame.bounds), "Initial bounds ${frame.bounds} must fit $available")
                 val pane = requireNotNull(manager.selectedPane)
-                assertEquals(Dimension(columns, rows), pane.terminal.visibleGridSize())
-                assertTrue(packed.width > frame.minimumSize.width)
-                assertTrue(packed.height > frame.minimumSize.height)
+                val visible = pane.terminal.visibleGridSize()
+                assertTrue(visible.width in 2..columns)
+                assertTrue(visible.height in 1..rows)
+                if (frame.preferredSize.width <= available.width && frame.preferredSize.height <= available.height) {
+                    assertEquals(Dimension(columns, rows), visible)
+                }
+                pane.tab.session.readRenderFrame { rendered ->
+                    assertEquals(visible.width, rendered.columns)
+                    assertEquals(visible.height, rendered.rows)
+                }
+                assertEquals(columns, settings.config.columns)
+                assertEquals(rows, settings.config.rows)
+                assertEquals(frame.size, packed)
             }
         } finally {
             release.complete(Unit)
@@ -839,6 +916,7 @@ class TabManagerStartupDesktopTest {
         options: TerminalWorkspaceOpenOptions,
         onClose: () -> Unit = {},
         shellIntegration: TerminalShellIntegrationFactory? = null,
+        onWrite: (ByteArray, Int, Int) -> Unit = { _, _, _ -> },
         onStart: () -> Unit = {},
     ): TerminalSession =
         TerminalSession.create(
@@ -855,7 +933,7 @@ class TabManagerStartupDesktopTest {
                     bytes: ByteArray,
                     offset: Int,
                     length: Int,
-                ) = Unit
+                ) = onWrite(bytes, offset, length)
 
                 override fun close() = onClose()
             },

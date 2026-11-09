@@ -17,9 +17,39 @@ package io.github.ketraterm.app.ui
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.awt.Dimension
+import java.awt.Insets
 import java.awt.Rectangle
 
 class WindowResizeGeometryTest {
+    @Test
+    fun `initial window keeps its preferred size when it fits inside desktop insets`() {
+        assertEquals(
+            Rectangle(350, 165, 1200, 700),
+            initialWindowBounds(Dimension(1200, 700), Rectangle(0, 0, 1920, 1080), Insets(30, 10, 80, 30)),
+        )
+    }
+
+    @Test
+    fun `initial window shrinks to a scaled monitor work area with a negative origin`() {
+        assertEquals(
+            Rectangle(-1280, 24, 1280, 656),
+            initialWindowBounds(Dimension(1600, 900), Rectangle(-1280, 0, 1280, 720), Insets(24, 0, 40, 0)),
+        )
+        assertEquals(Rectangle(0, 150, 800, 300), initialWindowBounds(Dimension(1200, 300), Rectangle(0, 0, 800, 600), Insets(0, 0, 0, 0)))
+    }
+
+    @Test
+    fun `initial window arithmetic cannot wrap for invalid work areas or extreme coordinates`() {
+        val bounds =
+            initialWindowBounds(
+                Dimension(Int.MAX_VALUE, Int.MAX_VALUE),
+                Rectangle(Int.MAX_VALUE, Int.MIN_VALUE, 1920, 1080),
+                Insets(Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE),
+            )
+        assertEquals(Rectangle(Int.MAX_VALUE, -1, 1, 1), bounds)
+    }
+
     private val geometry =
         WindowResizeGeometry(
             cellWidth = 8,

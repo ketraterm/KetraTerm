@@ -42,8 +42,8 @@ title_permission = "allow"
 
 | Section | Key | Default | Accepted values |
 | --- | --- | --- | --- |
-| `window` | `columns` | `120` | Integer, 10..1000. |
-| `window` | `rows` | `32` | Integer, 10..500. |
+| `window` | `columns` | `100` | Integer, 10..1000. |
+| `window` | `rows` | `28` | Integer, 10..500. |
 | `window` | `scrollback_lines` | `10000` | Integer, 0..1000000. |
 | `font` | `family` | Platform default | Installed family name. Windows: `Cascadia Mono`; macOS: `Menlo`; elsewhere: the first installed family in Swing's curated monospace list, falling back to `Monospaced`. |
 | `font` | `size` | `16` | Integer points, 10..56. |
@@ -55,6 +55,10 @@ Unknown theme identifiers use `one-dark` at rendering time. Font selection uses
 Swing's font-family resolution and fallback rules. Window and scrollback values
 are initial settings for new terminals, rather than requests to replace an
 existing process or history buffer.
+
+The initial window is centered within its monitor's usable area, excluding taskbars
+and docks. Oversized windows shrink to fit; the session receives the resulting
+visible grid before shell output starts. The saved dimensions are not rewritten.
 
 Defaults apply to new configuration files and omitted preferences. Explicitly
 saved window dimensions, scrollback capacity, fonts, and cursor preferences are
@@ -97,6 +101,18 @@ Paste handling is independent of the local PTY's newline policy. Legacy `raw`
 and `normalize-line-endings` values load as `preserve`; saving writes the
 canonical value. See the [paste contract](../../ketraterm-input/docs/terminal-input-contract.md#paste-and-focus-contract)
 for control-character and framing rules.
+
+Explicit clipboard and middle-button pastes containing line breaks or control
+characters other than Tab require confirmation. The preview is limited to 400
+Unicode codepoints and shows controls as escapes; Cancel is selected initially.
+Approval submits the original captured text through the configured paste policy.
+This review also applies when bracketed paste is active. Safe single-line text
+does not prompt. Terminal-originated clipboard requests use their separate permissions.
+
+Bell bursts coalesce into one pending UI task per window, retaining at most 64
+originating panes. Feedback is limited to one delivery every 500 ms per window;
+one delivery can flash multiple panes but sounds only once. Closing the window
+cancels queued bells, and feedback rechecks current settings and pane lifetime.
 
 Persisted completion data is stored beside the configuration file. See the
 [storage reference](../../docs/reference/storage.md) for retained ranking data,

@@ -39,7 +39,8 @@ See the [Swing guide](../../ketraterm-ui-swing/README.md) for configuration.
 | Local shells | Shared [profile discovery and hooks](shells.md). | Shared profile discovery and hooks. |
 | Settings | TOML configuration and settings dialog, with live appearance updates. | IDE application settings with live updates, and project startup commands. |
 | Appearance | FlatLaf window chrome and terminal themes. | IDE theme/font integration and native UI components. |
-| Shortcuts | Built-in platform shortcuts. | Active IDE keymap integration. |
+| Shortcuts | Built-in platform shortcuts; Ctrl+Space passes through when no editable shell completion context is available. | Active IDE keymap integration. |
+| Initial window size | Fits the preferred grid to the monitor work area before shell output starts; saved dimensions are preserved. | IDE-owned tool-window geometry. |
 | Open terminal here | Open another terminal at the current local directory. | Project View, editor, editor-tab, and terminal context actions. |
 | Tab titles | Custom, application, foreground-process, directory, and profile titles. | Same title sources. |
 | Tab colors | User-selected tab accent colors with reset. | No corresponding product control. |
@@ -48,8 +49,8 @@ See the [Swing guide](../../ketraterm-ui-swing/README.md) for configuration.
 | Project JDK | Uses the configured process environment. | Optional project JDK `JAVA_HOME` and `PATH` injection for new local sessions. |
 | Link navigation | Host URL/file actions. | IDE console filters, project files, and editor navigation. |
 | Command output | Copy and file export of retained output. | Copy and host actions for retained output. |
-| Clipboard permissions | Session-bound consent dialogs. | Consent and clipboard access bound to the originating IDE client. |
-| Bell handling | Independent audible/visual settings; urgency requests desktop attention where supported, and pop-on-bell raises the window. | Visual bell. |
+| Clipboard permissions | Session-bound consent dialogs; explicit unsafe pastes have a separate confirmation with an escaped preview. | Consent and clipboard access bound to the originating IDE client. |
+| Bell handling | Independent audible/visual settings with bounded, coalesced feedback at most every 500 ms per window; urgency requests desktop attention where supported, and pop-on-bell raises the window. | Visual bell. |
 | Notifications | Terminal-originated desktop notifications through the system tray where supported. | IDE notifications. Both products apply terminal-output permissions. |
 | Command-finished alerts | Opt-in desktop alerts for unfocused panes after a configurable minimum command runtime; initially 10 seconds. | Opt-in IDE alerts with the same duration, focus, and session-permission checks. Both require shell metadata; see the [alert contract](../reference/notifications.md#command-finished-alerts). |
 | Application progress | OSC 9;4 percentage/spinning rings in shell-icon slots, selected-window status and per-window taskbar progress where supported. | Tab-shell-icon rings and selected tool-window status. Both always enable progress independently of title permission and clear stale reports after five minutes; see the [contract](../reference/protocol.md#progress-reporting). |

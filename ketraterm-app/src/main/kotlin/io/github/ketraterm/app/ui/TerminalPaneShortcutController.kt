@@ -94,6 +94,7 @@ internal class TerminalPaneShortcutController(
         if (event.keyCode == KeyEvent.VK_ESCAPE && pane.clipboardReadPrompt.dismiss()) return true
         val action = shortcutMap.actionFor(event.keyCode, event.modifiersEx) ?: return false
         if (!actionRegistry.isEnabled(action, pane)) return false
+        if (action == SwingTerminalHostAction.REQUEST_SUGGESTIONS) return actionRegistry.perform(action, pane)
         actionRegistry.perform(action, pane)
         return true
     }
@@ -145,7 +146,6 @@ internal object TerminalPaneActionRegistry {
             SwingTerminalHostAction.REQUEST_SUGGESTIONS -> {
                 if (target.suggestionsEnabled()) {
                     target.requestShellSuggestions()
-                    true
                 } else {
                     false
                 }
@@ -200,7 +200,7 @@ internal interface TerminalPaneActionTarget {
     /**
      * Requests suggestions for the active shell command line.
      */
-    fun requestShellSuggestions()
+    fun requestShellSuggestions(): Boolean
 
     /**
      * Opens host-owned search chrome.

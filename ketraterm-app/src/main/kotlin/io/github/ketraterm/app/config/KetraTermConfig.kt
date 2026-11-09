@@ -184,8 +184,8 @@ internal data class KetraTermConfig(
         const val DEFAULT_THEME: String = "one-dark"
         const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
         const val DEFAULT_FONT_SIZE: Int = 16
-        const val DEFAULT_COLUMNS: Int = 120
-        const val DEFAULT_ROWS: Int = 32
+        const val DEFAULT_COLUMNS: Int = 100
+        const val DEFAULT_ROWS: Int = 28
         const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
         const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
         const val DEFAULT_CURSOR_SHAPE: String = "block"

@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -43,6 +44,7 @@ internal class TerminalPane private constructor(
     private val settings: KetraTermSettings,
     private val searchBar: SwingTerminalSearchBar,
     val clipboardReadPrompt: SwingClipboardReadPrompt,
+    private var completionProvider: SwingShellSuggestionProvider?,
 ) : TerminalPaneActionTarget {
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
@@ -60,6 +62,7 @@ internal class TerminalPane private constructor(
 
     fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
         if (closed.get()) return
+        completionProvider = provider
         terminal.setShellSuggestionProvider(provider)
     }
 
@@ -75,8 +78,13 @@ internal class TerminalPane private constructor(
 
     override fun clearScreen(): Boolean = terminal.clearScreen()
 
-    override fun requestShellSuggestions() {
-        if (suggestionsEnabled()) terminal.requestActiveShellSuggestions()
+    override fun requestShellSuggestions(): Boolean {
+        if (!suggestionsEnabled()) return false
+        val provider = completionProvider ?: return false
+        val interaction = terminal.beginActiveShellSuggestionInteraction() ?: return false
+        terminal.presentShellSuggestions(interaction)
+        terminal.requestShellSuggestions(interaction, provider)
+        return true
     }
 
     override fun openSearch() {
@@ -135,6 +143,11 @@ internal class TerminalPane private constructor(
                         settingsProvider = settings::current,
                         hostServices =
                             SwingHostServices.create { draft ->
+                                draft.clipboardHandler =
+                                    TerminalPasteClipboard(TerminalClipboardHandler.SYSTEM) { request ->
+                                        val parent = paneRef[0]?.terminal ?: return@TerminalPasteClipboard false
+                                        SwingMessageDialogs.show(parent, request) == 0
+                                    }
                                 draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
                                 draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
                                 draft.contextMenuHandler =
@@ -170,6 +183,7 @@ internal class TerminalPane private constructor(
                         settings = settings,
                         searchBar = searchBar,
                         clipboardReadPrompt = clipboardReadPrompt,
+                        completionProvider = completionProvider,
                     )
                 ownedPane = pane
                 pane.shortcutController = TerminalPaneShortcutController(pane, settings)

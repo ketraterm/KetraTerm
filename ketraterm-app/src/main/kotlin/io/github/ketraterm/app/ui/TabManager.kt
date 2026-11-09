@@ -109,6 +109,32 @@ internal class TabManager(
 
     @Volatile private var completionTransition: Job? = null
     private val shutdownStarted = AtomicBoolean()
+    private val bellDispatcher =
+        TerminalBellDispatcher { requests ->
+            if (!shutdownStarted.get() && frame.isDisplayable) {
+                val targets = panes.filter { pane -> requests.any { it.tabId == pane.tab.id } && !pane.tab.session.isClosed }
+                if (targets.isNotEmpty()) {
+                    val config = settings.config
+                    if (config.visualBell) targets.forEach { it.terminal.showVisualBell() }
+                    if (config.audibleBell) frame.toolkit.beep()
+                    val current = requests.filter { request -> targets.any { it.tab.id == request.tabId } }
+                    if (current.any { it.urgent }) {
+                        try {
+                            attentionTaskbar?.let { taskbar ->
+                                if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)) {
+                                    taskbar.requestWindowUserAttention(frame)
+                                } else if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION)) {
+                                    taskbar.requestUserAttention(true, true)
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Desktop attention is best effort on unsupported systems.
+                        }
+                    }
+                    if (current.any { it.pop }) frame.toFront()
+                }
+            }
+        }
     private val workspaceShutdown = CompletableFuture<Unit>()
     private val windowResizeController = TerminalWindowResizeController(frame)
     private var appliedTheme = settings.theme
@@ -496,6 +522,7 @@ internal class TabManager(
     fun closeAllTabsWithoutConfirmation(onComplete: (Result<Unit>) -> Unit = ::reportWorkspaceCleanup) {
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, bellDispatcher::close)
         failure = captureCleanupFailure(failure, tabBar::closeProgressAnimation)
         failure = captureCleanupFailure(failure, windowResizeController::close)
         failure = captureCleanupFailure(failure, commandOutputExporter::close)
@@ -1175,38 +1202,8 @@ internal class TabManager(
         }
 
         override fun bell(tab: TerminalWorkspaceTab) {
-            if (settings.config.visualBell) {
-                SwingUtilities.invokeLater {
-                    panes.firstOrNull { it.tab == tab }?.terminal?.showVisualBell()
-                }
-            }
-            if (settings.config.audibleBell) {
-                SwingUtilities.invokeLater {
-                    frame.toolkit.beep()
-                }
-            }
-
             val modes = tab.session.modeSnapshot
-            if (modes.isBellIsUrgent) {
-                SwingUtilities.invokeLater {
-                    try {
-                        attentionTaskbar?.let { taskbar ->
-                            if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)) {
-                                taskbar.requestWindowUserAttention(frame)
-                            } else if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION)) {
-                                taskbar.requestUserAttention(true, true)
-                            }
-                        }
-                    } catch (_: Exception) {
-                        // Ignore taskbar access failure on unsupported systems.
-                    }
-                }
-            }
-            if (modes.isPopOnBell) {
-                SwingUtilities.invokeLater {
-                    frame.toFront()
-                }
-            }
+            bellDispatcher.request(tab.id, modes.isBellIsUrgent, modes.isPopOnBell)
         }
 
         override fun titleChanged(

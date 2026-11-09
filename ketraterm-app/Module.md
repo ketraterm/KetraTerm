@@ -22,6 +22,10 @@ host permissions, and shutdown through `TerminalWorkspace`. Each `TerminalPane`
 owns its terminal view, search bar, prompts, and shortcut registrations. Closing
 a pane releases those UI resources; closing its workspace tab closes the session.
 
+`TerminalPasteClipboard` reviews unsafe explicit paste before returning captured
+text to the view. `TerminalBellDispatcher` bounds and coalesces per-window feedback
+before the EDT applies current preferences and pane-lifetime checks.
+
 `KetraTermConfigManager` loads and replaces settings files.
 `KetraTermSettings` publishes saved immutable preferences to EDT consumers.
 `StandaloneCompletionRegistry` composes the completion modules for a window.

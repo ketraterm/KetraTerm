@@ -452,8 +452,8 @@ class KetraTermConfigTest {
 
         assertTrue(Files.exists(configFile))
         assertEquals("one-dark", config.theme)
-        assertEquals(120, config.columns)
-        assertEquals(32, config.rows)
+        assertEquals(100, config.columns)
+        assertEquals(28, config.rows)
         assertEquals(10_000, config.scrollbackLines)
         val expectedFont =
             when {
@@ -483,8 +483,8 @@ class KetraTermConfigTest {
         assertEquals(TerminalTitlePermission.ALLOW, config.titlePermission)
 
         val paneSettings = KetraTermSettings(manager).current()
-        assertEquals(120, paneSettings.columns)
-        assertEquals(32, paneSettings.rows)
+        assertEquals(100, paneSettings.columns)
+        assertEquals(28, paneSettings.rows)
         assertEquals(SwingSettings.resolveFontFamily(expectedFont), paneSettings.font.family)
         assertEquals(16, paneSettings.font.size)
         assertEquals(TerminalRenderCursorShape.BLOCK, paneSettings.cursorShape)
@@ -700,8 +700,8 @@ class KetraTermConfigTest {
         val loaded = manager.load()
         // Should return default config instead of crashing
         assertEquals("one-dark", loaded.theme)
-        assertEquals(120, loaded.columns)
-        assertEquals(32, loaded.rows)
+        assertEquals(100, loaded.columns)
+        assertEquals(28, loaded.rows)
         assertEquals(10_000, loaded.scrollbackLines)
         assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
         assertEquals(loaded, manager.load())

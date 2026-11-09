@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
-- New configurations start at 120 × 32 cells with 10,000 scrollback lines. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
+- New configurations start at 100 × 28 cells with 10,000 scrollback lines; the initial window fits the monitor's usable area before shell output starts. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
+- Added review of explicit pastes containing line breaks or control characters, with an escaped preview and Cancel selected by default.
+- Coalesced bell bursts and limited audible, visual, and desktop-attention feedback to one delivery every 500 ms per window.
+- Ctrl+Space now passes through to the running application when shell completion cannot start.
 
 ## [0.5.0] - 2026-11-09
 

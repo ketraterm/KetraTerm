@@ -43,7 +43,8 @@ and terminal permissions. Settings are saved before publication to
 open panes. Initial process and buffer settings apply when a new terminal is
 created.
 
-The first window packs the configured grid. New tabs and split panes synchronize
+The first window fits the configured grid to the monitor's usable area, preserving
+its requested size when it fits. Saved dimensions are unchanged. New tabs and split panes synchronize
 their installed viewport dimensions with the session before shell output starts.
 
 For manual edits, see the [configuration reference](docs/profile-config-toml.md)
@@ -53,7 +54,8 @@ settings and does not use this file.
 
 Suggestions are enabled by default. Use the Shell Suggestions section in settings
 to control completion, automatic popups, Enter acceptance, and learning persistence.
-Ctrl+Space requests suggestions even when automatic popups are disabled.
+Ctrl+Space requests suggestions even when automatic popups are disabled. Without
+an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
 
 Native local profiles receive a small `ketra` companion command:
