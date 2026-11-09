@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-completion</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.completion.api</a><span class="delimiter">/</span><span class="current">TerminalCompletionSourcePrior</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Completion</span><wbr><span>Source</span><wbr><span><span>Prior</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="index.html">TerminalCompletionSourcePrior</a></div><p class="paragraph">Reviewed cold-start priors for the built-in completion source families.</p><p class="paragraph">Priors are deliberately small because <a href="../-terminal-completion-source-entry/priority.html">TerminalCompletionSourceEntry.priority</a> is only one bounded input to global evidence fusion. Hosts should use these values when composing the corresponding built-in sources so standalone and IDE integrations start from the same policy before learned evidence applies.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../-experimental-terminal-completion-api/index.html"><span class="token annotation builtin">ExperimentalTerminalCompletionApi</span></a></div></div><span class="token keyword">object </span><a href="index.html">TerminalCompletionSourcePrior</a></div><p class="paragraph">Reviewed cold-start priors for the built-in completion source families.</p><p class="paragraph">Priors are deliberately small because <a href="../-terminal-completion-source-entry/priority.html">TerminalCompletionSourceEntry.priority</a> is only one bounded input to global evidence fusion. Hosts should use these values when composing the corresponding built-in sources so standalone and IDE integrations start from the same policy before learned evidence applies.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -165,6 +165,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-g-r-a-d-l-e_-t-a-s-k.html">GRADLE_TASK</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">15</span></div><div class="brief "><p class="paragraph">Prior for imported Gradle task candidates.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="942573042%2FProperties%2F-293776716" anchor-label="NATIVE_SHELL" id="942573042%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-a-t-i-v-e_-s-h-e-l-l.html"><span>NATIVE_</span><wbr><span>SHELL</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="942573042%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-n-a-t-i-v-e_-s-h-e-l-l.html">NATIVE_SHELL</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">20</span></div><div class="brief "><p class="paragraph">Prior for candidates returned by the current interactive shell's native completer.</p></div></div></div>
                 </div>
               </div>
             </div>

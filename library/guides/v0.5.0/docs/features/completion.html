@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Command completion · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="v0.5.0">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a aria-current="page" href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Command completion</span></li></ol></nav><div class="doc-version"><span>v0.5.0</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#stability-experimental">Stability: experimental</a><a class="depth-2" href="#availability">Availability</a><a class="depth-2" href="#using-suggestions">Using suggestions</a><a class="depth-3" href="#argument-hints">Argument hints</a><a class="depth-2" href="#sources-by-host">Sources by host</a><a class="depth-3" href="#working-directory-and-remote-shells">Working directory and remote shells</a><a class="depth-3" href="#git-suggestions">Git suggestions</a><a class="depth-3" href="#powershell-suggestions">PowerShell suggestions</a><a class="depth-3" href="#bash-and-zsh-suggestions">Bash and zsh suggestions</a><a class="depth-2" href="#built-in-command-catalog">Built-in command catalog</a><a class="depth-2" href="#matching-and-interaction">Matching and interaction</a><a class="depth-2" href="#library-customization">Library customization</a><a class="depth-2" href="#learning-and-privacy">Learning and privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="command-completion">Command completion</h1>
+<p>KetraTerm&#39;s optional completion engine combines command specifications, paths,
+host-provided sources, and bounded local learning. It can run independently of
+a terminal or use the Swing/IntelliJ suggestion UI.</p>
+<h2 id="stability-experimental">Stability: experimental</h2>
+<p>Completion and suggestions are <strong>experimental</strong>, including their engine, sources,
+learning, persistence, and UI APIs. Suggestions may be incomplete, rank poorly,
+or behave unexpectedly in edge cases. APIs may change before stabilization.
+Remaining work is tracked in the <a href="../terminal-feature-gap-map.html#completion-and-suggestions">gap map</a>.</p>
+<p>Kotlin callers can opt in to <code>ExperimentalTerminalCompletionApi</code> for the engine
+and <code>ExperimentalShellSuggestionsApi</code> for Swing suggestions. Both use
+<code>RequiresOptIn.Level.WARNING</code>: calls compile without opt-in unless warnings are
+errors. The Swing completion adapter uses both markers. Opt-in acknowledges the
+experimental contract; suggestions are enabled separately. Java callers follow
+the same stability contract.</p>
+<h2 id="availability">Availability</h2>
+<p>Completion and automatic suggestions are <strong>enabled by default in both products</strong>
+for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
+Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
+explicitly, including when automatic popups are disabled.
+Settings expose the master switch, automatic popups, Enter acceptance, and optional
+learning persistence. Automatic popups can appear <strong>Always</strong> (the default) or
+<strong>Only for parameters</strong>. Parameter-only mode includes subcommands, options, and
+arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set <code>smart_suggestions_enabled</code>
+in the <a href="https://ketraterm.github.io/KetraTerm/settings.html">TOML configuration</a>.
+Library hosts enable and configure their own provider and presentation.</p>
+<p>History suggestions are selective: command names use ordinary discovery, and
+full-command replay requires a nonempty argument prefix. Running or accepting a
+command does not make its full history entry appear after an empty argument.
+Whole-command replays have a small row budget; learned ranking continues to
+influence live results. See the
+<a href="../../ketraterm-completion/docs/completion-architecture.html#history-suggestion-policy">history suggestion policy</a>.</p>
+<p>Use <strong>Reset learned suggestions...</strong> in settings to clear learned commands and
+ranking preferences. See <a href="../reference/storage.html#completion-learning">saved learning and reset behavior</a>.</p>
+<p>Terminal suggestions require an editable command context, normally supplied by
+<a href="shells.html#prompt-hooks-and-completion-dialects">shell hooks</a>.
+Unsupported shells do not gain command tracking merely by enabling completion.
+Custom hosts can supply their own context and editing authority.</p>
+<p>Fish&#39;s inline autosuggestions and some redraws of wrapped input can make the
+editable context unavailable because there is no Fish editor-buffer confirmation
+bridge. <code>set -g fish_autosuggestion_enabled 0</code> removes the inline-prediction
+conflict. Suggestions still require an unambiguous prompt-to-cursor context;
+KetraTerm does not guess how cursor-positioned rows form an editable command.</p>
+<h2 id="using-suggestions">Using suggestions</h2>
+<p>With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
+Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+Automatic refreshes cannot replace an active Ctrl+Space request.
+After Escape, automatic suggestions remain dismissed across cursor movement and
+focus changes until the command text changes. Completion candidates that leave the
+command text unchanged are omitted; explicit completion remains available.
+Enter acceptance and automatic popups are preferences; IntelliJ also uses its
+active keymap. Shell-native Tab completion remains a separate facility.</p>
+<h3 id="argument-hints">Argument hints</h3>
+<p>Command and option rows show argument placeholders when command specifications
+provide metadata, for example <code>switch &lt;branch&gt;</code> and <code>-m &lt;message&gt;</code>. Named optional
+arguments use <code>[name]</code>. Repeated arguments use the same compact placeholder.
+Subcommand option overrides supply their own descriptions and hints.
+Git&#39;s <code>checkout</code> distinguishes
+its optional reference/file argument from subsequent pathspecs; <code>add</code> and
+<code>cherry-pick</code> describe pathspecs and commits. Hints are never inserted, matched,
+or saved as command text. Native results without specification metadata may omit them.</p>
+<p>The shared Swing popup exposes normal and selected hint colors through
+<code>SwingShellSuggestionStyle</code>; the IntelliJ view follows the IDE theme. Custom
+providers can set <code>argumentHint</code>, and custom views choose how to display it.</p>
+<h2 id="sources-by-host">Sources by host</h2>
+<p>This table describes the sources available when completion is enabled.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Standalone</th>
+<th>IntelliJ plugin</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Built-in command specifications</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Live PowerShell completion</td>
+<td>Commands, session functions, aliases, and installed argument completers through the current PSReadLine session.</td>
+<td>Same native bridge.</td>
+</tr>
+<tr>
+<td>Bash command inventory</td>
+<td>Commands, alias definitions, functions, and enabled builtins discovered in the shell at each prompt. Requires Bash 5.3+ and <code>base64</code>. Literal aliases inform argument semantics.</td>
+<td>Same inventory and command authority.</td>
+</tr>
+<tr>
+<td>zsh command inventory</td>
+<td>Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires <code>zsh/parameter</code> and <code>base64</code>; verified with zsh 5.9. Literal aliases inform argument semantics.</td>
+<td>Same inventory and command authority.</td>
+</tr>
+<tr>
+<td>Files and directories</td>
+<td>Bounded local directory scans.</td>
+<td>The same bounded local scans, including files outside the IDE index or excluded from the project.</td>
+</tr>
+<tr>
+<td>Project-wide files</td>
+<td>No project index.</td>
+<td>IDE fuzzy filename lookup with match highlighting, while the terminal is inside the project&#39;s content roots. Names containing literal backslashes use ordinary directory completion because IntelliJ&#39;s VFS excludes them.</td>
+</tr>
+<tr>
+<td>Git branches and tags</td>
+<td>Bounded local Git queries for modeled reference arguments.</td>
+<td>Local/remote branches and tags from IDE repositories.</td>
+</tr>
+<tr>
+<td>Git remote names</td>
+<td>Bounded <code>git remote</code> query of local configuration.</td>
+<td>Configured remotes from the selected IDE repository.</td>
+</tr>
+<tr>
+<td>Recent Git commits</td>
+<td>No dynamic source.</td>
+<td>Up to 50 commits for supported commit arguments.</td>
+</tr>
+<tr>
+<td>Git changed paths</td>
+<td>Ordinary path completion.</td>
+<td>IDE change-list paths for supported Git commands.</td>
+</tr>
+<tr>
+<td>Gradle tasks</td>
+<td>Built-in lifecycle tasks.</td>
+<td>Also tasks from the deepest imported build root containing the terminal directory or completed <code>-p</code>/<code>--project-dir</code> target.</td>
+</tr>
+<tr>
+<td>Learned commands and tokens</td>
+<td>In-memory learning when enabled.</td>
+<td>In-memory learning when enabled.</td>
+</tr>
+</tbody></table></div>
+<h3 id="working-directory-and-remote-shells">Working directory and remote shells</h3>
+<p>Filesystem and Git sources need a locally resolvable working directory. WSL and
+remote shell metadata do not provide access to the guest&#39;s files. Explicit remote
+or malformed directory metadata is never replaced with unrelated local data.</p>
+<p>For Git commands, completed root <code>-C</code> options select the directory for all applicable
+sources; <code>switch -C</code> names a branch and does not change that directory.
+Relative values build on the preceding directory; an empty value leaves
+it unchanged. IntelliJ uses the project directory only when shell directory
+metadata is absent.</p>
+<h3 id="git-suggestions">Git suggestions</h3>
+<p>Git suggestions use local repository data, including configured remotes and
+locally known tracking branches. They do not query a remote server. Standalone
+runs bounded Git queries; IntelliJ uses its repository model. Missing Git or an
+unavailable repository leaves other suggestion sources usable. Standalone queries
+use the host&#39;s Git executable and environment, so shell-local toolchain changes
+are not reflected in them.</p>
+<ul>
+<li><code>checkout</code>, <code>merge</code>, and <code>rebase</code> offer applicable branches and tags. After a
+completed <code>--</code>, <code>checkout</code> and <code>reset</code> offer paths only.</li>
+<li><code>push</code>, <code>pull</code>, and <code>fetch</code> first offer remote names or local repository
+directories, then references. Push offers local branches and tags, including
+the current branch. Fetch/pull offer tracking branches of the chosen remote
+without its prefix: <code>git fetch origin fe</code> can insert <code>feature/x</code> from
+<code>origin/feature/x</code>. Configured remotes are available before fetching refs.</li>
+<li><code>push --delete</code> offers the chosen remote&#39;s locally known branches.
+<code>fetch --multiple</code> offers remaining remote names. <code>fetch --all</code> stops
+repository/ref suggestions; <code>push --all</code>, <code>--branches</code>, and <code>--mirror</code> stop
+ref suggestions after the repository. Options remain available, and
+<code>push --tags</code> still accepts explicit refspecs.</li>
+<li>Ordinary <code>[+]&lt;source&gt;:&lt;destination&gt;</code> refspecs complete the component at the
+cursor. Push uses local sources and remote tracking destinations; fetch/pull
+reverse those roles. Empty-source push deletion (<code>:branch</code>) is supported.
+Edits preserve the force marker, other component, and shell quoting.
+Whole-command history is suppressed while editing a composite refspec.</li>
+</ul>
+<p>The current branch is omitted where it would suggest merging or switching to
+itself; symbolic remote aliases are omitted. Wildcard, negative, and malformed
+multi-colon refspecs are left untouched. Remaining Git coverage is listed in the
+<a href="../terminal-feature-gap-map.html">gap map</a>.</p>
+<h3 id="powershell-suggestions">PowerShell suggestions</h3>
+<p>With prompt hooks and PSReadLine installed, completion uses <code>TabExpansion2</code> in
+the running shell. This includes available commands, session functions, aliases,
+and installed argument completers. Catalog descriptions enrich commands verified
+by the shell. Bare names and executable extensions merge when they resolve to
+the same file; shadowing aliases and functions remain distinct.</p>
+<p>PowerShell owns parameter names and values after options, including abbreviations
+and attached values such as <code>-Encoding:u</code>. Aliases and functions therefore do not
+inherit Unix options from similarly named catalog commands. Compatible external
+applications retain catalog options when the shell returns only generic paths or
+no candidates; installed argument completers take precedence.
+Other modeled arguments prefer catalog and host sources, with native fallback
+when they have no results. Unknown functions and arguments use native completers
+before generic path suggestions. Directory arguments exclude files; typed values
+such as Git branches exclude unrelated path suggestions. Relevant live values
+precede history-only results, while learning can still influence their order.</p>
+<p>Acceptance uses the shell&#39;s replacement text and range. The PowerShell bridge
+restores the edited command prefix through PSReadLine&#39;s exact replacement API,
+preserving text after the cursor. Slow native completers
+can time out. Cancelling a request cannot stop a completer already running inside
+PowerShell. Automatic requests follow the popup settings and use the same native
+confirmation and edit validation as explicit requests.
+Suggestions use the confirmed editor buffer even when inline history
+predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
+real editable suffix text. See the <a href="../reference/protocol.html#private-powershell-completion-metadata">bridge protocol</a>
+for request limits and validation.</p>
+<p>On Windows, combining accents (for example, <code>e</code> followed by U+0301) can make native
+suggestions unavailable in PowerShell 5.1 and 7. PSReadLine may position the cursor
+beyond the rendered text, causing KetraTerm&#39;s exact editor-buffer validation to fail.</p>
+<h3 id="bash-and-zsh-suggestions">Bash and zsh suggestions</h3>
+<p>Prompt hooks discover aliases, functions, builtins, and executables using the
+running shell&#39;s environment. WSL uses the guest environment. Shell-local names
+are available first, while executable discovery runs in the background without
+redrawing the prompt. Available commands remain usable while discovery continues;
+new executable files may take a later refresh to appear.</p>
+<p>Shell-local names take precedence over matching executable names. Alias, function,
+and builtin enablement changes are picked up at the next prompt. PATH changes invalidate the
+previous executable inventory; directory changes do so when PATH contains empty
+or relative entries. An unchanged PATH can be re-scanned after 60 seconds, with
+refresh starting at a later prompt. Failed refreshes retain the last complete
+snapshot for the same environment. Executable discovery streams directory entries
+under scan budgets, including non-executable files and directories; an incomplete
+or overflowed scan is never presented as a complete command list.</p>
+<p>Simple aliases also inform argument suggestions. For example, <code>g=&#39;git&#39;</code> and
+<code>gs=&#39;git switch&#39;</code> inherit the corresponding Git arguments while acceptance keeps
+the typed alias. Literal chains and fixed arguments are supported. Complex shell
+expansion, cyclic aliases, and quoted command names do not inherit a potentially
+incorrect command grammar. zsh global/suffix aliases are excluded, disabled
+functions and builtins are excluded, and autoloaded functions are listed without
+loading their bodies. On Git Bash/Cygwin, <code>.exe</code> names use bare insertion only
+when both spellings resolve to the same executable.</p>
+<p>Popup arguments use command specifications and host sources. Installed Bash/zsh
+programmable argument completers and guest filesystem completion are not
+integrated. Normal shell Tab completion remains available. Older Bash and shells
+without command inventories retain their existing sources.</p>
+<p>See the <a href="../reference/protocol.html#private-bash-command-inventory">inventory protocol</a>
+for wire formats, bounds, and refresh ownership, and the
+<a href="../../ketraterm-completion/docs/completion-architecture.html#internal-implementation">engine contract</a>
+for alias interpretation and merging rules.</p>
+<h2 id="built-in-command-catalog">Built-in command catalog</h2>
+<p>The catalog provides selected subcommands, options, and argument domains; it is
+not an exhaustive schema for every version of these tools.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Commands</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Files and navigation</td>
+<td><code>cd</code>, <code>pushd</code>, <code>ls</code>, <code>cat</code>, <code>mkdir</code>, <code>rm</code>, <code>cp</code>, <code>mv</code></td>
+</tr>
+<tr>
+<td>Version control</td>
+<td><code>git</code>, <code>gh</code></td>
+</tr>
+<tr>
+<td>Build and languages</td>
+<td><code>gradle</code> / <code>gradlew</code>, <code>mvn</code> / <code>mvnw</code>, <code>dotnet</code>, <code>cargo</code>, <code>go</code>, <code>kotlin</code>, <code>kotlinc</code>, <code>python</code> / <code>python3</code></td>
+</tr>
+<tr>
+<td>Package managers</td>
+<td><code>npm</code>, <code>pnpm</code>, <code>yarn</code>, <code>bun</code>, <code>pip</code></td>
+</tr>
+<tr>
+<td>Containers and cloud</td>
+<td><code>docker</code>, <code>docker-compose</code>, <code>kubectl</code>, <code>aws</code></td>
+</tr>
+<tr>
+<td>Network clients</td>
+<td><code>curl</code>, <code>ssh</code></td>
+</tr>
+<tr>
+<td>Developer tools</td>
+<td><code>code</code>, <code>adb</code>, <code>ketra</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="matching-and-interaction">Matching and interaction</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Matching</td>
+<td>Exact, prefix, CamelHump, word-boundary/acronym, and substring matching.</td>
+</tr>
+<tr>
+<td>Context</td>
+<td>Active command segment, preceding arguments, case-sensitive option identity, option values, and end-of-options handling.</td>
+</tr>
+<tr>
+<td>Command specifications</td>
+<td>Aliases, nested/repeatable subcommands, ordered/variadic arguments, literal values, path kinds, and mutually exclusive option groups.</td>
+</tr>
+<tr>
+<td>Shell syntax</td>
+<td>POSIX and PowerShell subsets, plus conservative plain parsing; see the <a href="shells.html">shell matrix</a>.</td>
+</tr>
+<tr>
+<td>Paths</td>
+<td>Directory traversal, including for file-valued arguments, shell-aware escaping, literal POSIX backslashes, Windows separators, and hidden entries when explicitly requested.</td>
+</tr>
+<tr>
+<td>Ranking</td>
+<td>Merged sources, deterministic ordering, contextual priority, and bounded learning boosts.</td>
+</tr>
+<tr>
+<td>Progressive results</td>
+<td>Sources can update results asynchronously; obsolete requests are cancelled.</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td>Compact matched-text rows, keyboard/pointer navigation, description-only hover tooltips, full row context for accessibility, and custom UI support.</td>
+</tr>
+<tr>
+<td>Acceptance</td>
+<td>A stale editing context is rejected before replacement is admitted.</td>
+</tr>
+</tbody></table></div>
+<h2 id="library-customization">Library customization</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Host control</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Catalog</td>
+<td>Replace or extend command specifications and localize descriptions without changing command tokens.</td>
+</tr>
+<tr>
+<td>Sources</td>
+<td>Register custom asynchronous sources with bounded priorities and a failure-reporting callback.</td>
+</tr>
+<tr>
+<td>Source adapters</td>
+<td>Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, Git snapshots, or dynamic argument values.</td>
+</tr>
+<tr>
+<td>Learning</td>
+<td>Supply a shared learning store and replay policy; enable ranking evidence independently of command replay.</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td>Configure built-in popup colors and source labels, or replace the provider, view, keymap, or entire presentation target.</td>
+</tr>
+<tr>
+<td>Editing and feedback</td>
+<td>Supply request-scoped edit authority and observe acceptance/dismissal outcomes.</td>
+</tr>
+</tbody></table></div>
+<p>The engine performs no host I/O itself. Source adapters use host-supplied data;
+the Gradle adapter does not run Gradle to discover tasks. Ordinary source
+exceptions are reported while other sources continue; request cancellation
+cancels source work.</p>
+<h2 id="learning-and-privacy">Learning and privacy</h2>
+<p>Learning adjusts matching candidates using executions, acceptance, and explicit
+dismissal. Successful commands admitted by the replay policy can also supply
+history and observed-token suggestions. Hosts may independently disable replay
+retention while keeping ranking evidence.
+Completed arguments keep their case-sensitive identity, so learning for <code>ssh -L</code>
+does not leak into <code>ssh -l</code>. Matching the word being typed ignores case.
+Learned replay preserves supported shell expressions and keeps them distinct from
+literal arguments. Commands with substitutions or other syntax that cannot be
+replayed safely are omitted; see the <a href="../../ketraterm-completion/docs/completion-architecture.html#learning-and-privacy">learning contract</a>.</p>
+<p>Persistence is opt-in. Approved replay may contain plaintext command data;
+filtering cannot identify every secret. See the <a href="../reference/storage.html">storage and privacy contract</a>
+for location, retention, and encoding.</p>
+<p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
+<a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
+and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

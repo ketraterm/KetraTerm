@@ -6,6 +6,8 @@ io.github.ketraterm.completion.api
 io.github.ketraterm.completion.model
 module:ketraterm-completion-host
 io.github.ketraterm.completion.host
+module:ketraterm-completion-persistence
+io.github.ketraterm.completion.persistence
 module:ketraterm-core
 io.github.ketraterm.core
 io.github.ketraterm.core.api
@@ -44,3 +46,5 @@ io.github.ketraterm.ui.swing.settings
 io.github.ketraterm.ui.swing.suggestion
 module:ketraterm-ui-swing-host
 io.github.ketraterm.ui.swing.host
+module:ketraterm-workspace
+io.github.ketraterm.workspace

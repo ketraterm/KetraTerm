@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -233,6 +233,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="command-metadata.html"><span class="token function">commandMetadata</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-shell-integration-command-metadata/index.html">TerminalShellIntegrationCommandMetadata</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns an immutable metadata snapshot for <a href="../-terminal-shell-integration-view/command-metadata.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-90953912%2FFunctions%2F-1853948372" anchor-label="commandOutputRecordIdAtLine" id="-90953912%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-output-record-id-at-line.html"><span>command</span><wbr><span>Output</span><wbr><span>Record</span><wbr><span>Id</span><wbr><span>At</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-90953912%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="command-output-record-id-at-line.html"><span class="token function">commandOutputRecordIdAtLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the command owning an observed primary-buffer output <a href="../-terminal-shell-integration-view/command-output-record-id-at-line.html">lineId</a>, or zero.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1955692767%2FFunctions%2F-1853948372" anchor-label="commandPrompt" id="1955692767%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-prompt.html"><span>command</span><wbr><span><span>Prompt</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1955692767%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="command-prompt.html"><span class="token function">commandPrompt</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../../ketraterm-render-cache/io.github.ketraterm.render.cache/-terminal-render-row-snapshot/index.html">TerminalRenderRowSnapshot</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns a retained immutable prompt/input row captured before command output, or null. Captures preserve terminal cell attributes and clusters; fonts remain renderer-owned. Availability is independently bounded and does not imply that the original grid row remains. Custom views may omit this optional presentation capability.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -477,17 +507,17 @@
               </div>
             </div>
           </div>
-<a data-name="-2101351539%2FFunctions%2F-1853948372" anchor-label="recordCommandStart" id="-2101351539%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+<a data-name="2017765604%2FFunctions%2F-1853948372" anchor-label="recordCommandStart" id="2017765604%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="record-command-start.html"><span>record</span><wbr><span>Command</span><wbr><span><span>Start</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2101351539%2FFunctions%2F-1853948372"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2017765604%2FFunctions%2F-1853948372"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-command-start.html"><span class="token function">recordCommandStart</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">includeLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">commandText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">workingDirectoryUri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records command execution start.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-command-start.html"><span class="token function">recordCommandStart</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">includeLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">commandText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">workingDirectoryUri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records command execution start.</p></div><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-command-start.html"><span class="token function">recordCommandStart</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">includeLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">commandText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">workingDirectoryUri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">prompt<span class="token operator">: </span><a href="../../../ketraterm-render-cache/io.github.ketraterm.render.cache/-terminal-render-row-snapshot/index.html">TerminalRenderRowSnapshot</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records a command atomically with its immutable original prompt/input <a href="record-command-start.html">prompt</a> row.</p></div></div></div>
                 </div>
               </div>
             </div>

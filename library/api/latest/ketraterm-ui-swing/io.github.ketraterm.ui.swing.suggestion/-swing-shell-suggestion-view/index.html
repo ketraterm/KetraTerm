@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.suggestion</a><span class="delimiter">/</span><span class="current">SwingShellSuggestionView</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>View</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">SwingShellSuggestionView</a></div><p class="paragraph">Host-pluggable visual surface for shell suggestions.</p><p class="paragraph">The interaction owns selection, acceptance, dismissal and feedback; the embedded controller owns navigation and popup placement. A view renders immutable items and reports pointer interaction through the listener used to create it. Implementations must update Swing component state only on the Event Dispatch Thread and must not invoke completion providers or mutate command lines.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">interface </span><a href="index.html">SwingShellSuggestionView</a></div><p class="paragraph">Host-pluggable visual surface for shell suggestions.</p><p class="paragraph"><strong>Experimental:</strong> follows the suggestion stability contract of <a href="../-swing-shell-suggestion-view-factory/index.html">SwingShellSuggestionViewFactory</a>.</p><p class="paragraph">The interaction owns selection, acceptance, dismissal and feedback; the embedded controller owns navigation and popup placement. A view renders immutable items and reports pointer interaction through the listener used to create it. Implementations must update Swing component state only on the Event Dispatch Thread and must not invoke completion providers or mutate command lines.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>

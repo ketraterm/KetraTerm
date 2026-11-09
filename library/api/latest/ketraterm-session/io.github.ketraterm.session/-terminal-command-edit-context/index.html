@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-session</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.session</a><span class="delimiter">/</span><span class="current">TerminalCommandEditContext</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Command</span><wbr><span>Edit</span><wbr><span><span>Context</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">TerminalCommandEditContext</a></div><p class="paragraph">Session-issued editing context captured with a selected producer's revision. Retain it from suggestion request through final admission; never recapture it merely to make an old edit pass. It is specific to its issuing session and becomes stale after input, output, resize or a producer update. No writer or frame lease is retained. Acceptance still does not confirm remote execution.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">TerminalCommandEditContext</a></div><p class="paragraph">Session-issued editing context captured with a selected producer's revision. Retain it from suggestion request through final admission; never recapture it merely to make an old edit pass. It is specific to its issuing session and becomes stale after editing input, resize or an authoritative producer update. Screen-derived contexts also track the producer's observation revision. A native completion exchange can confirm the original buffer and cursor independently of repainting. No writer or frame lease is retained. Acceptance still does not confirm remote execution.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -119,7 +119,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-line.html">commandLine</a><span class="token operator">: </span><a href="../-terminal-shell-command-line-snapshot/index.html">TerminalShellCommandLineSnapshot</a></div><div class="brief "><p class="paragraph">authoritative snapshot used to calculate editor actions.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-line.html">commandLine</a><span class="token operator">: </span><a href="../-terminal-shell-command-line-snapshot/index.html">TerminalShellCommandLineSnapshot</a></div><div class="brief "><p class="paragraph">snapshot used to calculate editor actions. A snapshot requiring shell confirmation cannot admit edits until the native editor has confirmed its exact text and cursor through <a href="../-terminal-session/request-shell-completions.html">TerminalSession.requestShellCompletions</a>.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -135,6 +135,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="is-cancelled.html">isCancelled</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Whether the owner has cancelled this request. Cancellation is permanent.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1767439312%2FProperties%2F-1853948372" anchor-label="prefixResetKeys" id="-1767439312%2FProperties%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="prefix-reset-keys.html"><span>prefix</span><wbr><span>Reset</span><wbr><span><span>Keys</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1767439312%2FProperties%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="prefix-reset-keys.html">prefixResetKeys</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="../../../ketraterm-input/io.github.ketraterm.input.event/-terminal-key-event/index.html">TerminalKeyEvent</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">detached key sequence that clears only the editor's text before its cursor, captured with <a href="command-line.html">commandLine</a>; empty when that capability is unavailable.</p></div></div></div>
                 </div>
               </div>
             </div>

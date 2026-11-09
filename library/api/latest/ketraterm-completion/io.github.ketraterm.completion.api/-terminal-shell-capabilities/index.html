@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.4.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,24 +102,24 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-completion</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.completion.api</a><span class="delimiter">/</span><span class="current">TerminalShellCapabilities</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Shell</span><wbr><span><span>Capabilities</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalShellCapabilities</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>syntax<span class="token operator">: </span><a href="../-terminal-shell-syntax/index.html">TerminalShellSyntax</a><span class="token operator"> = </span>TerminalShellSyntax.PLAIN<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>quoting<span class="token operator">: </span><a href="../-terminal-shell-quoting-policy/index.html">TerminalShellQuotingPolicy</a><span class="token operator"> = </span>TerminalShellQuotingPolicy.CONSERVATIVE</span></span><span class="token punctuation">)</span></div><p class="paragraph">Immutable shell capabilities resolved by the host from authoritative profile metadata before a completion request is created.</p><p class="paragraph">The shared completion engine never infers shell behavior from command text or profile ids. Hosts should use <a href="-companion/-p-l-a-i-n.html">PLAIN</a> for shells without a tested lexical and replacement contract, <a href="-companion/-p-o-s-i-x.html">POSIX</a> for the supported POSIX subset, and <a href="-companion/-p-o-w-e-r-s-h-e-l-l.html">POWERSHELL</a> for PowerShell.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../-experimental-terminal-completion-api/index.html"><span class="token annotation builtin">ExperimentalTerminalCompletionApi</span></a></div></div><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalShellCapabilities</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>syntax<span class="token operator">: </span><a href="../-terminal-shell-syntax/index.html">TerminalShellSyntax</a><span class="token operator"> = </span>TerminalShellSyntax.PLAIN<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>quoting<span class="token operator">: </span><a href="../-terminal-shell-quoting-policy/index.html">TerminalShellQuotingPolicy</a><span class="token operator"> = </span>TerminalShellQuotingPolicy.CONSERVATIVE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>backslashPathSeparator<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span>syntax == TerminalShellSyntax.POWERSHELL</span></span><span class="token punctuation">)</span></div><p class="paragraph">Immutable shell capabilities resolved by the host from authoritative profile metadata before a completion request is created.</p><p class="paragraph">The shared completion engine never infers shell behavior from command text or profile ids. Hosts should use <a href="-companion/-p-l-a-i-n.html">PLAIN</a> for shells without a tested lexical and replacement contract, <a href="-companion/-p-o-s-i-x.html">POSIX</a> for the supported POSIX subset, and <a href="-companion/-p-o-w-e-r-s-h-e-l-l.html">POWERSHELL</a> for PowerShell.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="CONSTRUCTOR">
         <h2 class="tableheader">Constructors</h2>
-        <div class="table"><a data-name="171365368%2FConstructors%2F-293776716" anchor-label="TerminalShellCapabilities" id="171365368%2FConstructors%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+        <div class="table"><a data-name="596922508%2FConstructors%2F-293776716" anchor-label="TerminalShellCapabilities" id="596922508%2FConstructors%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
           <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="-terminal-shell-capabilities.html"><span>Terminal</span><wbr><span>Shell</span><wbr><span><span>Capabilities</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="171365368%2FConstructors%2F-293776716"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="596922508%2FConstructors%2F-293776716"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">syntax<span class="token operator">: </span><a href="../-terminal-shell-syntax/index.html">TerminalShellSyntax</a><span class="token operator"> = </span>TerminalShellSyntax.PLAIN<span class="token punctuation">, </span></span><span class="parameter ">quoting<span class="token operator">: </span><a href="../-terminal-shell-quoting-policy/index.html">TerminalShellQuotingPolicy</a><span class="token operator"> = </span>TerminalShellQuotingPolicy.CONSERVATIVE</span></span><span class="token punctuation">)</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">syntax<span class="token operator">: </span><a href="../-terminal-shell-syntax/index.html">TerminalShellSyntax</a><span class="token operator"> = </span>TerminalShellSyntax.PLAIN<span class="token punctuation">, </span></span><span class="parameter ">quoting<span class="token operator">: </span><a href="../-terminal-shell-quoting-policy/index.html">TerminalShellQuotingPolicy</a><span class="token operator"> = </span>TerminalShellQuotingPolicy.CONSERVATIVE<span class="token punctuation">, </span></span><span class="parameter ">backslashPathSeparator<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span>syntax == TerminalShellSyntax.POWERSHELL</span></span><span class="token punctuation">)</span></div></div></div>
                 </div>
               </div>
             </div>
@@ -147,7 +147,22 @@
       </div>
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="1519838260%2FProperties%2F-293776716" anchor-label="quoting" id="1519838260%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+        <div class="table"><a data-name="983871363%2FProperties%2F-293776716" anchor-label="backslashPathSeparator" id="983871363%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="backslash-path-separator.html"><span>backslash</span><wbr><span>Path</span><wbr><span><span>Separator</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="983871363%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="backslash-path-separator.html">backslashPathSeparator</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether a decoded backslash separates path components. Defaults to true for PowerShell and false otherwise. Hosts must set it for their shell environment: Git Bash accepts Windows separators despite POSIX quoting.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1519838260%2FProperties%2F-293776716" anchor-label="quoting" id="1519838260%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -173,6 +188,25 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="syntax.html">syntax</a><span class="token operator">: </span><a href="../-terminal-shell-syntax/index.html">TerminalShellSyntax</a></div><div class="brief "><p class="paragraph">lexical rules used to resolve the cursor's command segment.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="621310071%2FFunctions%2F-293776716" anchor-label="normalizePathSeparators" id="621310071%2FFunctions%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="normalize-path-separators.html"><span>normalize</span><wbr><span>Path</span><wbr><span><span>Separators</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="621310071%2FFunctions%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="normalize-path-separators.html"><span class="token function">normalizePathSeparators</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">path<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Converts decoded path separators to the host-provider convention of <code class="lang-kotlin">/</code>. Literal backslashes are preserved when <a href="backslash-path-separator.html">backslashPathSeparator</a> is false. This performs no expansion, filesystem access, or shell unescaping.</p></div></div></div>
                 </div>
               </div>
             </div>

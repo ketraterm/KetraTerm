@@ -1,0 +1,503 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalRenderRowSnapshot</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-render-cache/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-render-cache/main" data-filter=":ketraterm-render-cache/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-render-cache::io.github.ketraterm.render.cache/TerminalRenderRowSnapshot///PointingToDeclaration//-1970694365">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-render-cache</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.render.cache</a><span class="delimiter">/</span><span class="current">TerminalRenderRowSnapshot</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Render</span><wbr><span>Row</span><wbr><span><span>Snapshot</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">TerminalRenderRowSnapshot</a> : <a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-frame/index.html">TerminalRenderFrame</a></div><p class="paragraph">Immutable primitive copy of one physical terminal row, including colors, cell styles and clusters. Capturing allocates; subsequent copies never read or retain the source frame. No cursor, images, terminal hyperlinks, or viewport policy are retained. Consumers may share this value.</p><p class="paragraph">Each snapshot is an independent content source with constant generations, even when two snapshots preserve the same <a href="line-id.html">lineId</a>. Call <a href="../-terminal-render-cache/reset.html">TerminalRenderCache.reset</a> before passing a different snapshot to <a href="../-terminal-render-cache/accept.html">TerminalRenderCache.accept</a>; generations cannot be compared across snapshot instances. Row access uses index zero, regardless of the original source row.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="-302063568%2FClasslikes%2F-1970694365" anchor-label="Companion" id="-302063568%2FClasslikes%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-302063568%2FClasslikes%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="1379280107%2FProperties%2F-1970694365" anchor-label="activeBuffer" id="1379280107%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-buffer.html"><span>active</span><wbr><span><span>Buffer</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1379280107%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="active-buffer.html">activeBuffer</a><span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-buffer-kind/index.html">TerminalRenderBufferKind</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1784417108%2FProperties%2F-1970694365" anchor-label="columns" id="-1784417108%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="columns.html"><span><span>columns</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1784417108%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2062428209%2FProperties%2F-1970694365" anchor-label="contentGeneration" id="2062428209%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#2062428209%2FProperties%2F-1970694365"><span>content</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2062428209%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#2062428209%2FProperties%2F-1970694365">contentGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-529260165%2FProperties%2F-1970694365" anchor-label="cursor" id="-529260165%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor.html"><span><span>cursor</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-529260165%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="cursor.html">cursor</a><span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cursor/index.html">TerminalRenderCursor</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-504595817%2FProperties%2F-1970694365" anchor-label="cursorPendingWrap" id="-504595817%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#-504595817%2FProperties%2F-1970694365"><span>cursor</span><wbr><span>Pending</span><wbr><span><span>Wrap</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-504595817%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#-504595817%2FProperties%2F-1970694365">cursorPendingWrap</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1581772550%2FProperties%2F-1970694365" anchor-label="discardedCount" id="1581772550%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#1581772550%2FProperties%2F-1970694365"><span>discarded</span><wbr><span><span>Count</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1581772550%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#1581772550%2FProperties%2F-1970694365">discardedCount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1247215396%2FProperties%2F-1970694365" anchor-label="frameGeneration" id="1247215396%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="frame-generation.html"><span>frame</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1247215396%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="frame-generation.html">frameGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2100720139%2FProperties%2F-1970694365" anchor-label="graphicsGeneration" id="-2100720139%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#-2100720139%2FProperties%2F-1970694365"><span>graphics</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2100720139%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#-2100720139%2FProperties%2F-1970694365">graphicsGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1230980283%2FProperties%2F-1970694365" anchor-label="historyContentGeneration" id="1230980283%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#1230980283%2FProperties%2F-1970694365"><span>history</span><wbr><span>Content</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1230980283%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#1230980283%2FProperties%2F-1970694365">historyContentGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1817600979%2FProperties%2F-1970694365" anchor-label="historySize" id="-1817600979%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#-1817600979%2FProperties%2F-1970694365"><span>history</span><wbr><span><span>Size</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1817600979%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#-1817600979%2FProperties%2F-1970694365">historySize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1125288847%2FProperties%2F-1970694365" anchor-label="outputEndAbsoluteRow" id="1125288847%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#1125288847%2FProperties%2F-1970694365"><span>output</span><wbr><span>End</span><wbr><span>Absolute</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1125288847%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#1125288847%2FProperties%2F-1970694365">outputEndAbsoluteRow</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1709636658%2FProperties%2F-1970694365" anchor-label="palette" id="-1709636658%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="palette.html"><span><span>palette</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1709636658%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="palette.html">palette</a><span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-color-palette/index.html">TerminalColorPalette</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-401669800%2FProperties%2F-1970694365" anchor-label="rows" id="-401669800%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="rows.html"><span><span>rows</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-401669800%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1273366447%2FProperties%2F-1970694365" anchor-label="scrollbackOffset" id="-1273366447%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#-1273366447%2FProperties%2F-1970694365"><span>scrollback</span><wbr><span><span>Offset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1273366447%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#-1273366447%2FProperties%2F-1970694365">scrollbackOffset</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1164500065%2FProperties%2F-1970694365" anchor-label="storageBytes" id="1164500065%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="storage-bytes.html"><span>storage</span><wbr><span><span>Bytes</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1164500065%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="storage-bytes.html">storageBytes</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Cell and cluster-plane bytes, excluding fixed row, object and palette overhead.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1937221794%2FProperties%2F-1970694365" anchor-label="structureGeneration" id="-1937221794%2FProperties%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="structure-generation.html"><span>structure</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1937221794%2FProperties%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="structure-generation.html">structureGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-1483868495%2FFunctions%2F-1970694365" anchor-label="copyCursor" id="-1483868495%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-cursor.html"><span>copy</span><wbr><span><span>Cursor</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1483868495%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="copy-cursor.html"><span class="token function">copyCursor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">sink<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cursor-sink/index.html">TerminalRenderCursorSink</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="571493823%2FFunctions%2F-1970694365" anchor-label="copyImages" id="571493823%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="index.html#571493823%2FFunctions%2F-1970694365"><span>copy</span><wbr><span><span>Images</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="571493823%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#571493823%2FFunctions%2F-1970694365"><span class="token function">copyImages</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">sink<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-image-sink/index.html">TerminalRenderImageSink</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-56212385%2FFunctions%2F-1970694365" anchor-label="copyLine" id="-56212385%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-line.html"><span>copy</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-56212385%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="copy-line.html"><span class="token function">copyLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">codeWords<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">codeOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">attrWords<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">attrOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">flagOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">extraAttrWords<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">extraAttrOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">hyperlinkIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">hyperlinkOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">clusterSink<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cluster-sink/index.html">TerminalRenderClusterSink</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">clusterDataSink<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cluster-data-sink/index.html">TerminalRenderClusterDataSink</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1647672558%2FFunctions%2F-1970694365" anchor-label="copyTextLine" id="-1647672558%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-text-line.html"><span>copy</span><wbr><span>Text</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1647672558%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="copy-text-line.html"><span class="token function">copyTextLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">codeWords<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">codeOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">flagOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">clusterDataSink<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-cluster-data-sink/index.html">TerminalRenderClusterDataSink</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1267824445%2FFunctions%2F-1970694365" anchor-label="lineGeneration" id="-1267824445%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-generation.html"><span>line</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1267824445%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="line-generation.html"><span class="token function">lineGeneration</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1025896992%2FFunctions%2F-1970694365" anchor-label="lineId" id="-1025896992%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-id.html"><span>line</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1025896992%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="line-id.html"><span class="token function">lineId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-736362826%2FFunctions%2F-1970694365" anchor-label="lineWrapped" id="-736362826%2FFunctions%2F-1970694365" data-filterable-set=":ketraterm-render-cache/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-cache/main" data-filterable-set=":ketraterm-render-cache/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-wrapped.html"><span>line</span><wbr><span><span>Wrapped</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-736362826%2FFunctions%2F-1970694365"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-cache/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="line-wrapped.html"><span class="token function">lineWrapped</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

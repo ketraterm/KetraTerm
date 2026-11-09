@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Protocol limits and replies · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="v0.5.0">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>v0.5.0</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#relative-cursor-aliases">Relative cursor aliases</a><a class="depth-2" href="#repeat-character">Repeat character</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#progress-reporting">Progress reporting</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#xtversion">XTVERSION</a><a class="depth-2" href="#xtgettcap">XTGETTCAP</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#private-powershell-completion-metadata">Private PowerShell completion metadata</a><a class="depth-2" href="#private-bash-command-inventory">Private Bash command inventory</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a><a class="depth-2" href="#screen-to-history-clear">Screen-to-history clear</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+<p>This reference records boundary behavior for parser and host implementers.
+For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
+<h2 id="csi-parameters">CSI parameters</h2>
+<p>CSI collection has a shared limit of 32 semicolon/colon fields, including omitted
+fields. Opening field 33 rejects the entire command; no truncated SGR, mode,
+cursor, or query is dispatched. Numeric saturation is independent of this limit.
+CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
+state. Ordinary C0 handling continues during rejection.</p>
+<h2 id="relative-cursor-aliases">Relative cursor aliases</h2>
+<p>Plain CSI movement aliases route to the existing cursor operations:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Sequence</th>
+<th>Name</th>
+<th>Equivalent operation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>CSI Ps a</code></td>
+<td>HPR</td>
+<td>Forward by <code>Ps</code> columns (<code>CSI Ps C</code>).</td>
+</tr>
+<tr>
+<td><code>CSI Ps e</code></td>
+<td>VPR</td>
+<td>Down by <code>Ps</code> rows (<code>CSI Ps B</code>).</td>
+</tr>
+<tr>
+<td><code>CSI Ps j</code></td>
+<td>HPB</td>
+<td>Backward by <code>Ps</code> columns (<code>CSI Ps D</code>).</td>
+</tr>
+<tr>
+<td><code>CSI Ps k</code></td>
+<td>VPB</td>
+<td>Up by <code>Ps</code> rows (<code>CSI Ps A</code>).</td>
+</tr>
+</tbody></table></div>
+<p>Omitted and zero counts mean one. Decimal overflow saturates to <code>Int.MAX_VALUE</code>,
+as with the equivalent cursor commands; core bounds the movement to the active
+screen and margins. Origin mode, pending wrap, and enabled reverse wrapping
+follow those same operations. Private markers and intermediates do not select
+these aliases. The shared <a href="#csi-parameters">CSI parameter limits</a> and cancellation
+rules apply.</p>
+<p>These names and encodings follow <a href="https://www.ecma-international.org/wp-content/uploads/ECMA-48_5th_edition_june_1991.pdf">ECMA-48, sections 8.3.58–59 and 8.3.159–160</a>.</p>
+<h2 id="repeat-character">Repeat character</h2>
+<p>REP (<code>CSI Ps b</code>) writes <code>Ps</code> additional copies of the preceding graphic, as defined
+by <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm&#39;s control sequences</a>.
+Omitted and zero counts mean one. KetraTerm repeats the complete retained grapheme
+after charset mapping, including spaces, combining sequences, and emoji, bounded
+by the existing 32-codepoint retention limit. With no preceding graphic, REP is
+ignored. Cursor movement, erasure, SGR, and screen switches preserve the source;
+parser reset, RIS, and DECSTR clear it.</p>
+<p>Copies use the current pen and width policy, insert mode, margins, autowrap,
+and scrolling, as ordinary printable writes do. REP does not copy the original
+cell&#39;s attributes or read text back from the grid. Counts through <code>Int.MAX_VALUE</code>
+are accepted; work is proportional to generated output without a count-sized
+temporary buffer. Numeric overflow, extra fields, colon subparameters, private
+markers, and intermediates reject REP. The shared <a href="#csi-parameters">CSI limits</a>
+and cancellation rules apply.</p>
+<h2 id="osc-encoding">OSC encoding</h2>
+<p>Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
+8-bit C1 termination inside payloads.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Encoding and malformed-input behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Titles (0/1/2), notifications (9/777)</td>
+<td>Replacement decoding; repaired text still passes host policy and length checks.</td>
+</tr>
+<tr>
+<td>Directory (7), palette (4/10/11/12/21), shell markers (133)</td>
+<td>Strict UTF-8; reject malformed commands without updating state.</td>
+</tr>
+<tr>
+<td>Color resets (104/110/111/112)</td>
+<td>ASCII decimal indices or an empty payload; non-ASCII input rejects the complete reset.</td>
+</tr>
+<tr>
+<td>Color stack (30001/30101)</td>
+<td>Bare command or an empty semicolon; nonempty arguments reject the command.</td>
+</tr>
+<tr>
+<td>Hyperlinks (8)</td>
+<td>Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links.</td>
+</tr>
+<tr>
+<td>Clipboard (52)</td>
+<td>ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access.</td>
+</tr>
+<tr>
+<td>Progress (9;4)</td>
+<td>ASCII decimal fields; malformed envelopes preserve prior progress and never become notifications.</td>
+</tr>
+<tr>
+<td>Pointer shape (22)</td>
+<td>Exact ASCII CSS names from the supported subset, optionally prefixed with <code>=</code>; empty name restores host defaults. Unknown or malformed names leave state unchanged.</td>
+</tr>
+</tbody></table></div>
+<p>BEL or <code>ESC \</code> completes OSC. CAN/SUB, reset, and EOF discard unfinished commands.
+Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
+ignored unless a custom handler is installed. Recovery preserves later commands.
+Host title/notification limits count UTF-16 code units and avoid splitting a valid
+surrogate pair; they do not guarantee grapheme-boundary truncation.</p>
+<h2 id="progress-reporting">Progress reporting</h2>
+<p><code>OSC 9 ; 4 ; state ; percentage ST</code> reports application-controlled progress;
+BEL also terminates the command. The <a href="https://learn.microsoft.com/en-us/windows/terminal/tutorials/progress-bar-sequences">Microsoft protocol documentation</a>
+defines the following states:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Presentation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code></td>
+<td>Hidden; clears progress.</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Normal determinate progress.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Error determinate progress.</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>Indeterminate work; ignores the percentage.</td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td>Warning/paused determinate progress.</td>
+</tr>
+</tbody></table></div>
+<p>Percentages are inclusive <code>0..100</code>. Determinate zero remains zero, and 100
+remains visible until cleared. Hidden/indeterminate snapshots use percentage
+zero. Progress is independent of shell command metadata and never triggers a
+notification or a terminal reply.</p>
+<p>KetraTerm defaults missing/empty state and percentage fields to zero. It rejects
+unknown states, out-of-range/overflowing numbers, signs, whitespace, non-ASCII
+fields and extra fields. The ordinary 4,096-byte OSC envelope limit applies;
+oversized or cancelled reports leave prior progress unchanged. <a href="https://github.com/microsoft/terminal/blob/main/src/terminal/adapter/adaptDispatch.cpp">Windows Terminal&#39;s parser</a>
+also implements tolerant conventions such as clamping values above 100; those
+are outside this documented slice.</p>
+<p><code>HostPolicy.progressPolicy</code> authorizes progress as presentation metadata,
+independently of title, notification, window-manipulation and terminal-response
+permissions. It defaults to allow. <code>HostEventSink.progressChanged</code> runs
+synchronously with accepted reports, including equal reports, under the existing
+host callback contract. RIS always emits hidden progress; DECSTR, buffer switches
+and local screen clearing preserve it.</p>
+<p>The standard session retains an immutable <code>TerminalProgress</code> in
+<code>TerminalSession.progress</code>, a read-only <code>StateFlow</code>. It initially contains
+<code>HIDDEN</code>, conflates intermediate/equal presentation states, and does not complete
+on closure. Consumers own their collection lifetime. Reports received before a
+collector starts are retained. Identical accepted reports renew freshness.
+A single atomic retained report and lazy expiry worker bound pending work per session.</p>
+<p>A session clears progress after five minutes without an accepted report, on
+RIS, progress-permission revocation, or immediately when closure begins. Expiry uses
+monotonic time and needs no collector. The five-minute limit is KetraTerm product
+policy, not a protocol requirement. Reallowing permission does not restore stale
+progress; an application must send a new report.</p>
+<p>Both products replace the shell icon with a thin progress ring while progress is
+active. Normal, error and warning states use accent, red and amber arcs filled
+according to the percentage; indeterminate work uses a rotating arc. Tab names
+remain unchanged. Localized tooltips/accessibility text retain the numeric/status
+information, and the selected session&#39;s window/tool-window title retains status.
+Hidden progress restores the shell icon. Both products always enable progress independently of
+the existing title permission. Library embedders control progress separately
+through <code>HostPolicy.progressPolicy</code>.
+Standalone additionally uses per-window taskbar state/value APIs where supported;
+IntelliJ retains ownership of the IDE&#39;s global taskbar. A standalone split tab
+uses its active pane, following the existing title-selection convention. Queued
+UI refreshes are bounded and read the latest retained state at delivery, so a
+late callback cannot restore cleared progress.</p>
+<p>Custom parser sinks opt in through <code>TerminalProgressCommandSink</code>; older plain
+<code>TerminalCommandSink</code> implementations remain valid and ignore these reports.
+Decorators must preserve the optional capability explicitly. Custom session
+assembly owns its host-event wiring; automatic retained progress is supplied by
+<code>TerminalSession.create</code>.</p>
+<p>The optional Swing-host <code>SwingTerminalProgressIcon</code> is a host-owned, EDT-confined
+painter with configurable size, colors, phase and accessible description. It owns
+no session, observation job or timer. <code>SwingTerminalProgressAnimation</code> supplies
+one explicitly closed, visibility-bound clock per host container; callers enable
+it only for indeterminate work. Embedders can omit the helper or drive phase with
+their own animation/reduced-motion policy.</p>
+<h2 id="pointer-shapes">Pointer shapes</h2>
+<p><code>OSC 22 ; name ST</code> sets the mouse pointer; BEL also terminates the command.
+An optional <code>=</code> prefix is accepted. An empty name restores the host default.
+Supported CSS names are <code>default</code>, <code>crosshair</code>, <code>text</code>, <code>wait</code>, <code>pointer</code>,
+<code>move</code>, and <code>n-resize</code>, <code>ne-resize</code>, <code>e-resize</code>, <code>se-resize</code>, <code>s-resize</code>,
+<code>sw-resize</code>, <code>w-resize</code>, <code>nw-resize</code>.</p>
+<p>Names are exact, case-sensitive ASCII. Invalid, unsupported, or oversized
+requests preserve the previous shape and never reach a custom OSC handler.
+The override is session-wide: screen switches, cursor save/restore, resize,
+and DECSTR preserves it; RIS clears it.</p>
+<p>Pointer presentation is independent of mouse reporting and window-manipulation
+permission. Activatable links and prompt actions can override the application
+pointer. See <a href="https://ghostty.org/docs/vt/osc/22">Ghostty&#39;s basic command</a>, the
+<a href="https://sw.kovidgoyal.net/kitty/pointer-shapes/">Kitty specification</a>, and
+<a href="../terminal-feature-gap-map.html#optional-protocol-work">remaining extensions</a>.</p>
+<h2 id="payload-limits">Payload limits</h2>
+<p>OSC/DCS limits count collected bytes, including family headers/separators and
+excluding introducers, terminators, and ignored control bytes. Graphics APC uses
+separate header and payload budgets.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Collection limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Titles, directory, hyperlinks, notifications/progress, palette 4/21/104, shell markers</td>
+<td>4,096 bytes.</td>
+</tr>
+<tr>
+<td>Dynamic colors 10/11/12/110/111/112</td>
+<td>256 bytes.</td>
+</tr>
+<tr>
+<td>Pointer shape 22</td>
+<td>32 bytes.</td>
+</tr>
+<tr>
+<td>Color stack 30001/30101</td>
+<td>6 bytes, including the command number and optional empty semicolon.</td>
+</tr>
+<tr>
+<td>DECRQSS</td>
+<td>64 bytes.</td>
+</tr>
+<tr>
+<td>XTGETTCAP</td>
+<td>4,096 bytes.</td>
+</tr>
+<tr>
+<td>Custom OSC</td>
+<td>4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit.</td>
+</tr>
+<tr>
+<td>OSC 52</td>
+<td>Ordinary 4,096-byte limit; eligible writes use a budget derived from the active decoded-text limit.</td>
+</tr>
+<tr>
+<td>Graphics APC</td>
+<td>Separate header, encoded-chunk and decoded-transfer bounds; see <a href="../../ketraterm-parser/docs/ansi-fsm-specification.html#graphics-apc-collection">graphics collection</a> and <a href="../development/kitty-graphics-contract.html#resource-limits">resource limits</a>.</td>
+</tr>
+</tbody></table></div>
+<p>Overflow stops collection and consumes through termination/cancellation without
+dispatching a truncated prefix. An oversized OSC 8 ends active link context;
+other rejected commands preserve prior metadata. Oversized DCS queries receive
+no reply. DCS terminates with ST, not BEL.</p>
+<p>Graphics APC drains rejected payloads through ST. Unknown/malformed headers are
+discarded; identified transfer-limit failures can produce fixed failure replies
+subject to quiet flags and response permission. Its per-chunk accounting excludes
+the APC header, separator and terminator.</p>
+<p>Session-integrated clipboard writes permit up to 1 MiB of decoded text by default.
+Standalone parsers without that integration retain the ordinary collection limit.
+Permissions and decoded-size limits are checked again before execution.</p>
+<h2 id="query-allowlists">Query allowlists</h2>
+<p>The optional PowerShell completion exchange below is host-initiated semantic
+input. Receiving its OSC metadata never sends a terminal reply, executes command
+text, or requests completion by itself; it adds no terminal-response allowlist entry.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Reply scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DECRQSS</td>
+<td>SGR (<code>m</code>), vertical margins (<code>r</code>), horizontal margins (<code>s</code>), cursor style (<code>SP q</code>). Unsupported selectors receive empty failure replies.</td>
+</tr>
+<tr>
+<td>XTGETTCAP</td>
+<td>Identity, colors, parameterized scrolling, paste delimiters, underline capabilities and legacy keyboard names from the <a href="#xtgettcap">explicit allowlist</a>. Each well-formed name receives its own success or failure frame.</td>
+</tr>
+<tr>
+<td>Kitty colors (OSC 21)</td>
+<td>Indices 0–255, <code>foreground</code>, <code>background</code>, <code>cursor</code>, <code>cursor_text</code>, <code>selection_foreground</code>, <code>selection_background</code>. Unknown keys receive <code>unknown=</code> plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply.</td>
+</tr>
+<tr>
+<td>Kitty graphics (APC G)</td>
+<td>Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed <code>ENOTSUP</code> errors. Queries require nonzero <code>i</code>. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required.</td>
+</tr>
+<tr>
+<td>Device identity</td>
+<td><code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, VT420-class primary DA, and secondary DA. No DA3 unique identity.</td>
+</tr>
+<tr>
+<td>XTVERSION</td>
+<td>Product/build identity from <code>CSI &gt; q</code> or <code>CSI &gt; 0 q</code>; see the <a href="#xtversion">reply contract</a>.</td>
+</tr>
+<tr>
+<td>Cursor position</td>
+<td>One-based coordinates, relative to active origin/margins when origin mode is enabled.</td>
+</tr>
+<tr>
+<td>Window geometry</td>
+<td><code>CSI 14 t</code> reports text-area pixels and <code>CSI 16 t</code> reports cell pixels as <code>CSI 6;height;width t</code>; pixel reports require known positive dimensions. Cell dimensions use integer text-area pixels divided by grid dimensions, independently of margins. <code>CSI 18 t</code> and <code>CSI 19 t</code> report the terminal grid. These queries require terminal-response permission, not window-manipulation permission.</td>
+</tr>
+<tr>
+<td>Mode status</td>
+<td>ANSI/DEC DECRQM replies for the <a href="#mode-status-reports">listed modes</a>, including permanently enabled grapheme mode 2027. Unknown modes report <code>0</code>.</td>
+</tr>
+<tr>
+<td>Color scheme</td>
+<td><code>CSI ?996n</code> reports dark/light host preference; mode 2031 permits automatic reports for host theme changes. Application color overrides and resets do not change that preference or emit change reports.</td>
+</tr>
+<tr>
+<td>In-band resize</td>
+<td>Mode 2048 permits <code>CSI 48;rows;columns;heightPixels;widthPixels t</code> reports on enable and after text-area size changes.</td>
+</tr>
+<tr>
+<td>Rectangle checksum</td>
+<td>Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions.</td>
+</tr>
+</tbody></table></div>
+<p>Denying terminal responses suppresses success and failure replies alike.
+Unsupported queries use their defined failure frames rather than replaying
+arbitrary request text.</p>
+<h2 id="xtversion">XTVERSION</h2>
+<p><code>CSI &gt; q</code> and <code>CSI &gt; 0 q</code> return <code>DCS &gt; | KetraTerm (version) ST</code>, using the
+library build version, including <code>-SNAPSHOT</code> for development builds. The identity
+is at most 76 printable ASCII characters.
+Existing DA identity and <code>$TERM</code> values remain unchanged.</p>
+<p>Terminal-response permission gates the entire reply. Nonzero, extra, colon or
+overflowing parameters are ignored. XTVERSION defines no failure reply. Custom
+parser sinks and response channels may leave the optional <code>requestTerminalVersion()</code>
+default unimplemented; those integrations stay silent.</p>
+<h2 id="xtgettcap">XTGETTCAP</h2>
+<p>Requests use <code>DCS +q hexName[;hexName...] ST</code>. Allowlisted names are case-sensitive
+ASCII. Each request token encodes bytes using two ASCII hex digits per byte;
+hex digits may use either case. The responder uses the following immutable allowlist:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Names</th>
+<th>Type</th>
+<th>Decoded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TN</code>, <code>name</code></td>
+<td>String</td>
+<td><code>xterm-256color</code></td>
+</tr>
+<tr>
+<td><code>Co</code>, <code>colors</code></td>
+<td>Number</td>
+<td>Decimal <code>256</code></td>
+</tr>
+<tr>
+<td><code>RGB</code>, <code>Tc</code></td>
+<td>Boolean</td>
+<td>Present, without a value; preserves KetraTerm&#39;s existing truecolor contract.</td>
+</tr>
+<tr>
+<td><code>indn</code></td>
+<td>String</td>
+<td><code>ESC [%p1%dS</code></td>
+</tr>
+<tr>
+<td><code>PS</code>, <code>PE</code></td>
+<td>String</td>
+<td><code>ESC [200~</code>, <code>ESC [201~</code>; paste delimiters used when mode 2004 is enabled.</td>
+</tr>
+<tr>
+<td><code>Su</code></td>
+<td>Boolean</td>
+<td>Styled and colored underlines.</td>
+</tr>
+<tr>
+<td><code>Smulx</code></td>
+<td>String</td>
+<td><code>ESC [4:%p1%dm</code>; parameter 0–5 selects none, single, double, curly, dotted, or dashed.</td>
+</tr>
+<tr>
+<td><code>Setulc</code></td>
+<td>String</td>
+<td><code>ESC [58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&amp;%d:%p1%{255}%&amp;%dm</code>; parameter is packed 24-bit RGB.</td>
+</tr>
+</tbody></table></div>
+<p>Here <code>ESC</code> denotes the actual byte <code>1b</code>, and the following space is notation,
+not part of the value. Values contain terminfo parameter expressions literally;
+the application expands them. Numeric values are decimal ASCII before hex encoding.
+No local terminfo database is consulted.</p>
+<p>Keyboard entries are strings describing legacy key presses in the current mode:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Terminfo / termcap names</th>
+<th>Decoded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kcuu1</code> / <code>ku</code>, <code>kcud1</code> / <code>kd</code>, <code>kcuf1</code> / <code>kr</code>, <code>kcub1</code> / <code>kl</code></td>
+<td>Normal cursor mode: <code>ESC [A/B/C/D</code>; application cursor mode: <code>ESC OA/OB/OC/OD</code>, respectively.</td>
+</tr>
+<tr>
+<td><code>khome</code> / <code>kh</code>, <code>kend</code> / <code>@7</code></td>
+<td>Normal: <code>ESC [H/F</code>; application: <code>ESC OH/OF</code>.</td>
+</tr>
+<tr>
+<td><code>kich1</code> / <code>kI</code>, <code>kdch1</code> / <code>kD</code>, <code>kpp</code> / <code>kP</code>, <code>knp</code> / <code>kN</code></td>
+<td><code>ESC [2~/3~/5~/6~</code>, respectively.</td>
+</tr>
+<tr>
+<td><code>kf1</code>–<code>kf9</code> / <code>k1</code>–<code>k9</code>; <code>kf10</code> / <code>k;</code>; <code>kf11</code> / <code>F1</code>; <code>kf12</code> / <code>F2</code></td>
+<td>F1–F4: <code>ESC OP/OQ/OR/OS</code>. F5–F12: <code>ESC [15~/17~/18~/19~/20~/21~/23~/24~</code>.</td>
+</tr>
+<tr>
+<td><code>kbs</code> / <code>kb</code></td>
+<td>BS (<code>08</code>) or DEL (<code>7f</code>), according to DECBKM or the current host Backspace policy.</td>
+</tr>
+<tr>
+<td><code>kcbt</code> / <code>kB</code></td>
+<td>Shift-Tab: <code>ESC [Z</code>.</td>
+</tr>
+<tr>
+<td><code>kHOM</code> / <code>#2</code>, <code>kLFT</code> / <code>#4</code>, <code>kRIT</code> / <code>%i</code>, <code>kEND</code> / <code>*7</code></td>
+<td>Shift+Home/Left/Right/End. Default cursor modifier level 2: <code>ESC [1;2H/D/C/F</code>.</td>
+</tr>
+<tr>
+<td><code>ka1</code> / <code>K1</code>, <code>ka3</code> / <code>K3</code>, <code>kc1</code> / <code>K4</code>, <code>kc3</code> / <code>K5</code></td>
+<td>Application keypad corners: numeric keypad 7/9/1/3 send <code>ESC Ow/Oy/Oq/Os</code>. Numeric keypad mode receives failure replies.</td>
+</tr>
+</tbody></table></div>
+<p>Slash-separated sequences above denote alternatives, not literal slash bytes.
+One coherent mode snapshot is used for the whole request. Queries do not enable
+application modes or change input policy. Applications must query again if they
+need an answer for a different mode.</p>
+<p>The four Shift cursor entries follow xterm&#39;s cursor modifier resource (1).
+Here <code>final</code> is <code>H</code>, <code>D</code>, <code>C</code> or <code>F</code>, respectively; <code>CSI</code> is <code>ESC [</code>
+and <code>SS3</code> is <code>ESC O</code>. Spaces below are notation, not transmitted bytes:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Cursor modifier level</th>
+<th>Normal cursor mode</th>
+<th>Application cursor mode</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Disabled (<code>-1</code>)</td>
+<td><code>CSI final</code></td>
+<td><code>SS3 final</code></td>
+</tr>
+<tr>
+<td><code>0</code></td>
+<td><code>CSI 2 final</code></td>
+<td><code>SS3 2 final</code></td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td><code>CSI 2 final</code></td>
+<td><code>CSI 2 final</code></td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td><code>CSI 1;2 final</code></td>
+<td><code>CSI 1;2 final</code></td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td><code>CSI &gt;1;2 final</code></td>
+<td><code>CSI &gt;1;2 final</code></td>
+</tr>
+</tbody></table></div>
+<p>Disabling cursor modifiers drops Shift, matching actual key encoding.
+Function, special and ordinary-key resource settings do not change these entries.</p>
+<p>Keypad corner discovery requires application keypad mode (DECKPAM, <code>ESC =</code>);
+DECKPNM (<code>ESC &gt;</code>) restores numeric mode. These controls share the state selected
+by DECSET/DECRST 66. It is independent of the application cursor
+mode and follows the keypad modifier resource (3). Numeric-mode digits are not
+advertised as function-key sequences, so consumers do not capture ordinary
+<code>7/9/1/3</code> input. These names describe numeric keypad identities, not the separate
+keypad Home/End/Page Up/Page Down identities or dedicated editing keys.
+Num Lock can override individual legacy keypad events; it does not change
+application mode or capability discovery.</p>
+<p>These entries describe the legacy press vocabulary only. While any Kitty keyboard
+flags are active, keyboard names receive failure replies. Xterm resource level 4
+declines only that resource&#39;s keys (cursor/editing, function, keypad, or special keys).
+<code>modifyOtherKeys</code> level 2 additionally declines Shift-Tab; level 3 declines both
+Shift-Tab and Backspace. Other entries still reply normally, including output
+capabilities. Resetting the relevant mode restores discovery.</p>
+<p>The host adapter supplies its current Backspace default through the optional
+<code>setTerminfoBackspaceDefault</code> hook, then invokes the original
+<code>TerminalResponseChannel.queryTerminfo(String)</code> method. Existing Kotlin wrappers
+still intercept that method. The standard core retains supplied metadata across
+RIS/DECSTR; explicit DECBKM takes precedence. Direct core callers supply the
+default before querying Backspace.</p>
+<p>Without supplied metadata, <code>kb</code>/<code>kbs</code> fail unless DECBKM makes the answer known.
+This also applies to retained JVM wrappers that cannot forward the new hook.
+Other capability replies remain available. The hook has a default no-op for
+existing implementations and does not change input encoding or terminal modes.</p>
+<p>KetraTerm follows Kitty-style individual replies: each supported name produces
+<code>DCS 1+r hexName[=hexValue] ST</code>, and each unknown name produces
+<code>DCS 0+r hexName ST</code>. Boolean successes omit <code>=hexValue</code>. Order, duplicates,
+and the original hex spelling are preserved; an unknown name does not stop later
+names. Well-formed encodings of other bytes, including non-ASCII identifiers,
+also receive keyed failure replies. This differs from xterm&#39;s combined-response
+and stop-at-unknown behavior.
+Previously KetraTerm combined recognized entries and omitted unknown entries;
+clients consuming batched replies must accept the individual frames.</p>
+<p>An empty list/token, odd-length token, or character outside ASCII <code>0–9</code>, <code>a–f</code>,
+and <code>A–F</code> rejects the whole batch with <code>DCS 0+r ST</code>. Validation and encoded-size preflight
+finish before any replies from that batch are queued. A complete response larger
+than 64 KiB is rejected the same way, including through the direct core API.
+Earlier queued replies remain intact. The parser&#39;s 4,096-byte collection ceiling
+includes <code>+q</code>; overflow drains the string without dispatch or a partial reply.</p>
+<p>The existing terminal-response permission gates all frames, including failures.
+Window-manipulation and palette permissions do not gate capability discovery.
+Direct core callers enforce host permission themselves. Query handling neither
+executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
+<p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
+<a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
+The <a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+verify template expansion and resulting terminal behavior without native test dependencies.
+The <a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
+<h2 id="kitty-colors">Kitty colors</h2>
+<p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
+into one reply. <code>key=?</code> queries, bare <code>key</code> restores the current host theme, and
+<code>key=</code> requests dynamic behavior. Keys are exact and case-sensitive; decimal
+indices accept leading zeros. Empty keys and invalid color values are ignored.
+Unknown keys receive encoded replies for set, reset, and query operations.</p>
+<p>Colors accept Kitty&#39;s named colors, <code>#RGB</code>/6/9/12-digit forms, scaled <code>rgb:</code>
+channels, and clipped <code>rgbi:</code> channels. The short <code>#RGB</code> form uses the most
+significant bits (<code>#3a7</code> becomes <code>#30a070</code>). Optional <code>@alpha</code> is validated but
+has no effect on these opaque color roles. This syntax is independent of the
+older OSC 4/10/11/12 parser.</p>
+<p>Dynamic cursor colors resolve the underlying cell&#39;s foreground/background;
+dynamic selection colors reverse those cell colors. Fixed selection overrides
+use the requested colors; resetting restores host selection presentation.
+Foreground, background, and indexed colors do not accept dynamic requests.
+Queries return <code>rgb:rrrr/gggg/bbbb</code>, or an empty value for dynamic colors and
+host-controlled selection styling without a fixed color override.
+See the <a href="https://sw.kovidgoyal.net/kitty/color-stack/">Kitty specification</a>.</p>
+<h2 id="color-stack">Color stack</h2>
+<p>Kitty <code>OSC 30001 ST</code> pushes effective indexed and named colors, including
+dynamic cursor/selection behavior; <code>OSC 30101 ST</code> restores and removes the last
+entry. An empty semicolon is also accepted. Both commands require palette
+permission and emit no replies or color-scheme notifications.</p>
+<p>The terminal-wide stack holds ten entries, dropping the oldest on overflow;
+an empty pop has no effect. Hard and soft reset clear it. Screen switches,
+resize, and host theme changes preserve snapshots. Pop restores saved effective
+color values while retaining the current host light/dark and bold-as-bright
+settings; subsequent color resets still use the latest host theme.</p>
+<h2 id="color-resets">Color resets</h2>
+<p>OSC 104 restores the specified palette entries to the current host theme&#39;s
+configured values. Bare <code>OSC 104 ST</code> or <code>OSC 104; ST</code> restores all 256 entries;
+<code>OSC 104;1;255 ST</code> restores only entries 1 and 255. Decimal indices must be in
+<code>0..255</code>. Invalid and empty fields in a nonempty list are ignored individually,
+duplicates are coalesced, and a list without valid indices changes nothing.
+Non-ASCII bytes reject the complete list.</p>
+<p>OSC 110, 111, and 112 restore the theme&#39;s foreground, background, and cursor
+colors respectively. They accept no payload, with an optional trailing
+semicolon. These resets preserve other application overrides and host
+presentation preferences. They obey palette permission and emit no replies.
+See <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm&#39;s color operations</a>.</p>
+<h2 id="change-reports">Change reports</h2>
+<p>Both subscriptions are initially disabled, accept DECSET/DECRST, and are
+disabled by RIS or DECSTR. Terminal-response permission gates reports without
+changing subscription state; palette permission independently gates application
+color operations. Reports use the same ordered session output path as input
+and explicit replies.</p>
+<p>Mode 2031 (<code>CSI ?2031h</code> / <code>CSI ?2031l</code>) subscribes to host theme palette changes.
+Reports are <code>CSI ?997;1n</code> for dark or <code>CSI ?997;2n</code> for light, matching the
+one-shot <code>CSI ?996n</code> query. Changed host palette values report even if the
+light/dark preference is unchanged. Enabling alone emits nothing, and
+application OSC color changes or resets emit no change reports. See the
+<a href="https://github.com/contour-terminal/contour/blob/f3c3334aa5c861348c5bbe8ffe572c872eef2e08/docs/vt-extensions/color-palette-update-notifications.md">color-scheme protocol</a>.</p>
+<p>Mode 2048 (<code>CSI ?2048h</code> / <code>CSI ?2048l</code>) subscribes to text-area size changes.
+Every enable request, including repeated enable, immediately reports the
+current size as <code>CSI 48;rows;columns;heightPixels;widthPixels t</code>. Subsequent
+reports follow completed changes to grid dimensions or text-area pixels.
+Identical geometry emits nothing. Pixel dimensions exclude padding and are
+zero when unavailable. See the
+<a href="https://gist.github.com/rockorager/e695fb2924d36b2bcf1fff4a3704bd83">in-band resize protocol</a>.</p>
+<h2 id="mode-status-reports">Mode status reports</h2>
+<p>DECRQM returns set (<code>1</code>), reset (<code>2</code>), permanently set (<code>3</code>), or unsupported (<code>0</code>).
+ANSI and DEC namespaces are independent.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Queryable modes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ANSI</td>
+<td>4, 20.</td>
+</tr>
+<tr>
+<td>DEC core</td>
+<td>1, 3, 5, 6, 7, 12, 25, 45, 66, 69, 1004, 1007, 1045, 2004, 2026.</td>
+</tr>
+<tr>
+<td>DEC grapheme processing</td>
+<td>2027 always reports permanently set (<code>3</code>).</td>
+</tr>
+<tr>
+<td>DEC change reports</td>
+<td>2031, 2048.</td>
+</tr>
+<tr>
+<td>DEC mouse tracking</td>
+<td>9, 1000, 1002, 1003.</td>
+</tr>
+<tr>
+<td>DEC mouse encoding</td>
+<td>1005, 1006, 1015, 1016.</td>
+</tr>
+<tr>
+<td>DEC alternate screen</td>
+<td>47, 1047, 1049 report the active buffer.</td>
+</tr>
+<tr>
+<td>DEC Backarrow</td>
+<td>67 reports the application override or current host Backspace default.</td>
+</tr>
+<tr>
+<td>DEC host actions</td>
+<td>1042/1043 require host capability declarations.</td>
+</tr>
+</tbody></table></div>
+<p>Mode 3 reports the last DECCOLM selection, not measured window width. Mode 1048
+is an action and reports unsupported. Standalone declares supported bell actions;
+IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
+cancelled, or incomplete requests receive no reply. Queries do not mutate state.
+See the <a href="../../ketraterm-protocol/docs/protocol-modes.html">mode reference</a> for names.</p>
+<p><code>CSI ?2027$p</code> replies <code>CSI ?2027;3$y</code>: grapheme processing is always enabled.
+DECSET/DECRST 2027 leave that policy unchanged, including across RIS, DECSTR,
+screen switches, and resize. ANSI mode 2027 is unsupported. Replies use the
+normal terminal-response permission; no window permission is required.
+This advertises grapheme processing, not complete conformance to the original
+<a href="https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex">Unicode Core draft</a>:
+KetraTerm retains its documented <a href="../../ketraterm-core/docs/terminal-core-contract.html#unicode-scalar-and-width-policy">VS15/VS16 width policy</a>
+and <a href="#streaming-grapheme-placement">streaming placement</a>.</p>
+<h2 id="private-powershell-completion-metadata">Private PowerShell completion metadata</h2>
+<p>The same optional producer also accepts the bounded Bash command inventory
+<a href="#private-bash-command-inventory">described below</a>.</p>
+<p>The optional OSC shell producer accepts <code>OSC 633;KetraTermCompletion;3;... BEL</code>
+(ST is also accepted) from the workspace&#39;s PSReadLine hook. All envelope fields
+are printable ASCII; text fields are standard Base64 of strictly decoded UTF-8.
+Other completion protocol versions are ignored.
+The session&#39;s default parser forwards unknown OSC bodies synchronously to the
+selected producer. Custom parser factories must forward <code>observeCustomOsc</code> and
+use <code>customOscPayloadLimitBytes</code> themselves.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Message body after <code>KetraTermCompletion;3;</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Ready;epoch</code></td>
+<td>Prompt completion hook, with 32 lowercase hexadecimal epoch characters.</td>
+</tr>
+<tr>
+<td><code>Ready;epoch;PrefixReset</code></td>
+<td>Also advertises the installed <code>F12,r</code> prefix-reset binding. Plain <code>Ready</code> does not advertise this capability.</td>
+</tr>
+<tr>
+<td><code>Result;epoch;id;Failed</code></td>
+<td>Correlated failure.</td>
+</tr>
+<tr>
+<td><code>Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...</code></td>
+<td>Exact live buffer and UTF-16 replacement range, with Base64 <code>line</code> and <code>externalCommandName</code>. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip.</td>
+</tr>
+</tbody></table></div>
+<p>The session assigns each query a positive signed 64-bit request ID, never reused during
+that session, including across prompt changes. It admits at most one query at a
+time and sends the ID through ordered semantic input as one frame:</p>
+<ol>
+<li><code>F12,q</code> starts the frame.</li>
+<li>Nineteen <code>F12,digit</code> chords carry the decimal ID, padded with leading zeroes.</li>
+<li><code>F12,e</code> commits the frame and invokes the completer.</li>
+</ol>
+<p>The hook echoes the supplied ID and its current prompt epoch; it keeps no
+independent request counter. Missing, incomplete, zero, overflowing, or otherwise
+invalid frames are ignored without editing the buffer or invoking completion.
+Starting a new frame or announcing <code>Ready</code> discards any partial frame. Commit
+consumes the frame once, including when validation fails, and invalid frames emit
+no reply.
+Replies must match the active prompt epoch and pending request ID, as well as
+the captured command and cursor. A request processed after a prompt change cannot
+satisfy a later query because its ID remains distinct. Wrong epochs or IDs are
+ignored; a matched malformed reply fails its query. Unsolicited result metadata
+has no editing authority.</p>
+<p>The hook samples PSReadLine&#39;s input buffer and cursor before invoking completers,
+then checks both again immediately before emitting a successful result. If either
+differs, or the final read fails, it emits <code>Failed</code> without candidates. This also
+applies when a completer throws after changing the editor. Terminal repainting
+does not itself change that buffer. The host treats this correlated buffer
+confirmation separately from its screen-derived command observation; see the
+<a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional-edit contract</a>
+for its lifetime and final admission checks.</p>
+<p><code>Ready</code> is accepted only within an active primary-screen OSC 133 prompt, after
+<code>A</code>; it may precede <code>B</code>. Command start/finish (<code>C</code>/<code>D</code>), a local primary-buffer
+clear, or an observed alternate-screen transition revoke the completion hook.
+A new <code>A</code> also clears the previous epoch and requires a fresh announcement.
+Prompt announcements never reset the session&#39;s request IDs. Every accepted
+announcement invalidates earlier editing contexts and pending results,
+including announcements that change only <code>PrefixReset</code>.
+The hook reinstalls its private PSReadLine bindings before each <code>Ready</code> announcement.
+Readiness advertises the prompt&#39;s hook, not completion of prompt rendering or
+PSReadLine initialization. The query handler reads the editor when the shell
+processes the completed request frame.</p>
+<p><code>PrefixReset</code> lets acceptance clear the text before the real cursor through
+<code>PSConsoleReadLine.Replace(0, cursor, &quot;&quot;)</code>, then paste the edited prefix in the same
+ordered input operation. Text after the cursor is preserved. This avoids relying
+on version-dependent Delete/Backspace behavior. The binding does not execute the
+command and preserves <code>LASTEXITCODE</code>. This capability has the same prompt lifetime
+as the completion hook.</p>
+<p>Complete custom OSC collection is capped at 256 KiB with this producer installed;
+built-in command limits remain unchanged. Replies contain at most 128 candidates,
+a 4096 UTF-16-unit command and replacement, a 512-unit label, and a 1024-unit
+tooltip per candidate. Ranges must contain the cursor and stay within the buffer
+on scalar boundaries. Command, application-name, and replacement controls are rejected. Application names are limited to 512 UTF-16 units. The hook
+bounds its serialized body below the collection limit and preserves <code>LASTEXITCODE</code>.</p>
+<p>Empty command buffers use bounded <code>Get-Command</code> discovery. The hook uses PowerShell&#39;s
+parser to quote command names that require explicit invocation. For simple executable
+names it removes an extension only after resolving the long and short invocation
+to the same application/script path and type. Shadowing functions and aliases do
+not authorize that normalization. The command authority and catalog enrichment
+policy belongs to the <a href="../../ketraterm-completion/docs/completion-architecture.html#internal-implementation">completion engine</a>.</p>
+<p>Each caller&#39;s wait expires after ten seconds, allowing cold PowerShell module
+discovery. Callers can cancel earlier. Native completers run in the shell and may
+continue after host cancellation. See the session&#39;s
+<a href="../../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">query lifecycle and conditional editing contract</a>
+for shared queries, wire-slot retirement, and validation before suggestion acceptance.</p>
+<h2 id="private-bash-command-inventory">Private Bash command inventory</h2>
+<p>Bash and zsh share a versioned snapshot protocol. Each message uses
+<code>OSC 633;KetraTermCommands;3;... BEL</code> for PATH executables and
+<code>OSC 633;KetraTermShellCommands;3;... BEL</code> for shell-local commands (or ST).
+Each source has independent epochs, scan order, deadlines, and atomic snapshots:</p>
+<p>Workspace PATH workers write their <code>Begin</code>/<code>Chunk</code>/<code>End</code> or <code>Fail</code> envelopes to
+<code>path.pending</code> in a private session directory, then rename it to <code>path.ready</code>.
+They never write to the PTY: concurrent terminal writes can split and interleave
+OSC envelopes with Readline/ZLE redraws or prompt markers. <code>Ready</code> and shell-local
+metadata remain foreground output. The host supplies the mailbox through
+<code>KetraTerm_COMMAND_INVENTORY_DIRECTORY</code> (WSL receives a translated guest path).
+The optional <code>ShellCommandInventoryInput</code> accepts only complete BEL-terminated
+PATH envelopes, at most 8 MiB encoded and 258 frames, and checks the live epoch
+before passing records to the same inventory decoder. It cannot inject terminal
+text, prompt markers, native completion replies, or environment announcements.
+File arrival may precede <code>Ready</code>; the host retains one bounded pending file and
+retries, replacing it when a newer file arrives. Terminal bytes are never injected
+or replayed to deliver file metadata. Session closure detaches the input.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Suffix</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Ready;epoch</code></td>
+<td>Announce the current shell environment.</td>
+</tr>
+<tr>
+<td><code>Begin;epoch;scan</code></td>
+<td>Start a complete replacement snapshot.</td>
+</tr>
+<tr>
+<td><code>Chunk;epoch;scan;sequence;data</code></td>
+<td>Append complete records; sequences start at zero.</td>
+</tr>
+<tr>
+<td><code>End;epoch;scan;chunks;entries;bytes</code></td>
+<td>Verify exact totals and atomically publish.</td>
+</tr>
+<tr>
+<td><code>Fail;epoch;scan;reason</code></td>
+<td>Abandon the scan (<code>Overflow</code> or <code>Unavailable</code> from workspace hooks).</td>
+</tr>
+</tbody></table></div>
+<p>Epochs have 32 lowercase hexadecimal characters; scan IDs are positive increasing
+integers within an epoch. A changed Ready epoch clears that source&#39;s old command authority and
+publishes <code>PENDING</code>. Same-environment refresh keeps the last complete snapshot,
+including when refresh fails. Without a complete snapshot, failure publishes
+<code>UNAVAILABLE</code>; it does not enable unverified catalog fallback. Other ready sources
+remain usable. Shell-local names override matching PATH entries. The merged
+snapshot enforces the same entry/text limits; combined overflow publishes
+unavailable rather than truncating. READY can contain one ready source while
+another is pending. Retained source snapshots share candidate strings with the
+merged index; at most two bounded source assemblies can exist. Null session inventory
+means no installed producer. Superseded epoch/scan messages cannot publish results.</p>
+<p><code>data</code> is standard Base64 of UTF-8 NUL-terminated quadruples: display name,
+shell-escaped insertion, kind (<code>C</code> command or <code>A</code> alias), and literal alias definition.
+An empty insertion reuses the name. Command definitions must be empty; empty alias
+definitions also represent definitions exceeding the producer&#39;s 4096-byte bound.
+Definitions are never executed. Zero chunks/entries/bytes at End publishes a complete
+empty inventory. Duplicate names, controls in names/insertions, invalid UTF-8,
+unknown kinds, incomplete records, missing/repeated/out-of-order chunks, and
+incorrect totals reject the entire scan.</p>
+<p>Decoded chunks are at most 48 KiB, with at most 256 chunks, 4 MiB decoded bytes,
+32,768 entries, and 2,097,152 retained UTF-16 text units per snapshot. Names allow
+512 units and insertions/definitions 4096 each. Identical name/insertion strings
+share storage. Workspace hooks enforce conservative UTF-8 byte budgets for text.
+The existing 256 KiB custom OSC bound still applies independently. Overflow emits
+Fail, never a successful truncated End. Assemblies expire after 60 seconds when
+protocol/output activity next checks the deadline; idle partial buffers remain
+bounded and are released at session closure. Completed snapshots expose an immutable
+sorted list, binary prefix lookup, and a cached alias map.</p>
+<p>The workspace PATH collector streams immediate directory entries under separate
+scan budgets: 4,096 PATH components, 131,072 entries, and 16 MiB of entry bytes
+(including <code>./</code> and NUL delimiters). Components count even when empty, repeated,
+or inaccessible; entries count before duplicate, executable, or directory filtering.
+Emitted names remain limited to 32,768 unique executables and 2 MiB including
+NUL terminators. Exceeding any budget emits <code>Overflow</code>. The collector requires a
+compatible <code>find</code> from PATH or the shell&#39;s standard utility path. Missing tools
+and incomplete enumeration emit <code>Unavailable</code>. These budgets bound the collector&#39;s
+own storage and work, not the external utility&#39;s memory or filesystem call duration.</p>
+<p>Workspace hooks check shell-local state and PATH independently at each prompt,
+with at most one background PATH worker. Bounded shell-local state publishes
+at the prompt, independently of PATH I/O. Unchanged PATH discovery is eligible 60 seconds after a prompt observes its
+worker completing. Shell-local changes reuse executable authority; only PATH
+changes, or directory changes with relative/empty PATH entries, invalidate it.
+PATH changes during an active worker require a subsequent prompt after it finishes.
+This is one-way shell
+metadata, not a terminal query: it emits no host reply, installs no key binding,
+and grants no editing authority. Consumers retain ordinary conditional-edit checks.
+It supplies command availability and alias definitions for semantic argument analysis;
+it does not advertise native argument or remote filesystem completion.
+See <a href="../features/completion.html#sources-by-host">completion scope</a>.</p>
+<h2 id="streaming-grapheme-placement">Streaming grapheme placement</h2>
+<p>Printable prefixes are published at each parser call boundary. Segmentation
+continues across calls; retained continuations update the same cell with its
+original attributes. Core adjusts the following cursor and pending wrap.</p>
+<p>Publication commits grid effects. Later width changes do not relocate the
+cluster, reverse completed wraps/scrolls/insert shifts, or restore overwritten
+text. Narrowing frees a spacer as blank; widening consumes a neighboring cell
+when it fits. At the right margin, text remains in the single available cell.
+A rejected initial write has no continuation target.</p>
+<p>Whole-input and split-input placement can therefore differ at margins, over
+occupied cells, and on tiny grids. Retained text, cell integrity, and following
+text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
+and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
+<h2 id="screen-to-history-clear">Screen-to-history clear</h2>
+<p>Kitty ED 22 (<code>CSI 22 J</code>) retains the primary display in bounded scrollback, then
+clears the viewport like ED 2. Text rows move with their attributes, grapheme
+payloads, line identities, and soft-wrap provenance. Images retain their immutable
+pixel resources; off-bottom image portions are cropped before retention, and
+history eviction clips or removes placements normally.</p>
+<p>Trailing rows without stored text or visible images are omitted. Explicit spaces
+count as text; blank rows between occupied rows remain. An empty display does
+not add history. Existing history is preserved up to the configured capacity;
+zero capacity still clears the display.</p>
+<p>Retention requires the primary screen and a full-height vertical scroll region.
+On alternate screens or with partial-height regions, ED 22 only clears. Horizontal
+margins do not restrict the operation. Cursor position, pen, modes, margins, tabs,
+saved cursor, and inactive screen survive; pending wrap is cancelled. Cleared
+cells use the current erase attributes and fresh line identities, as for ED 2.
+Protection does not prevent this ordinary erase. The selective form <code>CSI ? 22 J</code>
+is unsupported and ignored. Colon subparameters and extra parameters on ED 22
+are rejected without erasing or admitting history.</p>
+<p>Reference: <a href="https://sw.kovidgoyal.net/kitty/misc-protocol/#an-escape-code-to-move-the-contents-of-the-screen-into-the-scrollback">Kitty&#39;s screen-to-scrollback extension</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm benchmarks · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="v0.5.0">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm benchmarks</span></li></ol></nav><div class="doc-version"><span>v0.5.0</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#build-and-run">Build and run</a><a class="depth-2" href="#select-a-measurement-boundary">Select a measurement boundary</a><a class="depth-3" href="#sticky-command-headers">Sticky command headers</a><a class="depth-3" href="#reverse-wrap-cursor-motion">Reverse-wrap cursor motion</a><a class="depth-3" href="#application-mouse-behavior">Application mouse behavior</a><a class="depth-3" href="#first-parser-input">First parser input</a><a class="depth-3" href="#storage-lifecycle">Storage lifecycle</a><a class="depth-3" href="#fresh-terminal-log-ingestion">Fresh-terminal log ingestion</a><a class="depth-2" href="#report-results">Report results</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-benchmarks">KetraTerm benchmarks</h1>
+<p>JMH measurements for parser, core, input, session, render-cache, completion, and
+Swing behavior. This is a development module, not a consumer library.</p>
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/results/shell-command-inventory/README.md">shell inventory guide</a> explains how
+to measure snapshot construction, lookups, and native shell discovery.</p>
+<h2 id="build-and-run">Build and run</h2>
+<p>Use JDK 25 and the repository Gradle wrapper; see the
+<a href="../CONTRIBUTING.html">development prerequisites</a>. Run commands
+from the repository root. On Windows, use <code>gradlew.bat</code> in place of <code>./gradlew</code>.</p>
+<p>Compile and package the benchmark harnesses without running measurements:</p>
+<pre><code class="language-text">./gradlew :ketraterm-benchmarks:jmhJar
+</code></pre>
+<p>The executable JAR is written under <code>ketraterm-benchmarks/build/libs</code>. Replace
+<code>&lt;jmh-jar&gt;</code> below with its path. List available benchmarks and command options:</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; -l
+java -jar &lt;jmh-jar&gt; -h
+</code></pre>
+<p>Run a selected warmed parser workload and save the raw results:</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalParserBenchmark.parseIsolated&quot; -p workload=ascii -wi 3 -i 5 -w 1s -r 1s -f 3 -t 1 -prof gc -rf json -rff parser.json
+</code></pre>
+<p>Filters are regular expressions over benchmark names. <code>-p</code> selects an annotated
+parameter; inspect the benchmark&#39;s source for available values. An invocation may
+process a whole input buffer or batch, so an operation is not necessarily one
+byte, cell, or key.</p>
+<p>The full warmed suite is available through:</p>
+<pre><code class="language-text">./gradlew :ketraterm-benchmarks:jmh
+</code></pre>
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/build.gradle.kts">Gradle configuration</a> defines suite defaults and excludes
+the first-input benchmark. Direct JAR runs use annotations unless overridden.</p>
+<h2 id="select-a-measurement-boundary">Select a measurement boundary</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Representative benchmarks</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Parsing without core mutation</td>
+<td><code>TerminalParserBenchmark</code>, <code>TerminalGraphemeBenchmark</code> with <code>pipeline=parser</code></td>
+</tr>
+<tr>
+<td>Core writes, scrolling, erasure, and frame copying</td>
+<td><code>TerminalCoreWriteBenchmark</code>, <code>TerminalCoreScrollBenchmark</code>, <code>TerminalCoreEraseBenchmark</code>, <code>TerminalBufferBenchmark</code></td>
+</tr>
+<tr>
+<td>REP and repeated scalar writes</td>
+<td><code>TerminalRepeatBenchmark</code>; equivalent 8/80/1024-cell output through scalar writes, bulk writes, REP bytes, or expanded ASCII bytes. Each invocation starts at home and overwrites the same grid without scrolling.</td>
+</tr>
+<tr>
+<td>History disposal and reuse after extended attributes are cleared</td>
+<td><code>TerminalStorageLifecycleBenchmark</code></td>
+</tr>
+<tr>
+<td>Input encoding and session output through transport completion</td>
+<td><code>TerminalInputBenchmark</code>, <code>TerminalPasteBenchmark</code>, <code>TerminalSessionOutputBenchmark</code></td>
+</tr>
+<tr>
+<td>OSC 22 parsing and pointer metadata reads</td>
+<td><code>TerminalPointerShapeBenchmark</code>; parsing is per request, three per invocation. Excludes Swing/native cursor updates.</td>
+</tr>
+<tr>
+<td>Published-frame access and viewport projection</td>
+<td><code>TerminalRenderLeaseBenchmark</code>, <code>RetainedFrameViewportBenchmark</code></td>
+</tr>
+<tr>
+<td>Warmed image placement publication and copying</td>
+<td><code>TerminalGraphicsFrameBenchmark</code>; <code>placements=0,1,4096</code> share one pixel resource. Upload and capacity growth occur in setup; Java2D painting is excluded.</td>
+</tr>
+<tr>
+<td>Warmed image raster reuse and software painting</td>
+<td><code>TerminalGraphicsPaintBenchmark</code>; opaque/translucent native and scaled images, prompt dividers, and dense shared-resource placements. The <code>opaque-scroll</code>/<code>translucent-scroll</code> workloads also copy alternating live/history viewports, completely hiding and revealing the existing image each invocation. Includes Java2D scaling/clipping allocation, excluding upload, publication, and Swing dispatch.</td>
+</tr>
+<tr>
+<td>Allocation-permitted image replacement</td>
+<td><code>TerminalGraphicsReplacementBenchmark</code>; alternating raw RGBA uploads replace one image ID, publish/copy the new frame and construct a new Swing raster. Includes Base64 parsing, transfer staging, canonical pixels and cache-pressure eviction; excludes fixture encoding, PNG/zlib decoding and painting. <code>side=64,512</code> selects the source dimensions.</td>
+</tr>
+<tr>
+<td>Completion evaluation and directory scanning</td>
+<td><code>TerminalCompletionBenchmark</code>, <code>TerminalDirectoryCompletionBenchmark</code>, <code>TerminalLearnedRankingBenchmark</code></td>
+</tr>
+<tr>
+<td>Swing text, search, hyperlinks, and painting</td>
+<td><code>TerminalTextRenderingBenchmark</code>, <code>TerminalSearchScanBenchmark</code>, <code>TerminalSearchRefreshBenchmark</code>, <code>TerminalHyperlinkDiscoveryBenchmark</code>, <code>SwingPaintBenchmark</code></td>
+</tr>
+<tr>
+<td>Color-policy resolution without Java2D</td>
+<td><code>TerminalColorResolutionBenchmark</code>; warmed reusable row buffers, selection/search foregrounds and contrast-cache hits or changing truecolor. <code>ratio=1.0,3.0,4.5</code> includes disabled, default and stronger contrast. Its owner-thread allocation counter excludes Swing dispatch and painting.</td>
+</tr>
+<tr>
+<td>Sticky prompt overlay updates and painting</td>
+<td><code>StickyCommandHeaderBenchmark</code>; hidden/ASCII/Unicode cases, warmed fractional updates, cached raster painting, and separate command-transition preparation.</td>
+</tr>
+<tr>
+<td>Prompt decoration software painting</td>
+<td><code>TerminalPromptDecorationBenchmark</code>; warmed default/custom colors with identical alpha values. Includes Java2D antialiasing/compositing allocation, excluding fixture construction.</td>
+</tr>
+</tbody></table></div>
+<p>Read the selected fixture before interpreting a result. Isolated parsing uses a
+no-op command sink; frame publication is separate from painting; directory scans
+use a temporary directory on the filesystem selected by the JVM. These workloads
+measure different boundaries and cannot substitute for an end-to-end terminal
+measurement.</p>
+<p>For complete component painting, <code>SwingPaintBenchmark.paintPublishedFrame</code>
+paints 64 frames per invocation on the EDT and reports operations per frame.
+The GC profiler includes painting, amortized EDT dispatch, and other JVM-thread
+allocation. A zero allocation result from the color-policy helper is not a
+zero allocation claim for a complete frame. For example:</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*SwingPaintBenchmark.paintPublishedFrame&quot; -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=true -wi 3 -i 5 -w 1s -r 1s -f 1 -t 1 -prof gc
+</code></pre>
+<h3 id="sticky-command-headers">Sticky command headers</h3>
+<p><code>StickyCommandHeaderBenchmark.fractionalScroll</code> measures owner-thread state updates
+without EDT dispatch or source reads. <code>countUpdateAllocations</code> uses the same
+owner-thread allocation counter as the color-policy benchmark, batching 128 warmed
+updates per invocation. <code>paint</code> measures the cached raster composite; <code>commandTransition</code>
+includes new raster preparation and is intentionally allocation-permitted. Prompt
+snapshots and fixture construction occur in setup. ASCII and Unicode cases use the
+same terminal painter as the normal grid.</p>
+<pre><code class="language-text">java -Xms128m -Xmx512m -jar &lt;jmh-jar&gt; &quot;.*StickyCommandHeaderBenchmark.*&quot; -wi 2 -i 3 -w 1s -r 1s -f 1 -t 1 -foe true -prof gc -rf json -rff sticky-header.json
+java -Xms128m -Xmx512m -jar &lt;jmh-jar&gt; &quot;.*SwingPaintBenchmark.paintPublishedFrame&quot; -p focused=true -p columns=80 -p rows=24 -p workload=ascii -p selected=false -p stickyHeaders=false,true -wi 2 -i 3 -w 1s -r 1s -f 1 -t 1 -foe true -prof gc -rf json -rff sticky-full-paint.json
+</code></pre>
+<p>The complete-component comparison uses the same retained prompt and output with
+only the overlay toggle changed. It includes amortized EDT dispatch and Java2D
+costs. Keep this boundary separate from the update-only allocation counter; neither
+establishes zero allocation for all terminal workloads or platforms. These short
+runs are useful validation; use additional forks and longer measurements for
+performance comparisons. Run under JDK 25, even if a different Java is on <code>PATH</code>.</p>
+<h3 id="reverse-wrap-cursor-motion">Reverse-wrap cursor motion</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalReverseWrapBenchmark.kt">TerminalReverseWrapBenchmark</a>
+measures direct core and parser/host CUB with <code>Int.MAX_VALUE</code> on a fixed 80×24
+soft-wrapped screen. <code>mode=0</code> measures ordinary clamping, <code>45</code> checks wrapped
+rows, and <code>1045</code> cycles using cell-offset arithmetic. Each operation includes
+cursor positioning and CUB; construction, seeding, and input encoding occur
+outside measurement. Trial teardown verifies the final cursor and history.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalReverseWrapBenchmark.*&quot; -p mode=0,45,1045 -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff reverse-wrap.json
+</code></pre>
+<h3 id="application-mouse-behavior">Application mouse behavior</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalMouseBehaviorBenchmark.kt">TerminalMouseBehaviorBenchmark</a>
+measures one packed routing-state read or four parser/host preference changes.
+The terminal, parser, and bytes are constructed before measurement. Trial
+teardown verifies the resulting flags and untouched cursor/history. The GC
+profile covers these primitive state/protocol paths, rather than Swing event
+construction or an entire painted frame.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalMouseBehaviorBenchmark.*&quot; -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff mouse-behavior.json
+</code></pre>
+<h3 id="first-parser-input">First parser input</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt">TerminalParserFirstInputBenchmark</a>
+measures one parser input in each fresh JVM fork. Parser construction and payload
+encoding happen before timing; lazy initialization triggered by the first input
+is included. Its setup requires single-shot mode, one thread, no warmup, one
+measurement iteration, and a batch size of one.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalParserFirstInputBenchmark.*&quot; -wi 0 -i 1 -f 15 -t 1 -bm ss -tu us -prof gc -rf json -rff first-input.json
+</code></pre>
+<p>GC-profiler results include harness activity and do not isolate Unicode table
+initialization allocation.</p>
+<h3 id="storage-lifecycle">Storage lifecycle</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalStorageLifecycleBenchmark.kt">TerminalStorageLifecycleBenchmark</a>
+uses public core operations on a 120×24 terminal. <code>discardHistory</code> measures ED 3
+while preserving visible content and the cursor; <code>clearAll</code> also clears the
+viewport and homes the cursor. Both are single-shot measurements with 10,000
+history rows. <code>content=ascii</code> fills 119 cells; <code>cluster</code> replaces the first cell
+with a two-codepoint combining cluster. <code>clusterEnd</code> fills the first 119 cells
+with ASCII and puts a cluster in the final column; <code>denseClusters</code> fills all
+120 columns with clusters. The latter two cases exercise disposal when cluster
+handles extend to the row&#39;s end and when every cell owns a handle.
+Each iteration repopulates the same buffer with preallocated payloads outside
+timing. Iteration teardown checks history disposal, visible cells, clusters,
+and cursor semantics.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalStorageLifecycleBenchmark.(discardHistory|clearAll)&quot; -bm ss -wi 15 -i 15 -f 2 -t 1 -prof gc -rf json -rff storage-history.json
+</code></pre>
+<p>Keep single-shot mode and a batch size of one for those two methods. GC-profiler
+totals include history repopulation and semantic teardown; they do not isolate
+allocation in history disposal.</p>
+<p><code>writeShiftErase</code> writes an ASCII row, inserts/deletes a cell at its midpoint,
+and erases its trailing half for all 24 rows. <code>clearScreen</code> repeatedly clears an
+already blank viewport. <code>extendedHistory=never</code> uses rows that have never held
+extended attributes; <code>cleared</code> first writes every cell with a hyperlink and
+clears the viewport with a zero hyperlink pen. These warmed methods retain the
+same rows and have no invocation or iteration setup. One operation covers one
+viewport; trial teardown verifies default attributes and the resulting cells.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalStorageLifecycleBenchmark.(writeShiftErase|clearScreen)&quot; -wi 3 -i 5 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff storage-steady.json
+</code></pre>
+<h3 id="fresh-terminal-log-ingestion">Fresh-terminal log ingestion</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt">TerminalLogIngestionBenchmark</a>
+ingests a fixed 6,000-line ASCII log into a fresh fixture for each shot. Its
+<code>pipeline</code> parameter selects direct core writes, isolated parsing, or parser-to-core
+ingestion. Core and host variants verify retained cells, wrapping, history
+eviction, and the final cursor during teardown.</p>
+<pre><code class="language-text">java -jar &lt;jmh-jar&gt; &quot;.*TerminalLogIngestionBenchmark.ingest&quot; -p pipeline=host -p columns=80 -p maxHistory=13107 -p chunkBytes=4096 -bm ss -wi 60 -i 30 -f 3 -t 1 -tu ms -prof gc -rf json -rff log-ingestion.json
+</code></pre>
+<p>Keep single-shot mode and a batch size of one. This workload excludes transport,
+session publication workers, compatibility projection, and frontend rendering.
+GC-profiler totals include fixture setup and must not be reported as ingestion
+allocation alone.</p>
+<h2 id="report-results">Report results</h2>
+<p>Record the Git revision, JDK build, JVM arguments, OS, CPU, filesystem or graphics
+environment where relevant, complete command, parameter values, and raw JMH
+output. Compare the same workload, timing boundary, warmup, forks, and profiler
+settings. Check semantic tests before attributing a difference to an optimization.</p>
+<p>Report score uncertainty and allocation units alongside the score. Small or
+rounded allocation results do not establish that a public API never allocates;
+setup, harness activity, background work, and warmed caches can affect the result.
+Use additional forks and repeated runs when a difference is close to measurement
+noise.</p>
+<p>See <a href="Module.html">Module.md</a> for source sets and harness dependencies. The
+<a href="../ketraterm-ui-swing/docs/bifurcated-text-rendering.html">Swing rendering guide</a>
+provides rendering workload context.</p>
+<p><code>TerminalStorageLifecycleBenchmark.rewriteClusters</code> rewrites all 120 × 24 cells
+with prebuilt clusters of 2 or 32 codepoints. The buffer and payload are created
+once per trial; allocation profiling measures sustained writes and payload reuse
+after JMH warmup. Trial teardown verifies every payload and cursor placement.
+<code>resizeClusters -p length=32</code> alternates 2- and 32-codepoint payloads across that
+viewport to force dead regions and compaction. Its payloads are also prebuilt;
+the final retained prefix is verified outside the measured loop.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-benchmarks/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

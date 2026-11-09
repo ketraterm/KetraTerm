@@ -19,15 +19,15 @@
       <a class="brand" href="index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
       <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="index.html" aria-current="true">Library</a></nav>
     </div>
-    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="guides/v0.4.0/docs/README.html">Guides</a><a   href="guides/v0.4.0/modules.html">Modules</a><a   href="versions.html">API & versions</a><a   href="guides/v0.4.0/CHANGELOG.html">Changelog</a><a  class="nav-primary" href="guides/v0.4.0/README.html">Get started</a></nav></details>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="guides/v0.5.0/docs/README.html">Guides</a><a   href="guides/v0.5.0/modules.html">Modules</a><a   href="versions.html">API & versions</a><a   href="guides/v0.5.0/CHANGELOG.html">Changelog</a><a  class="nav-primary" href="guides/v0.5.0/README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
   <main id="main" tabindex="-1"><section class="wrap library-hero">
-    <div class="library-heading"><p class="product-label">Kotlin/JVM terminal library</p><h1>A terminal engine.<br>Built for your app.</h1><p class="lead">A modular terminal engine with Swing and headless entry points. You own the transport, host services, and presentation.</p><div class="actions"><a class="button" href="guides/v0.4.0/README.html">Get started</a><a class="button secondary" href="versions.html">API reference</a></div></div>
+    <div class="library-heading"><p class="product-label">Kotlin/JVM terminal library</p><h1>A terminal engine.<br>Built for your app.</h1><p class="lead">A modular terminal engine with Swing and headless entry points. You own the transport, host services, and presentation.</p><div class="actions"><a class="button" href="guides/v0.5.0/README.html">Get started</a><a class="button secondary" href="versions.html">API reference</a></div></div>
     <div class="code-panel">
       <div class="panel-title"><span>build.gradle.kts</span><span>Kotlin DSL</span></div>
       <div class="entry-switch" role="group" aria-label="Choose a library entry point">
-        <button type="button" data-library-entry="swing" data-guide="guides/v0.4.0/ketraterm-swing/README.html" aria-pressed="true">Swing view</button><button type="button" data-library-entry="headless" data-guide="guides/v0.4.0/ketraterm-headless/README.html" aria-pressed="false">Headless session</button>
+        <button type="button" data-library-entry="swing" data-guide="guides/v0.5.0/ketraterm-swing/README.html" aria-pressed="true">Swing view</button><button type="button" data-library-entry="headless" data-guide="guides/v0.5.0/ketraterm-headless/README.html" aria-pressed="false">Headless session</button>
       </div>
       <pre><code><span class="code-key">dependencies</span> {
     implementation(platform(
@@ -37,29 +37,29 @@
         <span class="code-string">"io.github.ketraterm:<span id="library-dependency">ketraterm-swing</span>"</span>
     )
 }</code></pre>
-      <div class="code-footer"><a id="library-entry-link" href="guides/v0.4.0/ketraterm-swing/README.html">Entry point guide ↗</a><a href="guides/v0.4.0/README.html#using-the-libraries">Repositories & versions ↗</a></div>
+      <div class="code-footer"><a id="library-entry-link" href="guides/v0.5.0/ketraterm-swing/README.html">Entry point guide ↗</a><a href="guides/v0.5.0/README.html#using-the-libraries">Repositories & versions ↗</a></div>
     </div>
   </section>
   <div class="wrap"><div class="runtime-rail"><span>Java 25</span><span>Kotlin 2.4+</span><span>Kotlin & Java APIs</span><span>Apache 2.0</span></div></div>
   <section class="wrap section">
-    <div class="section-heading"><h2>Compose the terminal you need.</h2><a href="guides/v0.4.0/modules.html">Browse modules ↗</a></div>
+    <div class="section-heading"><h2>Compose the terminal you need.</h2><a href="guides/v0.5.0/modules.html">Browse modules ↗</a></div>
     <div class="integration-map">
-      <a href="guides/v0.4.0/ketraterm-transport-api/README.html"><span class="integration-label">Your transport</span><h3>Ordered bytes in and out.</h3><p>Supply a connector. Add local PTY processes when you need them.</p><code>TerminalConnector</code></a>
+      <a href="guides/v0.5.0/ketraterm-transport-api/README.html"><span class="integration-label">Your transport</span><h3>Ordered bytes in and out.</h3><p>Supply a connector. Add local PTY processes when you need them.</p><code>TerminalConnector</code></a>
       <span class="pipeline-arrow" aria-hidden="true">→</span>
-      <a href="guides/v0.4.0/ketraterm-session/README.html"><span class="integration-label">Terminal session</span><h3>State, input, and lifecycle.</h3><p>Parse output, maintain grid and history, and serialize terminal input.</p><code>TerminalSession</code></a>
+      <a href="guides/v0.5.0/ketraterm-session/README.html"><span class="integration-label">Terminal session</span><h3>State, input, and lifecycle.</h3><p>Parse output, maintain grid and history, and serialize terminal input.</p><code>TerminalSession</code></a>
       <span class="pipeline-arrow" aria-hidden="true">→</span>
-      <a href="guides/v0.4.0/ketraterm-ui-swing/README.html"><span class="integration-label">Your presentation</span><h3>A view that fits your host.</h3><p>Embed Swing or read frames for your own renderer.</p><code>SwingTerminal / frame readers</code></a>
+      <a href="guides/v0.5.0/ketraterm-ui-swing/README.html"><span class="integration-label">Your presentation</span><h3>A view that fits your host.</h3><p>Embed Swing or read frames for your own renderer.</p><code>SwingTerminal / frame readers</code></a>
     </div>
-    <div class="integration-extras"><span>Add what your host needs.</span><a href="guides/v0.4.0/ketraterm-pty/README.html">Local PTY</a><a href="guides/v0.4.0/docs/features/shells.html">Shell integration</a><a href="guides/v0.4.0/docs/features/completion.html">Completion</a><a href="guides/v0.4.0/docs/library/configuration.html">Host services</a></div>
+    <div class="integration-extras"><span>Add what your host needs.</span><a href="guides/v0.5.0/ketraterm-pty/README.html">Local PTY</a><a href="guides/v0.5.0/docs/features/shells.html">Shell integration</a><a href="guides/v0.5.0/docs/features/completion.html">Completion</a><a href="guides/v0.5.0/docs/library/configuration.html">Host services</a></div>
   </section>
   <section class="wrap section help-section">
     <div><h2>Know the contracts.</h2><p>Supported capabilities, customization, and versioned reference material for your integration.</p></div>
     <div class="link-list">
-      <a href="guides/v0.4.0/docs/terminal-feature-map.html">Terminal features <span aria-hidden="true">↗</span></a>
-      <a href="guides/v0.4.0/docs/features/embedding.html">Embedding & customization <span aria-hidden="true">↗</span></a>
-      <a href="guides/v0.4.0/docs/terminal-feature-gap-map.html">Known limitations <span aria-hidden="true">↗</span></a>
-      <a href="guides/v0.4.0/docs/library/compatibility.html">Compatibility & migrations <span aria-hidden="true">↗</span></a>
-      <a href="guides/v0.4.0/CHANGELOG.html">Library changelog <span aria-hidden="true">↗</span></a>
+      <a href="guides/v0.5.0/docs/terminal-feature-map.html">Terminal features <span aria-hidden="true">↗</span></a>
+      <a href="guides/v0.5.0/docs/features/embedding.html">Embedding & customization <span aria-hidden="true">↗</span></a>
+      <a href="guides/v0.5.0/docs/terminal-feature-gap-map.html">Known limitations <span aria-hidden="true">↗</span></a>
+      <a href="guides/v0.5.0/docs/library/compatibility.html">Compatibility & migrations <span aria-hidden="true">↗</span></a>
+      <a href="guides/v0.5.0/CHANGELOG.html">Library changelog <span aria-hidden="true">↗</span></a>
     </div>
   </section></main>
   <footer>

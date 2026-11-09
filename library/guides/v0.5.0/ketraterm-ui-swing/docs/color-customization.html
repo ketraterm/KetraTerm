@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Color customization · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="v0.5.0">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-ui-swing</a></li><li><span aria-current="page">Color customization</span></li></ol></nav><div class="doc-version"><span>v0.5.0</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#selection">Selection</a><a class="depth-2" href="#search-matches">Search matches</a><a class="depth-2" href="#prompt-decorations">Prompt decorations</a><a class="depth-2" href="#search-controls">Search controls</a><a class="depth-2" href="#terminal-overrides-and-precedence">Terminal overrides and precedence</a><a class="depth-2" href="#contrast-and-faint-text">Contrast and faint text</a><a class="depth-2" href="#migration">Migration</a></nav></details><div class="article-content"><div class="prose"><h1 id="color-customization">Color customization</h1>
+<p>Configure an immutable <code>SwingSettings</code> snapshot on the EDT. Return the new snapshot
+from the view&#39;s settings provider and call <code>reloadSettings()</code>. View color settings
+do not rewrite stored cell attributes. The <a href="../../docs/library/configuration.html">configuration guide</a>
+explains session and host ownership.</p>
+<h2 id="selection">Selection</h2>
+<p><code>selectionStyle</code> configures focused selection. Until a host assigns it, the
+selection fill follows the session palette and uses a visible light/dark fallback.
+Assigning a style makes its fill exact, even if it equals the default value.
+<code>inactiveSelectionStyle = null</code> inherits the focused policy; supplying a style
+configures the unfocused view independently. Focus changes repaint the view
+without changing the selection.</p>
+<pre><code class="language-kotlin">val settings = SwingSettings.create {
+    it.selectionStyle = SwingSelectionStyle(
+        background = 0x804B6EAF.toInt(),
+        foreground = 0xFFFFFFFF.toInt(),
+    )
+    // Preserve terminal/link/search text colors in the unfocused view.
+    it.inactiveSelectionStyle = SwingSelectionStyle(background = 0x404B6EAF)
+}
+</code></pre>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>background</code></td>
+<td>Explicit styles use an exact ARGB fill, blended over the existing cell/search/link background. Zero alpha leaves that background visible. <code>SwingSelectionStyle()</code> supplies <code>0x66FFFFFF</code> when explicitly assigned. Untouched settings use the palette-aware default.</td>
+</tr>
+<tr>
+<td><code>foreground = null</code></td>
+<td>Preserve terminal/link/search text presentation.</td>
+</tr>
+<tr>
+<td>Opaque <code>foreground</code></td>
+<td>Replace selected text color. Transparent text overrides are rejected.</td>
+</tr>
+<tr>
+<td><code>reverseVideo = true</code></td>
+<td>Swap each selected cell&#39;s original terminal foreground/background after inverse attributes. Configured foreground/background are unused in this mode. Images are not inverted.</td>
+</tr>
+</tbody></table></div>
+<p>Use <code>SwingSelectionStyle(reverseVideo = true)</code> for cell-based reverse selection.
+Linear/block selections, bidirectional rows, wide cells, and graphemes share the
+view&#39;s normal selection geometry. Concealed and blink-hidden text stays hidden.</p>
+<p><code>selectionBackground</code> remains a convenience getter/setter for
+<code>selectionStyle.background</code>; there is one stored style. Setting this convenience
+property makes the fill exact and preserves the style&#39;s foreground and
+reverse-video choice. For example, changing a reversed selection&#39;s fill requires
+first disabling <code>reverseVideo</code>. Call <code>resetSelectionStyle()</code> on a settings draft
+to restore the palette-aware focused default; it leaves the inactive style alone.</p>
+<h2 id="search-matches">Search matches</h2>
+<p><code>searchMatchStyle</code> and <code>searchActiveMatchStyle</code> independently configure ordinary
+matches and the active navigation result. Each immutable <code>SwingSearchMatchStyle</code>
+has a required background and optional foreground and border. The active style
+does not inherit any roles from the ordinary style.</p>
+<pre><code class="language-kotlin">val settings = SwingSettings.create {
+    it.searchMatchStyle = SwingSearchMatchStyle(
+        background = 0x554B6EAF,
+        border = 0xFF4B6EAF.toInt(),
+    )
+    it.searchActiveMatchStyle = SwingSearchMatchStyle(
+        background = 0xFFFFC857.toInt(),
+        foreground = 0xFF161616.toInt(),
+        border = 0xFFFFFFFF.toInt(),
+    )
+}
+</code></pre>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>background</code></td>
+<td>Exact ARGB fill blended over terminal/link backgrounds. Zero alpha gives a border-only or text-only highlight.</td>
+</tr>
+<tr>
+<td><code>foreground = null</code></td>
+<td>Preserve underlying terminal/link text, including faint presentation.</td>
+</tr>
+<tr>
+<td>Opaque <code>foreground</code></td>
+<td>Replace matched text color before selection and minimum contrast. Transparent text overrides are rejected.</td>
+</tr>
+<tr>
+<td><code>border = null</code></td>
+<td>No outline. A supplied ARGB color adds a one-logical-pixel outline inside each visible contiguous match segment; zero alpha is invisible.</td>
+</tr>
+</tbody></table></div>
+<p>Wrapped matches have an outline on each physical row. Bidirectional matches may
+split into separate visual segments; each segment has its own outline. Borders
+use the same cell geometry as the fill, consume no layout space, and never extend
+into neighboring cells. Selection, glyphs, and the cursor paint over search
+borders. Concealed and blink-hidden text stays hidden; intrinsic color emoji and
+images are not recolored.</p>
+<p>Defaults retain the existing background-only appearance: normal <code>0x55FFD54F</code>,
+active <code>0xAAFF8C00</code>, both foregrounds and borders null. Existing
+<code>searchMatchBackground</code> and <code>searchActiveMatchBackground</code> accessors remain
+convenience aliases for their style&#39;s background. Assigning either preserves
+that style&#39;s foreground and border. Reloading search styles repaints existing
+results without changing the query, active match, or session palette.</p>
+<h2 id="prompt-decorations">Prompt decorations</h2>
+<p>Choose <code>promptDecoration = SwingPromptDecoration.GUTTER</code>, <code>DIVIDER</code>, or <code>NONE</code>.
+Decorations require shell metadata and appear only on the primary screen.
+Prompts without a completed command block use a hollow gutter circle. Dividers
+always remain solid lines. Both styles ignore hover and clicks while a command
+is pending, running, or abandoned. Completed commands use filled gutter circles
+and enable hover styling and click-to-select command blocks for both styles.
+Color overrides belong to <code>SwingSettings</code>; reload a new snapshot on the EDT to
+repaint existing decorations without changing shell records or grid dimensions.</p>
+<p>Gutter and divider modes share the same left padding and
+<code>shellIntegrationDecorationGutterWidth</code>. Switching between these styles preserves
+the text&#39;s horizontal position. Defaults reserve 10 logical pixels for the gutter
+plus 2 pixels of left padding, for a compact 12-pixel total inset in both idle and
+failed-command views. Explicit widths and padding remain authoritative.
+Dots and rails share an axis slightly left of
+the gutter&#39;s center, leaving more space before text. Failed-command rails appear
+in both modes; in divider mode they span the failed prompt and output between
+divider bands. Rails and divider rules align their thickness to device pixels
+at fractional display scales, and adjacent rail segments join without seams.
+Configure the same
+<code>shellIntegrationFailedCommandRailColor</code>, <code>shellIntegrationFailedCommandRailWidth</code>,
+and <code>shellIntegrationFailedCommandRailsVisible</code> settings for either style.
+Disabling rails preserves the shared gutter; alternate screens and
+<code>promptDecoration = NONE</code> do not paint rails. <code>NONE</code> also removes the gutter.</p>
+<pre><code class="language-kotlin">val settings = SwingSettings.create {
+    it.promptDecoration = SwingPromptDecoration.GUTTER
+    it.shellIntegrationPromptDotHoverColor = 0xFFFFFFFF.toInt()
+    it.shellIntegrationFailedPromptDotHoverColor = 0xFFFF8A8A.toInt()
+    it.shellIntegrationPromptDotHoverHaloColor = 0x404B6EAF
+    it.shellIntegrationFailedPromptDotHoverHaloColor = 0x40E74856
+    // Used when promptDecoration is DIVIDER.
+    it.shellIntegrationPromptDividerColor = 0x304B6EAF
+    it.shellIntegrationPromptDividerHoverColor = 0xFF4B6EAF.toInt()
+}
+</code></pre>
+<p>All six overrides accept packed ARGB values or null. Alpha is used as supplied;
+zero alpha hides that part of the decoration. Null restores these defaults:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Override</th>
+<th>Null behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>shellIntegrationPromptDotHoverColor</code></td>
+<td>Retain the normal prompt dot&#39;s resolved color.</td>
+</tr>
+<tr>
+<td><code>shellIntegrationFailedPromptDotHoverColor</code></td>
+<td>Retain <code>shellIntegrationFailedPromptDotColor</code>.</td>
+</tr>
+<tr>
+<td><code>shellIntegrationPromptDotHoverHaloColor</code></td>
+<td>Use the hovered normal dot&#39;s RGB with alpha <code>0x52</code>.</td>
+</tr>
+<tr>
+<td><code>shellIntegrationFailedPromptDotHoverHaloColor</code></td>
+<td>Use the hovered failed dot&#39;s RGB with alpha <code>0x52</code>.</td>
+</tr>
+<tr>
+<td><code>shellIntegrationPromptDividerColor</code></td>
+<td>Use the current terminal default foreground&#39;s RGB with alpha <code>0x30</code>.</td>
+</tr>
+<tr>
+<td><code>shellIntegrationPromptDividerHoverColor</code></td>
+<td>Independently use the current terminal default foreground&#39;s RGB with alpha <code>0x70</code>. This does not inherit the normal divider override.</td>
+</tr>
+</tbody></table></div>
+<p>Dots paint over their hover halos, with their alphas composed normally. Set both
+halo overrides to <code>0</code> to retain dot color changes without halos. A transparent
+hover dot alone does not suppress its default halo; configure both roles to hide
+both. Normal and failed colors are independent; marker hover never recolors a
+failed-command rail. Normal-state dots and rails keep their existing
+<code>shellIntegrationPromptDotColor</code>, <code>shellIntegrationFailedPromptDotColor</code>, and
+<code>shellIntegrationFailedCommandRailColor</code> settings. The established normal-dot
+default <code>0x8CFFFFFF</code> requests terminal foreground RGB with alpha <code>0x8C</code>.</p>
+<p>These colors do not affect terminal text or participate in <code>minimumContrastRatio</code>.
+Palette-derived defaults follow the current session foreground, including
+permitted terminal palette changes. Explicit overrides stay fixed. Transparent
+colors retain the decoration&#39;s hit target and space: a hidden divider rule still
+reserves its band. Use <code>promptDecoration = NONE</code> to remove decoration space, or
+<code>shellIntegrationPromptDotsVisible = false</code> to suppress dots and their halos while
+retaining any configured failure rails. For completed commands, hover follows
+the full existing gutter or divider hit target, not just the painted dot or rule.</p>
+<h2 id="search-controls">Search controls</h2>
+<p>The optional host search bar uses a separate immutable <code>SwingTerminalSearchColors</code>
+snapshot. It supports independent failure/no-match counter and query-border colors,
+plus query-field selection background and foreground. Configure those roles with
+<code>SwingTerminalSearchBar.refreshColors</code>, not <code>SwingSettings</code>. See
+<a href="../../ketraterm-ui-swing-host/README.html#search-colors">search chrome colors and defaults</a>.</p>
+<h2 id="terminal-overrides-and-precedence">Terminal overrides and precedence</h2>
+<p>Host styles are presentation defaults. Permitted OSC 21 selection overrides in
+the session palette take precedence independently for foreground and background,
+in both focused and unfocused views. Dynamic overrides use original cell colors.
+Resetting those roles returns to the applicable host style. Palette fallback
+fields without explicit selection-override flags do not replace host styles.
+The <a href="../../docs/reference/protocol.html#kitty-colors">protocol contract</a>
+describes permissions, queries, and reset behavior.</p>
+<p>Cell/link backgrounds are painted first, followed by search fills and borders,
+selection fills, text, and the cursor. Text color resolves from terminal/link
+styling, then an explicit search foreground, then a selection foreground override,
+then enabled minimum contrast. A null selection foreground preserves the
+terminal/link/search text. Application-supplied underline colors remain
+authoritative.</p>
+<h2 id="contrast-and-faint-text">Contrast and faint text</h2>
+<p><code>minimumContrastRatio</code> accepts finite values from <code>1.0</code> through <code>21.0</code>.
+The default <code>3.0</code> preserves the prior minimum adjustment. Set it to <code>1.0</code> to
+disable adjustment and preserve requested text colors, or <code>4.5</code> for the WCAG
+normal-text contrast target. This is a rendering aid, not a claim that an embedding application
+meets every accessibility requirement.</p>
+<p>The renderer evaluates the displayed foreground against the cell background after
+inverse attributes, link fills, search highlights, and selection fills. It shifts
+text toward black or white only when needed. Some targets cannot be reached by
+changing foreground alone; in that case it uses whichever of black or white gives
+the greatest contrast. Backgrounds and stored terminal colors never change.
+OSC color queries therefore still report the session&#39;s original palette values.</p>
+<p><code>faintOpacity</code> accepts finite values from <code>0.0</code> through <code>1.0</code>, defaulting to <code>0.5</code>.
+SGR faint text blends toward its displayed background: zero reaches that background,
+half blends equally, and one disables dimming. Explicit selection/search/link foregrounds
+replace this inherited faint presentation. Contrast adjustment runs afterwards;
+when enabled it can brighten or darken faint text to restore readability.</p>
+<pre><code class="language-kotlin">val settings = SwingSettings.create {
+    it.minimumContrastRatio = 4.5
+    it.faintOpacity = 0.5
+}
+val exactColors = settings.copy { it.minimumContrastRatio = 1.0 }
+</code></pre>
+<p>Configured selection/search colors and permitted terminal selection overrides are inputs
+to the same contrast policy. Disable contrast adjustment when their exact
+foreground colors must be retained. Concealed/blink-hidden text remains hidden.
+Box drawing, block elements, geometric shading, Braille, sextants, octants, and
+geometric Powerline separators retain their color
+relationships; intrinsic color emoji and image pixels are not recolored. Cursor
+colors and explicit underline colors retain their separate presentation rules.
+Contrast uses the terminal cell background and UI fills. It does not sample image
+pixels, a host image, or translucent window composition behind the terminal.</p>
+<p>Color policy and contrast caches belong to each renderer, with bounded primitive
+storage. Frame installation reserves reusable row scratch before component painting.
+Stable repainting does not allocate color-policy entries; Java2D color-cache misses,
+glyph preparation, and native rendering have their own allocation behavior.</p>
+<h2 id="migration">Migration</h2>
+<p>Untouched selection settings retain the palette-derived fill and visibility
+fallback. Assigning <code>selectionStyle</code> or <code>selectionBackground</code> opts into an exact
+ARGB fill, including <code>0x66FFFFFF</code>; <code>resetSelectionStyle()</code> restores the default.
+Existing <code>selectionBackground</code> source and binary entry points remain available.</p>
+<p>Ordinary text retains the default 3:1 adjustment. Set <code>minimumContrastRatio = 1.0</code>
+for exact colors, or choose <code>4.5</code> for stronger readability. Faint text now blends
+toward its displayed background rather than always darkening RGB toward black.
+This intentionally improves faint text on light themes. Selection and color-policy
+changes are local UI settings; reloading them alone preserves application palette
+overrides. A deliberate host palette change follows the existing session palette
+replacement contract.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-ui-swing/docs/color-customization.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>SwingShellSuggestionStyle</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-ui-swing/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-ui-swing/main" data-filter=":ketraterm-ui-swing/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-ui-swing::io.github.ketraterm.ui.swing.settings/SwingShellSuggestionStyle///PointingToDeclaration//848369053">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.settings</a><span class="delimiter">/</span><span class="current">SwingShellSuggestionStyle</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Swing</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Style</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">SwingShellSuggestionStyle</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>background<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF34383F.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>foreground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFDFE1E5.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF3A3D44.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFFFFFFF.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>matchForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF82AFFC.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionMatchForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>matchForeground<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>matchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>background<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>selectionBackground<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>border<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF666B73.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>secondaryForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFADB2BC.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>argumentHintForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>secondaryForeground<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionArgumentHintForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>argumentHintForeground</span></span><span class="token punctuation">)</span></div><p class="paragraph">Immutable colors for the built-in shell suggestion popup. Custom views own their styling.</p><p class="paragraph">Defaults form a dark palette. Every color is a concrete packed ARGB value and is used exactly, without theme lookup, inheritance, or contrast correction during rendering. Text and fills must be opaque; <a href="border.html">border</a> may have alpha, including zero to omit its outline. Apply changed settings with <a href="../../io.github.ketraterm.ui.swing.api/-swing-terminal/reload-settings.html">io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings</a>.</p><h4 class="tableheader">Throws</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-illegal-argument-exception/index.html"><span>Illegal</span><wbr><span>Argument</span><wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if a non-border color is translucent.</p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-715727029%2FConstructors%2F848369053" anchor-label="SwingShellSuggestionStyle" id="-715727029%2FConstructors%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-swing-shell-suggestion-style.html"><span>Swing</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Style</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-715727029%2FConstructors%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">background<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF34383F.toInt()<span class="token punctuation">, </span></span><span class="parameter ">foreground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFDFE1E5.toInt()<span class="token punctuation">, </span></span><span class="parameter ">selectionBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF3A3D44.toInt()<span class="token punctuation">, </span></span><span class="parameter ">selectionForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFFFFFFF.toInt()<span class="token punctuation">, </span></span><span class="parameter ">matchForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF82AFFC.toInt()<span class="token punctuation">, </span></span><span class="parameter ">selectionMatchForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>matchForeground<span class="token punctuation">, </span></span><span class="parameter ">matchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>background<span class="token punctuation">, </span></span><span class="parameter ">selectionMatchBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>selectionBackground<span class="token punctuation">, </span></span><span class="parameter ">border<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF666B73.toInt()<span class="token punctuation">, </span></span><span class="parameter ">secondaryForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFADB2BC.toInt()<span class="token punctuation">, </span></span><span class="parameter ">argumentHintForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>secondaryForeground<span class="token punctuation">, </span></span><span class="parameter ">selectionArgumentHintForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>argumentHintForeground</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-11664476%2FProperties%2F848369053" anchor-label="argumentHintForeground" id="-11664476%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="argument-hint-foreground.html"><span>argument</span><wbr><span>Hint</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-11664476%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="argument-hint-foreground.html">argumentHintForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">ordinary argument-placeholder foreground; defaults to <a href="secondary-foreground.html">secondaryForeground</a> at construction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1859725155%2FProperties%2F848369053" anchor-label="background" id="-1859725155%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="background.html"><span><span>background</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1859725155%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="background.html">background</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">popup and ordinary row background.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-715765153%2FProperties%2F848369053" anchor-label="border" id="-715765153%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="border.html"><span><span>border</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-715765153%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="border.html">border</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">popup outline; zero alpha omits it.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1295444440%2FProperties%2F848369053" anchor-label="foreground" id="-1295444440%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="foreground.html"><span><span>foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1295444440%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="foreground.html">foreground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">ordinary label foreground.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2119505084%2FProperties%2F848369053" anchor-label="matchBackground" id="2119505084%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="match-background.html"><span>match</span><wbr><span><span>Background</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2119505084%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="match-background.html">matchBackground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">matched fragment background; defaults to <a href="background.html">background</a> at construction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1611181497%2FProperties%2F848369053" anchor-label="matchForeground" id="-1611181497%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="match-foreground.html"><span>match</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1611181497%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="match-foreground.html">matchForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">matched fragment foreground.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1993104184%2FProperties%2F848369053" anchor-label="secondaryForeground" id="1993104184%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="secondary-foreground.html"><span>secondary</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1993104184%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="secondary-foreground.html">secondaryForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">overflow counter and ordinary path-parent foreground.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-909288036%2FProperties%2F848369053" anchor-label="selectionArgumentHintForeground" id="-909288036%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selection-argument-hint-foreground.html"><span>selection</span><wbr><span>Argument</span><wbr><span>Hint</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-909288036%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="selection-argument-hint-foreground.html">selectionArgumentHintForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">selected argument-placeholder foreground; defaults to <a href="argument-hint-foreground.html">argumentHintForeground</a>. These are concrete independent values after construction, including when using <code class="lang-kotlin">copy()</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1138530667%2FProperties%2F848369053" anchor-label="selectionBackground" id="-1138530667%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selection-background.html"><span>selection</span><wbr><span><span>Background</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1138530667%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="selection-background.html">selectionBackground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">selected row background.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-574249952%2FProperties%2F848369053" anchor-label="selectionForeground" id="-574249952%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selection-foreground.html"><span>selection</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-574249952%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="selection-foreground.html">selectionForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">selected label foreground outside matched fragments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="324698564%2FProperties%2F848369053" anchor-label="selectionMatchBackground" id="324698564%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selection-match-background.html"><span>selection</span><wbr><span>Match</span><wbr><span><span>Background</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="324698564%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="selection-match-background.html">selectionMatchBackground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">selected fragment background; defaults to <a href="selection-background.html">selectionBackground</a> at construction. These are independent values afterwards, including when using <code class="lang-kotlin">copy()</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="888979279%2FProperties%2F848369053" anchor-label="selectionMatchForeground" id="888979279%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selection-match-foreground.html"><span>selection</span><wbr><span>Match</span><wbr><span><span>Foreground</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="888979279%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="selection-match-foreground.html">selectionMatchForeground</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">selected matched fragment foreground; defaults to <a href="match-foreground.html">matchForeground</a> at construction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
