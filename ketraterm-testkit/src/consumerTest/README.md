@@ -56,6 +56,10 @@ Verification covers:
   provider and suggestion configuration across construction and unbinding.
 - Exported pty4j types, constructor defaults, resize forwarding, and connector
   destruction without starting a native process.
+- Workspace profiles, Java listener defaults, immutable launch options, and
+  empty-workspace cleanup without starting a native process.
+- Completion-learning persistence, hydration, and reset through a caller-owned
+  coroutine lifecycle and temporary files.
 - BOM version alignment and an empty BOM-only runtime graph; entry-point graphs
   and absence of unwanted optional/product dependencies.
 
@@ -70,8 +74,8 @@ host-owned session remains open.
 at the requested version and mixed library versions in runtime graphs. Parser
 and core consumers must stay free of UI/native hosting. The base Swing consumer
 must stay free of optional PTY, OSC, workspace, and completion implementations.
-Workspace and completion persistence are product modules outside the supported
-Maven boundary; their owner-module tests verify their behavior.
+Workspace and completion persistence have isolated Kotlin and Java consumers;
+they remain optional dependencies of embedding hosts.
 
 `TerminalLibraryConsumerCompilationTest`, run by ordinary testkit `test`,
 separately invokes Java compilation against exported project API variants.

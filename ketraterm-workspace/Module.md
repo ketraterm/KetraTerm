@@ -1,8 +1,8 @@
 # Module ketraterm-workspace
 
-Shared product infrastructure for host-neutral profiles, local terminal tabs,
-and workspace lifecycle. This module is consumed by the standalone application
-and IntelliJ integration; it is not a supported published library entry point.
+A published library for host-neutral profiles, local terminal tabs,
+and workspace lifecycle. This module is consumed by embedding hosts, the
+standalone application, and IntelliJ integration.
 The [README](README.md) describes construction, listener threading, and ownership.
 
 <a id="package-structure"></a>

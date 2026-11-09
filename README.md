@@ -33,6 +33,8 @@ Choose an entry point and add optional integrations as needed:
 | [ketraterm-headless](ketraterm-headless/README.md) | Terminal pipeline and session with a host-owned transport. |
 | [ketraterm-swing](ketraterm-swing/README.md) | Swing terminal component and its headless dependencies. |
 | [ketraterm-pty](ketraterm-pty/README.md) | Local processes through Pty4J. |
+| [ketraterm-workspace](ketraterm-workspace/README.md) | Shell profiles, local terminal tabs, and workspace lifecycle. |
+| [ketraterm-completion-persistence](ketraterm-completion-persistence/README.md) | Optional file storage for experimental completion learning. |
 | [ketraterm-shell-integration](ketraterm-shell-integration/README.md) | Built-in OSC shell metadata producer. |
 | [ketraterm-ui-swing-host](ketraterm-ui-swing-host/README.md) | Host actions and completion-to-Swing adapters. |
 

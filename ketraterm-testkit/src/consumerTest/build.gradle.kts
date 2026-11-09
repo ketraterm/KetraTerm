@@ -233,8 +233,6 @@ val verifyPublicationBoundary =
             val version = requestedVersion.get()
             val productArtifacts =
                 setOf(
-                    "ketraterm-workspace",
-                    "ketraterm-completion-persistence",
                     "ketraterm-app",
                     "ketraterm-testkit",
                     "ketraterm-benchmarks",
@@ -274,6 +272,8 @@ val verifyPublicationBoundary =
                                     "ketraterm-ui-swing-host",
                                     "ketraterm-completion",
                                     "ketraterm-completion-host",
+                                    "ketraterm-completion-persistence",
+                                    "ketraterm-workspace",
                                 ) &&
                                 module.group != "org.jetbrains.pty4j" &&
                                 module.group != "net.java.dev.jna",

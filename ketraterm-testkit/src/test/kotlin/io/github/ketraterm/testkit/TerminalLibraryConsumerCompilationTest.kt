@@ -47,6 +47,7 @@ class TerminalLibraryConsumerCompilationTest {
         "completion, completion.api.ExperimentalTerminalCompletionApi, completion.model.TerminalCommandSpec",
         "completion, completion.api.ExperimentalTerminalCompletionApi, completion.api.TerminalCompletionLearningStore",
         "completion-host, completion.api.ExperimentalTerminalCompletionApi, completion.host.TerminalDirectoryScanner",
+        "completion-persistence, completion.api.ExperimentalTerminalCompletionApi, completion.persistence.TerminalCompletionLearningCoordinator",
         "ui-swing-host, completion.api.ExperimentalTerminalCompletionApi, ui.swing.host.SessionShellCompletionProvider",
         "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionProvider",
         "ui-swing, ui.swing.suggestion.ExperimentalShellSuggestionsApi, ui.swing.suggestion.SwingShellSuggestionViewFactory",
