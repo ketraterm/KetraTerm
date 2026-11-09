@@ -32,6 +32,14 @@ import {
 const pending =
   "# Changelog\n\n## [Unreleased]\n\n### Fixes\n\n- Fixed [rendering](docs/render.md).\n\n## [0.3.0] - 2026-09-23\n\n- Old change.\n";
 
+test("repository changelogs satisfy the release preparation contract", () => {
+  const version = readFileSync(new URL("../../VERSION", import.meta.url), "utf8").trim();
+  for (const [file] of changelogs) {
+    const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
+    assert.doesNotThrow(() => finalizeChangelog(source, version, "2000-01-01"), file);
+  }
+});
+
 test("release ordering handles all native prerelease stages numerically", () => {
   const ordered = [
     "0.4.0-alpha01",
