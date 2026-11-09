@@ -25,7 +25,7 @@
   <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Test organization and execution</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#execution-suites">Execution suites</a><a class="depth-2" href="#test-and-fixture-structure">Test and fixture structure</a><a class="depth-2" href="#ci">CI</a></nav></details><div class="article-content"><div class="prose"><h1 id="test-organization-and-execution">Test organization and execution</h1>
 <p>Tests belong to the module that owns the behavior. A feature name does not create
 a new CI job or execution framework. The shared Gradle convention in
-<a href="https://github.com/ketraterm/KetraTerm/blob/3c79aba337aa7ea74fc9dd27ff5126e1d1d43cab/gradle/test-suites.gradle.kts"><code>gradle/test-suites.gradle.kts</code></a> selects suites
+<a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/gradle/test-suites.gradle.kts"><code>gradle/test-suites.gradle.kts</code></a> selects suites
 by JUnit tags and owns JVM settings, reports, and display serialization.</p>
 <h2 id="execution-suites">Execution suites</h2>
 <div class="table-scroll"><table>
@@ -73,7 +73,7 @@ No additional property is needed to enable PTY fixtures.</p>
 <p>Each task writes its own <code>build/test-results/&lt;task&gt;/</code> XML and
 <code>build/reports/tests/&lt;task&gt;/</code> HTML. Running another suite cannot replace those
 results. Declare modules with environment-dependent tests in
-<a href="https://github.com/ketraterm/KetraTerm/blob/3c79aba337aa7ea74fc9dd27ff5126e1d1d43cab/gradle/test-environments.properties"><code>gradle/test-environments.properties</code></a>.
+<a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/gradle/test-environments.properties"><code>gradle/test-environments.properties</code></a>.
 Root aggregates depend only on those owners; other modules&#39; environment tasks
 skip without launching an empty test JVM. CI checks that every tagged source has
 a declared owner.</p>
@@ -116,7 +116,7 @@ display service, including under <code>--parallel</code>. JUnit and Gradle fork 
 are disabled within those suites. Focus-sensitive tests must not compete for the
 same desktop. Avoid interacting with their windows during a run.</p>
 <h2 id="ci">CI</h2>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/3c79aba337aa7ea74fc9dd27ff5126e1d1d43cab/.github/workflows/tests.yml">Test Suite workflow</a> plans independent
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/.github/workflows/tests.yml">Test Suite workflow</a> plans independent
 validation groups, then runs the selected groups in parallel:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -195,7 +195,7 @@ The suggestion scenarios exercise automatic popups through the product settings,
 including PowerShell profiles with PSReadLine.
 Such tests should use the same desktop execution contract when added, with their
 actual launch and input mechanisms documented in their owning fixture.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3c79aba337aa7ea74fc9dd27ff5126e1d1d43cab/docs/development/testing.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/docs/development/testing.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
