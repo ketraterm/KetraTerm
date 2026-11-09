@@ -48,6 +48,47 @@ The [settings reference](profile-config-toml.md) lists configuration keys,
 defaults, and file locations. Restart the app after editing `config.toml`
 directly. Built-in keyboard shortcuts follow the platform.
 
+## Keyboard, scrolling, and selection
+
+| Action | Windows | Linux | macOS |
+| --- | --- | --- | --- |
+| Copy selection | Ctrl+C or Ctrl+Shift+C | Ctrl+Shift+C | Cmd+C |
+| Paste | Ctrl+V or Ctrl+Shift+V | Ctrl+Shift+V | Cmd+V |
+| New terminal | Ctrl+Shift+T | Ctrl+Shift+T | Cmd+T |
+| Close active pane | Ctrl+Shift+W | Ctrl+Shift+W | Cmd+W |
+| Search | Ctrl+Shift+F | Ctrl+Shift+F | Cmd+Shift+F |
+| Increase / decrease font size | Ctrl+Plus / Ctrl+Minus | Ctrl+Plus / Ctrl+Minus | Cmd+Plus / Cmd+Minus |
+| Reset font size | Ctrl+0 | Ctrl+0 | Cmd+0 |
+| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab | Ctrl+Tab / Ctrl+Shift+Tab | Ctrl+Tab / Ctrl+Shift+Tab |
+| Page through history | Shift+Page Up / Shift+Page Down | Shift+Page Up / Shift+Page Down | Shift+Page Up / Shift+Page Down |
+| Oldest history / live output | Shift+Home / Shift+End | Shift+Home / Shift+End | Shift+Home / Shift+End |
+
+On Windows, Ctrl+C reaches the running program when nothing is selected. Font
+zoom affects only the current pane and is not saved. Reset restores the font
+size configured in settings. The equals key also increases the size with the
+platform modifier; numeric-keypad plus and minus work too.
+
+Wheel scrolling follows the operating system's scroll amount, and fractional
+trackpad motion accumulates without being discarded. Paging retains one row of
+context. New output follows the bottom while you are there and preserves your
+position when you scroll back; `scroll_on_output` can explicitly enable returning
+to the bottom on new output. Accepted terminal input or paste returns to live
+output. Terminal mouse reporting takes priority over local scrolling; alternate
+screen applications without mouse reporting can receive wheel motion as arrow keys.
+
+Drag to select text, double-click to select a word or path, and triple-click to
+select a row. Continuing a double- or triple-click drag extends by whole words
+or rows, including when you reverse direction. Alt+drag makes a rectangular
+selection. Copying preserves indentation and interior spaces, removes trailing
+row blanks, and joins soft wraps for a linear selection. Block selections keep
+their row breaks. Selection alone does not overwrite the clipboard.
+
+Hold Shift for local mouse interaction when an application reports mouse input,
+unless it explicitly requests Shift capture. Bare Ctrl+A and Ctrl+L remain
+available to the shell. Tab and pane shortcuts apply only in the app's own window.
+
+## Companion commands
+
 Native local profiles include three helper commands:
 
 ```shell

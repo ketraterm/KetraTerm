@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -24,6 +25,7 @@ import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
@@ -50,6 +52,30 @@ internal class TerminalPane private constructor(
 ) : TerminalPaneActionTarget {
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
+    private var fontSizeAdjustment = 0
+
+    private fun currentSettings(): SwingSettings {
+        val current = settings.current()
+        val size =
+            (settings.config.fontSize + fontSizeAdjustment)
+                .coerceIn(KetraTermConfig.FONT_SIZE_MIN, KetraTermConfig.FONT_SIZE_MAX)
+        return if (size == current.font.size) current else current.copy { it.font = current.font.deriveFont(size.toFloat()) }
+    }
+
+    /** Applies pane-local zoom; zero restores the configured font size. */
+    fun zoomFont(change: Int) {
+        val base = settings.config.fontSize
+        val current = (base + fontSizeAdjustment).coerceIn(KetraTermConfig.FONT_SIZE_MIN, KetraTermConfig.FONT_SIZE_MAX)
+        fontSizeAdjustment =
+            if (change == 0) {
+                0
+            } else {
+                (current.toLong() + change)
+                    .coerceIn(KetraTermConfig.FONT_SIZE_MIN.toLong(), KetraTermConfig.FONT_SIZE_MAX.toLong())
+                    .toInt() - base
+            }
+        terminal.reloadSettings()
+    }
 
     fun requestFocus() {
         terminal.requestFocusInWindow()
@@ -110,6 +136,7 @@ internal class TerminalPane private constructor(
             terminal
                 .visibleGridSize()
                 .height
+                .minus(1)
                 .coerceAtLeast(1)
                 .toDouble(),
         )
@@ -120,6 +147,7 @@ internal class TerminalPane private constructor(
             -terminal
                 .visibleGridSize()
                 .height
+                .minus(1)
                 .coerceAtLeast(1)
                 .toDouble(),
         )
@@ -155,7 +183,7 @@ internal class TerminalPane private constructor(
             return try {
                 val terminal =
                     SwingTerminal(
-                        settingsProvider = settings::current,
+                        settingsProvider = { paneRef[0]?.currentSettings() ?: settings.current() },
                         hostServices =
                             SwingHostServices.create { draft ->
                                 draft.clipboardHandler =

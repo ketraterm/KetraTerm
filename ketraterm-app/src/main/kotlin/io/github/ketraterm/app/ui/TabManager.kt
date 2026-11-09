@@ -153,14 +153,16 @@ internal class TabManager(
 
     private val keyEventDispatcher =
         KeyEventDispatcher { event ->
+            if (shutdownStarted.get() || SwingUtilities.getWindowAncestor(event.component) !== frame) return@KeyEventDispatcher false
             if (event.id == KeyEvent.KEY_PRESSED) {
                 val keyCode = event.keyCode
                 val modifiers = event.modifiersEx
                 val menuShortcutMask = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-                val isMenuShortcut = (modifiers and menuShortcutMask) == menuShortcutMask
-                val isCtrlPressed = (modifiers and InputEvent.CTRL_DOWN_MASK) == InputEvent.CTRL_DOWN_MASK
+                val commandModifiers = modifiers and (InputEvent.CTRL_DOWN_MASK or InputEvent.META_DOWN_MASK)
+                val isMenuShortcut = commandModifiers == menuShortcutMask
+                val isCtrlPressed = commandModifiers == InputEvent.CTRL_DOWN_MASK
                 val isShiftPressed = (modifiers and InputEvent.SHIFT_DOWN_MASK) == InputEvent.SHIFT_DOWN_MASK
-                val hasAlt = (modifiers and InputEvent.ALT_DOWN_MASK) != 0
+                val hasAlt = (modifiers and (InputEvent.ALT_DOWN_MASK or InputEvent.ALT_GRAPH_DOWN_MASK)) != 0
 
                 // 1. Tab cycling: Ctrl + Tab / Ctrl + Shift + Tab (on all platforms)
                 if (keyCode == KeyEvent.VK_TAB && isCtrlPressed && !hasAlt) {

@@ -466,6 +466,99 @@ class TerminalSelectionControllerTest {
     }
 
     @Test
+    fun `double click drag extends whole words and retains its original word when reversing`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(8, 1)
+            cache.accept(AbsoluteLinesFrame(listOf("aa bb cc"), historySize = 0))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.updateFrame(cache)
+            val button = JButton()
+            controller.handleSelectionMousePressed(
+                MouseEvent(
+                    button,
+                    MouseEvent.MOUSE_PRESSED,
+                    0,
+                    InputEvent.BUTTON1_DOWN_MASK,
+                    35,
+                    5,
+                    2,
+                    false,
+                    MouseEvent.BUTTON1,
+                ),
+            )
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 75, 5, alt = false))
+            assertEquals(CellSelection(3, 0, 8, 0), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 5, 5, alt = false))
+            assertEquals(CellSelection(5, 0, 0, 0), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 5, alt = false))
+            assertEquals(CellSelection(3, 0, 5, 0), controller.getViewportSelection(cache))
+            controller.stopSelectionDrag()
+        }
+    }
+
+    @Test
+    fun `triple click drag selects whole rows in either direction`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(8, 3)
+            cache.accept(AbsoluteLinesFrame(listOf("first", "middle", "last"), historySize = 0))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.updateFrame(cache)
+            val button = JButton()
+            controller.handleSelectionMousePressed(
+                MouseEvent(
+                    button,
+                    MouseEvent.MOUSE_PRESSED,
+                    0,
+                    InputEvent.BUTTON1_DOWN_MASK,
+                    35,
+                    25,
+                    3,
+                    false,
+                    MouseEvent.BUTTON1,
+                ),
+            )
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 45, alt = false))
+            assertEquals(CellSelection(0, 1, 8, 2), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 5, alt = false))
+            assertEquals(CellSelection(8, 1, 0, 0), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 5, 45, alt = false))
+            assertEquals(CellSelection(0, 1, 8, 2), controller.getViewportSelection(cache))
+            controller.stopSelectionDrag()
+        }
+    }
+
+    @Test
+    fun `word drag clips a discarded anchor instead of resurrecting trimmed history`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(8, 2)
+            cache.accept(AbsoluteLinesFrame(listOf("aa bb cc", "dd ee ff"), historySize = 0))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.updateFrame(cache)
+            val button = JButton()
+            controller.handleSelectionMousePressed(
+                MouseEvent(
+                    button,
+                    MouseEvent.MOUSE_PRESSED,
+                    0,
+                    InputEvent.BUTTON1_DOWN_MASK,
+                    35,
+                    5,
+                    2,
+                    false,
+                    MouseEvent.BUTTON1,
+                ),
+            )
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 25, alt = false))
+            cache.accept(AbsoluteLinesFrame(listOf("dd ee ff", "gg hh ii"), historySize = 0, discardedCount = 1))
+            controller.updateFrame(cache)
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 25, alt = false))
+            assertEquals(1L, controller.selectionAnchorAbsoluteRow)
+            assertEquals(CellSelection(0, 0, 5, 1), controller.getViewportSelection(cache))
+            controller.stopSelectionDrag()
+        }
+    }
+
+    @Test
     fun `getSelectedText extracts text from frame reader for selection spanning history`() {
         val lines =
             listOf(

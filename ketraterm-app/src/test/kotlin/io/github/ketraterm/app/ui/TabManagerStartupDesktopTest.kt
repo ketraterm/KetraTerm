@@ -51,7 +51,11 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.CardLayout
 import java.awt.Component
 import java.awt.Container
+import java.awt.DefaultKeyboardFocusManager
 import java.awt.Dimension
+import java.awt.KeyEventDispatcher
+import java.awt.KeyboardFocusManager
+import java.awt.Toolkit
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
 import java.awt.event.InputEvent
@@ -71,6 +75,161 @@ import kotlin.test.*
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
 class TabManagerStartupDesktopTest {
+    @Test
+    fun `pane zoom is temporary and window shortcuts ignore other windows`(
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(fontSize = 16, cursorBlinkMillis = 0, smartSuggestionsEnabled = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("keys", "Keys", listOf("unused"), workingDirectory = directory)
+        val output = ByteArrayOutputStream()
+        val received = CompletableFuture<String>()
+        val previousFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val focusManager =
+            object : DefaultKeyboardFocusManager() {
+                val installed = mutableListOf<KeyEventDispatcher>()
+
+                override fun addKeyEventDispatcher(dispatcher: KeyEventDispatcher) {
+                    installed.add(dispatcher)
+                    super.addKeyEventDispatcher(dispatcher)
+                }
+            }
+        val frame =
+            onEdt {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(focusManager)
+                JFrame().apply { pack() }
+            }
+        var manager: TabManager? = null
+        try {
+            val opened = CompletableFuture<Boolean>()
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            workspace(listener) { options ->
+                                idleSession(options, onWrite = { bytes, offset, length ->
+                                    output.write(bytes, offset, length)
+                                    val written = output.toString(Charsets.UTF_8)
+                                    if (written.endsWith("barrier")) received.complete(written)
+                                })
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            val first = onEdt { requireNotNull(manager.selectedPane) }
+            val secondOpened = CompletableFuture<Boolean>()
+            onEdt { assertTrue(manager.openTab(profile, onComplete = secondOpened::complete)) }
+            assertTrue(secondOpened.get(10, TimeUnit.SECONDS))
+
+            fun press(
+                keyCode: Int,
+                modifiers: Int,
+                character: Char = KeyEvent.CHAR_UNDEFINED,
+            ): KeyEvent {
+                val press = KeyEvent(first.terminal, KeyEvent.KEY_PRESSED, 0, modifiers, keyCode, character)
+                first.terminal.keyListeners.forEach { it.keyPressed(press) }
+                if (character != KeyEvent.CHAR_UNDEFINED) {
+                    first.terminal.keyListeners.forEach {
+                        it.keyTyped(KeyEvent(first.terminal, KeyEvent.KEY_TYPED, 0, modifiers, KeyEvent.VK_UNDEFINED, character))
+                    }
+                }
+                first.terminal.keyListeners.forEach {
+                    it.keyReleased(KeyEvent(first.terminal, KeyEvent.KEY_RELEASED, 0, modifiers, keyCode, character))
+                }
+                return press
+            }
+            onEdt {
+                val second = requireNotNull(manager.selectedPane)
+                val menu = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+                assertTrue(press(KeyEvent.VK_EQUALS, menu, '=').isConsumed)
+                assertEquals(17, first.terminal.font.size)
+                assertEquals(16, second.terminal.font.size)
+                assertEquals(16, settings.config.fontSize)
+                for (key in listOf(KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_PAGE_UP, KeyEvent.VK_PAGE_DOWN)) {
+                    assertTrue(press(key, InputEvent.SHIFT_DOWN_MASK).isConsumed)
+                }
+                press(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK, '\u0003')
+                press(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK, '\u0001')
+                press(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK, '\u000c')
+                val other = JFrame()
+                try {
+                    val field = JTextArea()
+                    other.add(field)
+                    val closeModifiers = menu or if (System.getProperty("os.name").startsWith("Mac")) 0 else InputEvent.SHIFT_DOWN_MASK
+                    assertFalse(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                field,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                closeModifiers,
+                                KeyEvent.VK_W,
+                                'w',
+                            ),
+                        ),
+                    )
+                    assertSame(second, manager.selectedPane)
+                    assertFalse(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                second.terminal,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                InputEvent.CTRL_DOWN_MASK or InputEvent.ALT_GRAPH_DOWN_MASK,
+                                KeyEvent.VK_TAB,
+                                '\t',
+                            ),
+                        ),
+                    )
+                    assertTrue(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                second.terminal,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                InputEvent.CTRL_DOWN_MASK,
+                                KeyEvent.VK_TAB,
+                                '\t',
+                            ),
+                        ),
+                    )
+                    assertSame(first, manager.selectedPane)
+                } finally {
+                    other.dispose()
+                }
+            }
+            settings.update(settings.config.copy(fontSize = 20))
+            onEdt {
+                assertEquals(21, first.terminal.font.size)
+                first.zoomFont(Int.MAX_VALUE)
+                assertEquals(KetraTermConfig.FONT_SIZE_MAX, first.terminal.font.size)
+                first.zoomFont(Int.MIN_VALUE)
+                assertEquals(KetraTermConfig.FONT_SIZE_MIN, first.terminal.font.size)
+                first.zoomFont(0)
+                assertEquals(20, first.terminal.font.size)
+                assertEquals(TerminalInputAdmission.ACCEPTED, first.tab.session.submitInput(TerminalPasteEvent("barrier")))
+            }
+            assertEquals("\u0003\u0001\u000cbarrier", received.get(10, TimeUnit.SECONDS))
+            assertEquals(20, configManager.load().fontSize)
+        } finally {
+            try {
+                close(manager, frame)
+            } finally {
+                onEdt { KeyboardFocusManager.setCurrentKeyboardFocusManager(previousFocusManager) }
+            }
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["nonzero", "negative", "transport", "unknown", "success", "closedBeforeDelivery", "split"])
     fun `failed sessions retain output while successful and explicitly closed panes are retired`(

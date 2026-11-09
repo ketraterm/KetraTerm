@@ -16,12 +16,36 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalPaneShortcutControllerTest {
+    @Test
+    fun `font zoom follows platform modifiers and preserves shell combinations`() {
+        for (os in listOf("Windows 11", "Linux", "Mac OS X", "Darwin")) {
+            val menu = if (os == "Mac OS X" || os == "Darwin") InputEvent.META_DOWN_MASK else InputEvent.CTRL_DOWN_MASK
+            for (key in listOf(KeyEvent.VK_EQUALS, KeyEvent.VK_PLUS, KeyEvent.VK_ADD)) {
+                assertEquals(1, terminalFontZoomChange(key, menu, os))
+                assertEquals(1, terminalFontZoomChange(key, menu or InputEvent.SHIFT_DOWN_MASK, os))
+            }
+            for (key in listOf(KeyEvent.VK_MINUS, KeyEvent.VK_SUBTRACT)) {
+                assertEquals(-1, terminalFontZoomChange(key, menu, os))
+            }
+            assertEquals(0, terminalFontZoomChange(KeyEvent.VK_0, menu, os))
+            assertEquals(0, terminalFontZoomChange(KeyEvent.VK_NUMPAD0, menu, os))
+            for (extra in listOf(InputEvent.ALT_DOWN_MASK, InputEvent.ALT_GRAPH_DOWN_MASK)) {
+                assertEquals(null, terminalFontZoomChange(KeyEvent.VK_EQUALS, menu or extra, os))
+            }
+            assertEquals(null, terminalFontZoomChange(KeyEvent.VK_MINUS, menu or InputEvent.SHIFT_DOWN_MASK, os))
+            assertEquals(null, terminalFontZoomChange(KeyEvent.VK_0, 0, os))
+            assertEquals(null, terminalFontZoomChange(KeyEvent.VK_C, menu, os))
+        }
+    }
+
     @Test
     fun `disabled completion action leaves input unclaimed`() {
         val target = RecordingActionTarget(enabled = false)

@@ -4,6 +4,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while preserving the initial selection when direction changes.
+
 - Shell-profile discovery now honors case-insensitive Windows environment names, including `Path`, `ProgramFiles`, and `COMSPEC`, while preserving case-sensitive lookup on Unix platforms.
 
 ## [0.5.0] - 2026-11-09
