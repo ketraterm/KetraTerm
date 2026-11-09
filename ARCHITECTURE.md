@@ -77,12 +77,14 @@ dependencies. Both publish dependency metadata without adding runtime code.
 See [library compatibility](docs/library/compatibility.md#supported-boundary)
 for the publication boundary.
 
+The [IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ) is maintained and released independently,
+using the published libraries above.
+
 ### Products and development modules
 
 | Module | Responsibility |
 | --- | --- |
 | [app](ketraterm-app/README.md) | Standalone desktop product, configuration, and window wiring. |
-| [intellij-plugin](ketraterm-intellij-plugin/README.md) | IntelliJ-specific product integration in a separate build. |
 | [testkit](ketraterm-testkit/README.md) | Reusable connector fakes, test fixtures, and verification campaigns. |
 | [benchmarks](ketraterm-benchmarks/README.md) | JMH measurements for terminal hot paths. |
 

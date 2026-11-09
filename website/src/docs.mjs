@@ -47,9 +47,7 @@ export function documentationFiles(root) {
   for (const module of fs
     .readdirSync(root)
     .filter(
-      (name) =>
-        name.startsWith("ketraterm-") &&
-        !["ketraterm-app", "ketraterm-intellij-plugin"].includes(name),
+      (name) => name.startsWith("ketraterm-") && name !== "ketraterm-app",
     )) {
     for (const name of ["README.md", "Module.md", "CHANGELOG.md"])
       if (fs.existsSync(path.join(root, module, name)))

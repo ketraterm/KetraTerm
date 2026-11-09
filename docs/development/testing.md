@@ -87,6 +87,9 @@ same desktop. Avoid interacting with their windows during a run.
 
 ## CI
 
+The [IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ) owns its tests and verification in its
+separate repository.
+
 The [Test Suite workflow](../../.github/workflows/tests.yml) plans independent
 validation groups, then runs the selected groups in parallel:
 
@@ -95,7 +98,6 @@ validation groups, then runs the selected groups in parallel:
 | Headless | Linux JVM tests, formatting, ABI, and native version metadata. |
 | Platform | Linux native/desktop tests; Windows and macOS JVM/native/desktop tests. Real-window suites remain serialized within each display. |
 | Consumers | Published Kotlin/Java clients, retained clients, and publication metadata. Linux on selective PRs; all three operating systems on full runs. |
-| IntelliJ plugin | Formatting and tests in the independent plugin build. |
 | Benchmarks | JMH compilation and packaging. |
 | Website | Documentation, website tests, formatting, build, and links. |
 | Differential | Bounded terminal-state smoke campaigns. Long campaigns retain their separate scheduled workflow. |

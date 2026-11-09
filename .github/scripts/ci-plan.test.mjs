@@ -34,13 +34,14 @@ for (const [path, expected] of [
     ["ketraterm-core/src/test/resources/fixture.md", ["headless"]],
     ["ketraterm-app/src/main/resources/help.md", ["headless", "platform"]],
     ["ketraterm-app/src/test/kotlin/WindowTest.kt", ["headless", "platform"]],
-    ["ketraterm-intellij-plugin/src/main/kotlin/Pane.kt", ["plugin"]],
     ["ketraterm-app/src/main/kotlin/Window.kt", ["headless", "platform"]],
-    ["ketraterm-ui-swing/src/main/kotlin/Painter.kt", ["headless", "platform", "consumers", "plugin", "benchmarks"]],
+    ["ketraterm-workspace/src/main/kotlin/TerminalWorkspace.kt", ["headless", "platform", "consumers", "benchmarks"]],
+    ["ketraterm-completion-persistence/src/main/kotlin/Coordinator.kt", ["headless", "platform", "consumers", "benchmarks"]],
+    ["ketraterm-ui-swing/src/main/kotlin/Painter.kt", ["headless", "platform", "consumers", "benchmarks"]],
     ["ketraterm-parser/src/main/kotlin/Parser.kt", checks.filter(check => check !== "website")],
     ["ketraterm-testkit/src/main/kotlin/Connector.kt", checks.filter(check => check !== "website")],
     ["ketraterm-testkit/src/consumerTest/ui-swing/Consumer.kt", ["headless", "consumers"]],
-    ["ketraterm-core/api/core.api", ["headless", "consumers", "plugin"]],
+    ["ketraterm-core/api/core.api", ["headless", "consumers"]],
     ["tools/xterm-oracle/package-lock.json", ["headless", "differential"]],
 ]) {
     test(`selection for ${path}`, () => assert.deepEqual(selected(planChanges([path], environments)), expected));
@@ -54,8 +55,8 @@ for (const path of ["build.gradle.kts", "settings.gradle.kts", "gradle.propertie
 
 test("empty discovery requests full coverage", () => assert.deepEqual(selected(planChanges([], environments)), checks));
 test("mixed changes take the union", () => assert.deepEqual(selected(planChanges([
-    "docs/README.md", "ketraterm-intellij-plugin/src/main/Pane.kt", "ketraterm-core/src/test/Test.kt",
-], environments)), ["headless", "plugin", "website"]));
+    "docs/README.md", "ketraterm-core/src/test/Test.kt",
+], environments)), ["headless", "website"]));
 
 test("diff discovery retains spaces, deletions, and both rename paths without shell parsing", () => {
     const base = "a".repeat(40);
@@ -102,7 +103,7 @@ test("every environment-tagged source has a declared module owner", () => {
         }
     }
     for (const entry of readdirSync(root, {withFileTypes: true})) {
-        if (entry.isDirectory() && entry.name.startsWith("ketraterm-") && entry.name !== "ketraterm-intellij-plugin") {
+        if (entry.isDirectory() && entry.name.startsWith("ketraterm-")) {
             const path = resolve(root, entry.name, "src/test");
             try { readdirSync(path); } catch (error) { if (error.code === "ENOENT") continue; throw error; }
             visit(path, entry.name);

@@ -21,7 +21,6 @@ import {pathToFileURL} from "node:url";
 export const changelogs = [
   ["CHANGELOG.md", "Libraries"],
   ["ketraterm-app/CHANGELOG.md", "Standalone application"],
-  ["ketraterm-intellij-plugin/CHANGELOG.md", "IntelliJ plugin"],
 ];
 
 // Match the prerelease stages and bounds supported by the native installers.

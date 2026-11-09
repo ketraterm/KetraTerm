@@ -94,7 +94,7 @@ IntelliJ's Gradle JVM to that SDK.
 
 `publicationChecks` validates build-local Maven artifacts, public ABI, formatting,
 tests, and isolated consumers; it does not upload artifacts. The IntelliJ plugin
-has a separate Gradle build. See [Contributing](CONTRIBUTING.md) for focused
+is maintained in its own repository. See [Contributing](CONTRIBUTING.md) for focused
 checks and product development commands.
 
 ## Authors

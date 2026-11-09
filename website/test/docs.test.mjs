@@ -47,7 +47,6 @@ test("publishes module docs once, preserves heading anchors, and rewrites links 
     "ketraterm-app/docs/profile-config-toml.md":
       "# App settings\n\nUnique app setting.",
     "ketraterm-app/CHANGELOG.md": "# App changelog",
-    "ketraterm-intellij-plugin/README.md": "# IDE plugin",
   };
   for (const [file, body] of Object.entries(sources)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -155,11 +154,7 @@ test("publishes module docs once, preserves heading anchors, and rewrites links 
     ],
   );
   assert.ok(
-    [...output.keys()].every(
-      (file) =>
-        !file.includes("ketraterm-app") &&
-        !file.includes("ketraterm-intellij-plugin"),
-    ),
+    [...output.keys()].every((file) => !file.includes("ketraterm-app")),
   );
   renderAppDocumentation({
     root,

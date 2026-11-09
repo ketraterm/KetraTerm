@@ -62,4 +62,4 @@ Close confirmation relies on shell command markers; it is not a general detector
 of every process running in a session.
 
 See the [standalone README](../../ketraterm-app/README.md) and
-[plugin README](../../ketraterm-intellij-plugin/README.md) for installation and use.
+[plugin README](https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/README.md) for installation and use.

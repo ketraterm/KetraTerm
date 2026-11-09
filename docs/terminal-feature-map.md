@@ -14,7 +14,7 @@ implemented capabilities and their host-specific limits.
 
 Start with [library setup](../README.md#using-the-libraries), the
 [standalone app](../ketraterm-app/README.md), or the
-[IntelliJ plugin](../ketraterm-intellij-plugin/README.md).
+[IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/README.md).
 Remaining work and intentional exclusions belong in the [gap map](terminal-feature-gap-map.md).
 
 See the [documentation index](README.md) for usage guides and detailed references.

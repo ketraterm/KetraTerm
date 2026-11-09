@@ -176,10 +176,10 @@ test("prepare command supports first release and resumes the immutable tag after
       encoding: "utf8",
       stdio: "pipe",
     });
-  writeFileSync(join(root, changelogs[2][0]), "# Missing release section\n");
+  writeFileSync(join(root, changelogs.at(-1)[0]), "# Missing release section\n");
   assert.throws(run);
   assert.equal(readFileSync(join(root, "CHANGELOG.md"), "utf8"), pending);
-  writeFileSync(join(root, changelogs[2][0]), pending);
+  writeFileSync(join(root, changelogs.at(-1)[0]), pending);
   run();
   assert.match(readFileSync(output, "utf8"), /needed=true/);
   for (const [file] of changelogs)

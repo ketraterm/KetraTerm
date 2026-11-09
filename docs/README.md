@@ -5,7 +5,7 @@
 - [Feature map](terminal-feature-map.md): terminal, shell, desktop, completion, and embedding capabilities.
 - [Shell support](features/shells.md): automatic discovery, prompt hooks, and startup commands.
 - [Completion](features/completion.md): availability, supported commands, and host-specific sources.
-- [Standalone app](../ketraterm-app/README.md) and [IntelliJ plugin](../ketraterm-intellij-plugin/README.md): installation and use.
+- [Standalone app](../ketraterm-app/README.md) and [IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/README.md): installation and use.
 - [Feature gaps](terminal-feature-gap-map.md): open work and intentional limitations.
 
 ## Embedding the library

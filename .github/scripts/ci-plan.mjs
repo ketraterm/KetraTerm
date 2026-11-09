@@ -19,7 +19,7 @@ import {execFileSync} from "node:child_process";
 import {resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 
-export const checks = ["headless", "platform", "consumers", "plugin", "benchmarks", "website", "differential"];
+export const checks = ["headless", "platform", "consumers", "benchmarks", "website", "differential"];
 export const platforms = [
     {os: "ubuntu-26.04", shells: "BASH,ZSH,FISH,POWERSHELL"},
     {os: "macos-15", shells: "BASH,ZSH,FISH,POWERSHELL"},
@@ -70,12 +70,10 @@ export function planChanges(paths, environments) {
         const [module, ...parts] = path.split("/");
         if (!modules.has(module)) return fullPlan("Unclassified change");
         const relative = parts.join("/");
-        if (module === "ketraterm-intellij-plugin") {
-            select("plugin");
-        } else if (relative.startsWith("src/consumerTest/")) {
+        if (relative.startsWith("src/consumerTest/")) {
             select("headless", "consumers");
         } else if (relative.startsWith("api/")) {
-            select("headless", "consumers", "plugin");
+            select("headless", "consumers");
         } else if (relative.startsWith("src/test/")) {
             select("headless");
             if (environments.native.has(module) || environments.desktop.has(module)) select("platform");
@@ -83,8 +81,7 @@ export function planChanges(paths, environments) {
             select("headless", "benchmarks");
         } else if (relative.startsWith("src/main/")) {
             select("headless", "platform");
-            if (module !== "ketraterm-app") select("plugin");
-            if (!["ketraterm-app", "ketraterm-workspace", "ketraterm-completion-persistence"].includes(module)) select("consumers", "benchmarks");
+            if (module !== "ketraterm-app") select("consumers", "benchmarks");
             if (["ketraterm-protocol", "ketraterm-parser", "ketraterm-core", "ketraterm-host", "ketraterm-render-api", "ketraterm-render-cache", "ketraterm-testkit"].includes(module)) select("differential");
             if (path === "ketraterm-app/src/main/resources/io/github/ketraterm/app/icons/logo.svg") select("website");
         } else {

@@ -26,23 +26,16 @@ Run these commands from the repository root:
 ./gradlew :ketraterm-app:test
 ```
 
-### IntelliJ Platform Plugin (`ketraterm-intellij-plugin`)
+### IntelliJ Platform Plugin
 
-The plugin is a separate Gradle build with its own wrapper:
-
-```bash
-cd ketraterm-intellij-plugin
-./gradlew runIde
-./gradlew test
-```
-
-Its [README](ketraterm-intellij-plugin/README.md) describes IDE requirements and
-library integration. Root build commands do not run the plugin's checks.
+The [IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ) has its own repository,
+Gradle wrapper, CI, and releases. Clone and open that repository independently.
+This repository publishes the shared libraries consumed by the plugin.
 
 ### Code Formatting
 
-Run `./gradlew spotlessApply` in the owning build before submitting Kotlin or
-Gradle changes. For plugin changes, run its wrapper from the plugin directory.
+Run `./gradlew spotlessApply` from the repository root before submitting Kotlin
+or Gradle changes.
 
 ## Verification
 

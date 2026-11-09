@@ -1,6 +1,6 @@
 # KetraTerm Library Changelog
 
-Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](ketraterm-intellij-plugin/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
+Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
 ## [0.5.0] - 2026-11-09
 

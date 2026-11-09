@@ -39,8 +39,9 @@ cross-project boundaries; module guides own local implementation detail.
   benchmarks.
 - `ketraterm-workspace`: host-neutral profiles, tabs, and local-session
   workspace state.
-- `ketraterm-intellij-plugin`: independent nested build containing IntelliJ-only
-  product integration.
+
+IntelliJ product integration is maintained in the separate
+[KetraTerm-IntelliJ repository](https://github.com/ketraterm/KetraTerm-IntelliJ).
 
 Keep ownership strict:
 

@@ -42,7 +42,6 @@ jobs:
       headless: ${{ steps.plan.outputs.headless }}
       platform: ${{ steps.plan.outputs.platform }}
       consumers: ${{ steps.plan.outputs.consumers }}
-      plugin: ${{ steps.plan.outputs.plugin }}
       benchmarks: ${{ steps.plan.outputs.benchmarks }}
       website: ${{ steps.plan.outputs.website }}
       differential: ${{ steps.plan.outputs.differential }}
@@ -171,36 +170,6 @@ jobs:
             **/build/reports/tests/
             **/build/test-results/
 
-  plugin:
-    name: IntelliJ plugin
-    needs: plan
-    if: needs.plan.outputs.plugin == 'true'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.revision }}
-      - uses: ./.github/actions/setup-jvm
-        with:
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-      - name: Install virtual display
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb fonts-dejavu-core
-      - name: Verify IDE integration in its independent build
-        working-directory: ketraterm-intellij-plugin
-        run: xvfb-run -a ./gradlew spotlessCheck test "-Djava.awt.headless=true" --continue
-      - name: Upload IDE reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-intellij
-          retention-days: 14
-          path: |
-            ketraterm-intellij-plugin/**/build/reports/tests/
-            ketraterm-intellij-plugin/**/build/test-results/
-
   benchmarks:
     name: Benchmark compilation
     needs: plan
@@ -236,7 +205,7 @@ jobs:
 
   gate:
     name: CI gate
-    needs: [plan, headless, platform, consumers, plugin, benchmarks, website, differential]
+    needs: [plan, headless, platform, consumers, benchmarks, website, differential]
     if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 5

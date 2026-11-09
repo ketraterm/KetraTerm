@@ -101,7 +101,7 @@ jobs:
           if [[ "$EXISTING_TAG" != true ]]; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add VERSION CHANGELOG.md ketraterm-app/CHANGELOG.md ketraterm-intellij-plugin/CHANGELOG.md
+            git add VERSION CHANGELOG.md ketraterm-app/CHANGELOG.md
             if ! git diff --cached --quiet; then
               git commit -m "Release $TAG"
             fi

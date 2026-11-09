@@ -1,8 +1,10 @@
 # Releasing KetraTerm
 
-`VERSION` on `master` is the release version for libraries, the standalone app,
-and the IntelliJ plugin. Set it to the desired version and merge the change
-before releasing. No manual tag or version input is needed.
+`VERSION` on `master` is the release version for libraries and the standalone app.
+Set it to the desired version and merge the change before releasing. No manual
+tag or version input is needed. The
+[IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ) owns its version
+and release workflow in its separate repository.
 
 In GitHub Actions, select **Release**, then **Run workflow** on `master`.
 The workflow:
@@ -10,8 +12,8 @@ The workflow:
 1. Reads `VERSION` and compares it with all published GitHub releases,
    including prereleases. An already published version is skipped; a downgrade
    or an alias of an existing version fails.
-2. Replaces the leading `Unreleased` heading in each of the three changelogs
-   with the version and the current UTC date. Older entries and already
+2. Replaces the leading `Unreleased` heading in the library and standalone
+   changelogs with the version and the current UTC date. Older entries and already
    finalized dates are preserved. A finalized section with additional
    Unreleased changes is rejected to avoid ambiguous release contents.
 3. Runs formatting, ABI, tests, local publication checks, and native version
@@ -20,10 +22,10 @@ The workflow:
    in one atomic push. If `master` advances during verification, the push
    fails; rerun against the updated branch. Existing tags are never moved.
 5. Runs the full [CI validation set](testing.md#ci) on the exact tagged revision,
-   including native/desktop suites, three-platform consumers, and IDE tests.
+   including native/desktop suites and three-platform consumers.
    Publication waits for this verification to succeed.
 6. Publishes Maven artifacts, builds application binaries, and creates the
-   GitHub release with notes from all three versioned changelog sections.
+   GitHub release with notes from both versioned changelog sections.
    Relative links in those notes point to the tagged source.
 7. Triggers website/documentation publication through the existing
    `workflow_run` hook after successful completion, so downloads reflect the
@@ -54,8 +56,8 @@ Ordinary checkout and release API calls use `GITHUB_TOKEN`; they do not inherit
 the release app's bypass access. Existing Maven Central and signing secrets are
 still required.
 
-For the next development cycle, add a new `## [Unreleased]` section to each
-changelog and bump `VERSION` before the next release.
+For the next development cycle, add a new `## [Unreleased]` section to both
+changelogs and bump `VERSION` before the next release.
 
 ## Prereleases
 
