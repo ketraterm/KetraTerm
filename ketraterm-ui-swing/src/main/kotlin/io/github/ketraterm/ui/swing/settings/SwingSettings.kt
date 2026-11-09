@@ -44,7 +44,7 @@ import java.util.*
  * Builders are temporary caller-owned drafts; snapshots store validated values directly.
  * Scrollback capacity and shell window permissions belong to core creation and host policy.
  *
- * @property font primary terminal font.
+ * @property font primary terminal font with a finite, positive point size.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
  * [font] cannot display a Unicode scalar cell or grapheme cluster.
  * @property useSystemFallbackFonts whether the complex-text renderer may use
@@ -731,6 +731,9 @@ public class SwingSettings private constructor(
         )
 
     init {
+        require(font.size2D.isFinite() && font.size2D > 0f) {
+            "font size must be finite and > 0, was ${font.size2D}"
+        }
         require(minimumContrastRatio.isFinite() && minimumContrastRatio in 1.0..21.0) {
             "minimumContrastRatio must be finite and in 1..21, was $minimumContrastRatio"
         }
@@ -804,7 +807,7 @@ public class SwingSettings private constructor(
         /**
          * Returns the default terminal font used when hosts do not provide one.
          *
-         * The preferred families match common modern Windows terminal defaults,
+         * Uses installed curated monospace families in preference order,
          * with the logical monospaced font as a portable fallback.
          *
          * @return default terminal font.
@@ -900,7 +903,8 @@ public class SwingSettings private constructor(
         private fun resolveDefaultFontFamily(): String = resolvedMonospaceFontFamilies.firstOrNull() ?: Font.MONOSPACED
 
         /**
-         * Returns all installed font family names that are verified to be monospaced on the current system.
+         * Returns installed curated monospace families in preference order,
+         * with the logical monospaced family as a portable fallback.
          *
          * @return list of monospaced font family names.
          */

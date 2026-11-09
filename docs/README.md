@@ -11,7 +11,7 @@
 ## Embedding the library
 
 - [Getting started](../README.md#using-the-libraries): dependencies and entry points.
-- [Configuration](library/configuration.md): settings, host services, and localization.
+- [Configuration](library/configuration.md): library defaults, host overrides, settings, services, and localization.
 - [Compatibility](library/compatibility.md): supported APIs, runtime requirements, and migrations.
 - [Render ownership](library/render-ownership.md): borrowed frames and producer/consumer responsibilities.
 

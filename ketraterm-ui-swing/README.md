@@ -59,6 +59,9 @@ fun createUnboundTerminalView(): SwingTerminal {
 ```
 
 The font name is a host choice; use a font available in your environment.
+See [library defaults and host overrides](../docs/library/configuration.md#library-defaults)
+for default geometry, font, cursor, interaction, and permission policy. Primary
+font sizes must be finite and positive; invalid sizes fail when settings are built.
 Selection, search and prompt decoration colors, terminal color precedence, and migration notes are explained in
 [Color customization](docs/color-customization.md).
 `columns` and `rows` set the preferred size. Once laid out, the visible cell

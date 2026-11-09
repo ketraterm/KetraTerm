@@ -48,6 +48,7 @@ import java.nio.file.Path
  * Unbracketed paste line endings are likewise canonicalized to CR so every
  * pasted boundary has the same input semantics as Enter.
  * @property maxHistory maximum scrollback lines retained by the core buffer.
+ * Must be non-negative and fit with [rows] in an [Int]; zero disables history.
  * @property readBufferSize buffer size used by the PTY stdout reader thread.
  * @property readerThreadName name for the daemon PTY stdout reader thread.
  * @property watcherThreadName name for the daemon process exit watcher thread.
@@ -202,6 +203,9 @@ public class PtyOptions private constructor(
         require(columns > 0) { "PTY columns must be positive, got $columns" }
         require(rows > 0) { "PTY rows must be positive, got $rows" }
         require(maxHistory >= 0) { "PTY maxHistory must be >= 0, got $maxHistory" }
+        require(maxHistory <= Int.MAX_VALUE - rows) {
+            "PTY maxHistory + rows exceeds Int.MAX_VALUE: maxHistory=$maxHistory, rows=$rows"
+        }
         require(readBufferSize > 0) { "PTY readBufferSize must be positive, got $readBufferSize" }
         require(readerThreadName.isNotBlank()) { "PTY readerThreadName must not be blank" }
         require(watcherThreadName.isNotBlank()) { "PTY watcherThreadName must not be blank" }

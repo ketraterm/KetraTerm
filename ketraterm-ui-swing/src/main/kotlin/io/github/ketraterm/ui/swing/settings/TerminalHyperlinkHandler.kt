@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.settings
 
 import java.awt.Desktop
 import java.net.URI
+import java.net.URISyntaxException
 import java.util.*
 
 /**
@@ -38,6 +39,7 @@ public fun interface TerminalHyperlinkHandler {
     public companion object {
         /**
          * Conservative system-browser handler for common user-facing URI schemes.
+         * Malformed URIs and schemes other than HTTP, HTTPS, and mailto return false.
          */
         @JvmField
         public val SYSTEM: TerminalHyperlinkHandler = SystemTerminalHyperlinkHandler
@@ -52,6 +54,13 @@ public fun interface TerminalHyperlinkHandler {
 
 private object SystemTerminalHyperlinkHandler : TerminalHyperlinkHandler {
     override fun openHyperlink(uri: String): Boolean {
+        val parsed =
+            try {
+                URI(uri)
+            } catch (_: URISyntaxException) {
+                return false
+            }
+        if (!isAllowedScheme(parsed.scheme)) return false
         if (!Desktop.isDesktopSupported()) return false
         val desktop =
             try {
@@ -69,23 +78,16 @@ private object SystemTerminalHyperlinkHandler : TerminalHyperlinkHandler {
             }
         if (!browseSupported) return false
 
-        val parsed =
-            try {
-                URI(uri)
-            } catch (_: IllegalArgumentException) {
-                return false
-            }
-        return isAllowedScheme(parsed.scheme) &&
-            try {
-                desktop.browse(parsed)
-                true
-            } catch (_: SecurityException) {
-                false
-            } catch (_: UnsupportedOperationException) {
-                false
-            } catch (_: java.io.IOException) {
-                false
-            }
+        return try {
+            desktop.browse(parsed)
+            true
+        } catch (_: SecurityException) {
+            false
+        } catch (_: UnsupportedOperationException) {
+            false
+        } catch (_: java.io.IOException) {
+            false
+        }
     }
 
     private fun isAllowedScheme(scheme: String?): Boolean =

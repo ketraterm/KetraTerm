@@ -673,6 +673,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
  * @property maxHistory max scrollback lines retained by the core buffer.
+ * Must be non-negative and fit with [rows] in an [Int]; zero disables history.
  * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property shellIntegrationEnabled whether supported launch profiles should
@@ -773,6 +774,9 @@ public class TerminalWorkspaceOpenOptions private constructor(
         require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
+        require(maxHistory <= Int.MAX_VALUE - rows) {
+            "maxHistory + rows exceeds Int.MAX_VALUE: maxHistory=$maxHistory, rows=$rows"
+        }
         require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {
             "invalid host mode-report capabilities: $modeReportCapabilities"
         }
