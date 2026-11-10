@@ -159,6 +159,9 @@ public class SwingTerminal
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionInteraction: SwingShellSuggestionInteraction? = null
+        private var inlineShellSuggestion: InlineShellSuggestion? = null
+        private var inlineObservationJob: Job? = null
+        private var inlineCompositionActive = false
         private var suggestionRevision = 0L
         private var shellSuggestionProvider: SwingShellSuggestionProvider? = null
         private var shellSuggestionTarget: SwingShellSuggestionTarget? = null
@@ -495,6 +498,7 @@ public class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (!focused) clearInlineShellSuggestion()
                         if (settings.inactiveSelectionStyle != null) repaint()
                         if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
                         if (focused) reconcileHyperlinksOnEdt() else clearPointerHover()
@@ -699,7 +703,10 @@ public class SwingTerminal
             object : WindowAdapter() {
                 override fun windowGainedFocus(event: WindowEvent) = reconcileHyperlinksOnEdt()
 
-                override fun windowLostFocus(event: WindowEvent) = clearPointerHover()
+                override fun windowLostFocus(event: WindowEvent) {
+                    clearInlineShellSuggestion()
+                    clearPointerHover()
+                }
             }
 
         private val windowStateListener =
@@ -829,6 +836,17 @@ public class SwingTerminal
             focusTraversalKeysEnabled = false
             addFocusListener(inputController.focusListener)
             addKeyListener(inputController.keyListener)
+            addInputMethodListener(
+                object : InputMethodListener {
+                    override fun inputMethodTextChanged(event: InputMethodEvent) {
+                        val text = event.text
+                        inlineCompositionActive = text != null && text.endIndex - text.beginIndex > event.committedCharacterCount
+                        clearInlineShellSuggestion()
+                    }
+
+                    override fun caretPositionChanged(event: InputMethodEvent) = Unit
+                },
+            )
             addMouseListener(terminalMouseListener)
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
@@ -1237,6 +1255,7 @@ public class SwingTerminal
 
         override fun removeNotify() {
             terminalFocused = false
+            clearInlineShellSuggestion()
             cleanupSwingResources(
                 cursorTimer::stop,
                 visualBellController::stop,
@@ -1322,8 +1341,79 @@ public class SwingTerminal
             popup.setBounds(popupX, popupY, popupWidth, popupHeight)
         }
 
+        /**
+         * Presents a literal append-only ghost suffix against a previously captured edit context.
+         * Call on the EDT after asynchronous provider work. Returns false and clears the previous
+         * preview for stale, unconfirmed, unsupported or obstructed input. Text is single-line,
+         * control-free UTF-16, bounded to 16,384 code units. Wrapping clips to free visible cells;
+         * the live grid, selection and copied output never include the preview. [foreground] is an
+         * optional ARGB color; otherwise the current terminal foreground is used, at muted opacity.
+         * This rendering API installs no provider or acceptance bindings and does not own [expected].
+         */
+        @JvmOverloads
+        @ExperimentalShellSuggestionsApi
+        public fun presentInlineShellSuggestion(
+            expected: TerminalCommandEditContext,
+            ghostText: String,
+            foreground: Int? = null,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            clearInlineShellSuggestion()
+            val bound = session ?: return false
+            if (disposed ||
+                !terminalFocused ||
+                ancestorWindow?.isFocused == false ||
+                inlineCompositionActive ||
+                !isLiveViewportOnEdt() ||
+                selectionController.currentRange() != null
+            ) {
+                return false
+            }
+            val cells = bound.captureCommandSuffixPreview(expected, ghostText) ?: return false
+            refreshRenderCacheFromSession(bound)
+            val inline = InlineShellSuggestion(bound, expected, cells, foreground)
+            if (!inline.reconcile(renderCache)) return false
+            inlineShellSuggestion = inline
+            inlineObservationJob =
+                componentScope.launch {
+                    bound.commandEditChanges.collect {
+                        if (inlineShellSuggestion === inline) {
+                            if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
+                            repaint()
+                        }
+                    }
+                }
+            repaint()
+            return true
+        }
+
+        /** Removes the inline presentation on the EDT without cancelling the caller's edit context. */
+        @ExperimentalShellSuggestionsApi
+        public fun clearInlineShellSuggestion() {
+            check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            inlineObservationJob?.cancel()
+            inlineObservationJob = null
+            if (inlineShellSuggestion == null) return
+            inlineShellSuggestion = null
+            repaint()
+        }
+
         override fun paintComponent(graphics: Graphics) {
             super.paintComponent(graphics)
+
+            val inline =
+                inlineShellSuggestion?.takeIf {
+                    val valid =
+                        !disposed &&
+                            terminalFocused &&
+                            ancestorWindow?.isFocused != false &&
+                            session === it.session &&
+                            isLiveViewportOnEdt() &&
+                            selectionController.currentRange() == null &&
+                            it.reconcile(renderCache)
+                    if (!valid) clearInlineShellSuggestion()
+                    valid
+                }
 
             val g = graphics.create() as Graphics2D
             try {
@@ -1352,6 +1442,8 @@ public class SwingTerminal
                     hyperlinkHover = hyperlinkController.hover,
                     hyperlinkPresentations = hyperlinkDiscoveryController.hyperlinkPresentationsFor(renderCache),
                     followedHyperlinkId = hyperlinkDiscoveryController.followedHyperlinkId,
+                    inlineSuggestion = inline?.cells,
+                    inlineForeground = inline?.foreground,
                 )
                 stickyCommandHeader.paint(g)
                 if (hostServices.scrollbarOverlayEnabled) {
@@ -1379,6 +1471,7 @@ public class SwingTerminal
             onComplete: (Throwable?) -> Unit,
         ) = selectionController.deferChanges {
             if (disposed) return@deferChanges
+            clearInlineShellSuggestion()
             bindingIdentity.set(false)
             bindingIdentity = AtomicBoolean(true)
             synchronized(resizePublicationLock) { resizeResultPending = false }
@@ -1487,6 +1580,7 @@ public class SwingTerminal
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
+                clearInlineShellSuggestion()
                 bindingIdentity.set(false)
                 bindingIdentity = AtomicBoolean(false)
                 cleanupSwingResources(
@@ -1531,6 +1625,7 @@ public class SwingTerminal
             }
 
         private fun disposeOnEdt() {
+            clearInlineShellSuggestion()
             if (disposed) return
             disposed = true
             automaticSuggestionEligibilityRevision++
@@ -2866,6 +2961,7 @@ public class SwingTerminal
         }
 
         private fun invalidateShellSuggestionsOnEdt(retainPresentation: Boolean = false) {
+            clearInlineShellSuggestion()
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input", retainPresentation = retainPresentation)
             suggestionScheduler?.onInvalidated()
             suggestionInvalidationListeners.forEach { listener ->
@@ -3056,6 +3152,7 @@ public class SwingTerminal
             renderMappingChanged: Boolean,
             scrollComplete: Boolean,
         ) {
+            clearInlineShellSuggestion()
             viewportInteractionRevision++
             val boundSession = session
             if (boundSession != null && pendingGeometryRequests > 0) {
@@ -3550,6 +3647,10 @@ public class SwingTerminal
                 }
                 painter.prepareFrame(renderCache)
                 selectionController.updateFrame(renderCache)
+                inlineShellSuggestion?.let { inline ->
+                    if (!session.isCommandEditCurrent(inline.expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
+                    repaint()
+                }
                 hyperlinkDiscoveryController.scheduleForFrame()
                 selectionController.publishChange()
             }

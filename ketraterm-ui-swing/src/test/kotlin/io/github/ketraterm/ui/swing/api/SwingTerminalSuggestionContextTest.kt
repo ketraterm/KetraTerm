@@ -42,6 +42,91 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["clear", "focus", "input", "unbind", "dispose", "model", "selection", "composition"])
+    fun `inline presentation disappears without changing terminal text`(change: String) {
+        val dispatcher = StandardTestDispatcher()
+        lateinit var ingress: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    ingress = listener
+                }
+            }
+        Fixture(
+            sessionHandler = true,
+            connector = connector,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+            uiDispatcher = TerminalUiDispatcher { it.run() },
+        ).use { fixture ->
+            onEdt {
+                fixture.session.start(30, 4)
+                val bytes = "    git s".toByteArray()
+                ingress.onBytes(bytes, 0, bytes.size)
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                dispatcher.scheduler.runCurrent()
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+
+                fun pixels(): IntArray {
+                    val view = fixture.terminal
+                    val image = java.awt.image.BufferedImage(view.width, view.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                    val g = image.createGraphics()
+                    view.paint(g)
+                    g.dispose()
+                    return image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+                }
+                val before = pixels()
+                assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
+                assertFalse(before.contentEquals(pixels()))
+                when (change) {
+                    "clear" -> fixture.terminal.clearInlineShellSuggestion()
+                    "focus" -> fixture.terminal.focusListeners.forEach { it.focusLost(FocusEvent(fixture.terminal, FocusEvent.FOCUS_LOST)) }
+                    "input" ->
+                        fixture.terminal.keyListeners.forEach {
+                            it.keyTyped(KeyEvent(fixture.terminal, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 'x'))
+                        }
+                    "unbind" -> fixture.terminal.unbind()
+                    "dispose" -> fixture.terminal.dispose()
+                    "model" -> fixture.editableSource.value = snapshot().copy(commandText = "git st", cursorOffset = 6, cursorColumn = 10)
+                    "selection" -> {
+                        assertTrue(fixture.terminal.selectAll())
+                        assertFalse(
+                            fixture.terminal
+                                .selectedText()
+                                .orEmpty()
+                                .contains("tatus"),
+                        )
+                    }
+                    "composition" -> {
+                        val text = java.text.AttributedString("x").iterator
+                        val event =
+                            java.awt.event.InputMethodEvent(
+                                fixture.terminal,
+                                java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                                text,
+                                0,
+                                null,
+                                null,
+                            )
+                        fixture.terminal.inputMethodListeners.forEach { it.inputMethodTextChanged(event) }
+                    }
+                }
+                dispatcher.scheduler.runCurrent()
+                val after = pixels()
+                fixture.terminal.clearInlineShellSuggestion()
+                assertContentEquals(after, pixels(), "preview survived $change")
+                assertFalse(expected.isCancelled && change == "clear", "clearing presentation cancelled caller authority")
+                fixture.session.readRenderFrame { frame ->
+                    val codes = IntArray(frame.columns)
+                    frame.copyTextLine(0, codes, flags = IntArray(frame.columns))
+                    assertEquals('s'.code, codes[8])
+                    assertEquals(0, codes[9])
+                }
+            }
+        }
+    }
+
     @Test
     fun `automatic popup stays mounted through shell echo debounce and a delayed provider`() {
         val dispatcher = StandardTestDispatcher()

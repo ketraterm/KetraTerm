@@ -342,6 +342,48 @@ collection. Lifecycle changes invalidate obsolete results and edits.
 `copyCellBounds` to anchor a host popup and `setShellSuggestionFailureHandler`
 for view-owned diagnostics.
 
+### Inline suffix rendering
+
+The experimental inline API paints caller-supplied ghost text through the same
+text renderer as ordinary terminal cells. Capture edit authority before starting
+asynchronous work, then present the result on the EDT:
+
+```kotlin
+import io.github.ketraterm.session.TerminalCommandEditContext
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun showSuffix(view: SwingTerminal, expected: TerminalCommandEditContext, suffix: String): Boolean =
+    view.presentInlineShellSuggestion(expected, suffix)
+```
+
+The bound session must match the captured context. Presentation requires a
+confirmed command-end cursor, focus, no selection or IME composition, and the
+live primary viewport with full-screen margins and automatic wrapping. A visible
+shell suffix suppresses host ghost text. Preview text is single-line,
+control-free, well-formed UTF-16, at most 16,384 code units, and cannot attach to
+or modify the command's final grapheme. Invalid or unavailable presentation returns
+`false` and clears any previous preview.
+
+Wrapping uses the session's Unicode and ambiguous-width policy. Rendering stops
+before an occupied cell or image, preserving whole wide cells and clusters, and
+clips at the bottom without scrolling. Directional layouts are suppressed when
+they would move existing text or the preview into the command prefix. Font
+fallback, shaping, row geometry, and cursor painting use the ordinary renderer.
+The optional `foreground` argument supplies ARGB; the default uses the current
+terminal foreground at muted opacity.
+
+`clearInlineShellSuggestion()` removes the presentation. Input, invalid edit
+authority, focus loss, selection, scrolling, rebind, disposal, or incompatible
+geometry remove it too. The view borrows the edit context; clearing presentation
+does not cancel it. Ghost text never enters selection copying, search, command
+output, scrollback, or the live grid.
+
+This API provides rendering. Callers own request scheduling and guarded acceptance
+through `TerminalSession.submitInput(expected, events)`. Presentation does not
+install acceptance keys or merge its results with the completion popup.
+
 ## How to Extend: Custom Host Services
 
 `SwingHostServices` is an immutable snapshot of host-owned services, supplied at

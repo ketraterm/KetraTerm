@@ -275,6 +275,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun bind (Lio/github/ketraterm/session/TerminalSession;)V
 	public final fun bind (Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun bind$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun clearInlineShellSuggestion ()V
 	public final fun clearScreen ()Z
 	public final fun clearSearch ()V
 	public final fun clearSelection ()V
@@ -304,6 +305,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun preferredGridSize (II)Ljava/awt/Dimension;
 	public final fun preferredGridSize (IILio/github/ketraterm/render/api/TerminalRenderBufferKind;)Ljava/awt/Dimension;
 	public static synthetic fun preferredGridSize$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;IILio/github/ketraterm/render/api/TerminalRenderBufferKind;ILjava/lang/Object;)Ljava/awt/Dimension;
+	public final fun presentInlineShellSuggestion (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;)Z
+	public final fun presentInlineShellSuggestion (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;Ljava/lang/Integer;)Z
+	public static synthetic fun presentInlineShellSuggestion$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Z
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;)V
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;I)V
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;II)V

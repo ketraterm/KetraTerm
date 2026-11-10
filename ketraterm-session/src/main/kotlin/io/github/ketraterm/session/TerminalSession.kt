@@ -768,6 +768,50 @@ public class TerminalSession private constructor(
             } == true
         }
 
+    /**
+     * Builds detached render cells for an append-only suffix using the terminal's parser and width
+     * policy. Returns null for invalid text, stale/unconfirmed edits, a non-end cursor, unsupported
+     * screen state, or a suffix that changes the preceding grapheme. Text must be single-line,
+     * control-free, well-formed UTF-16 and at most 16,384 code units. Layout clips at the bottom
+     * without scrolling. The caller owns the returned mutable cache; it never contains live cells.
+     *
+     * This cold-path operation serializes with mutation. Capture before painting; presentation must
+     * independently check occupancy, viewport eligibility and freshness. No input is sent.
+     */
+    public fun captureCommandSuffixPreview(
+        expected: TerminalCommandEditContext,
+        suffix: String,
+    ): TerminalRenderCache? {
+        if (!CommandSuffixPreview.validText(suffix)) return null
+        return synchronized(mutationLock) {
+            if (processingOutput ||
+                !isCommandEditCurrent(expected) ||
+                expected.commandLine.requiresShellConfirmation ||
+                expected.commandLine.cursorOffset != expected.commandLine.commandText.length ||
+                runtime.shellIntegration?.state?.hasRunningCommand() != false
+            ) {
+                return@synchronized null
+            }
+            val modes = terminal.getModeSnapshot()
+            if (modes.isOriginMode || modes.isLeftRightMarginMode || !modes.isAutoWrap) return@synchronized null
+            var result: TerminalRenderCache? = null
+            renderReader.readRenderFrame { frame ->
+                if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY &&
+                    frame.hasFullScreenMargins &&
+                    frame.cursor.row == expected.commandLine.cursorRow &&
+                    (
+                        frame.cursor.column == expected.commandLine.cursorColumn ||
+                            frame.cursorPendingWrap &&
+                            expected.commandLine.cursorColumn == frame.columns
+                    )
+                ) {
+                    result = CommandSuffixPreview.capture(frame, suffix, modes.treatAmbiguousAsWide)
+                }
+            }
+            result
+        }
+    }
+
     private fun commandEditAuthorityIsCurrent(
         expected: TerminalCommandEditContext,
         shellRevision: Long,

@@ -4,8 +4,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Added experimental caller-controlled inline suffix rendering. Ghost text reuses ordinary terminal text painting and Unicode layout, wraps through free visible cells, and stays out of live terminal content. Presentation validates edit authority and suppresses shell-text collisions and unsupported viewport states.
 - Added bounded headless command-output extraction through `TerminalSession.commandOutputText`. The OSC producer returns a completed command's retained text tail with separate caller-truncation and missing-history flags, preserving graphemes and logical line breaks. Custom producers can implement the same optional contract.
-
 - PTY options and workspace launch profiles preserve empty arguments after the executable, including through configuration copies.
 - Added `TerminalSession.confirmCommandEdit` and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine's buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.
 - PTY and workspace options reject retained row capacity overflow during construction, before process creation. Swing settings reject non-positive or non-finite primary font sizes while preserving fractional sizes and host overrides. See [library defaults](docs/library/configuration.md#library-defaults).

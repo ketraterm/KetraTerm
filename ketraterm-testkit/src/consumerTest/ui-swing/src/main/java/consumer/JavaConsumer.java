@@ -56,6 +56,13 @@ import java.util.List;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static boolean showSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix) {
+        return view.presentInlineShellSuggestion(expected, suffix);
+    }
+    public static boolean showColoredSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix, int color) {
+        return view.presentInlineShellSuggestion(expected, suffix, color);
+    }
+    public static void clearInline(SwingTerminal view) { view.clearInlineShellSuggestion(); }
     public static void verifySelection(SwingTerminal terminal) {
         var events = new AtomicInteger();
         io.github.ketraterm.ui.swing.api.TerminalSelectionListener listener = (previous, current) -> {

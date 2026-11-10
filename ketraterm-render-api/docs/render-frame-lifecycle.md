@@ -7,6 +7,11 @@ implementations.
 
 ## 1. Frame Reader & Consumer Synchronization
 
+`hasFullScreenMargins` is an optional geometry proof for consumers laying out
+printable previews. Core reports whether the current scrolling and horizontal
+margins cover the full grid. Custom readers default to `false`; copied caches
+preserve the value. It does not authorize editing or describe viewport focus.
+
 `TerminalRenderFrameReader.readRenderFrame` invokes
 `TerminalRenderFrameConsumer.accept` before returning. An implementation may hold
 a mutation lock while invoking the callback. Keep callbacks short: copy rows,

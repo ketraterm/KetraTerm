@@ -28,6 +28,7 @@ public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/git
 	public final fun getGraphicsGeneration ()J
 	public final fun getHasBlinkingText ()Z
 	public final fun getHasFrame ()Z
+	public final fun getHasFullScreenMargins ()Z
 	public final fun getHistoryContentGeneration ()J
 	public final fun getHistorySize ()I
 	public final fun getHyperlinkIds ()[I
@@ -107,6 +108,7 @@ public final class io/github/ketraterm/render/cache/TerminalRenderRowSnapshot : 
 	public fun getDiscardedCount ()J
 	public fun getFrameGeneration ()J
 	public fun getGraphicsGeneration ()J
+	public fun getHasFullScreenMargins ()Z
 	public fun getHistoryContentGeneration ()J
 	public fun getHistorySize ()I
 	public fun getOutputEndAbsoluteRow ()J

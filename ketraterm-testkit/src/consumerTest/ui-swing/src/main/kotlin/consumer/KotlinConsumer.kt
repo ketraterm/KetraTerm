@@ -76,6 +76,12 @@ private const val COLUMNS = 80
 private const val ROWS = 3
 private const val HOST_PASTE = "primary selection from published consumer"
 
+fun showSuffix(
+    view: SwingTerminal,
+    expected: io.github.ketraterm.session.TerminalCommandEditContext,
+    suffix: String,
+): Boolean = view.presentInlineShellSuggestion(expected, suffix)
+
 fun main() =
     runBlocking {
         check(SwingSettings().alternateScreenWheelToArrowEnabled)

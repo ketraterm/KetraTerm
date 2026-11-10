@@ -95,6 +95,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final synthetic fun acquirePublishedFrame ()Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun activeShellCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public final fun captureCommandEdit ()Lio/github/ketraterm/session/TerminalCommandEditContext;
+	public final fun captureCommandSuffixPreview (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;)Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun clearBuffer ()Z
 	public fun close ()V
 	public final fun commandOutputText (I)Lio/github/ketraterm/session/TerminalCommandOutputText;

@@ -252,6 +252,10 @@ public class TerminalRenderCache(
     public var cursorPendingWrap: Boolean = false
         private set
 
+    /** Last copied proof that printable wrapping uses unrestricted full-screen margins. */
+    public var hasFullScreenMargins: Boolean = false
+        private set
+
     /**
      * Convenience cursor snapshot for tests and compatibility callers.
      *
@@ -566,6 +570,7 @@ public class TerminalRenderCache(
         cursorShape = source.cursorShape
         cursorGeneration = source.cursorGeneration
         cursorPendingWrap = source.cursorPendingWrap
+        hasFullScreenMargins = source.hasFullScreenMargins
         cursorChangedOnLastUpdate =
             oldHasCursor != hasCursor ||
             oldCursorColumn != cursorColumn ||
@@ -741,6 +746,7 @@ public class TerminalRenderCache(
         cursorShape = TerminalRenderCursorShape.BLOCK
         cursorGeneration = UNINITIALIZED_GENERATION
         cursorPendingWrap = false
+        hasFullScreenMargins = false
         historySize = 0
         scrollbackOffset = 0
         discardedCount = 0L
@@ -800,6 +806,7 @@ public class TerminalRenderCache(
         cursorShape = nextCursorShape
         cursorGeneration = nextCursorGeneration
         cursorPendingWrap = nextCursorPendingWrap
+        hasFullScreenMargins = frame.hasFullScreenMargins
     }
 
     private fun clearAllClusters() {

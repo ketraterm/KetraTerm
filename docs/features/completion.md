@@ -259,6 +259,15 @@ the Gradle adapter does not run Gradle to discover tasks. Ordinary source
 exceptions are reported while other sources continue; request cancellation
 cancels source work.
 
+## Inline suffix presentation
+
+Library consumers can opt into experimental append-only ghost-text rendering
+through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary terminal
+text painter, clips wrapped previews to free visible cells, and requires current
+command-edit authority. See the [rendering contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
+for eligibility, Unicode handling, collisions, and caller ownership.
+The standalone application does not enable this presentation by default.
+
 ## Learning and privacy
 
 Learning adjusts matching candidates using executions, acceptance, and explicit
