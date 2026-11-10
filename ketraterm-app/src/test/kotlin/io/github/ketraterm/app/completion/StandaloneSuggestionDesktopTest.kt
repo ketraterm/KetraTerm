@@ -31,6 +31,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
@@ -102,12 +103,14 @@ class StandaloneSuggestionDesktopTest {
                 }
                 awaitPopup("Get-Chi", "Get-ChildItem")
                 selectAndAccept("Get-ChildItem")
-                withTimeout(15.seconds) {
-                    session.commandEditChanges.first {
-                        val snapshot = session.activeShellCommandLine()
-                        snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
+                val acceptedLine =
+                    withTimeoutOrNull(15.seconds) {
+                        session.commandEditChanges.first {
+                            val snapshot = session.activeShellCommandLine()
+                            snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
+                        }
                     }
-                }
+                assertNotNull(acceptedLine, "Accepted suggestion did not reach the editor: ${session.activeShellCommandLine()}")
                 val buffer = assertNotNull(session.requestShellCompletions("Get-ChildItem", 13))
                 assertEquals("Get-ChildItem", buffer.commandLine)
                 assertEquals(13, buffer.cursorOffset)

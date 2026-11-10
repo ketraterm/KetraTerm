@@ -165,7 +165,10 @@ restores the edited command prefix through PSReadLine's exact replacement API,
 preserving text after the cursor. Slow native completers
 can time out. Cancelling a request cannot stop a completer already running inside
 PowerShell. Automatic requests follow the popup settings and use the same native
-confirmation and edit validation as explicit requests.
+confirmation and edit validation as explicit requests. Buffer confirmation reads
+PSReadLine's editor state without running `TabExpansion2`, so candidate discovery
+does not block verification of inline predictions. Native candidate requests
+still invoke the shell's completers.
 Suggestions use the confirmed editor buffer even when inline history
 predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
 real editable suffix text. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)

@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Added `TerminalSession.confirmCommandEdit` and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine's buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.
 - PTY and workspace options reject retained row capacity overflow during construction, before process creation. Swing settings reject non-positive or non-finite primary font sizes while preserving fractional sizes and host overrides. See [library defaults](docs/library/configuration.md#library-defaults).
 - The default Swing hyperlink handler rejects malformed URIs without throwing and rejects unsupported schemes before contacting the desktop.
 

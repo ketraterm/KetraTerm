@@ -20,7 +20,7 @@ function global:Set-PSReadLineKeyHandler {
     $global:CompletionHandlers[$ViMode + $Chord] = $ScriptBlock
 }
 __SCRIPT__
-function Send-TestFrame([string] $Digits, [string] $Mode = '') {
+function Send-TestFrame([string] $Digits, [string] $Mode = '', [string] $Operation = 'e') {
     & $global:CompletionHandlers[$Mode + 'F12,q']
     foreach ($digit in $Digits.ToCharArray()) {
         $handler = $global:CompletionHandlers[$Mode + 'F12,' + $digit]
@@ -30,7 +30,7 @@ function Send-TestFrame([string] $Digits, [string] $Mode = '') {
             & $handler ([pscustomobject]@{ KeyChar = $digit }) $null
         }
     }
-    & $global:CompletionHandlers[$Mode + 'F12,e']
+    & $global:CompletionHandlers[$Mode + 'F12,' + $Operation]
 }
 function Get-KetraNativeWidget { param([ValidateSet('alpha','beta')][string] $Mode) }
 function Get-KetraCustomCompleter { param([string] $Value) }
@@ -104,6 +104,23 @@ Complete-Test 'Get-KetraMutatingCompleter -Value throws'
 [Console]::WriteLine("EXIT=$global:LASTEXITCODE")
 if ($global:ProgressPreference -ne 'Continue') { throw 'Completion changed the interactive progress preference' }
 
+function Get-KetraBufferOnly { param([string] $Value) }
+$global:BufferOnlyCompleterCalls = 0
+Register-ArgumentCompleter -CommandName Get-KetraBufferOnly -ParameterName Value -ScriptBlock {
+    $global:BufferOnlyCompleterCalls++
+    [System.Management.Automation.CompletionResult]::new('buffer-candidate', 'buffer-candidate',
+        [System.Management.Automation.CompletionResultType]::ParameterValue, 'buffer-candidate')
+}
+[Microsoft.PowerShell.PSConsoleReadLine]::Line = 'Get-KetraBufferOnly -Value b'
+[Microsoft.PowerShell.PSConsoleReadLine]::Cursor = -1
+$global:TestRequestId++
+Send-TestFrame $global:TestRequestId.ToString('D19', [Globalization.CultureInfo]::InvariantCulture) '' 'b'
+[Console]::WriteLine()
+if ($global:BufferOnlyCompleterCalls -ne 0) { throw 'Buffer confirmation invoked the candidate completer' }
+Complete-Test 'Get-KetraBufferOnly -Value b'
+if ($global:BufferOnlyCompleterCalls -ne 1) { throw 'A full request must still invoke the candidate completer' }
+[Console]::WriteLine('BUFFER_ONLY=OK')
+
 # Framing never calls the completer for incomplete, malformed, consumed, or overflowed tokens.
 $savedCompleter = (Get-Item Function:\__KetraTermComplete).ScriptBlock
 $global:ReceivedTokens = [Collections.Generic.List[long]]::new()
@@ -128,7 +145,7 @@ if ($global:ReceivedTokens.Count -ne 2 -or $global:ReceivedTokens[0] -ne 101 -or
 # PSReadLine resets bindings even when Set-PSReadLineOption selects the current EditMode.
 $global:CompletionHandlers.Clear()
 global:__KetraTermCompletionReady
-foreach ($suffix in @('q', 'e', 'r') + (0..9)) {
+foreach ($suffix in @('q', 'e', 'r', 'b') + (0..9)) {
     if (-not $global:CompletionHandlers.ContainsKey('F12,' + $suffix)) { throw 'Same-mode reset lost a private handler' }
 }
 Send-TestFrame '0000000000000000303'
@@ -138,7 +155,7 @@ if ($global:ReceivedTokens.Count -ne 3 -or $global:ReceivedTokens[2] -ne 303) {
 $global:TestEditMode = 'Vi'
 global:__KetraTermCompletionReady
 foreach ($mode in @('Insert', 'Command')) {
-    foreach ($suffix in @('q', 'e', 'r') + (0..9)) {
+    foreach ($suffix in @('q', 'e', 'r', 'b') + (0..9)) {
         if (-not $global:CompletionHandlers.ContainsKey($mode + 'F12,' + $suffix)) { throw 'Missing Vi mode handler' }
     }
     Send-TestFrame '0000000000000000202' $mode

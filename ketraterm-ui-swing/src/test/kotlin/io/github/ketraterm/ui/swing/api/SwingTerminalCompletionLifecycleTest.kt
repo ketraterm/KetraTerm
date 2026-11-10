@@ -27,6 +27,7 @@ import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
@@ -44,6 +45,58 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCompletionLifecycleTest {
+    @Test
+    fun `automatic prediction confirmation does not wait for native candidate completion`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, bufferConfirmation = true)
+            val view = RecordingView()
+            val terminal = terminal(testScheduler, view)
+            var collections = 0
+            val provider =
+                object : SwingShellSuggestionProvider {
+                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                        flow {
+                            collections++
+                            emit(listOf(suggestion))
+                        }.flowOn(StandardTestDispatcher(testScheduler))
+
+                    override fun open(request: SwingShellSuggestionRequest) = SwingShellSuggestionSource(suggestions(request))
+                }
+            val target =
+                RecordingTarget { interaction ->
+                    terminal.presentShellSuggestions(interaction)
+                    terminal.requestShellSuggestions(interaction, provider)
+                }
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals("\u001b[23~", fixture.connector.output.toString(Charsets.UTF_8))
+                assertEquals(0, collections)
+                fixture.respond(TerminalShellCompletionResult("git s", 5, 5, 5, emptyList()))
+                runCurrent()
+                assertEquals(1, collections)
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                val native = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertEquals("\u001b[23~\u001b[24~", fixture.connector.output.toString(Charsets.UTF_8))
+                assertFalse(native.isCompleted, "The full completer has not replied")
+                assertEquals(listOf(suggestion), view.snapshot.visibleSuggestions)
+                fixture.respond(TerminalShellCompletionResult("git s", 5, 4, 5, emptyList()), requestId = 2)
+                runCurrent()
+                assertNotNull(native.await())
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
     @Test
     fun `late shell inventory refreshes finite automatic results without replacing an explicit interaction`() =
         onEdtTest {
@@ -1436,6 +1489,7 @@ class SwingTerminalCompletionLifecycleTest {
         command: String = "git s",
         nativeCompletion: Boolean = false,
         private val screenDerived: Boolean = false,
+        bufferConfirmation: Boolean = false,
     ) : AutoCloseable {
         val connector = RecordingConnector()
         val model =
@@ -1456,7 +1510,13 @@ class SwingTerminalCompletionLifecycleTest {
                 shellIntegration =
                     TerminalShellIntegrationFactory { context ->
                         completion = context.shellCompletion
-                        if (nativeCompletion) completion.ready("test") { listOf(TerminalKeyEvent.key(TerminalKey.F12)) }
+                        if (nativeCompletion) {
+                            completion.ready(
+                                "test",
+                                { listOf(TerminalKeyEvent.key(TerminalKey.F12)) },
+                                if (bufferConfirmation) { _ -> listOf(TerminalKeyEvent.key(TerminalKey.F11)) } else null,
+                            )
+                        }
                         val host =
                             if (legacySource == null) {
                                 TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)

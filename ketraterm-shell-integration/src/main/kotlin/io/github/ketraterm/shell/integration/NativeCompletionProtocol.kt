@@ -71,12 +71,28 @@ internal class NativeCompletionProtocol(
         if (fields.size < 4 || fields[0] != "KetraTermCompletion" || fields[1] != "3") return false
         val epoch = fields[3]
         if (epoch.length != 32 || epoch.any { it !in '0'..'9' && it !in 'a'..'f' }) return false
-        if (fields[2] == "Ready" && (fields.size == 4 || fields.size == 5 && fields[4] == "PrefixReset")) {
+        if (fields[2] == "Ready") {
             if (!promptActive) return false
-            channel.ready(epoch, ::requestInput)
+            if (fields.size !in 4..6) return false
+            var capabilities = 0
+            for (index in 4 until fields.size) {
+                val bit =
+                    when (fields[index]) {
+                        "PrefixReset" -> 1
+                        "BufferState" -> 2
+                        else -> return false
+                    }
+                if (capabilities and bit != 0) return false
+                capabilities = capabilities or bit
+            }
+            channel.ready(
+                epoch,
+                { requestInput(it, 'e') },
+                if (capabilities and 2 != 0) { id -> requestInput(id, 'b') } else null,
+            )
             canConfirmCommandLine = true
             commandLinePrefixResetKeys =
-                if (fields.size == 5) {
+                if (capabilities and 1 != 0) {
                     listOf(TerminalKeyEvent(key = TerminalKey.F12), TerminalKeyEvent(codepoint = 'r'.code))
                 } else {
                     emptyList()
@@ -129,7 +145,10 @@ internal class NativeCompletionProtocol(
         return TerminalShellCompletionResult(line, cursor, start, end, candidates, externalCommandName)
     }
 
-    private fun requestInput(requestId: Long): List<TerminalInputEvent> =
+    private fun requestInput(
+        requestId: Long,
+        suffix: Char,
+    ): List<TerminalInputEvent> =
         buildList(42) {
             val prefix = TerminalKeyEvent(key = TerminalKey.F12)
             add(prefix)
@@ -139,7 +158,7 @@ internal class NativeCompletionProtocol(
                 add(TerminalKeyEvent(codepoint = digit.code))
             }
             add(prefix)
-            add(TerminalKeyEvent(codepoint = 'e'.code))
+            add(TerminalKeyEvent(codepoint = suffix.code))
         }
 
     private fun text(

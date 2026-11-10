@@ -34,6 +34,7 @@ public class TerminalShellCompletionChannel internal constructor(
     private var closed = false
     private var nextRequestId = 0L
     private var requestInput: ((Long) -> List<TerminalInputEvent>)? = null
+    private var confirmationInput: ((Long) -> List<TerminalInputEvent>)? = null
     internal var pending: Pending? = null
         private set
     private var receipt: Receipt? = null
@@ -60,6 +61,7 @@ public class TerminalShellCompletionChannel internal constructor(
         synchronized(lock) {
             epoch = null
             requestInput = null
+            confirmationInput = null
             receipt = null
             confirmationRequiredFor = null
             pending?.apply {
@@ -83,12 +85,25 @@ public class TerminalShellCompletionChannel internal constructor(
     public fun ready(
         epoch: String,
         requestInput: (Long) -> List<TerminalInputEvent>,
+    ): Unit = ready(epoch, requestInput, null)
+
+    /**
+     * Installs a prompt with optional non-executing buffer-only [confirmationInput].
+     * Both encoders follow [ready]'s request bounds and correlation contract. A null
+     * confirmation encoder uses [requestInput] for buffer confirmation as well.
+     * Buffer-only replies must not invoke candidate completers or mutate the editor.
+     */
+    public fun ready(
+        epoch: String,
+        requestInput: (Long) -> List<TerminalInputEvent>,
+        confirmationInput: ((Long) -> List<TerminalInputEvent>)?,
     ) {
         require(epoch.length in 1..128 && epoch.all { it.isLetterOrDigit() })
         synchronized(lock) {
             if (closed) return
             this.epoch = epoch
             this.requestInput = requestInput
+            this.confirmationInput = confirmationInput
             receipt = null
             confirmationRequiredFor = null
             pending?.apply {
@@ -112,14 +127,18 @@ public class TerminalShellCompletionChannel internal constructor(
         }
     }
 
-    internal fun begin(expected: TerminalCommandEditContext): Pending? {
+    internal fun begin(
+        expected: TerminalCommandEditContext,
+        confirmationOnly: Boolean = false,
+    ): Pending? {
         if (closed || epoch == null || pending != null || nextRequestId == Long.MAX_VALUE) return null
-        val encodeRequest = requestInput ?: return null
+        val confirmation = confirmationInput.takeIf { confirmationOnly }
+        val encodeRequest = confirmation ?: requestInput ?: return null
         val requestId = nextRequestId + 1
         val input = encodeRequest(requestId)
         require(input.isNotEmpty() && input.size <= 64) { "Completion requests must contain between one and 64 input events" }
         val detachedInput = input.toList()
-        val current = Pending(requestId, expected, detachedInput)
+        val current = Pending(requestId, expected, detachedInput, includesCandidates = confirmation == null)
         nextRequestId = requestId
         receipt = null
         confirmationRequiredFor = expected
@@ -128,10 +147,15 @@ public class TerminalShellCompletionChannel internal constructor(
     }
 
     /** Called under session mutation serialization; cancellation owns a waiter, never another caller's result. */
-    internal fun join(expected: TerminalCommandEditContext): Pending? {
+    internal fun join(
+        expected: TerminalCommandEditContext,
+        confirmationOnly: Boolean = false,
+    ): Pending? {
         val current = pending ?: return null
         if (current.waiters == 0 ||
             current.responded ||
+            !confirmationOnly &&
+            !current.includesCandidates ||
             !sameAuthority(expected, current.expected)
         ) {
             return null
@@ -166,7 +190,7 @@ public class TerminalShellCompletionChannel internal constructor(
             result.commandLine == expected.commandLine.commandText &&
             result.cursorOffset == expected.commandLine.cursorOffset
         ) {
-            receipt = Receipt(expected, result)
+            receipt = Receipt(expected, result, current.includesCandidates)
         } else {
             current.response = null
         }
@@ -196,6 +220,7 @@ public class TerminalShellCompletionChannel internal constructor(
         prefixResetKeys: List<TerminalKeyEvent>,
     ): TerminalShellCompletionResult? {
         val completed = receipt ?: return null
+        if (!completed.includesCandidates) return null
         val expected = completed.expected
         return completed.result.takeIf {
             expected.commandLine.requiresShellConfirmation &&
@@ -209,9 +234,13 @@ public class TerminalShellCompletionChannel internal constructor(
     }
 
     /** Reuses confirmation only while the editor context still owns its exact receipt. */
-    internal fun confirmedResult(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
+    internal fun confirmedResult(
+        expected: TerminalCommandEditContext,
+        confirmationOnly: Boolean = false,
+    ): TerminalShellCompletionResult? {
         if (!expected.commandLine.requiresShellConfirmation) return null
         val completed = receipt ?: return null
+        if (!confirmationOnly && !completed.includesCandidates) return null
         return completed.result.takeIf { sameAuthority(expected, completed.expected) }
     }
 
@@ -220,6 +249,7 @@ public class TerminalShellCompletionChannel internal constructor(
             closed = true
             epoch = null
             requestInput = null
+            confirmationInput = null
             mutableCommands.value = null
             receipt = null
             confirmationRequiredFor = null
@@ -247,6 +277,7 @@ public class TerminalShellCompletionChannel internal constructor(
         val requestId: Long,
         val expected: TerminalCommandEditContext,
         val input: List<TerminalInputEvent>,
+        val includesCandidates: Boolean,
     ) {
         val deferred = CompletableDeferred<TerminalShellCompletionResult?>()
         var waiters = 1
@@ -266,5 +297,6 @@ public class TerminalShellCompletionChannel internal constructor(
     private class Receipt(
         val expected: TerminalCommandEditContext,
         val result: TerminalShellCompletionResult,
+        val includesCandidates: Boolean,
     )
 }

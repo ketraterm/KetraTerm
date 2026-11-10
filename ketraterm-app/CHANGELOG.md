@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- PowerShell automatic suggestions confirm inline-prediction input without waiting for native candidate discovery.
 - Added temporary per-pane font zoom/reset, Windows Ctrl+Shift+C/V clipboard aliases, and window-scoped tab/pane shortcuts. History paging keeps one row of context; Shift+Home/End jumps to oldest history/live output.
 - Double- and triple-click dragging extends selection by whole words or rows. Word selection preserves complete wide characters and keeps adjacent paths out of whitespace/delimiter selections.
 

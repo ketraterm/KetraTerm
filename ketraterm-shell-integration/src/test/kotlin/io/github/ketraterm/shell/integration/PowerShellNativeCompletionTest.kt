@@ -28,12 +28,52 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.util.*
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PowerShellNativeCompletionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["BufferState", "PrefixReset;BufferState", "BufferState;PrefixReset"])
+    fun `buffer confirmation uses its announced wire operation without consuming full completion`(capabilities: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.feed(ready().dropLast(1) + ";$capabilities\u0007")
+                fixture.feed("ldItem\u001b[6D")
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                val confirmed = async { fixture.session.confirmCommandEdit(expected) }
+                runCurrent()
+                assertEquals(request(1, 'b'), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+                fixture.feed(confirmationReply("Get-Chi", 1))
+                runCurrent()
+                assertTrue(confirmed.await())
+                assertEquals("Get-Chi", expected.commandLine.commandText)
+
+                val full = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertEquals(request(1, 'b') + request(2), fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+                fixture.feed(reply("Get-Chi", id = 2))
+                runCurrent()
+                assertEquals("Get-ChildItem", assertNotNull(full.await()).candidates.single().replacementText)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["BufferState;BufferState", "PrefixReset;PrefixReset", "Unknown", "BufferState;Unknown"])
+    fun `invalid confirmation capabilities do not install a native hook`(capabilities: String) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), ready = false).use { fixture ->
+                fixture.feed(ready().dropLast(1) + ";$capabilities\u0007")
+                assertFalse(fixture.session.shellCompletionAvailable)
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+                assertFalse(fixture.session.confirmCommandEdit(expected))
+                assertTrue(fixture.connector.writtenBytes.isEmpty())
+            }
+        }
+
     @Test
     fun `completion readiness is accepted only within a primary prompt`() =
         runTest {
@@ -571,13 +611,24 @@ class PowerShellNativeCompletionTest {
     }
 
     companion object {
-        private fun request(id: Long): String =
+        private fun request(
+            id: Long,
+            suffix: Char = 'e',
+        ): String =
             "\u001b[24~q" +
                 id
                     .toString()
                     .padStart(19, '0')
                     .map { "\u001b[24~$it" }
-                    .joinToString("") + "\u001b[24~e"
+                    .joinToString("") + "\u001b[24~$suffix"
+
+        private fun confirmationReply(
+            line: String,
+            id: Int,
+        ): String =
+            "\u001b]633;KetraTermCompletion;3;Result;${"a".repeat(
+                32,
+            )};$id;Ok;${line.length};${line.length};${line.length};${encoded(line)};;0\u0007"
 
         private fun encoded(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 

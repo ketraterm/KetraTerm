@@ -199,7 +199,10 @@ may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 `captureCommandEdit()` and submit with `submitInput(expected, events)` so stale
 edits are rejected. If native confirmation is required, pass that same context to
-`requestShellCompletions(expected)` before collecting suggestions. A native query
+`confirmCommandEdit(expected)` and proceed only when it returns true. Capable
+producers read only the editor buffer, without running candidate completers;
+other producers fall back to a full native query. Use
+`requestShellCompletions(expected)` when native candidates are needed. A native query
 does not count as a user edit. Its confirmed buffer remains valid across terminal
 repaints and unrelated metadata; real input, producer editing or lifecycle changes,
 resize, cancellation, and closure still invalidate it. Use
