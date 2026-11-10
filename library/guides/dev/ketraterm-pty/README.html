@@ -49,7 +49,8 @@ and the <a href="../ketraterm-ui-swing/README.html#how-to-use">Swing view exampl
 <h2 id="launch-options">Launch options</h2>
 <p><code>PtyOptions.create</code> builds an immutable configuration; <code>copy</code> and <code>toBuilder</code>
 support changes.</p>
-<p>Pass the executable and each argument as separate command elements. Shell
+<p>Pass the executable and each argument as separate command elements. The executable
+must be nonempty; later arguments may be empty strings. Shell
 operators such as pipes are interpreted only if the chosen executable is a
 shell and its arguments request command evaluation.</p>
 <pre><code class="language-kotlin">import io.github.ketraterm.pty.PtyOptions
@@ -125,7 +126,7 @@ Windows graphics cursor desynchronization, and verified upstream evidence.</li>
 threads, failure, shutdown, resizing, and native test requirements.</li>
 <li><a href="Module.html">Module ownership</a>: implementation components and dependencies.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/ketraterm-pty/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a26527043a6c6ee0c8974532228cf806608806bf/ketraterm-pty/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

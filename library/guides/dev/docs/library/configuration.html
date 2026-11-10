@@ -180,7 +180,9 @@ occurs at build, and failed updates leave the original snapshot unchanged.
 Collection values are detached; supplied services keep their own lifetimes.
 Nullable services can be cleared explicitly.</p>
 <p>Default alternate-screen padding derives from primary padding and reserved decoration space.
-A copied builder retains resolved padding; assigning null requests recalculation.</p>
+Automatic padding remains automatic when settings are copied and follows the final
+primary padding and gutter settings. Explicit alternate padding remains fixed;
+assigning null restores automatic padding.</p>
 <p>Use the current examples in the <a href="../../ketraterm-ui-swing/README.html">Swing README</a>
 and <a href="../../ketraterm-pty/README.html">PTY README</a>.</p>
 <h2 id="session-independent-completion-construction">Session-independent completion construction</h2>
@@ -217,7 +219,7 @@ terminal data, source identity, ranking, or feedback routing. Localized command
 catalogs change descriptions while preserving command and option tokens.</p>
 <p>See <a href="../../ketraterm-ui-swing-host/README.html#localization-and-host-settings">host localization and settings</a>
 and <a href="../../ketraterm-completion/README.html#customize-the-engine">completion customization</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a26527043a6c6ee0c8974532228cf806608806bf/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
