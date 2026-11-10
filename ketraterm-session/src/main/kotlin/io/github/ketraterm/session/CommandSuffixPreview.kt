@@ -18,6 +18,7 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 
@@ -56,23 +57,30 @@ internal object CommandSuffixPreview {
         buffer.setTreatAmbiguousAsWide(ambiguousAsWide)
         buffer.setCursorVisible(false)
         buffer.positionCursor(if (precedingText != null) preceding else insertion, row)
-        val parser = TerminalParsers.create(HostCommandAdapter(buffer))
-        if (precedingText != null) parser.accept(precedingText.toByteArray(Charsets.UTF_8))
-        val bytes = text.toByteArray(Charsets.UTF_8)
-        var offset = 0
-        while (offset < bytes.size && buffer.cursorRow < frame.rows) {
-            // Keep the parser's grapheme context across reads, including variation/ZWJ updates.
-            val length =
-                when (bytes[offset].toInt() and 0xff) {
-                    in 0..0x7f -> 1
-                    in 0xc0..0xdf -> 2
-                    in 0xe0..0xef -> 3
-                    else -> 4
+        val adapter = HostCommandAdapter(buffer)
+        // Accept complete input batches so the parser determines each grapheme's final width.
+        // Omit the optional ASCII-run capability: every placement must respect the clipping row.
+        val sink =
+            object : TerminalCommandSink by adapter {
+                private inline fun emit(action: () -> Unit) {
+                    if (buffer.cursorRow < frame.rows) action()
                 }
-            parser.accept(bytes, offset, length)
-            offset += length
-            if (precedingText == null && offset == length && buffer.cursorRow == row && buffer.cursorCol == insertion) return null
-        }
+
+                override fun writeCodepoint(codepoint: Int) = emit { adapter.writeCodepoint(codepoint) }
+
+                override fun writeCluster(
+                    codepoints: IntArray,
+                    length: Int,
+                ) = emit { adapter.writeCluster(codepoints, length) }
+
+                override fun updatePreviousCluster(
+                    codepoints: IntArray,
+                    length: Int,
+                ) = emit { adapter.updatePreviousCluster(codepoints, length) }
+            }
+        val parser = TerminalParsers.create(sink)
+        if (precedingText != null) parser.accept(precedingText.toByteArray(Charsets.UTF_8))
+        parser.accept(text.toByteArray(Charsets.UTF_8))
         parser.endOfInput()
         var result: TerminalRenderCache? = null
         buffer.readRenderFrame { laidOut ->

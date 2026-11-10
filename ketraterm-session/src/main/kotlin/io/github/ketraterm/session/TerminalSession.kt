@@ -42,6 +42,7 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.*
@@ -473,16 +474,18 @@ public class TerminalSession private constructor(
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
 
+    private val inputAdmissions = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     /**
      * Conflated opportunities to retry [captureCommandEdit], including an initial sample.
-     * Observes output publication, producer revisions, outbound write retirement, and lifecycle.
+     * Observes input admission, output publication, producer revisions, outbound write retirement, and lifecycle.
      * A wakeup neither guarantees capture will succeed nor invalidates a retained edit context;
      * callers must perform the atomic capture or admission check again. In particular, a native
      * query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement.
      * Collectors own cancellation and should stop waiting when [isClosed] becomes true.
      */
     public val commandEditChanges: Flow<Unit> by lazy {
-        merge<Any>(renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
+        merge<Any>(inputAdmissions, renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
     }
 
     private val outboundJob: Job
@@ -808,7 +811,7 @@ public class TerminalSession private constructor(
                     result = CommandSuffixPreview.capture(frame, suffix, modes.treatAmbiguousAsWide)
                 }
             }
-            result
+            result.takeIf { isCommandEditCurrent(expected) }
         }
     }
 
@@ -1502,7 +1505,10 @@ public class TerminalSession private constructor(
     private inline fun finishAdmission(block: () -> TerminalInputAdmission): TerminalInputAdmission {
         try {
             val result = block()
-            if (result == TerminalInputAdmission.ACCEPTED) outboundWriter.signalPending()
+            if (result == TerminalInputAdmission.ACCEPTED) {
+                inputAdmissions.tryEmit(Unit)
+                outboundWriter.signalPending()
+            }
             return result
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)

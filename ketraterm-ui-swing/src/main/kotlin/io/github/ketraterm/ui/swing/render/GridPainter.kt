@@ -60,6 +60,7 @@ internal class GridPainter(
     private val clipScratch = Rectangle()
     private val graphicsPainter = GraphicsPainter()
     private val pixels = TerminalDeviceGeometry()
+    private val inlineCellGeometry = TerminalBidiLayout()
 
     fun prepareFrame(cache: TerminalRenderCache) {
         graphicsPainter.prepare(cache.images)
@@ -271,11 +272,22 @@ internal class GridPainter(
                 val inlinePalette = if (inlineForeground == null) palette else palette.copy(defaultForeground = inlineForeground)
                 try {
                     for (inlineRow in firstRow until minOf(rows, inlineSuggestion.rows)) {
-                        val shift = (geometry?.rowTop(inlineRow)
-                            ?: (inlineRow * metrics.cellHeight)) - inlineRow * metrics.cellHeight
+                        val shift =
+                            (
+                                geometry?.rowTop(inlineRow)
+                                    ?: (inlineRow * metrics.cellHeight)
+                            ) - inlineRow * metrics.cellHeight
                         if (shift != 0) g.translate(0, shift)
                         try {
-                            textPainter.paintRow(g, inlineSuggestion, inlinePalette, metrics, inlineRow, fontRenderContext)
+                            textPainter.paintRow(
+                                g,
+                                inlineSuggestion,
+                                inlinePalette,
+                                metrics,
+                                inlineRow,
+                                fontRenderContext,
+                                bidi = inlineCellGeometry.row(inlineSuggestion, inlineRow),
+                            )
                         } finally {
                             if (shift != 0) g.translate(0, -shift)
                         }
@@ -283,6 +295,8 @@ internal class GridPainter(
                 } finally {
                     g.composite = previousComposite
                 }
+            } else {
+                inlineCellGeometry.reset()
             }
 
             val cursorOffset =

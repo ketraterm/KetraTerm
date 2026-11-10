@@ -1372,7 +1372,7 @@ public class SwingTerminal
             val cells = bound.captureCommandSuffixPreview(expected, ghostText) ?: return false
             refreshRenderCacheFromSession(bound)
             val inline = InlineShellSuggestion(bound, expected, cells, foreground)
-            if (!inline.reconcile(renderCache)) return false
+            if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) return false
             inlineShellSuggestion = inline
             inlineObservationJob =
                 componentScope.launch {

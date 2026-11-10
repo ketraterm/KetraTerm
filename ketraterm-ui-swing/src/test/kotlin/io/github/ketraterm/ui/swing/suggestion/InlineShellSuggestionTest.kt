@@ -105,6 +105,19 @@ class InlineShellSuggestionTest {
         }
 
     @Test
+    fun `directional text on a later row matters only when the preview reaches it`() =
+        runTest {
+            for (suffix in listOf("x", "12345678901")) {
+                fixture { session, input, expected ->
+                    val preview = assertNotNull(session.captureCommandSuffixPreview(expected, suffix))
+                    input.feed("\u001b[3;1Hשלום\u001b[1;4H")
+                    val reconciled = InlineShellSuggestion(session, expected, preview, null).reconcile(cache(session))
+                    assertEquals(suffix == "x", reconciled, suffix)
+                }
+            }
+        }
+
+    @Test
     fun `suffix wraps wide and clustered text using normal grid semantics without changing live cells`() =
         runTest {
             fixture { session, input, expected ->

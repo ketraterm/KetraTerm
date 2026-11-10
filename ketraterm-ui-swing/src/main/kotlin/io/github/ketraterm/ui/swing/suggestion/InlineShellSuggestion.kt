@@ -59,12 +59,17 @@ internal class InlineShellSuggestion(
         }
         var visible = false
         for (row in anchorRow until cells.rows) {
-            if (liveBidi.row(live, row) != null) return false
-            val layout = bidi.row(cells, row)
+            var rowPrepared = false
+            var layout: TerminalBidiLayout.Row? = null
             for (column in 0 until cells.columns) {
                 val index = cells.rowOffset(row) + column
                 val flags = cells.flags[index]
                 if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) continue
+                if (!rowPrepared) {
+                    if (liveBidi.row(live, row) != null) return false
+                    layout = bidi.row(cells, row)
+                    rowPrepared = true
+                }
                 val visual = layout?.visualColumn(column) ?: column
                 val span = if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
                 if (row == anchorRow && visual < anchorColumn) return false

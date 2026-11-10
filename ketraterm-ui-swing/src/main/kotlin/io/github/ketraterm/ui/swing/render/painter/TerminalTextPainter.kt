@@ -87,6 +87,7 @@ internal class TerminalTextPainter(
 
     /**
      * Paints all drawable text runs in [row].
+     * Overlays supply their source-owned [bidi] mapping to preserve the live row geometry cache.
      */
     fun paintRow(
         g: Graphics2D,
@@ -104,9 +105,9 @@ internal class TerminalTextPainter(
         selectionStyle: SwingSelectionStyle = checkNotNull(settings).selectionStyle,
         selectionBackground: Int = selectionStyle.background,
         searchHighlights: TerminalSearchViewportHighlights? = null,
+        bidi: TerminalBidiLayout.Row? = cellGeometry.row(cache, row),
     ) {
         pixels.update(g)
-        val bidi = cellGeometry.row(cache, row)
         runStyle.configureRow(
             textBlinkVisible = textBlinkVisible,
             hyperlinkIds = hyperlinkIds,

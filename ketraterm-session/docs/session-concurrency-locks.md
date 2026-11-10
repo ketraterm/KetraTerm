@@ -94,8 +94,8 @@ synchronized revision checks. Submit the resulting semantic events with
 `submitInput(expected, events)` using that same context.
 
 Use `commandEditChanges` to await another capture opportunity. This conflated
-flow includes an initial sample and observes render publication, producer
-revisions, outbound write retirement, and session lifecycle. Recheck the desired
+flow includes an initial sample and observes input admission, render publication,
+producer revisions, outbound write retirement, and session lifecycle. Recheck the desired
 command and perform `captureCommandEdit()` on each wakeup; the notification
 does not reserve input or guarantee that capture succeeds. Rendering and editor
 revisions alone are insufficient: the final prompt can be rendered while a

@@ -29,9 +29,7 @@ import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TerminalBidiRenderingTest {
     private val metrics = SwingMetrics(12, 24, 16, 18, 10, 0, 1)
@@ -43,6 +41,55 @@ class TerminalBidiRenderingTest {
             draft.shellIntegrationDecorationGutterWidth = 0
         }
     private val colors = intArrayOf(TEST_RED, TEST_GREEN, TEST_BLUE)
+
+    @Test
+    fun `unchanged live bidi geometry survives repeated inline overlay paints`() {
+        val live =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        Array(6) { column ->
+                            if (column < 3) TestCell("cmd"[column].code, TerminalRenderCellFlags.CODEPOINT) else TestCell()
+                        },
+                        Array(6) { column ->
+                            if (column < 3) TestCell(0x05D0 + column, TerminalRenderCellFlags.CODEPOINT) else TestCell()
+                        },
+                    ),
+                ),
+            )
+        val inline =
+            renderCache(
+                TestRenderFrame(
+                    Array(2) { row ->
+                        Array(6) { column ->
+                            if (row == 0 && column == 3) TestCell('x'.code, TerminalRenderCellFlags.CODEPOINT) else TestCell()
+                        }
+                    },
+                ),
+            )
+        val liveGeometry = TerminalBidiLayout()
+        val originalLayout = assertNotNull(liveGeometry.row(live, 1))
+        val painter = GridPainter(cellGeometry = liveGeometry)
+        val image = BufferedImage(metrics.cellWidth * 6, metrics.cellHeight * 2, BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        try {
+            repeat(3) {
+                painter.paint(
+                    graphics,
+                    live,
+                    settings,
+                    metrics,
+                    image.width,
+                    image.height,
+                    cursorBlinkVisible = it % 2 == 0,
+                    inlineSuggestion = inline,
+                )
+                assertSame(originalLayout, liveGeometry.row(live, 1), "Unchanged live row was reanalyzed after overlay painting")
+            }
+        } finally {
+            graphics.dispose()
+        }
+    }
 
     @Test
     fun `rtl background follows its glyph and underline`() {

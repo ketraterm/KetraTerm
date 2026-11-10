@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -33,6 +34,8 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
@@ -68,17 +71,9 @@ class SwingTerminalSuggestionContextTest {
                 dispatcher.scheduler.runCurrent()
                 val expected = assertNotNull(fixture.session.captureCommandEdit())
 
-                fun pixels(): IntArray {
-                    val view = fixture.terminal
-                    val image = java.awt.image.BufferedImage(view.width, view.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-                    val g = image.createGraphics()
-                    view.paint(g)
-                    g.dispose()
-                    return image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
-                }
-                val before = pixels()
+                val before = pixels(fixture.terminal)
                 assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
-                assertFalse(before.contentEquals(pixels()))
+                assertFalse(before.contentEquals(pixels(fixture.terminal)))
                 when (change) {
                     "clear" -> fixture.terminal.clearInlineShellSuggestion()
                     "focus" -> fixture.terminal.focusListeners.forEach { it.focusLost(FocusEvent(fixture.terminal, FocusEvent.FOCUS_LOST)) }
@@ -113,9 +108,9 @@ class SwingTerminalSuggestionContextTest {
                     }
                 }
                 dispatcher.scheduler.runCurrent()
-                val after = pixels()
+                val after = pixels(fixture.terminal)
                 fixture.terminal.clearInlineShellSuggestion()
-                assertContentEquals(after, pixels(), "preview survived $change")
+                assertContentEquals(after, pixels(fixture.terminal), "preview survived $change")
                 assertFalse(expected.isCancelled && change == "clear", "clearing presentation cancelled caller authority")
                 fixture.session.readRenderFrame { frame ->
                     val codes = IntArray(frame.columns)
@@ -125,6 +120,73 @@ class SwingTerminalSuggestionContextTest {
                 }
             }
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bytes", "key", "batch"])
+    fun `external input hides inline text before a blocked writer retires`(kind: String) {
+        val dispatcher = StandardTestDispatcher()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        lateinit var ingress: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    ingress = listener
+                }
+
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    entered.countDown()
+                    release.await()
+                }
+            }
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
+            Fixture(sessionHandler = true, connector = connector, workerDispatcher = dispatcher, ioDispatcher = io).use { fixture ->
+                try {
+                    onEdt {
+                        fixture.session.start(30, 4)
+                        val bytes = "    git s".toByteArray()
+                        ingress.onBytes(bytes, 0, bytes.size)
+                        fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                        dispatcher.scheduler.runCurrent()
+                        val expected = assertNotNull(fixture.session.captureCommandEdit())
+                        val before = pixels(fixture.terminal)
+                        assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
+                        dispatcher.scheduler.runCurrent()
+                        assertFalse(before.contentEquals(pixels(fixture.terminal)))
+                        val key = TerminalKeyEvent.text("x")
+                        val admission =
+                            when (kind) {
+                                "bytes" -> fixture.session.submitBytes(byteArrayOf('x'.code.toByte()))
+                                "key" -> fixture.session.submitInput(key)
+                                else -> fixture.session.submitInput(expected, listOf(key))
+                            }
+                        assertEquals(TerminalInputAdmission.ACCEPTED, admission)
+                        assertTrue(entered.await(5, TimeUnit.SECONDS), "writer did not enter connector.write")
+                        assertFalse(fixture.session.isCommandEditCurrent(expected))
+                        dispatcher.scheduler.runCurrent()
+                        assertContentEquals(before, pixels(fixture.terminal), "stale ghost remained while $kind input was blocked")
+                    }
+                } finally {
+                    release.countDown()
+                }
+            }
+        }
+    }
+
+    private fun pixels(view: SwingTerminal): IntArray {
+        val image = java.awt.image.BufferedImage(view.width, view.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        try {
+            view.paint(graphics)
+        } finally {
+            graphics.dispose()
+        }
+        return image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
     }
 
     @Test
