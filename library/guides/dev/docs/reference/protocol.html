@@ -548,9 +548,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -697,6 +697,10 @@ use <code>customOscPayloadLimitBytes</code> themselves.</p>
 <td>Also advertises the installed <code>F12,r</code> prefix-reset binding. Plain <code>Ready</code> does not advertise this capability.</td>
 </tr>
 <tr>
+<td><code>Ready;epoch;BufferState</code></td>
+<td>Also advertises <code>F12,b</code> buffer-only confirmation. It may be combined with <code>PrefixReset</code>, in either order; repeated or unknown capabilities are rejected.</td>
+</tr>
+<tr>
 <td><code>Result;epoch;id;Failed</code></td>
 <td>Correlated failure.</td>
 </tr>
@@ -711,8 +715,15 @@ time and sends the ID through ordered semantic input as one frame:</p>
 <ol>
 <li><code>F12,q</code> starts the frame.</li>
 <li>Nineteen <code>F12,digit</code> chords carry the decimal ID, padded with leading zeroes.</li>
-<li><code>F12,e</code> commits the frame and invokes the completer.</li>
+<li><code>F12,e</code> commits the frame and invokes the completer. With <code>BufferState</code>,
+<code>F12,b</code> instead commits a buffer-only confirmation request.</li>
 </ol>
+<p>Buffer-only confirmation reads the current editor text and UTF-16 cursor without
+invoking candidate completers or changing the editor. It returns the same <code>Result</code>
+envelope with <code>start = end = cursor</code>, an empty application name and zero candidates.
+Its editing receipt cannot satisfy a later candidate request. Full candidate queries
+can also confirm the same buffer; older hooks without <code>BufferState</code> use full queries
+for confirmation.</p>
 <p>The hook echoes the supplied ID and its current prompt epoch; it keeps no
 independent request counter. Missing, incomplete, zero, overflowing, or otherwise
 invalid frames are ignored without editing the buffer or invoking completion.
@@ -738,7 +749,7 @@ clear, or an observed alternate-screen transition revoke the completion hook.
 A new <code>A</code> also clears the previous epoch and requires a fresh announcement.
 Prompt announcements never reset the session&#39;s request IDs. Every accepted
 announcement invalidates earlier editing contexts and pending results,
-including announcements that change only <code>PrefixReset</code>.
+including announcements that change only <code>PrefixReset</code> or <code>BufferState</code>.
 The hook reinstalls its private PSReadLine bindings before each <code>Ready</code> announcement.
 Readiness advertises the prompt&#39;s hook, not completion of prompt rendering or
 PSReadLine initialization. The query handler reads the editor when the shell
@@ -893,7 +904,7 @@ Protection does not prevent this ordinary erase. The selective form <code>CSI ? 
 is unsupported and ignored. Colon subparameters and extra parameters on ED 22
 are rejected without erasing or admitting history.</p>
 <p>Reference: <a href="https://sw.kovidgoyal.net/kitty/misc-protocol/#an-escape-code-to-move-the-contents-of-the-screen-into-the-scrollback">Kitty&#39;s screen-to-scrollback extension</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

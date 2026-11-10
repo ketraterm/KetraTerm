@@ -55,7 +55,7 @@ controls and platform integrations are listed separately below.</p>
 </tr>
 <tr>
 <td>Selection</td>
-<td>Linear/block selection, double-click word selection, triple-click row selection, command-block selection, Select All, and wrap-aware copying.</td>
+<td>Linear/block selection, wide-cell-aware double-click word/path selection, triple-click row selection, word/row drag extension, command-block selection, Select All, and wrap-aware copying.</td>
 </tr>
 <tr>
 <td>Search</td>
@@ -144,8 +144,13 @@ See the <a href="../../ketraterm-ui-swing/README.html">Swing guide</a> for confi
 </tr>
 <tr>
 <td>Shortcuts</td>
-<td>Built-in platform shortcuts.</td>
+<td><a href="https://ketraterm.github.io/KetraTerm/guide.html#keyboard-scrolling-and-selection">Platform shortcuts</a>, pane-local font zoom/reset, overlapping history paging, and history/live jumps. Window actions are scoped to their owning app window. Ctrl+Space passes through when no editable shell completion context is available.</td>
 <td>Active IDE keymap integration.</td>
+</tr>
+<tr>
+<td>Initial window size</td>
+<td>Fits the preferred grid to the monitor work area before shell output starts; saved dimensions are preserved.</td>
+<td>IDE-owned tool-window geometry.</td>
 </tr>
 <tr>
 <td>Open terminal here</td>
@@ -166,6 +171,11 @@ See the <a href="../../ketraterm-ui-swing/README.html">Swing guide</a> for confi
 <td>Close confirmation</td>
 <td>Confirms termination when shell metadata reports a running command, including grouped pane/window closure.</td>
 <td>Confirms tab closure when shell metadata reports a running command.</td>
+</tr>
+<tr>
+<td>Failed-session presentation</td>
+<td>Retains output with a status banner after nonzero or unknown-status exits and transport failure; scrolling, copy, search, and explicit close remain available after process cleanup. Successful exits close normally.</td>
+<td>Host-owned closed-session presentation.</td>
 </tr>
 <tr>
 <td>Tab restoration</td>
@@ -189,12 +199,12 @@ See the <a href="../../ketraterm-ui-swing/README.html">Swing guide</a> for confi
 </tr>
 <tr>
 <td>Clipboard permissions</td>
-<td>Session-bound consent dialogs.</td>
+<td>Session-bound consent dialogs; explicit unsafe pastes have a separate confirmation with an escaped preview.</td>
 <td>Consent and clipboard access bound to the originating IDE client.</td>
 </tr>
 <tr>
 <td>Bell handling</td>
-<td>Independent audible/visual settings; urgency requests desktop attention where supported, and pop-on-bell raises the window.</td>
+<td>Independent audible/visual settings with bounded, coalesced feedback at most every 500 ms per window; urgency requests desktop attention where supported, and pop-on-bell raises the window.</td>
 <td>Visual bell.</td>
 </tr>
 <tr>
@@ -219,9 +229,9 @@ IntelliJ tabs start new processes and do not restore output or running commands.
 Project JDK injection excludes WSL launchers and WSL SDK paths.
 Close confirmation relies on shell command markers; it is not a general detector
 of every process running in a session.</p>
-<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/ketraterm-app/README.md">standalone README</a> and
+<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/ketraterm-app/README.md">standalone README</a> and
 <a href="https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/README.md">plugin README</a> for installation and use.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -75,8 +75,10 @@ only for the atomic commit/tag push. The token is revoked at the end of the job.
 Ordinary checkout and release API calls use <code>GITHUB_TOKEN</code>; they do not inherit
 the release app&#39;s bypass access. Existing Maven Central and signing secrets are
 still required.</p>
-<p>For the next development cycle, add a new <code>## [Unreleased]</code> section to both
-changelogs and bump <code>VERSION</code> before the next release.</p>
+<p>At the start of the next development cycle, bump <code>VERSION</code> to the next intended
+release and add a new <code>## [Unreleased]</code> section to both changelogs in the same
+change, before adding new release notes. Development builds append <code>-SNAPSHOT</code>
+to <code>VERSION</code>; keep that suffix out of the file itself.</p>
 <h2 id="prereleases">Prereleases</h2>
 <p>Use the native packager&#39;s existing formats: <code>0.5.0-alpha01</code>, <code>0.5.0-beta02</code>,
 or <code>0.5.0-rc01</code>. Stage numbers are 1–19; unpadded forms such as <code>alpha1</code>
@@ -96,7 +98,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

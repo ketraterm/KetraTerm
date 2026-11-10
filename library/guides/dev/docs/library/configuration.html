@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a aria-current="page" href="configuration.html">Configuration</a><a  href="compatibility.html">Compatibility</a><a  href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Library configuration</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#ownership">Ownership</a><a class="depth-2" href="#immutable-settings">Immutable settings</a><a class="depth-2" href="#session-independent-completion-construction">Session-independent completion construction</a><a class="depth-2" href="#optional-host-chrome-and-labels">Optional host chrome and labels</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-configuration">Library configuration</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a aria-current="page" href="configuration.html">Configuration</a><a  href="compatibility.html">Compatibility</a><a  href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Library configuration</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#ownership">Ownership</a><a class="depth-2" href="#library-defaults">Library defaults</a><a class="depth-2" href="#immutable-settings">Immutable settings</a><a class="depth-2" href="#session-independent-completion-construction">Session-independent completion construction</a><a class="depth-2" href="#optional-host-chrome-and-labels">Optional host chrome and labels</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-configuration">Library configuration</h1>
 <p>Configuration follows the object that owns the behavior. Product preferences
 and persistence belong to the embedding application.</p>
 <h2 id="ownership">Ownership</h2>
@@ -69,6 +69,109 @@ and persistence belong to the embedding application.</p>
 <p>Binding/reloading a Swing view also applies its palette, width, cursor, and paste
 settings to the session. Launch settings affect new sessions. See
 <a href="../../ketraterm-ui-swing/README.html#binding-and-configuration-ownership">binding ownership</a>.</p>
+<h2 id="library-defaults">Library defaults</h2>
+<p>These are embedding defaults, independent of the standalone app&#39;s saved preferences.
+Hosts choose their own product settings and supply overrides at the owning boundary.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Default</th>
+<th>Host override</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Initial grid</td>
+<td><code>80 × 24</code> in <code>SwingSettings</code>, <code>PtyOptions</code>, and workspace options. Direct core creation requires explicit dimensions.</td>
+<td>Set launch dimensions and the view&#39;s preferred grid. Once laid out, the view synchronizes the session to its visible grid.</td>
+</tr>
+<tr>
+<td>Scrollback</td>
+<td><code>1_000</code> rows for core creation, local PTY sessions, and workspace sessions; <code>0</code> disables history.</td>
+<td>Set <code>maxHistory</code> before session creation. The view does not choose history capacity.</td>
+</tr>
+<tr>
+<td>Font</td>
+<td>16-point plain font from installed curated monospace families, with logical <code>Monospaced</code> fallback.</td>
+<td>Set <code>SwingSettings.font</code>; its point size must be finite and positive. Fractional sizes are supported.</td>
+</tr>
+<tr>
+<td>Glyph fallback</td>
+<td>Installed curated fallback fonts followed by logical fonts; asynchronous system fallback discovery enabled.</td>
+<td>Replace <code>fallbackFonts</code>, disable <code>useSystemFallbackFonts</code>, or supply <code>SwingHostServices.fontResolver</code>.</td>
+</tr>
+<tr>
+<td>Cursor</td>
+<td>Block, blinking every <code>600</code> ms.</td>
+<td>Set <code>cursorShape</code> and <code>cursorBlinkMillis</code>; <code>0</code> disables blinking.</td>
+</tr>
+<tr>
+<td>Scrolling</td>
+<td>Smooth scrolling enabled; new output preserves a scrolled reading position. Accepted terminal input and paste return to live output.</td>
+<td>Set <code>smoothScrolling</code> and <code>scrollOnOutput</code>; use viewport methods and host-owned paging shortcuts.</td>
+</tr>
+<tr>
+<td>Selection</td>
+<td>Linear/block and word/row gestures; copy on selection and middle-button paste disabled.</td>
+<td>Set <code>copyOnSelection</code>, <code>middleClickPaste</code>, and <code>middleClickPasteSource</code>, or install a deferred paste handler.</td>
+</tr>
+<tr>
+<td>Application shortcuts</td>
+<td>No copy/paste, tab, zoom, or search bindings installed by the reusable view.</td>
+<td>Install host actions through <code>hostKeyHandler</code> and host key bindings. The optional host shortcut map is explicitly installed.</td>
+</tr>
+<tr>
+<td>Terminal mouse input</td>
+<td>Reporting enabled; alternate-screen wheel-to-arrow fallback enabled when the application permits alternate scrolling.</td>
+<td>Set <code>mouseReportingEnabled</code> and <code>alternateScreenWheelToArrowEnabled</code>.</td>
+</tr>
+<tr>
+<td>Suggestions</td>
+<td>Master switch disabled; no provider installed.</td>
+<td>Enable <code>smartSuggestionsEnabled</code> and install a provider on the EDT.</td>
+</tr>
+<tr>
+<td>OSC 52 clipboard</td>
+<td>Reads and writes denied; decoded payload bound is 1 MiB if permitted.</td>
+<td>Set session <code>HostPolicy.clipboardPolicy</code> and supply host execution/consent.</td>
+</tr>
+<tr>
+<td>Hyperlink activation</td>
+<td>Ctrl/Cmd-click; the system handler permits HTTP, HTTPS, and mailto. Detection from ordinary text is disabled.</td>
+<td>Replace <code>hyperlinkHandler</code>, install a detector, or set the OSC 8 gesture policy. <code>TerminalHyperlinkHandler.NONE</code> denies activation.</td>
+</tr>
+<tr>
+<td>Other terminal controls</td>
+<td>Title, hyperlink metadata, working directory, notifications, window requests, palette, progress, and allowlisted terminal replies permitted by <code>HostPolicy</code>.</td>
+<td>Select permissions for the entire session; callbacks and product actions remain host-owned.</td>
+</tr>
+</tbody></table></div>
+<p>History capacity limits rows, not total bytes. The reference table is allocated
+for the retained row capacity; row objects are allocated in batches, and cell
+arrays and cluster payloads depend on width and content. <code>maxHistory + rows</code>
+must fit in an <code>Int</code>; PTY and workspace option construction rejects overflow
+before a process can be launched. Hosts should choose dimensions and history
+capacity for their memory budget. See the
+<a href="../../ketraterm-core/docs/grid-storage-layout.html#2-off-screen-history-ring-historyring">grid storage contract</a>.</p>
+<p>Raw PTY connectors accept any positive width because they create no emulator.
+Local session factories, workspace options, and Swing settings require at least
+two columns so wide characters fit. A one-column session is rejected before launch.</p>
+<p>Changing the view&#39;s font or cursor default uses <code>reloadSettings()</code>; unchanged
+cursor settings preserve an application&#39;s selected cursor shape. Blink timing
+is presentation policy, while the terminal application can control cursor
+visibility and blinking eligibility through its modes.</p>
+<p>The system clipboard service supports explicit host copy/paste; it does not
+grant OSC 52 permission. <code>pasteControlPolicy</code> defaults to <code>PRESERVE</code>, independently
+of bracketed-paste protection. Hosts choose confirmation or filtering for explicit
+paste actions. Generic input policy preserves unbracketed paste line endings and
+honors newline mode for Enter; local PTY defaults canonicalize those line endings
+and Enter to CR. See <a href="../../ketraterm-pty/README.html#launch-options">PTY input policy</a>.</p>
+<p>For hosts that do not implement terminal-originated window controls, select
+<code>HostPolicy(windowManipulationPolicy = HostControlPolicy.DENY)</code> explicitly.
+Clipboard and other permissions apply to all output, including nested SSH and
+multiplexer sessions. Denying terminal responses also suppresses failure replies.
+See <a href="../../ketraterm-host/README.html#host-policy">host policy</a> for execution ownership
+and the <a href="../reference/protocol.html">protocol reference</a> for collection and reply bounds.</p>
 <h2 id="immutable-settings">Immutable settings</h2>
 <p><code>SwingSettings</code>, <code>SwingHostServices</code>, and <code>PtyOptions</code> support
 <code>create(Consumer)</code>, <code>copy(Consumer)</code>, <code>builder()</code>, and <code>toBuilder()</code>.
@@ -114,7 +217,7 @@ terminal data, source identity, ranking, or feedback routing. Localized command
 catalogs change descriptions while preserving command and option tokens.</p>
 <p>See <a href="../../ketraterm-ui-swing-host/README.html#localization-and-host-settings">host localization and settings</a>
 and <a href="../../ketraterm-completion/README.html#customize-the-engine">completion customization</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -195,7 +195,10 @@ may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 <code>captureCommandEdit()</code> and submit with <code>submitInput(expected, events)</code> so stale
 edits are rejected. If native confirmation is required, pass that same context to
-<code>requestShellCompletions(expected)</code> before collecting suggestions. A native query
+<code>confirmCommandEdit(expected)</code> and proceed only when it returns true. Capable
+producers read only the editor buffer, without running candidate completers;
+other producers fall back to a full native query. Use
+<code>requestShellCompletions(expected)</code> when native candidates are needed. A native query
 does not count as a user edit. Its confirmed buffer remains valid across terminal
 repaints and unrelated metadata; real input, producer editing or lifecycle changes,
 resize, cancellation, and closure still invalidate it. Use
@@ -234,7 +237,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

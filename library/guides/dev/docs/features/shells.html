@@ -28,9 +28,12 @@ hooks. Library users choose their own process, transport, and shell integration.
 <h2 id="automatic-discovery">Automatic discovery</h2>
 <p>Profiles are offered in the order below. A configured shell or explicit launch
 command can override the default.</p>
-<p>On Windows, both products default to Windows PowerShell 5.1 (<code>powershell.exe</code>).
-Installing PowerShell 7 adds a separate <strong>PowerShell</strong> profile; to use it for
-default tabs, select its executable (<code>pwsh.exe</code>) in the shell settings.</p>
+<p>Fresh standalone Windows configurations prefer discovered modern PowerShell
+(<code>pwsh.exe</code>), falling back to Windows PowerShell (<code>powershell.exe</code>). Existing
+saved shell paths are preserved. Other embedding products choose their own defaults;
+select the separate <strong>PowerShell</strong> profile or configure <code>pwsh.exe</code> explicitly there.</p>
+<p>Discovery treats environment variable names as case-insensitive on Windows and
+case-sensitive on Unix platforms.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -241,7 +244,7 @@ Native standalone profiles also receive the <code>ketra version</code>, <code>ke
 <code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
 <p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
 and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/c448af75d443ef89fb251722ffac412a02136486/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d8a95c07ce8443cbc27f287feda65dd0b0ab20c7/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
