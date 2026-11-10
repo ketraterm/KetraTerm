@@ -6,7 +6,6 @@ namespace Microsoft.PowerShell {
         private bool _waitingToRender;
         public static string Line;
         public static int Cursor = -1;
-        public static int FlushedCursor = -1;
         public static int FlushCount;
         public static void SetWaitingToRender(bool waiting) {
             _singleton._waitingToRender = waiting;
@@ -15,12 +14,9 @@ namespace Microsoft.PowerShell {
             line = Line;
             cursor = Cursor < 0 ? Line.Length : Cursor;
         }
-        public static void SetCursorPosition(int cursor) {
-            if (_singleton._waitingToRender) {
-                _singleton._waitingToRender = false;
-                FlushedCursor = cursor;
-                FlushCount++;
-            }
+        private void ForceRender() {
+            _waitingToRender = false;
+            FlushCount++;
         }
     }
 }
@@ -133,8 +129,7 @@ $global:TestRequestId++
 Send-TestFrame $global:TestRequestId.ToString('D19', [Globalization.CultureInfo]::InvariantCulture) '' 'b'
 [Console]::WriteLine()
 if ($global:BufferOnlyCompleterCalls -ne 0) { throw 'Buffer confirmation invoked the candidate completer' }
-if ([Microsoft.PowerShell.PSConsoleReadLine]::FlushCount -ne 1 -or
-    [Microsoft.PowerShell.PSConsoleReadLine]::FlushedCursor -ne 'Get-KetraBufferOnly -Value b'.Length) {
+if ([Microsoft.PowerShell.PSConsoleReadLine]::FlushCount -ne 1) {
     throw 'Buffer confirmation did not flush deferred PSReadLine rendering'
 }
 [Microsoft.PowerShell.PSConsoleReadLine]::SetWaitingToRender($true)
