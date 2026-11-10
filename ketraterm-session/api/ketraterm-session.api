@@ -31,6 +31,21 @@ public final class io/github/ketraterm/session/TerminalCommandEditContext {
 	public final fun isCancelled ()Z
 }
 
+public final class io/github/ketraterm/session/TerminalCommandOutputText {
+	public fun <init> (Ljava/lang/String;ZZ)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;ZZ)Lio/github/ketraterm/session/TerminalCommandOutputText;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalCommandOutputText;Ljava/lang/String;ZZILjava/lang/Object;)Lio/github/ketraterm/session/TerminalCommandOutputText;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHistoryIncomplete ()Z
+	public final fun getText ()Ljava/lang/String;
+	public final fun getTruncated ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class io/github/ketraterm/session/TerminalHyperlinkResolver {
 	public static final field Companion Lio/github/ketraterm/session/TerminalHyperlinkResolver$Companion;
 	public static final field NONE Lio/github/ketraterm/session/TerminalHyperlinkResolver;
@@ -82,6 +97,10 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun captureCommandEdit ()Lio/github/ketraterm/session/TerminalCommandEditContext;
 	public final fun clearBuffer ()Z
 	public fun close ()V
+	public final fun commandOutputText (I)Lio/github/ketraterm/session/TerminalCommandOutputText;
+	public final fun commandOutputText (II)Lio/github/ketraterm/session/TerminalCommandOutputText;
+	public final fun commandOutputText (III)Lio/github/ketraterm/session/TerminalCommandOutputText;
+	public static synthetic fun commandOutputText$default (Lio/github/ketraterm/session/TerminalSession;IIIILjava/lang/Object;)Lio/github/ketraterm/session/TerminalCommandOutputText;
 	public final fun confirmCommandEdit (Lio/github/ketraterm/session/TerminalCommandEditContext;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;)Lio/github/ketraterm/session/TerminalSession;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;)Lio/github/ketraterm/session/TerminalSession;
@@ -371,6 +390,7 @@ public final class io/github/ketraterm/session/TerminalShellCompletionResult {
 public abstract interface class io/github/ketraterm/session/TerminalShellIntegration {
 	public abstract fun activeCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public fun bufferCleared (Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
+	public fun commandOutputText (III)Lio/github/ketraterm/session/TerminalCommandOutputText;
 	public abstract fun getCommandLineChanges ()Lkotlinx/coroutines/flow/Flow;
 	public fun getCommandLineObservationRevision ()J
 	public fun getCommandLinePrefixResetKeys ()Ljava/util/List;
@@ -388,6 +408,7 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 
 public final class io/github/ketraterm/session/TerminalShellIntegration$DefaultImpls {
 	public static fun bufferCleared (Lio/github/ketraterm/session/TerminalShellIntegration;Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
+	public static fun commandOutputText (Lio/github/ketraterm/session/TerminalShellIntegration;III)Lio/github/ketraterm/session/TerminalCommandOutputText;
 	public static fun getCommandLineObservationRevision (Lio/github/ketraterm/session/TerminalShellIntegration;)J
 	public static fun getCommandLinePrefixResetKeys (Lio/github/ketraterm/session/TerminalShellIntegration;)Ljava/util/List;
 	public static fun getCustomOscPayloadLimitBytes (Lio/github/ketraterm/session/TerminalShellIntegration;)I

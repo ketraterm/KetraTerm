@@ -16,6 +16,7 @@
 package consumer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.session.TerminalCommandOutputText
 import io.github.ketraterm.session.TerminalSession
 
 fun main() {
@@ -30,9 +31,19 @@ fun main() {
         check(session.currentWorkingDirectoryUri() == "file:///tmp")
         val command = checkNotNull(session.activeShellCommandLine())
         check(command.commandText == "git status" && command.cursorOffset == 10)
+        val output = "\r\n\u001b]133;C\u0007clean\r\n\u001b]133;D;0\u0007\u001b]133;A\u0007$ ".encodeToByteArray()
+        connector.listener.onBytes(output, 0, output.size)
+        val recordId = session.shellIntegrationState.latestCommandRecordId()
+        check(recentOutput(session, recordId) == TerminalCommandOutputText("clean", false, false))
+        JavaConsumer.verifyOutput(session, recordId)
         check(session.clearBuffer())
         check(session.activeShellCommandLine() == null)
         JavaConsumer.clear(session)
     }
     check(connector.closes == 1)
 }
+
+fun recentOutput(
+    session: TerminalSession,
+    recordId: Int,
+): TerminalCommandOutputText? = session.commandOutputText(recordId, maxChars = 32_768, maxRows = 256)

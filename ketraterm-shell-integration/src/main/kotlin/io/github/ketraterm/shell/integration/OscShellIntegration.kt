@@ -98,6 +98,16 @@ private class OscShellIntegrationSession(
     }
 
     override val state = TerminalShellIntegrationState()
+
+    override fun commandOutputText(
+        recordId: Int,
+        maxChars: Int,
+        maxRows: Int,
+    ): TerminalCommandOutputText? =
+        context.withTerminalState {
+            ShellCommandOutputTextExtractor().extract(context, state, recordId, maxChars, maxRows)
+        }
+
     private val mutablePromptReady = MutableStateFlow(false)
     override val promptReady: StateFlow<Boolean> = mutablePromptReady.asStateFlow()
     private var readinessPromptStarted = false

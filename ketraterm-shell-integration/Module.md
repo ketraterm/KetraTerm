@@ -42,6 +42,11 @@ range or cluster data cannot be reconstructed. Marker callbacks capture command
 metadata; subscribed edit tracking compares fingerprints before requesting
 allocating snapshots.
 
+`ShellCommandOutputTextExtractor` resolves completed command ranges and copies a
+bounded logical-text tail. It scans row identities without materializing a full
+history cache and retains only request-local row scratch and result text.
+Session owns serialization and the neutral `TerminalCommandOutputText` result.
+
 The test suite covers real OSC byte streams, marker ordering, clear and resize,
 wrapped and Unicode command extraction, subscription lifetime, and startup
 submission.

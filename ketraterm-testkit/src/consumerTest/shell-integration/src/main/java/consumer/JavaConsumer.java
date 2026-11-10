@@ -33,6 +33,15 @@ public final class JavaConsumer {
     public static void clear(io.github.ketraterm.session.TerminalSession session) {
         if (!session.clearBuffer()) throw new AssertionError("Open session clear");
     }
+    public static void verifyOutput(io.github.ketraterm.session.TerminalSession session, int recordId) {
+        var full = session.commandOutputText(recordId);
+        if (full == null || !full.getText().equals("clean") || full.getTruncated() || full.getHistoryIncomplete()) {
+            throw new AssertionError("Completed output");
+        }
+        var tail = session.commandOutputText(recordId, 3);
+        if (tail == null || !tail.getText().equals("ean") || !tail.getTruncated()) throw new AssertionError("Output tail");
+        if (!full.equals(session.commandOutputText(recordId, 100, 1))) throw new AssertionError("Explicit limits");
+    }
     public static void verify() {
         if (factory() == null) throw new AssertionError("Exported factory");
     }

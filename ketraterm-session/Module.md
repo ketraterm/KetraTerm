@@ -33,6 +33,10 @@ selection;
 admission. Optional OSC interpretation and grid extraction belong to
 `ketraterm-shell-integration`, which this module does not depend on.
 
+`TerminalCommandOutputText` is the detached result of optional producer-owned
+completed-output extraction. Session validates limits, serializes the read, and
+rejects results when the producer's metadata revision changes during capture.
+
 `TerminalShellCommandInventory` owns a validated immutable command snapshot, its
 binary prefix lookup, and cached alias definitions. `TerminalShellCompletionChannel`
 publishes readiness/status and snapshots without copying them per request. It
