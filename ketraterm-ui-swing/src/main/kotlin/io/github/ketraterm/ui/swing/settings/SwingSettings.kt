@@ -515,7 +515,8 @@ public class SwingSettings private constructor(
 
         /**
          * Explicit alternate padding, or null to balance the final [padding] and gutter at build time.
-         * A copied draft retains the original resolved padding; set null to recalculate it.
+         * Automatic padding remains automatic when copied and follows the final primary padding
+         * and gutter settings. Explicit padding remains fixed; set null to restore automatic padding.
          */
         public var alternateScreenPadding: SwingPadding? = source?.alternateScreenPadding
 

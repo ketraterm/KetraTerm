@@ -88,7 +88,8 @@ retain a second authoritative progress state. Tab removal cancels observation.
 [`TerminalProfile`](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt)
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
-as a list, rather than split from a command string. Keep the supplied collections
+as a list, rather than split from a command string. The executable must be nonempty;
+arguments after it may be empty strings. Keep the supplied collections
 unchanged while the profile is in use.
 
 `TerminalProfileRegistry` discovers built-in profiles in preference order.

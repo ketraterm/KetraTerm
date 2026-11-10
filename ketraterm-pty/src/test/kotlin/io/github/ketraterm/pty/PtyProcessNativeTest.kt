@@ -57,6 +57,38 @@ class PtyProcessNativeTest {
         sessions.forEach(TerminalSession::close)
     }
 
+    @Test
+    fun `real PTY preserves empty arguments at every position after the executable`(
+        @TempDir directory: Path,
+    ) = runBlocking(Dispatchers.IO) {
+        val arguments = listOf("", "value with spaces", "", "-leading", "", "")
+        val source = Files.createDirectory(directory.resolve("argument fixture")).resolve("Arguments.java")
+        Files.writeString(
+            source,
+            """
+            class Arguments {
+                public static void main(String[] actual) {
+                    String[] expected = {"", "value with spaces", "", "-leading", "", ""};
+                    if (!java.util.Arrays.equals(expected, actual)) {
+                        throw new AssertionError("ARGV_BAD:" + java.util.Arrays.toString(actual));
+                    }
+                    System.out.println("ARGV_OK");
+                }
+            }
+            """.trimIndent(),
+        )
+        val java = Path.of(System.getProperty("java.home"), "bin", if (isWindows()) "java.exe" else "java")
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions.create { it.command = listOf(java.toString(), "-Xmx64m", source.toString()) + arguments },
+            )
+        sessions += session
+        withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } }
+        assertEquals(0, session.exitCode, session.retainedText())
+        assertTrue(session.retainedText().contains("ARGV_OK"), session.retainedText())
+        assertNull(session.failure)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `OSC 52 harness validates real PTY request and reply bytes`(deny: Boolean) =

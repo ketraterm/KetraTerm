@@ -32,7 +32,8 @@ import java.nio.file.Path
  * Command and environment collections are defensively copied when built.
  * Callbacks, policies, and shell producers retain their documented host ownership.
  *
- * @property command command and arguments passed to the PTY child process.
+ * @property command nonempty executable name followed by arguments passed to the PTY
+ * child process. Arguments after the executable may be empty strings.
  * @property environment environment variables for the child process. `TERM` and
  * `COLORTERM` default to the shared terminal capability identity when the
  * caller does not provide them.
@@ -199,7 +200,7 @@ public class PtyOptions private constructor(
             "invalid host mode-report capabilities: $modeReportCapabilities"
         }
         require(command.isNotEmpty()) { "PTY command must not be empty" }
-        require(command.none { it.isEmpty() }) { "PTY command elements must not be empty" }
+        require(command.first().isNotEmpty()) { "PTY executable must not be empty" }
         require(columns > 0) { "PTY columns must be positive, got $columns" }
         require(rows > 0) { "PTY rows must be positive, got $rows" }
         require(maxHistory >= 0) { "PTY maxHistory must be >= 0, got $maxHistory" }

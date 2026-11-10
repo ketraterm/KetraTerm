@@ -45,6 +45,27 @@ import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
     @Test
+    fun `options preserve empty arguments through construction copy and detached builders`() {
+        val command = mutableListOf("tool", "", "value with spaces", "", "")
+        val expected = command.toList()
+        val options = PtyOptions.create { it.command = command }
+        command[1] = "changed"
+        assertEquals(expected, options.command)
+        assertEquals(expected, options.copy {}.command)
+        assertEquals(expected, options.toBuilder().build().command)
+        val replacement = listOf("another-tool", "", "")
+        assertEquals(replacement, options.copy { it.command = replacement }.command)
+
+        for (invalid in listOf(emptyList(), listOf(""), listOf("", "argument"))) {
+            assertThrows(IllegalArgumentException::class.java) { PtyOptions.create { it.command = invalid } }
+            assertThrows(IllegalArgumentException::class.java) { options.copy { it.command = invalid } }
+            val draft = options.toBuilder()
+            draft.command = invalid
+            assertThrows(IllegalArgumentException::class.java) { draft.build() }
+        }
+    }
+
+    @Test
     fun `history capacity is validated before options can launch a child process`() {
         val original = PtyOptions()
         assertEquals(80, original.columns)
