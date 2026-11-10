@@ -36,7 +36,8 @@ and the [Swing view example](../ketraterm-ui-swing/README.md#how-to-use).
 `PtyOptions.create` builds an immutable configuration; `copy` and `toBuilder`
 support changes.
 
-Pass the executable and each argument as separate command elements. Shell
+Pass the executable and each argument as separate command elements. The executable
+must be nonempty; later arguments may be empty strings. Shell
 operators such as pipes are interpreted only if the chosen executable is a
 shell and its arguments request command evaluation.
 

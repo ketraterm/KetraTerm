@@ -15,13 +15,144 @@
  */
 package io.github.ketraterm.workspace
 
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class TerminalProfileRegistryTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["", "bad\u0000path;", "\"unterminated;", "\"\";"])
+    fun windowsDiscoverySkipsMalformedPathEntriesAndFindsQuotedDirectories(
+        prefix: String,
+        @TempDir directory: Path,
+    ) {
+        val shellDirectory = directory.resolve("PowerShell 7")
+        val executable = shellDirectory.resolve("pwsh.exe")
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Windows 11",
+                environment = mapOf("PATH" to "$prefix\"$shellDirectory\""),
+                pathSeparator = ";",
+                executableExists = { it == executable },
+            )
+
+        val profile = registry.availableProfiles().single { it.id == "powershell" }
+        assertEquals(listOf(executable.toString(), "-NoLogo"), profile.command)
+        assertTrue(registry.isValidShellPath("pwsh.exe"))
+        assertFalse(registry.isValidShellPath("missing.exe"))
+    }
+
+    @Test
+    fun unixValidationAndDiscoveryRequireExecutePermission(
+        @TempDir directory: Path,
+    ) {
+        assumeTrue(Files.getFileStore(directory).supportsFileAttributeView("posix"))
+        val executable = Files.createFile(directory.resolve("bash"))
+        val permissions = setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+        Files.setPosixFilePermissions(executable, permissions)
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = mapOf("PATH" to directory.toString()),
+            )
+
+        assertFalse(registry.isValidShellPath(executable.toString()))
+        assertFalse(registry.isValidShellPath("bash"))
+        assertTrue(registry.availableProfiles().none { it.command.first() == executable.toString() })
+
+        val injected =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = mapOf("PATH" to directory.toString()),
+                executableExists = { it == executable },
+            )
+        assertTrue(injected.isValidShellPath(executable.toString()))
+        assertEquals(
+            executable.toString(),
+            injected
+                .availableProfiles()
+                .single { it.id == "bash" }
+                .command
+                .first(),
+        )
+
+        Files.setPosixFilePermissions(executable, permissions + PosixFilePermission.OWNER_EXECUTE)
+        assertTrue(registry.isValidShellPath(executable.toString()))
+        assertTrue(registry.isValidShellPath("bash"))
+        assertEquals(
+            executable.toString(),
+            registry
+                .availableProfiles()
+                .single { it.id == "bash" }
+                .command
+                .first(),
+        )
+    }
+
+    @Test
+    fun unixPathDirectoriesRetainLiteralQuotes(
+        @TempDir directory: Path,
+    ) {
+        assumeTrue(Files.getFileStore(directory).supportsFileAttributeView("posix"))
+        val shellDirectory = Files.createDirectory(directory.resolve("\"shells\""))
+        val executable = shellDirectory.resolve("bash")
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = mapOf("PATH" to "bad\u0000path:$shellDirectory"),
+                pathSeparator = ":",
+                executableExists = { it == executable },
+            )
+        assertTrue(registry.isValidShellPath("bash"))
+        assertEquals(
+            executable.toString(),
+            registry
+                .availableProfiles()
+                .single { it.id == "bash" }
+                .command
+                .first(),
+        )
+    }
+
+    @Test
+    fun profilesPreserveEmptyArgumentsThroughConstructionCopyAndInitialSelection() {
+        val command = listOf("tool", "", "value with spaces", "", "")
+        val profile = TerminalProfile(id = "custom", displayName = "Custom", command = command)
+        assertEquals(command, profile.command)
+        assertEquals(command, profile.copy(displayName = "Copy").command)
+        val registry = TerminalProfileRegistry(osName = "Linux", environment = emptyMap(), executableExists = { false })
+        assertEquals(command, registry.initialProfile(command).command)
+
+        for (invalid in listOf(emptyList(), listOf(""), listOf("", "argument"))) {
+            assertFailsWith<IllegalArgumentException> { TerminalProfile(id = "custom", displayName = "Custom", command = invalid) }
+            assertFailsWith<IllegalArgumentException> { profile.copy(command = invalid) }
+            if (invalid.isNotEmpty()) {
+                assertFailsWith<IllegalArgumentException> { registry.initialProfile(invalid) }
+            }
+        }
+    }
+
+    @Test
+    fun windowsDefaultValidationAcceptsRegularFilesAndRejectsDirectories(
+        @TempDir directory: Path,
+    ) {
+        val executable = Files.createFile(directory.resolve("shell.exe"))
+        val registry = TerminalProfileRegistry(osName = "Windows 11", environment = mapOf("PATH" to directory.toString()))
+        assertTrue(registry.isValidShellPath(executable.toString()))
+        assertTrue(registry.isValidShellPath("shell.exe"))
+        assertFalse(registry.isValidShellPath(directory.toString()))
+    }
+
     @Test
     fun localizedCommandPromptNamePreservesLaunchMetadataAndConfiguredProfileKind() {
         val registry =

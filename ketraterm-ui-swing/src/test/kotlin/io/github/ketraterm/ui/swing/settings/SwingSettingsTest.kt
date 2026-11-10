@@ -34,6 +34,26 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @Test
+    fun `automatic alternate padding follows copied settings while explicit padding stays fixed`() {
+        val original = SwingSettings()
+        assertEquals(SwingPadding(4, 9, 4, 9), original.alternateScreenPadding)
+        val changed = original.copy { it.padding = SwingPadding(4, 20, 4, 6) }
+        assertEquals(SwingPadding(4, 18, 4, 18), changed.alternateScreenPadding)
+        val draft = original.toBuilder()
+        draft.padding = changed.padding
+        assertEquals(changed, draft.build())
+
+        val explicit = changed.copy { it.alternateScreenPadding = SwingPadding(1, 8, 2, 12) }
+        val widerGutter = explicit.copy { it.shellIntegrationDecorationGutterWidth = 20 }
+        assertEquals(SwingPadding(1, 8, 2, 12), widerGutter.alternateScreenPadding)
+        val automatic = widerGutter.copy { it.alternateScreenPadding = null }
+        assertEquals(SwingPadding(4, 23, 4, 23), automatic.alternateScreenPadding)
+        val undecorated = automatic.copy { it.promptDecoration = SwingPromptDecoration.NONE }
+        assertEquals(SwingPadding(4, 13, 4, 13), undecorated.alternateScreenPadding)
+        assertEquals(SwingPadding(4, 9, 4, 9), original.alternateScreenPadding)
+    }
+
+    @Test
     fun `embedding defaults retain conservative geometry and configurable cursor presentation`() {
         val original = SwingSettings()
         assertEquals(80, original.columns)

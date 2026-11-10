@@ -1,8 +1,19 @@
 # Pty4j backend limitations
 
-Confirmed against `org.jetbrains.pty4j:pty4j:0.14.0` on 2026-10-22. This reference
+Confirmed against `org.jetbrains.pty4j:pty4j:0.14.0`. This reference
 records backend constraints and reproduction evidence; open work belongs in the
 [gap map](../../docs/terminal-feature-gap-map.md#transports-and-execution-environments).
+
+## Empty Windows launch arguments
+
+Pty4j 0.14.0's `CommandList` serializes empty arguments without quotes, so Windows
+discards them when creating the child process. KetraTerm uses the backend's raw
+command-string entry point when a Windows argument list contains empty elements,
+quoting each empty element as `""` and retaining pty4j's serialization of nonempty
+elements. Unix launches retain the original argument list.
+
+The native PTY suite verifies empty arguments before, between, and after nonempty
+arguments by comparing the child process's actual argument list.
 
 ## Native pixel dimensions
 

@@ -4,13 +4,12 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- PTY options and workspace launch profiles preserve empty arguments after the executable, including through configuration copies.
 - Added `TerminalSession.confirmCommandEdit` and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine's buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.
 - PTY and workspace options reject retained row capacity overflow during construction, before process creation. Swing settings reject non-positive or non-finite primary font sizes while preserving fractional sizes and host overrides. See [library defaults](docs/library/configuration.md#library-defaults).
 - The default Swing hyperlink handler rejects malformed URIs without throwing and rejects unsupported schemes before contacting the desktop.
-
 - Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while preserving the initial selection when direction changes.
-
-- Shell-profile discovery now honors case-insensitive Windows environment names, including `Path`, `ProgramFiles`, and `COMSPEC`, while preserving case-sensitive lookup on Unix platforms.
+- Shell-profile discovery honors case-insensitive Windows environment names, accepts quoted Windows PATH directories, and skips malformed PATH entries. Unix lookup remains case-sensitive and requires execute permission; custom executable predicates retain control over discovery and validation.
 
 ## [0.5.0] - 2026-11-09
 

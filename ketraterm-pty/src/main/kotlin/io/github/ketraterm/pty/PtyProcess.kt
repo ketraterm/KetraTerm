@@ -15,9 +15,11 @@
  */
 package io.github.ketraterm.pty
 
+import com.pty4j.Command
 import com.pty4j.PtyProcessBuilder
 import com.pty4j.WinSize
 import com.pty4j.windows.conpty.WinConPtyProcess
+import com.sun.jna.Platform
 import java.io.InputStream
 import java.io.OutputStream
 import com.pty4j.PtyProcess as Pty4jNativeProcess
@@ -49,9 +51,20 @@ internal interface PtyProcessFactory {
 
 internal object Pty4jProcessFactory : PtyProcessFactory {
     override fun start(options: PtyOptions): PtyProcess {
+        val command =
+            if (Platform.isWindows() && options.command.any(String::isEmpty)) {
+                // pty4j 0.14.0 leaves empty argv elements unquoted, so Windows discards them.
+                Command.RawCommandString(
+                    options.command.joinToString(" ") { argument ->
+                        if (argument.isEmpty()) "\"\"" else Command.CommandList(listOf(argument)).toCommandLine()
+                    },
+                )
+            } else {
+                Command.CommandList(options.command)
+            }
         val builder =
             PtyProcessBuilder()
-                .setCommand(options.command.toTypedArray())
+                .setCommand(command)
                 .setEnvironment(options.environment)
                 .setInitialColumns(options.columns)
                 .setInitialRows(options.rows)

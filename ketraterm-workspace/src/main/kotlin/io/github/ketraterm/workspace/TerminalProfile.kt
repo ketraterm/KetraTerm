@@ -31,7 +31,8 @@ import java.nio.file.Path
  *
  * @property id stable profile identifier.
  * @property displayName user-facing profile name.
- * @property command command and arguments passed to the local PTY child process.
+ * @property command nonempty executable name followed by arguments passed to the local PTY
+ * child process. Arguments after the executable may be empty strings.
  * @property environment environment entries layered on top of PTY defaults.
  * @property workingDirectory initial process working directory, or `null` for
  * the platform/user default.
@@ -55,6 +56,6 @@ public data class TerminalProfile(
         require(id.isNotBlank()) { "profile id must not be blank" }
         require(displayName.isNotBlank()) { "profile displayName must not be blank" }
         require(command.isNotEmpty()) { "profile command must not be empty" }
-        require(command.none { it.isEmpty() }) { "profile command elements must not be empty" }
+        require(command.first().isNotEmpty()) { "profile executable must not be empty" }
     }
 }

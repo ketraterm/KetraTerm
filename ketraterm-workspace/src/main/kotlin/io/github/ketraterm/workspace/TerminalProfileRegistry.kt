@@ -18,6 +18,7 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.pty.PtyOptions
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.util.*
 
@@ -31,7 +32,9 @@ import java.util.*
  * @property osName operating system name used for platform profile selection.
  * @property environment process environment used for path and shell discovery.
  * @property pathSeparator platform path separator.
- * @property executableExists predicate used to verify discovered executables.
+ * @property executableExists predicate used to verify discovered executables. The default
+ * requires a regular file and, on Unix platforms, execute permission. A supplied predicate
+ * owns this decision without additional filesystem checks.
  * @property commandPromptDisplayName localized display name for the Windows command prompt.
  * @property defaultShellDisplayName localized display name for the portable fallback shell.
  */
@@ -39,7 +42,7 @@ public class TerminalProfileRegistry(
     private val osName: String = System.getProperty("os.name"),
     private val environment: Map<String, String> = System.getenv(),
     private val pathSeparator: String = File.pathSeparator,
-    private val executableExists: (Path) -> Boolean = Files::isRegularFile,
+    private val executableExists: (Path) -> Boolean = { defaultShellExecutableExists(it, osName) },
     private val commandPromptDisplayName: String = defaultProfileDisplayName("profile.commandPrompt"),
     private val defaultShellDisplayName: String = defaultProfileDisplayName("profile.defaultShell"),
 ) {
@@ -48,7 +51,7 @@ public class TerminalProfileRegistry(
         osName: String = System.getProperty("os.name"),
         environment: Map<String, String> = System.getenv(),
         pathSeparator: String = File.pathSeparator,
-        executableExists: (Path) -> Boolean = Files::isRegularFile,
+        executableExists: (Path) -> Boolean = { defaultShellExecutableExists(it, osName) },
     ) : this(
         osName = osName,
         environment = environment,
@@ -123,10 +126,11 @@ public class TerminalProfileRegistry(
     }
 
     /**
-     * Checks if a shell path is a valid executable file or an executable command on the PATH.
+     * Checks an explicit path or searches PATH using the configured executable predicate.
+     * Windows PATH directories may have paired double quotes; malformed entries are skipped.
      *
      * @param shellPath shell path to validate.
-     * @return true if the shell path exists and is executable, false otherwise.
+     * @return true if the configured predicate accepts the shell path, false otherwise.
      */
     public fun isValidShellPath(shellPath: String): Boolean {
         if (shellPath.isBlank()) return false
@@ -383,9 +387,16 @@ public class TerminalProfileRegistry(
     private fun executableOnPath(executableName: String): Path? {
         val path = environmentValue("PATH") ?: return null
         val segments = path.split(pathSeparator)
+        val windows = isWindows()
         for (segment in segments) {
-            if (segment.isBlank()) continue
-            val candidate = Path.of(segment, executableName)
+            val directory = if (windows) segment.removeSurrounding("\"") else segment
+            if (directory.isBlank() || windows && '"' in directory) continue
+            val candidate =
+                try {
+                    Path.of(directory, executableName)
+                } catch (_: InvalidPathException) {
+                    continue
+                }
             if (executableExists(candidate)) return candidate
         }
         return null
@@ -401,6 +412,11 @@ public class TerminalProfileRegistry(
         private const val CONFIGURED_SHELL_ID = "configured-shell"
     }
 }
+
+private fun defaultShellExecutableExists(
+    path: Path,
+    osName: String,
+): Boolean = Files.isRegularFile(path) && (osName.contains("windows", ignoreCase = true) || Files.isExecutable(path))
 
 private fun defaultProfileDisplayName(key: String): String =
     ResourceBundle

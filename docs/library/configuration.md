@@ -82,7 +82,9 @@ Collection values are detached; supplied services keep their own lifetimes.
 Nullable services can be cleared explicitly.
 
 Default alternate-screen padding derives from primary padding and reserved decoration space.
-A copied builder retains resolved padding; assigning null requests recalculation.
+Automatic padding remains automatic when settings are copied and follows the final
+primary padding and gutter settings. Explicit alternate padding remains fixed;
+assigning null restores automatic padding.
 
 Use the current examples in the [Swing README](../../ketraterm-ui-swing/README.md)
 and [PTY README](../../ketraterm-pty/README.md).
