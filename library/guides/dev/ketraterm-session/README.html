@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Session (:ketraterm-session)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#usage">Usage</a><a class="depth-2" href="#application-progress">Application progress</a><a class="depth-2" href="#input-and-lifecycle">Input and lifecycle</a><a class="depth-2" href="#rendering-and-local-operations">Rendering and local operations</a><a class="depth-2" href="#host-owned-shell-integration">Host-owned shell integration</a><a class="depth-2" href="#ketraterms-optional-producer">KetraTerm&#39;s optional producer</a><a class="depth-2" href="#custom-assembly">Custom assembly</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-session-ketraterm-session">KetraTerm Session (<code>:ketraterm-session</code>)</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Session (:ketraterm-session)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#usage">Usage</a><a class="depth-2" href="#application-progress">Application progress</a><a class="depth-2" href="#input-and-lifecycle">Input and lifecycle</a><a class="depth-2" href="#rendering-and-local-operations">Rendering and local operations</a><a class="depth-2" href="#completed-command-output">Completed command output</a><a class="depth-2" href="#host-owned-shell-integration">Host-owned shell integration</a><a class="depth-2" href="#ketraterms-optional-producer">KetraTerm&#39;s optional producer</a><a class="depth-2" href="#custom-assembly">Custom assembly</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-session-ketraterm-session">KetraTerm Session (<code>:ketraterm-session</code>)</h1>
 <p><code>TerminalSession</code> connects a transport connector to parsing, terminal state,
 input encoding, and render publication. It serializes terminal mutation and
 orders application input, terminal replies, and startup input through one
@@ -161,6 +161,38 @@ updates. See the <a href="../docs/reference/protocol.html#change-reports">change
 or resetting the parser. It returns false after shutdown begins. See the
 <a href="docs/session-concurrency-locks.html#local-buffer-clear">clear contract</a> before
 retaining selection or shell anchors across a clear.</p>
+<h2 id="completed-command-output">Completed command output</h2>
+<p>Use <code>commandOutputText</code> off the UI thread to capture bounded command context for
+an external suggestion provider or another consumer:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.session.TerminalCommandOutputText
+import io.github.ketraterm.session.TerminalSession
+
+fun recentOutput(session: TerminalSession, recordId: Int): TerminalCommandOutputText? =
+    session.commandOutputText(recordId, maxChars = 32_768, maxRows = 256)
+</code></pre>
+<p>The result contains <code>text</code>, <code>truncated</code> (caller limits omitted retained output),
+and <code>historyIncomplete</code> (a recorded range boundary is missing). Limits select the
+tail of the output, count UTF-16 code units and physical rows, and preserve stored
+graphemes. Soft wraps are joined; hard breaks and interior spaces are preserved,
+while terminal padding and trailing spaces at hard line ends are omitted.</p>
+<p>Select <a href="../ketraterm-shell-integration/README.html"><code>OscShellIntegration</code></a> with
+compatible shell hooks for the built-in implementation. Custom producers can
+implement <code>TerminalShellIntegration.commandOutputText</code>; host metadata alone does
+not provide output. The method returns <code>null</code> when unsupported, unfinished,
+unknown, fully evicted, or otherwise unavailable. Empty, untruncated text requires
+known empty output; a character limit too small for the final grapheme returns
+empty text with <code>truncated = true</code>. The OSC implementation reads the primary buffer and returns <code>null</code> while
+the alternate screen is active; retained output remains readable after closure.</p>
+<p>This is rendered terminal text, including overwrites, rather than a complete
+transcript or separate stdout/stderr streams. Metadata and text retention are
+independently bounded. Use existing command metadata for CWD, exit code, and
+timing; treat an unavailable field as unknown.</p>
+<p>The call serializes with terminal mutation and sends no input. Do not invoke it
+inside borrowed frame/cache callbacks. From a command-finished listener, enqueue
+work on a consumer-owned background dispatcher: a reentrant call during an output
+batch returns <code>null</code>, and later queued work may observe eviction. Retain the
+listener&#39;s immutable metadata when needed, and close its registration with the
+consumer&#39;s lifetime.</p>
 <h2 id="host-owned-shell-integration">Host-owned shell integration</h2>
 <p>A plain session has no shell metadata producer. An embedding host can supply its
 bounded terminal-facing timeline, versioned editing state, and prompt readiness:</p>
@@ -237,7 +269,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/627ead3640ef0faacb62a6a4cb79be53090163cc/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

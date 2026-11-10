@@ -96,6 +96,12 @@ snapshot. Session shares one
 tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session&#39;s conditional-edit APIs when admitting asynchronous suggestions.</p>
+<p>Completed output is available through
+<a href="../ketraterm-session/README.html#completed-command-output"><code>TerminalSession.commandOutputText</code></a>.
+The producer resolves the recorded primary-buffer range under session
+serialization and copies only a bounded tail. The result reports caller
+truncation separately from missing history; it never reads alternate-screen text
+as primary command output.</p>
 <h2 id="readiness-and-trust">Readiness and trust</h2>
 <p>With workspace PowerShell hooks and PSReadLine, this producer also decodes
 <a href="../docs/reference/protocol.html#private-powershell-completion-metadata">native completion metadata</a>.
@@ -127,7 +133,7 @@ defines notification, frame borrowing, and observation lifetime.</p>
 <p>Hosts using their own shell integration depend on <code>ketraterm-session</code> and supply
 <code>TerminalShellIntegrationFactory.host</code>. That selected model remains authoritative;
 OSC metadata does not supplement it. Such hosts do not need this module.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/627ead3640ef0faacb62a6a4cb79be53090163cc/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
