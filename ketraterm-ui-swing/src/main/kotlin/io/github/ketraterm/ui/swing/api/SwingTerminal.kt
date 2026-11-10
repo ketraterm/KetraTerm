@@ -2425,11 +2425,11 @@ public class SwingTerminal
                     if (requiresConfirmation) {
                         val confirmed =
                             if (sessionEditContext != null) {
-                                bound?.requestShellCompletions(sessionEditContext)
+                                bound?.confirmCommandEdit(sessionEditContext) == true
                             } else {
-                                bound?.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset)
+                                bound?.requestShellCompletions(interaction.request.commandText, interaction.request.cursorOffset) != null
                             }
-                        if (confirmed == null) {
+                        if (!confirmed) {
                             if (activeSuggestionInteraction === interaction) {
                                 cancelAndHideShellSuggestionsOnEdt(
                                     "Shell could not confirm suggestion input",

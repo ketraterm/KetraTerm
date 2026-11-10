@@ -43,9 +43,9 @@ title_permission = "allow"
 | Section | Key | Default | Accepted values |
 | --- | --- | --- | --- |
 | `window` | `columns` | `100` | Integer, 10..1000. |
-| `window` | `rows` | `30` | Integer, 10..500. |
-| `window` | `scrollback_lines` | `1000` | Integer, 0..1000000. |
-| `font` | `family` | Platform default | Installed family name. Windows: `Cascadia Mono`; macOS: `Menlo`; elsewhere: `Monospaced`. |
+| `window` | `rows` | `28` | Integer, 10..500. |
+| `window` | `scrollback_lines` | `10000` | Integer, 0..1000000. |
+| `font` | `family` | Platform default | Installed family name. Windows: `Cascadia Mono`; macOS: `Menlo`; elsewhere: the first installed family in Swing's curated monospace list, falling back to `Monospaced`. |
 | `font` | `size` | `16` | Integer points, 10..56. |
 | `font` | `line_height` | `1.0` | Multiplier, 0.7..1.5. |
 | `font` | `use_system_fallback_fonts` | `true` | Boolean; permits installed system fonts as fallback. |
@@ -55,6 +55,14 @@ Unknown theme identifiers use `one-dark` at rendering time. Font selection uses
 Swing's font-family resolution and fallback rules. Window and scrollback values
 are initial settings for new terminals, rather than requests to replace an
 existing process or history buffer.
+
+The initial window is centered within its monitor's usable area, excluding taskbars
+and docks. Oversized windows shrink to fit; the session receives the resulting
+visible grid before shell output starts. The saved dimensions are not rewritten.
+
+Defaults apply to new configuration files and omitted preferences. Explicitly
+saved window dimensions, scrollback capacity, fonts, and cursor preferences are
+preserved when the application is upgraded.
 
 ### Behavior
 
@@ -94,6 +102,18 @@ and `normalize-line-endings` values load as `preserve`; saving writes the
 canonical value. See the [paste contract](../../ketraterm-input/docs/terminal-input-contract.md#paste-and-focus-contract)
 for control-character and framing rules.
 
+Explicit clipboard and middle-button pastes containing line breaks or control
+characters other than Tab require confirmation. The preview is limited to 400
+Unicode codepoints and shows controls as escapes; Cancel is selected initially.
+Approval submits the original captured text through the configured paste policy.
+This review also applies when bracketed paste is active. Safe single-line text
+does not prompt. Terminal-originated clipboard requests use their separate permissions.
+
+Bell bursts coalesce into one pending UI task per window, retaining at most 64
+originating panes. Feedback is limited to one delivery every 500 ms per window;
+one delivery can flash multiple panes but sounds only once. Closing the window
+cancels queued bells, and feedback rechecks current settings and pane lifetime.
+
 Persisted completion data is stored beside the configuration file. See the
 [storage reference](../../docs/reference/storage.md) for retained ranking data,
 command replay, and privacy limits.
@@ -102,7 +122,7 @@ command replay, and privacy limits.
 
 | `[shell]` key | Default | Meaning |
 | --- | --- | --- |
-| `path` | Platform shell | One executable path or command name. Windows: `powershell.exe`; elsewhere: `$SHELL`, falling back to `/bin/bash`. A blank value uses this default. |
+| `path` | Platform shell | One executable path or command name. Windows: discovered `pwsh.exe`, falling back to `powershell.exe`; elsewhere: `$SHELL`, falling back to `/bin/bash`. A blank value uses this default. |
 | `start_directory` | User home | Working directory for new terminals. |
 | `startup_command` | `""` | One shell command line to submit after the first complete interactive prompt; blank disables it. |
 
@@ -142,6 +162,12 @@ The settings dialog labels `prompt` as Ask. These permissions govern terminal
 requests, rather than the user's explicit copy or paste actions. Removed
 local/remote permission keys are ignored; use the session-wide keys above.
 
+Explicit invalid or empty `clipboard_write`, `clipboard_read`, and
+`title_permission` values use `deny` and report the affected key and file path
+on standard error, without echoing the invalid value. Other valid preferences
+remain effective. Omitted write/title fields use their defaults; omitted read
+permissions in existing files remain denied.
+
 ## 2. Directory Resolution Hierarchy
 
 The first nonblank override wins:
@@ -171,7 +197,8 @@ WSL or Ubuntu launcher profiles.
   Existing files use `deny` for missing or invalid clipboard-read permissions.
 - A parse or configuration-validation failure moves the existing file to
   `<filename>.broken`, replacing any previous backup, then attempts to write a
-  default file. These recovery defaults deny clipboard reads. A failed backup
+  default file. These recovery defaults deny clipboard reads, clipboard writes,
+  and title changes. A failed backup
   leaves the original file in place and returns the recovery defaults.
 - An I/O read failure is reported and uses recovery defaults without backing up
   or replacing the unreadable file.

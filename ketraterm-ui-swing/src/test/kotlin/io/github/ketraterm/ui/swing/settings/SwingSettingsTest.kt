@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.settings
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler
@@ -32,6 +33,52 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingSettingsTest {
+    @Test
+    fun `embedding defaults retain conservative geometry and configurable cursor presentation`() {
+        val original = SwingSettings()
+        assertEquals(80, original.columns)
+        assertEquals(24, original.rows)
+        assertEquals(16f, original.font.size2D)
+        assertEquals(TerminalRenderCursorShape.BLOCK, original.cursorShape)
+        assertEquals(600, original.cursorBlinkMillis)
+        assertFalse(original.scrollOnOutput)
+        val custom =
+            original.copy {
+                it.columns = 132
+                it.rows = 40
+                it.font = Font(Font.MONOSPACED, Font.PLAIN, 20)
+                it.cursorShape = TerminalRenderCursorShape.BAR
+                it.cursorBlinkMillis = 0
+                it.useSystemFallbackFonts = false
+                it.fallbackFonts = emptyList()
+            }
+        assertEquals(132, custom.columns)
+        assertEquals(40, custom.rows)
+        assertEquals(20, custom.font.size)
+        assertEquals(TerminalRenderCursorShape.BAR, custom.cursorShape)
+        assertEquals(0, custom.cursorBlinkMillis)
+        assertFalse(custom.useSystemFallbackFonts)
+        assertTrue(custom.fallbackFonts.isEmpty())
+        assertEquals(custom, custom.toBuilder().build())
+        assertEquals(SwingSettings(), original)
+    }
+
+    @Test
+    fun `invalid font sizes fail during snapshot construction while fractional sizes remain supported`() {
+        val original = SwingSettings()
+        for (size in floatArrayOf(0f, -1f, Float.NaN, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY)) {
+            val font = Font(Font.MONOSPACED, Font.PLAIN, 16).deriveFont(size)
+            assertFailsWith<IllegalArgumentException> { SwingSettings.create { it.font = font } }
+            assertFailsWith<IllegalArgumentException> { original.copy { it.font = font } }
+            val draft = original.toBuilder()
+            draft.font = font
+            assertFailsWith<IllegalArgumentException> { draft.build() }
+        }
+        val fractional = original.copy { it.font = it.font.deriveFont(12.5f) }
+        assertEquals(12.5f, fractional.font.size2D)
+        assertEquals(16f, original.font.size2D)
+    }
+
     @Test
     fun `smooth scrolling defaults on and survives detached builder updates`() {
         val defaults = SwingSettings()

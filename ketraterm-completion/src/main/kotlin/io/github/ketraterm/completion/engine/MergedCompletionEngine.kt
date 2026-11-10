@@ -186,9 +186,11 @@ internal class MergedCompletionEngine(
                 publish()
             }
             collectSources(activeSources, request, completionContext, ::available) { completed ->
-                if (completed.candidates.isNotEmpty()) hasStructuredCandidates = true
-                rankingState.ingest(completed)
-                if (!canFallBackToShell || hasStructuredCandidates) publish()
+                if (completed.candidates.isNotEmpty()) {
+                    hasStructuredCandidates = true
+                    rankingState.ingest(completed)
+                    publish()
+                }
             }
             if (canFallBackToShell && !hasStructuredCandidates) {
                 val answer = if (queryShellFirst) shellAnswer else completeShell(request, completionContext)
@@ -207,6 +209,8 @@ internal class MergedCompletionEngine(
                         ),
                     )
                 }
+                publish()
+            } else if (lastPublished == null) {
                 publish()
             }
         }

@@ -46,6 +46,7 @@ import javax.swing.JFrame
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Real standalone wiring and component input, with bounded event waits and failure-safe ownership. */
@@ -155,7 +156,13 @@ internal class StandaloneSuggestionFixture private constructor(
             return withTimeout(15.seconds) {
                 var snapshot: SwingShellSuggestionViewSnapshot
                 do {
-                    val update = publications.receive()
+                    var update = publications.tryReceive().getOrNull()
+                    while (update == null) {
+                        if (!withContext(Dispatchers.Swing) { terminal.isFocusOwner }) {
+                            focusTerminal()
+                        }
+                        update = withTimeoutOrNull(250.milliseconds) { publications.receive() }
+                    }
                     lastUpdate = update
                     snapshot = update.second
                 } while (update.first != line ||
@@ -214,31 +221,73 @@ internal class StandaloneSuggestionFixture private constructor(
             }
         }
 
-    suspend fun awaitExecution(line: String) =
-        withTimeout(15.seconds) {
-            session.shellIntegrationState.revision.first {
+    suspend fun awaitExecution(line: String) {
+        try {
+            withTimeout(15.seconds) {
+                session.shellIntegrationState.revision.first {
+                    val state = session.shellIntegrationState
+                    val metadata = state.commandMetadata(state.latestCommandRecordId())
+                    metadata?.commandText == line && metadata.finishedAtEpochMillis != null
+                }
                 val state = session.shellIntegrationState
-                val metadata = state.commandMetadata(state.latestCommandRecordId())
-                metadata?.commandText == line && metadata.finishedAtEpochMillis != null
+                assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
             }
+        } catch (failure: TimeoutCancellationException) {
             val state = session.shellIntegrationState
-            assertEquals(0, state.commandMetadata(state.latestCommandRecordId())?.exitCode, line)
+            throw AssertionError(
+                "Expected execution '$line', latest=${state.commandMetadata(state.latestCommandRecordId())}; " +
+                    "projection=${session.activeShellCommandLine()}, session=${session.state.value}\n${screenText()}",
+                failure,
+            )
         }
+    }
 
     suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
+        focusTerminal()
         withContext(Dispatchers.Swing) { terminal.reloadSettings() }
     }
 
-    suspend fun type(text: String) =
+    private suspend fun focusTerminal() =
+        withTimeout(15.seconds) {
+            val acquired = CompletableDeferred<Unit>()
+            val listener =
+                object : FocusAdapter() {
+                    override fun focusGained(event: FocusEvent) {
+                        acquired.complete(Unit)
+                    }
+                }
+            try {
+                withContext(Dispatchers.Swing) {
+                    if (terminal.isFocusOwner) {
+                        acquired.complete(Unit)
+                    } else {
+                        terminal.addFocusListener(listener)
+                        window?.toFront()
+                        window?.requestFocus()
+                        terminal.requestFocusInWindow()
+                    }
+                }
+                acquired.await()
+            } finally {
+                withContext(NonCancellable + Dispatchers.Swing) { terminal.removeFocusListener(listener) }
+            }
+        }
+
+    suspend fun type(text: String) {
+        focusTerminal()
         withContext(Dispatchers.Swing) {
             for (character in text) {
                 val event = KeyEvent(terminal, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, character)
                 terminal.keyListeners.forEach { it.keyTyped(event) }
             }
         }
+    }
 
-    suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
+    suspend fun key(code: Int) {
+        focusTerminal()
+        withContext(Dispatchers.Swing) { press(code) }
+    }
 
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
@@ -349,6 +398,8 @@ internal class StandaloneSuggestionFixture private constructor(
                         workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                     )
                 val settings = KetraTermSettings(KetraTermConfigManager(directory.resolve("config.toml")))
+                // Session-submitted setup bypasses UI Enter handling and must not open completion requests.
+                withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = false)) }
                 val created =
                     withContext(Dispatchers.Swing) {
                         StandaloneSuggestionFixture(tab, provider, settings).also { fixture = it }
@@ -358,6 +409,7 @@ internal class StandaloneSuggestionFixture private constructor(
                     created.awaitExecution(setup)
                     created.awaitLine("", requireShellCompletion = true)
                 }
+                created.setAutomaticSuggestionsEnabled(true)
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.

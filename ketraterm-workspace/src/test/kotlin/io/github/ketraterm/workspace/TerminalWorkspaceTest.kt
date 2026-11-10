@@ -53,6 +53,36 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
     @Test
+    fun `workspace options reject retained row capacity overflow before opening a session`() {
+        val original = TerminalWorkspaceOpenOptions()
+        assertEquals(80, original.columns)
+        assertEquals(24, original.rows)
+        assertEquals(1000, original.maxHistory)
+        for (rows in intArrayOf(1, 24, Int.MAX_VALUE)) {
+            val boundary = Int.MAX_VALUE - rows
+            val valid =
+                original.copy {
+                    it.rows = rows
+                    it.maxHistory = boundary
+                }
+            assertEquals(boundary, valid.maxHistory)
+            assertEquals(valid, valid.toBuilder().build())
+            assertFailsWith<IllegalArgumentException> {
+                TerminalWorkspaceOpenOptions.create {
+                    it.rows = rows
+                    it.maxHistory = boundary + 1
+                }
+            }
+            assertFailsWith<IllegalArgumentException> { valid.copy { it.maxHistory = boundary + 1 } }
+            val draft = valid.toBuilder()
+            draft.maxHistory = boundary + 1
+            assertFailsWith<IllegalArgumentException> { draft.build() }
+        }
+        assertEquals(0, original.copy { it.maxHistory = 0 }.maxHistory)
+        assertEquals(1000, original.maxHistory)
+    }
+
+    @Test
     fun `first output observes the viewport accepted during tab publication`() = assertFirstOutputGeometry(resized = true)
 
     @Test

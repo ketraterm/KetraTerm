@@ -1,5 +1,19 @@
 # KetraTerm Standalone Changelog
 
+## [Unreleased]
+
+- PowerShell automatic suggestions confirm inline-prediction input without waiting for native candidate discovery.
+- Added temporary per-pane font zoom/reset, Windows Ctrl+Shift+C/V clipboard aliases, and window-scoped tab/pane shortcuts. History paging keeps one row of context; Shift+Home/End jumps to oldest history/live output.
+- Double- and triple-click dragging extends selection by whole words or rows. Word selection preserves complete wide characters and keeps adjacent paths out of whitespace/delimiter selections.
+
+- New configurations start at 100 × 28 cells with 10,000 scrollback lines; the initial window fits the monitor's usable area before shell output starts. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
+- Added review of explicit pastes containing line breaks or control characters, with an escaped preview and Cancel selected by default.
+- Coalesced bell bursts and limited audible, visual, and desktop-attention feedback to one delivery every 500 ms per window.
+- Ctrl+Space now passes through to the running application when shell completion cannot start.
+- Invalid explicit clipboard and title permissions now deny access and report the affected key. Malformed or unreadable configuration recovery also denies these permissions.
+- Failed sessions retain their final output with an exit-status banner and Close button. Transport failures and unknown exit statuses are retained too; successful exits still close normally.
+- Fresh Windows configurations prefer discovered modern PowerShell (`pwsh.exe`), falling back to Windows PowerShell. Saved shell choices remain effective.
+
 ## [0.5.0] - 2026-11-09
 
 - Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local paths, and Git references. PowerShell suggestions remain usable across inline-prediction redraws while changed input invalidates acceptance. The popup highlights matches and shows argument hints. Settings control automatic popups and Enter acceptance; saved learning is opt-in and can be reset. See the [completion guide](../docs/features/completion.md) for shell requirements and limitations.

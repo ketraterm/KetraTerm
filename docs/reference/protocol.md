@@ -467,6 +467,7 @@ use `customOscPayloadLimitBytes` themselves.
 | --- | --- |
 | `Ready;epoch` | Prompt completion hook, with 32 lowercase hexadecimal epoch characters. |
 | `Ready;epoch;PrefixReset` | Also advertises the installed `F12,r` prefix-reset binding. Plain `Ready` does not advertise this capability. |
+| `Ready;epoch;BufferState` | Also advertises `F12,b` buffer-only confirmation. It may be combined with `PrefixReset`, in either order; repeated or unknown capabilities are rejected. |
 | `Result;epoch;id;Failed` | Correlated failure. |
 | `Result;epoch;id;Ok;cursor;start;end;line;externalCommandName;count;entries...` | Exact live buffer and UTF-16 replacement range, with Base64 `line` and `externalCommandName`. The latter is empty for shell commands, functions, scripts, or unresolved invocations; otherwise it names the resolved application after following aliases. Names are data and must never be evaluated. Each entry has four fields: native result type, Base64 replacement, Base64 label, Base64 tooltip. |
 
@@ -476,7 +477,15 @@ time and sends the ID through ordered semantic input as one frame:
 
 1. `F12,q` starts the frame.
 2. Nineteen `F12,digit` chords carry the decimal ID, padded with leading zeroes.
-3. `F12,e` commits the frame and invokes the completer.
+3. `F12,e` commits the frame and invokes the completer. With `BufferState`,
+   `F12,b` instead commits a buffer-only confirmation request.
+
+Buffer-only confirmation reads the current editor text and UTF-16 cursor without
+invoking candidate completers or changing the editor. It returns the same `Result`
+envelope with `start = end = cursor`, an empty application name and zero candidates.
+Its editing receipt cannot satisfy a later candidate request. Full candidate queries
+can also confirm the same buffer; older hooks without `BufferState` use full queries
+for confirmation.
 
 The hook echoes the supplied ID and its current prompt epoch; it keeps no
 independent request counter. Missing, incomplete, zero, overflowing, or otherwise
@@ -505,7 +514,7 @@ clear, or an observed alternate-screen transition revoke the completion hook.
 A new `A` also clears the previous epoch and requires a fresh announcement.
 Prompt announcements never reset the session's request IDs. Every accepted
 announcement invalidates earlier editing contexts and pending results,
-including announcements that change only `PrefixReset`.
+including announcements that change only `PrefixReset` or `BufferState`.
 The hook reinstalls its private PSReadLine bindings before each `Ready` announcement.
 Readiness advertises the prompt's hook, not completion of prompt rendering or
 PSReadLine initialization. The query handler reads the editor when the shell

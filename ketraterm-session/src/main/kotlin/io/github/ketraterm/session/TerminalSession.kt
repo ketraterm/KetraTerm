@@ -798,12 +798,28 @@ public class TerminalSession private constructor(
      * exact buffer and cursor confirm the request; intervening editing input, producer authority,
      * geometry changes, or cancellation still reject it. Final edits must still pass [submitInput].
      */
-    public suspend fun requestShellCompletions(expected: TerminalCommandEditContext): TerminalShellCompletionResult? {
+    public suspend fun requestShellCompletions(expected: TerminalCommandEditContext): TerminalShellCompletionResult? =
+        requestShellCompletions(expected, confirmationOnly = false)
+
+    /**
+     * Confirms the exact native editor buffer and cursor captured by [expected].
+     * Capable producers use a buffer-only request without invoking candidate completers;
+     * other producers fall back to a full native completion request. Returns false for
+     * unsupported, stale, failed or timed-out requests. Confirmation never replaces the
+     * original editing context or authorizes a different buffer.
+     */
+    public suspend fun confirmCommandEdit(expected: TerminalCommandEditContext): Boolean =
+        requestShellCompletions(expected, confirmationOnly = true) != null
+
+    private suspend fun requestShellCompletions(
+        expected: TerminalCommandEditContext,
+        confirmationOnly: Boolean,
+    ): TerminalShellCompletionResult? {
         currentCoroutineContext().ensureActive()
         if (expected.owner !== editContextOwner || expected.isCancelled) return null
         val result =
             withTimeoutOrNull(10_000.milliseconds) {
-                awaitShellCompletions(expected.commandLine.commandText, expected.commandLine.cursorOffset, expected)
+                awaitShellCompletions(expected.commandLine.commandText, expected.commandLine.cursorOffset, expected, confirmationOnly)
             } ?: return null
         currentCoroutineContext().ensureActive()
         val confirmed =
@@ -824,6 +840,7 @@ public class TerminalSession private constructor(
         commandLine: String,
         cursorOffset: Int,
         original: TerminalCommandEditContext? = null,
+        confirmationOnly: Boolean = false,
     ): TerminalShellCompletionResult? {
         while (true) {
             var confirmedResult: TerminalShellCompletionResult? = null
@@ -878,14 +895,14 @@ public class TerminalSession private constructor(
                                             shellRevision = revision,
                                         )
                                     }
-                                if (channel.pending != null) return@synchronized channel.join(expected)
+                                if (channel.pending != null) return@synchronized channel.join(expected, confirmationOnly)
                                 if (!outboundWriter.isIdle()) {
                                     waitingForAdmission = true
                                     return@synchronized null
                                 }
-                                confirmedResult = channel.confirmedResult(expected)
+                                confirmedResult = channel.confirmedResult(expected, confirmationOnly)
                                 if (confirmedResult != null) return@synchronized null
-                                val pending = channel.begin(expected) ?: return@synchronized null
+                                val pending = channel.begin(expected, confirmationOnly) ?: return@synchronized null
                                 outboundWriter.submit(signal = false) { for (event in pending.input) inputEncoder.encodeEvent(event) }
                                 pending
                             }

@@ -30,6 +30,99 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalShellCompletionTest {
+    @Test
+    fun `buffer confirmation does not satisfy or swallow a queued candidate request`() =
+        runTest {
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                requestInput = { listOf(TerminalKeyEvent.text("q$it")) },
+                confirmationInput = { listOf(TerminalKeyEvent.text("b$it")) },
+            ).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val confirmed = async { fixture.session.confirmCommandEdit(expected) }
+                runCurrent()
+                assertEquals("b1", fixture.writtenText())
+                val candidates = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                assertEquals("b1", fixture.writtenText())
+                assertFalse(candidates.isCompleted)
+
+                fixture.reply(requestId = 1)
+                runCurrent()
+                assertTrue(confirmed.await())
+                assertEquals("b1q2", fixture.writtenText())
+                assertFalse(candidates.isCompleted)
+                fixture.reply(requestId = 2)
+                runCurrent()
+                assertTrue(checkNotNull(candidates.await()).candidates.isNotEmpty())
+            }
+        }
+
+    @Test
+    fun `confirmation shares an existing full query and preserves its candidate receipt`() =
+        runTest {
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                requestInput = { listOf(TerminalKeyEvent.text("q$it")) },
+                confirmationInput = { listOf(TerminalKeyEvent.text("b$it")) },
+            ).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val candidates = async { fixture.session.requestShellCompletions(expected) }
+                runCurrent()
+                val confirmed = async { fixture.session.confirmCommandEdit(expected) }
+                runCurrent()
+                assertEquals("q1", fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+                assertTrue(confirmed.await())
+                assertTrue(checkNotNull(candidates.await()).candidates.isNotEmpty())
+                assertNotNull(fixture.session.requestShellCompletions(expected))
+                assertEquals("q1", fixture.writtenText())
+            }
+        }
+
+    @Test
+    fun `confirmation falls back to native completion for a producer without a buffer encoder`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val confirmed = async { fixture.session.confirmCommandEdit(expected) }
+                runCurrent()
+                assertEquals("q", fixture.writtenText())
+                fixture.reply()
+                runCurrent()
+                assertTrue(confirmed.await())
+                assertNotNull(fixture.session.requestShellCompletions(expected))
+                assertEquals("q", fixture.writtenText())
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["input", "geometry", "prompt", "buffer", "cursor"])
+    fun `buffer confirmation never authorizes stale or mismatched editing`(change: String) =
+        runTest {
+            Fixture(
+                StandardTestDispatcher(testScheduler),
+                confirmationInput = { listOf(TerminalKeyEvent.text("b")) },
+            ).use { fixture ->
+                val expected = checkNotNull(fixture.session.captureCommandEdit())
+                val confirmed = async { fixture.session.confirmCommandEdit(expected) }
+                runCurrent()
+                when (change) {
+                    "input" -> assertEquals(ACCEPTED, fixture.session.submitInput(TerminalKeyEvent.text("x")))
+                    "geometry" -> fixture.session.resize(81, 4)
+                    "prompt" -> fixture.clearPrompt()
+                }
+                fixture.reply(
+                    commandLine = if (change == "buffer") "git st" else "git s",
+                    cursorOffset = if (change == "cursor") 4 else 5,
+                )
+                runCurrent()
+                assertFalse(confirmed.await())
+                assertEquals(STALE_CONTEXT, fixture.session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
+            }
+        }
+
     @ParameterizedTest
     @ValueSource(strings = ["before-next-request", "during-next-request", "dropped"])
     fun `request identity survives an earlier request crossing a prompt boundary`(oldReply: String) =
@@ -928,6 +1021,7 @@ class TerminalShellCompletionTest {
         ioDispatcher: CoroutineDispatcher = dispatcher,
         private val observationBacked: Boolean = false,
         private val requestInput: (Long) -> List<TerminalInputEvent> = { listOf(TerminalKeyEvent.text("q")) },
+        private val confirmationInput: ((Long) -> List<TerminalInputEvent>)? = null,
     ) : AutoCloseable {
         val connector = MockConnector()
         val model = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot("git s", 5, 5, 0, requiresConfirmation))
@@ -968,7 +1062,7 @@ class TerminalShellCompletionTest {
 
         fun ready(epoch: String = "epoch") {
             this.epoch = epoch
-            channel.ready(epoch, requestInput)
+            channel.ready(epoch, requestInput, confirmationInput)
         }
 
         fun observe(snapshot: TerminalShellCommandLineSnapshot?) {

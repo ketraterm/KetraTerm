@@ -31,6 +31,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
@@ -57,10 +58,7 @@ class StandaloneSuggestionDesktopTest {
     ): Unit =
         runBlocking {
             withSession(StandaloneSuggestionShell.POWERSHELL.profile(directory), directory) {
-                if (predictionAlreadyVisible) {
-                    // Establish the rendered prediction before enabling the automatic completion interaction.
-                    setAutomaticSuggestionsEnabled(false)
-                }
+                setAutomaticSuggestionsEnabled(false)
                 val location =
                     if (wrappedPrediction) {
                         var nameLength = 0
@@ -85,10 +83,11 @@ class StandaloneSuggestionDesktopTest {
                 awaitExecution(setup)
                 awaitLine("", requireShellCompletion = true)
 
+                if (!predictionAlreadyVisible) setAutomaticSuggestionsEnabled(true)
                 type("Get-Chi")
                 if (predictionAlreadyVisible) {
                     withTimeout(15.seconds) {
-                        session.renderGeneration.first {
+                        session.commandEditChanges.first {
                             val snapshot = session.activeShellCommandLine()
                             var predictionWrapped = !wrappedPrediction
                             if (snapshot != null && wrappedPrediction) {
@@ -104,12 +103,14 @@ class StandaloneSuggestionDesktopTest {
                 }
                 awaitPopup("Get-Chi", "Get-ChildItem")
                 selectAndAccept("Get-ChildItem")
-                withTimeout(15.seconds) {
-                    session.renderGeneration.first {
-                        val snapshot = session.activeShellCommandLine()
-                        snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
+                val acceptedLine =
+                    withTimeoutOrNull(15.seconds) {
+                        session.commandEditChanges.first {
+                            val snapshot = session.activeShellCommandLine()
+                            snapshot?.commandText == "Get-ChildItem" && snapshot.cursorOffset == 13
+                        }
                     }
-                }
+                assertNotNull(acceptedLine, "Accepted suggestion did not reach the editor: ${session.activeShellCommandLine()}")
                 val buffer = assertNotNull(session.requestShellCompletions("Get-ChildItem", 13))
                 assertEquals("Get-ChildItem", buffer.commandLine)
                 assertEquals(13, buffer.cursorOffset)
@@ -169,6 +170,7 @@ class StandaloneSuggestionDesktopTest {
             val profile = shell.profile(directory)
             assumeTrue(shell.supportsLiveCommands(profile), "Live command discovery is unsupported or its shell prerequisites are missing")
             withSession(profile, directory) {
+                setAutomaticSuggestionsEnabled(false)
                 val definition =
                     if (shell.isPowerShell) {
                         "Set-Alias ketra_smoke_echo Write-Output"
@@ -181,6 +183,7 @@ class StandaloneSuggestionDesktopTest {
                 )
                 awaitExecution(definition)
                 awaitLine("", requireShellCompletion = shell.isPowerShell)
+                setAutomaticSuggestionsEnabled(true)
                 type("ketra_smoke_e")
                 awaitPopup("ketra_smoke_e", "ketra_smoke_echo")
                 selectAndAccept("ketra_smoke_echo")

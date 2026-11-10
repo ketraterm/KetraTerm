@@ -109,6 +109,32 @@ internal class TabManager(
 
     @Volatile private var completionTransition: Job? = null
     private val shutdownStarted = AtomicBoolean()
+    private val bellDispatcher =
+        TerminalBellDispatcher { requests ->
+            if (!shutdownStarted.get() && frame.isDisplayable) {
+                val targets = panes.filter { pane -> requests.any { it.tabId == pane.tab.id } && !pane.tab.session.isClosed }
+                if (targets.isNotEmpty()) {
+                    val config = settings.config
+                    if (config.visualBell) targets.forEach { it.terminal.showVisualBell() }
+                    if (config.audibleBell) frame.toolkit.beep()
+                    val current = requests.filter { request -> targets.any { it.tab.id == request.tabId } }
+                    if (current.any { it.urgent }) {
+                        try {
+                            attentionTaskbar?.let { taskbar ->
+                                if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)) {
+                                    taskbar.requestWindowUserAttention(frame)
+                                } else if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION)) {
+                                    taskbar.requestUserAttention(true, true)
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Desktop attention is best effort on unsupported systems.
+                        }
+                    }
+                    if (current.any { it.pop }) frame.toFront()
+                }
+            }
+        }
     private val workspaceShutdown = CompletableFuture<Unit>()
     private val windowResizeController = TerminalWindowResizeController(frame)
     private var appliedTheme = settings.theme
@@ -127,14 +153,18 @@ internal class TabManager(
 
     private val keyEventDispatcher =
         KeyEventDispatcher { event ->
+            if (shutdownStarted.get() || event.component !== frame && SwingUtilities.getWindowAncestor(event.component) !== frame) {
+                return@KeyEventDispatcher false
+            }
             if (event.id == KeyEvent.KEY_PRESSED) {
                 val keyCode = event.keyCode
                 val modifiers = event.modifiersEx
                 val menuShortcutMask = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-                val isMenuShortcut = (modifiers and menuShortcutMask) == menuShortcutMask
-                val isCtrlPressed = (modifiers and InputEvent.CTRL_DOWN_MASK) == InputEvent.CTRL_DOWN_MASK
+                val commandModifiers = modifiers and (InputEvent.CTRL_DOWN_MASK or InputEvent.META_DOWN_MASK)
+                val isMenuShortcut = commandModifiers == menuShortcutMask
+                val isCtrlPressed = commandModifiers == InputEvent.CTRL_DOWN_MASK
                 val isShiftPressed = (modifiers and InputEvent.SHIFT_DOWN_MASK) == InputEvent.SHIFT_DOWN_MASK
-                val hasAlt = (modifiers and InputEvent.ALT_DOWN_MASK) != 0
+                val hasAlt = (modifiers and (InputEvent.ALT_DOWN_MASK or InputEvent.ALT_GRAPH_DOWN_MASK)) != 0
 
                 // 1. Tab cycling: Ctrl + Tab / Ctrl + Shift + Tab (on all platforms)
                 if (keyCode == KeyEvent.VK_TAB && isCtrlPressed && !hasAlt) {
@@ -496,6 +526,7 @@ internal class TabManager(
     fun closeAllTabsWithoutConfirmation(onComplete: (Result<Unit>) -> Unit = ::reportWorkspaceCleanup) {
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, bellDispatcher::close)
         failure = captureCleanupFailure(failure, tabBar::closeProgressAnimation)
         failure = captureCleanupFailure(failure, windowResizeController::close)
         failure = captureCleanupFailure(failure, commandOutputExporter::close)
@@ -680,9 +711,9 @@ internal class TabManager(
                 settings = settings,
                 completionProvider = completionProvider,
                 onBound = onBound,
-            ) { pane, request ->
-                showPaneContextMenu(pane, request)
-            }
+                onContextMenu = ::showPaneContextMenu,
+                onClose = ::closePane,
+            )
         } catch (failure: Throwable) {
             val cleanupFailure = captureCleanupFailure(failure) { retireUnpublishedTab(workspaceTab) }
             throw requireNotNull(cleanupFailure)
@@ -815,6 +846,7 @@ internal class TabManager(
             }
         val pasteItem =
             JMenuItem(appMessages.text("menu.paste")).apply {
+                isEnabled = !pane.tab.session.isClosed
                 addActionListener { request.pasteClipboard() }
             }
         val selectAllItem =
@@ -827,6 +859,7 @@ internal class TabManager(
             }
         val clearItem =
             JMenuItem(appMessages.text("menu.clear")).apply {
+                isEnabled = !pane.tab.session.isClosed
                 addActionListener { request.clearScreen() }
             }
 
@@ -957,7 +990,7 @@ internal class TabManager(
 
     private fun refreshWindowResizeTarget() {
         val pane = (tabRoots[tabBar.selectedId()] as? LeafNode)?.pane
-        if (shutdownStarted.get() || !settings.config.shellRequestResizeWindow || pane == null) {
+        if (shutdownStarted.get() || !settings.config.shellRequestResizeWindow || pane == null || pane.tab.session.isClosed) {
             windowResizeController.clearTarget()
         } else {
             windowResizeController.setTarget(pane.tab.session, pane.terminal)
@@ -974,8 +1007,9 @@ internal class TabManager(
     private fun confirmClose(panesToClose: List<TerminalPane>): Boolean {
         val liveProcessCount =
             panesToClose.count {
-                it.tab.session.shellIntegrationState
-                    .hasRunningCommand()
+                !it.tab.session.isClosed &&
+                    it.tab.session.shellIntegrationState
+                        .hasRunningCommand()
             }
         if (liveProcessCount == 0) return true
         val displayName = closeDisplayName(panesToClose)
@@ -987,8 +1021,9 @@ internal class TabManager(
         val liveProcessCount =
             tabIds.sumOf { tabId ->
                 tabRoots[tabId]?.allPanes()?.count {
-                    it.tab.session.shellIntegrationState
-                        .hasRunningCommand()
+                    !it.tab.session.isClosed &&
+                        it.tab.session.shellIntegrationState
+                            .hasRunningCommand()
                 } ?: 0
             }
         return liveProcessCount == 0 ||
@@ -1175,38 +1210,8 @@ internal class TabManager(
         }
 
         override fun bell(tab: TerminalWorkspaceTab) {
-            if (settings.config.visualBell) {
-                SwingUtilities.invokeLater {
-                    panes.firstOrNull { it.tab == tab }?.terminal?.showVisualBell()
-                }
-            }
-            if (settings.config.audibleBell) {
-                SwingUtilities.invokeLater {
-                    frame.toolkit.beep()
-                }
-            }
-
             val modes = tab.session.modeSnapshot
-            if (modes.isBellIsUrgent) {
-                SwingUtilities.invokeLater {
-                    try {
-                        attentionTaskbar?.let { taskbar ->
-                            if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)) {
-                                taskbar.requestWindowUserAttention(frame)
-                            } else if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION)) {
-                                taskbar.requestUserAttention(true, true)
-                            }
-                        }
-                    } catch (_: Exception) {
-                        // Ignore taskbar access failure on unsupported systems.
-                    }
-                }
-            }
-            if (modes.isPopOnBell) {
-                SwingUtilities.invokeLater {
-                    frame.toFront()
-                }
-            }
+            bellDispatcher.request(tab.id, modes.isBellIsUrgent, modes.isPopOnBell)
         }
 
         override fun titleChanged(
@@ -1234,7 +1239,12 @@ internal class TabManager(
         ) {
             SwingUtilities.invokeLater {
                 val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
-                closePane(pane, openReplacementWhenLastPane = true)
+                if (failure != null || exitCode != 0) {
+                    pane.showExitStatus(exitCode, failure)
+                    refreshWindowResizeTarget()
+                } else {
+                    closePane(pane, openReplacementWhenLastPane = true)
+                }
             }
         }
 
@@ -1450,6 +1460,10 @@ internal class TabManager(
         registry.setPersistenceEnabled(settings.config.persistentSuggestionLearningEnabled)
         if (previous === registry && !refreshProviders) return
         panes.forEach { pane ->
+            if (pane.tab.session.isClosed) {
+                pane.setCompletionProvider(null)
+                return@forEach
+            }
             pane.setCompletionProvider(
                 registry.createProvider(
                     session = pane.tab.session,

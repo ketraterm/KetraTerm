@@ -19,6 +19,7 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
 import java.awt.event.ActionEvent
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -92,10 +93,54 @@ internal class TerminalPaneShortcutController(
      */
     fun handleKeyPressed(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.VK_ESCAPE && pane.clipboardReadPrompt.dismiss()) return true
-        val action = shortcutMap.actionFor(event.keyCode, event.modifiersEx) ?: return false
+        terminalFontZoomChange(event.keyCode, event.modifiersEx)?.let {
+            pane.zoomFont(it)
+            return true
+        }
+        if (event.modifiersEx == InputEvent.SHIFT_DOWN_MASK) {
+            when (event.keyCode) {
+                KeyEvent.VK_HOME -> pane.terminal.scrollToScrollbackOffset(Int.MAX_VALUE)
+                KeyEvent.VK_END -> pane.terminal.scrollToLiveViewport()
+                else -> return handlePaneAction(event)
+            }
+            return true
+        }
+        return handlePaneAction(event)
+    }
+
+    private fun handlePaneAction(event: KeyEvent): Boolean {
+        val action =
+            shortcutMap.actionFor(event.keyCode, event.modifiersEx)
+                ?: when {
+                    shortcutMap.shortcut(SwingTerminalHostAction.COPY_SELECTION)?.modifiers == InputEvent.CTRL_DOWN_MASK &&
+                        event.modifiersEx == (InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK) ->
+                        when (event.keyCode) {
+                            KeyEvent.VK_C -> SwingTerminalHostAction.COPY_SELECTION
+                            KeyEvent.VK_V -> SwingTerminalHostAction.PASTE_CLIPBOARD
+                            else -> null
+                        }
+                    else -> null
+                } ?: return false
         if (!actionRegistry.isEnabled(action, pane)) return false
+        if (action == SwingTerminalHostAction.REQUEST_SUGGESTIONS) return actionRegistry.perform(action, pane)
         actionRegistry.perform(action, pane)
         return true
+    }
+}
+
+/** Font zoom uses the platform menu modifier and never claims Alt/AltGr combinations. */
+internal fun terminalFontZoomChange(
+    keyCode: Int,
+    modifiers: Int,
+    osName: String = System.getProperty("os.name").orEmpty(),
+): Int? {
+    val menu = if (osName.startsWith("Mac", true) || osName.equals("Darwin", true)) InputEvent.META_DOWN_MASK else InputEvent.CTRL_DOWN_MASK
+    if (modifiers != menu && modifiers != (menu or InputEvent.SHIFT_DOWN_MASK)) return null
+    return when (keyCode) {
+        KeyEvent.VK_EQUALS, KeyEvent.VK_PLUS, KeyEvent.VK_ADD -> 1
+        KeyEvent.VK_MINUS, KeyEvent.VK_SUBTRACT -> if (modifiers == menu) -1 else null
+        KeyEvent.VK_0, KeyEvent.VK_NUMPAD0 -> if (modifiers == menu) 0 else null
+        else -> null
     }
 }
 
@@ -145,7 +190,6 @@ internal object TerminalPaneActionRegistry {
             SwingTerminalHostAction.REQUEST_SUGGESTIONS -> {
                 if (target.suggestionsEnabled()) {
                     target.requestShellSuggestions()
-                    true
                 } else {
                     false
                 }
@@ -200,7 +244,7 @@ internal interface TerminalPaneActionTarget {
     /**
      * Requests suggestions for the active shell command line.
      */
-    fun requestShellSuggestions()
+    fun requestShellSuggestions(): Boolean
 
     /**
      * Opens host-owned search chrome.

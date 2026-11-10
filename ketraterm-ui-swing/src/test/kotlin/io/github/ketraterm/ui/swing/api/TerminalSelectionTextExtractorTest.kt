@@ -399,4 +399,55 @@ class TerminalSelectionTextExtractorTest {
         Array(text.length) { index ->
             TestCell(codeWord = text[index].code, flags = TerminalRenderCellFlags.CODEPOINT)
         }
+
+    @Test
+    fun `double clicking whitespace or delimiters never absorbs an adjacent path`() {
+        val text = "foo.txt  /tmp/bar"
+        val cache = renderCache(TestRenderFrame.text(text))
+        for (column in 7..8) {
+            assertEquals(CellSelection(7, 0, 9, 0), extractor.wordSelectionAt(cache, 0, column))
+        }
+        val quoted = renderCache(TestRenderFrame.text("\"foo.txt\""))
+        assertEquals(CellSelection(0, 0, 1, 0), extractor.wordSelectionAt(quoted, 0, 0))
+        assertEquals(CellSelection(8, 0, 9, 0), extractor.wordSelectionAt(quoted, 0, 8))
+        assertEquals(CellSelection(1, 0, 8, 0), extractor.wordSelectionAt(quoted, 0, 4))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `word selection treats both halves of a wide character as one cell`(clustered: Boolean) {
+        val glyph = if (clustered) "👩‍💻" else "字"
+        val lead =
+            if (clustered) {
+                TestCell(flags = TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING, cluster = glyph)
+            } else {
+                TestCell(codeWord = '字'.code, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING)
+            }
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        textCells("/tmp/") +
+                            arrayOf(
+                                lead,
+                                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                            ) + textCells(".txt "),
+                    ),
+                ),
+            )
+        for (column in 5..6) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, 0, column))
+            assertEquals(CellSelection(0, 0, 11, 0), selection)
+            assertEquals("/tmp/$glyph.txt", extractor.selectedText(cache, selection))
+        }
+        val word =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(lead, TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING)) + textCells(" "),
+                    ),
+                ),
+            )
+        for (column in 0..1) assertEquals(CellSelection(0, 0, 2, 0), extractor.wordSelectionAt(word, 0, column))
+    }
 }

@@ -117,20 +117,29 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb zsh fish fonts-dejavu-core
+          sudo apt-get install -y xvfb zsh fish neovim less tmux fonts-dejavu-core
       - name: Install macOS shells
         if: runner.os == 'macOS'
         run: |
-          brew install bash zsh fish
-          for formula in bash zsh fish; do
+          brew install bash zsh fish neovim tmux
+          for formula in bash zsh fish neovim tmux; do
             echo "$(brew --prefix "$formula")/bin" >> "$GITHUB_PATH"
           done
+      - name: Install Windows TUI editor
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install neovim --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          $neovim = Get-Command nvim.exe -ErrorAction Stop
+          Split-Path $neovim.Source | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Verify Linux native and desktop behavior
         if: runner.os == 'Linux'
-        run: xvfb-run -a ./gradlew :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+        run: xvfb-run -a ./gradlew :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}" '-Dterminal.test.requiredTuis=NEOVIM,LESS,TMUX'
       - name: Verify Windows and macOS JVM, native, and desktop behavior
         if: runner.os != 'Linux'
-        run: ./gradlew test :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}"
+        run: ./gradlew test :nativeTest :desktopTest --continue "-Dterminal.test.requiredShells=${{ matrix.shells }}" "-Dterminal.test.requiredTuis=${{ runner.os == 'Windows' && 'NEOVIM' || 'NEOVIM,LESS,TMUX' }}"
       - name: Upload platform reports
         if: always()
         uses: actions/upload-artifact@v4

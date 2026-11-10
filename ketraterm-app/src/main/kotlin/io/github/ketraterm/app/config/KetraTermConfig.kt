@@ -21,16 +21,26 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalCommandFinishedAlerts
+import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.util.*
 
-private fun defaultShellPath(): String {
-    val os = System.getProperty("os.name").lowercase(Locale.ROOT)
+internal fun defaultShellPath(
+    osName: String = System.getProperty("os.name"),
+    environment: Map<String, String> = System.getenv(),
+    profileRegistry: TerminalProfileRegistry = TerminalProfileRegistry(osName = osName, environment = environment),
+): String {
+    val os = osName.lowercase(Locale.ROOT)
     return if (os.contains("windows")) {
-        "powershell.exe"
+        profileRegistry
+            .availableProfiles()
+            .firstOrNull { it.id == "powershell" }
+            ?.command
+            ?.first() ?: "powershell.exe"
     } else {
-        System.getenv("SHELL").takeIf { !it.isNullOrBlank() } ?: "/bin/bash"
+        environment["SHELL"].takeIf { !it.isNullOrBlank() } ?: "/bin/bash"
     }
 }
 
@@ -39,7 +49,7 @@ private fun defaultFontFamily(): String {
     return when {
         os.contains("windows") -> "Cascadia Mono"
         os.contains("mac") -> "Menlo"
-        else -> "Monospaced"
+        else -> SwingSettings.defaultTerminalFont().family
     }
 }
 
@@ -184,7 +194,7 @@ internal data class KetraTermConfig(
         const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
         const val DEFAULT_FONT_SIZE: Int = 16
         const val DEFAULT_COLUMNS: Int = 100
-        const val DEFAULT_ROWS: Int = 30
+        const val DEFAULT_ROWS: Int = 28
         const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
         const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
         const val DEFAULT_CURSOR_SHAPE: String = "block"
@@ -193,7 +203,7 @@ internal data class KetraTermConfig(
         const val DEFAULT_VISUAL_BELL: Boolean = true
         const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true
         val DEFAULT_PASTE_CONTROL_POLICY: PasteControlPolicy = PasteControlPolicy.PRESERVE
-        const val DEFAULT_SCROLLBACK_LINES: Int = 1000
+        const val DEFAULT_SCROLLBACK_LINES: Int = 10_000
         const val DEFAULT_LINE_HEIGHT: Float = 1.0f
         const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
         const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false

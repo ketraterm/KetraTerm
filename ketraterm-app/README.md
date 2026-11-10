@@ -31,6 +31,9 @@ These are process arguments, rather than application options. They affect the
 initial terminal; later terminals use the selected profile. The configured
 startup directory applies to the initial terminal as well.
 
+New Windows configurations prefer discovered modern PowerShell (`pwsh.exe`),
+with Windows PowerShell as fallback. Saved shell choices remain effective.
+
 The standard application-plugin tasks `:ketraterm-app:installDist`,
 `:ketraterm-app:distZip`, and `:ketraterm-app:distTar` produce JVM distributions.
 Native packaging support stages dependencies with
@@ -43,8 +46,13 @@ and terminal permissions. Settings are saved before publication to
 open panes. Initial process and buffer settings apply when a new terminal is
 created.
 
-The first window packs the configured grid. New tabs and split panes synchronize
+The first window fits the configured grid to the monitor's usable area, preserving
+its requested size when it fits. Saved dimensions are unchanged. New tabs and split panes synchronize
 their installed viewport dimensions with the session before shell output starts.
+
+Unsuccessful or unknown-status exits and transport failures retain their output
+with a closeable status banner. Successful exits close normally. Retained output
+remains scrollable, selectable, copyable, and searchable.
 
 For manual edits, see the [configuration reference](docs/profile-config-toml.md)
 for file locations, recognized keys, defaults, and recovery behavior. Restart the
@@ -53,7 +61,8 @@ settings and does not use this file.
 
 Suggestions are enabled by default. Use the Shell Suggestions section in settings
 to control completion, automatic popups, Enter acceptance, and learning persistence.
-Ctrl+Space requests suggestions even when automatic popups are disabled.
+Ctrl+Space requests suggestions even when automatic popups are disabled. Without
+an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
 
 Native local profiles receive a small `ketra` companion command:

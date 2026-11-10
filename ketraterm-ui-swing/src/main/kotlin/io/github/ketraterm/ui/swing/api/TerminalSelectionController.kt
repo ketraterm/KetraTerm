@@ -238,6 +238,9 @@ internal class TerminalSelectionController(
     // Retain both cell coordinates; selectionAnchorColumn is a half-open edge.
     private var dragAnchorLogicalColumn: Int = 0
     private var dragAnchorVisualColumn: Int = 0
+    private var dragClickCount = 1
+    private var dragAnchorEndColumn = 0
+    private var dragAnchorEndAbsoluteRow = 0L
 
     var selectionAnchorAbsoluteRow: Long? = null
         private set
@@ -301,6 +304,7 @@ internal class TerminalSelectionController(
         host.requestFocusInWindow()
 
         selectingWithMouse = true
+        dragClickCount = event.clickCount
         copyOnMouseRelease = host.settings.copyOnSelection
         selectionIsBlock = event.isAltDown && event.clickCount < 2
         lastSelectionDragX = event.x
@@ -342,6 +346,8 @@ internal class TerminalSelectionController(
                 selectionCaretAbsoluteRow = null
             }
         }
+        dragAnchorEndColumn = selectionCaretColumn
+        dragAnchorEndAbsoluteRow = selectionCaretAbsoluteRow ?: selectionAnchorAbsoluteRow ?: 0L
         updateSelectionAutoscroll()
         host.repaint()
         event.consume()
@@ -459,6 +465,32 @@ internal class TerminalSelectionController(
         val row = unpackCellRow(cell)
 
         val caretAbsRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
+        if (!selectionIsBlock && dragClickCount >= 2) {
+            val anchorDiscarded = dragAnchorEndAbsoluteRow < cache.discardedCount
+            val originalRow = dragAnchorEndAbsoluteRow.coerceAtLeast(cache.discardedCount)
+            val originalStart = if (anchorDiscarded) 0 else dragAnchorLogicalColumn
+            val originalEnd = if (anchorDiscarded) 0 else dragAnchorEndColumn
+            val target =
+                if (dragClickCount >= 3) {
+                    CellSelection(0, row, cache.columns, row)
+                } else {
+                    selectionTextExtractor.wordSelectionAt(cache, row, column) ?: return
+                }
+            val beforeAnchor =
+                caretAbsRow < originalRow ||
+                    caretAbsRow == originalRow &&
+                    target.anchorColumn < originalStart
+            selectionAnchorAbsoluteRow = originalRow
+            selectionCaretAbsoluteRow = caretAbsRow
+            if (beforeAnchor) {
+                selectionAnchorColumn = originalEnd
+                selectionCaretColumn = target.anchorColumn
+            } else {
+                selectionAnchorColumn = originalStart
+                selectionCaretColumn = target.caretColumn
+            }
+            return
+        }
         val anchorColumn = if (selectionIsBlock) dragAnchorVisualColumn else dragAnchorLogicalColumn
         selectionAnchorColumn = if (selectionIsBlock && column < anchorColumn) anchorColumn + 1 else anchorColumn
         val caretColumn =

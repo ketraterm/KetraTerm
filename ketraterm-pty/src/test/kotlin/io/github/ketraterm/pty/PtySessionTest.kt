@@ -44,6 +44,38 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
+    @Test
+    fun `history capacity is validated before options can launch a child process`() {
+        val original = PtyOptions()
+        assertEquals(80, original.columns)
+        assertEquals(24, original.rows)
+        assertEquals(1000, original.maxHistory)
+        for (rows in intArrayOf(1, 24, Int.MAX_VALUE)) {
+            val boundary = Int.MAX_VALUE - rows
+            val valid =
+                original.copy {
+                    it.rows = rows
+                    it.maxHistory = boundary
+                }
+            assertEquals(boundary, valid.maxHistory)
+            assertEquals(valid, valid.toBuilder().build())
+            assertThrows(IllegalArgumentException::class.java) {
+                PtyOptions.create {
+                    it.rows = rows
+                    it.maxHistory = boundary + 1
+                }
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                valid.copy { it.maxHistory = boundary + 1 }
+            }
+            val draft = valid.toBuilder()
+            draft.maxHistory = boundary + 1
+            assertThrows(IllegalArgumentException::class.java) { draft.build() }
+        }
+        assertEquals(0, original.copy { it.maxHistory = 0 }.maxHistory)
+        assertEquals(1000, original.maxHistory)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `session factories reject a one column terminal before spawning a process`(startImmediately: Boolean) {

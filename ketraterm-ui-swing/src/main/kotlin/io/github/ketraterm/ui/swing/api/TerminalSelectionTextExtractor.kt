@@ -81,17 +81,17 @@ internal class TerminalSelectionTextExtractor {
         val codeWords = cache.codeWords
 
         // 1. Expand with the wide path/URL character set
-        var pathStart = column
-        while (pathStart > 0) {
-            val idx = rowOffset + pathStart - 1
-            if (!isPathChar(flagsPlane[idx], codeWords[idx])) break
+        val clickedColumn = leadingColumn(cache, rowOffset, column)
+        var pathStart = clickedColumn
+        val clickedIsPath = isPathCell(cache, rowOffset, clickedColumn)
+        while (clickedIsPath && pathStart > 0) {
+            if (!isPathCell(cache, rowOffset, pathStart - 1)) break
             pathStart--
         }
 
-        var pathEnd = column + 1
-        while (pathEnd < cache.columns) {
-            val idx = rowOffset + pathEnd
-            if (!isPathChar(flagsPlane[idx], codeWords[idx])) break
+        var pathEnd = clickedColumn + 1
+        while (clickedIsPath && pathEnd < cache.columns) {
+            if (!isPathCell(cache, rowOffset, pathEnd)) break
             pathEnd++
         }
 
@@ -99,37 +99,61 @@ internal class TerminalSelectionTextExtractor {
         var hasPathIndicator = false
         var col = pathStart
         while (col < pathEnd) {
-            val charVal = codeWords[rowOffset + col].toChar()
-            if (charVal == '/' || charVal == '\\' || charVal == '.' || charVal == ':') {
+            val index = rowOffset + col
+            val charVal = codeWords[index]
+            if (flagsPlane[index] and TerminalRenderCellFlags.CODEPOINT != 0 &&
+                (charVal == '/'.code || charVal == '\\'.code || charVal == '.'.code || charVal == ':'.code)
+            ) {
                 hasPathIndicator = true
                 break
             }
             col++
         }
 
-        if (hasPathIndicator) {
+        if (clickedIsPath && hasPathIndicator) {
             return CellSelection(pathStart, row, pathEnd, row)
         }
 
         // 2. Otherwise, fall back to standard word selection (letters, digits, underscore)
-        val clickedIndex = rowOffset + column
-        val clickedKind = wordKind(flagsPlane[clickedIndex], codeWords[clickedIndex])
+        val clickedKind = wordKindAt(cache, rowOffset, clickedColumn)
 
-        var start = column
+        var start = clickedColumn
         while (start > 0) {
-            val previousIndex = rowOffset + start - 1
-            if (wordKind(flagsPlane[previousIndex], codeWords[previousIndex]) != clickedKind) break
+            if (wordKindAt(cache, rowOffset, start - 1) != clickedKind) break
             start--
         }
 
-        var end = column + 1
+        var end = clickedColumn + 1
         while (end < cache.columns) {
-            val nextIndex = rowOffset + end
-            if (wordKind(flagsPlane[nextIndex], codeWords[nextIndex]) != clickedKind) break
+            if (wordKindAt(cache, rowOffset, end) != clickedKind) break
             end++
         }
 
         return CellSelection(start, row, end, row)
+    }
+
+    private fun leadingColumn(
+        cache: TerminalRenderCache,
+        offset: Int,
+        column: Int,
+    ): Int = if (column > 0 && cache.flags[offset + column] and TerminalRenderCellFlags.WIDE_TRAILING != 0) column - 1 else column
+
+    private fun isPathCell(
+        cache: TerminalRenderCache,
+        offset: Int,
+        column: Int,
+    ): Boolean {
+        val index = offset + leadingColumn(cache, offset, column)
+        return isPathChar(cache.flags[index], cache.codeWords[index])
+    }
+
+    private fun wordKindAt(
+        cache: TerminalRenderCache,
+        offset: Int,
+        column: Int,
+    ): Int {
+        val index = offset + leadingColumn(cache, offset, column)
+        return wordKind(cache.flags[index], cache.codeWords[index])
     }
 
     /** Bounds trimming by the whole row, so a partial selection retains interior spaces. */
@@ -240,8 +264,10 @@ internal class TerminalSelectionTextExtractor {
         if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) return false
         if (flags and TerminalRenderCellFlags.CLUSTER != 0) return true
         if (Character.isLetterOrDigit(codeWord)) return true
-        return when (codeWord.toChar()) {
-            '_', '-', '/', '\\', '.', ':', '~', '?', '&', '=', '%', '+', '@', '$', '*' -> true
+        return when (codeWord) {
+            '_'.code, '-'.code, '/'.code, '\\'.code, '.'.code, ':'.code, '~'.code,
+            '?'.code, '&'.code, '='.code, '%'.code, '+'.code, '@'.code, '$'.code, '*'.code,
+            -> true
             else -> false
         }
     }

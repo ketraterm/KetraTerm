@@ -22,6 +22,8 @@ import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.awt.CardLayout
 import java.awt.Dimension
+import java.awt.Insets
+import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.nio.file.Path
@@ -244,7 +246,7 @@ internal data class Window(
 ) {
     /**
      * Establishes the hidden window peer before starting asynchronous terminal creation.
-     * Shows the configured grid before shell output starts. Failed or cancelled startup
+     * Fits the configured grid to the monitor work area before shell output starts. Failed or cancelled startup
      * releases the window and its workspace.
      * Must be called on the EDT.
      *
@@ -272,7 +274,11 @@ internal data class Window(
                     beforeStart = { complete ->
                         // Repack for the installed pane before shell output sees the viewport.
                         frame.pack()
-                        frame.setLocationRelativeTo(null)
+                        val screen = frame.graphicsConfiguration
+                        val bounds = initialWindowBounds(frame.size, screen.bounds, frame.toolkit.getScreenInsets(screen))
+                        frame.minimumSize =
+                            Dimension(minOf(frame.minimumSize.width, bounds.width), minOf(frame.minimumSize.height, bounds.height))
+                        frame.bounds = bounds
                         frame.isVisible = true
                         val pane = checkNotNull(tabManager.selectedPane)
                         pane.requestFocus()
@@ -286,6 +292,26 @@ internal data class Window(
             throw failure
         }
     }
+}
+
+/** Centers the preferred window inside the monitor work area, shrinking only dimensions that cannot fit. */
+internal fun initialWindowBounds(
+    preferredSize: Dimension,
+    screen: Rectangle,
+    insets: Insets,
+): Rectangle {
+    val availableWidth = (screen.width.toLong() - insets.left - insets.right).coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
+    val availableHeight = (screen.height.toLong() - insets.top - insets.bottom).coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
+    val width = preferredSize.width.coerceIn(1, availableWidth)
+    val height = preferredSize.height.coerceIn(1, availableHeight)
+    val x = screen.x.toLong() + insets.left + (availableWidth - width) / 2
+    val y = screen.y.toLong() + insets.top + (availableHeight - height) / 2
+    return Rectangle(
+        x.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt(),
+        y.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt(),
+        width,
+        height,
+    )
 }
 
 /**

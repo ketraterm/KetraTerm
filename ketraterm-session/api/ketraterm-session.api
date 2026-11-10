@@ -82,6 +82,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun captureCommandEdit ()Lio/github/ketraterm/session/TerminalCommandEditContext;
 	public final fun clearBuffer ()Z
 	public fun close ()V
+	public final fun confirmCommandEdit (Lio/github/ketraterm/session/TerminalCommandEditContext;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;)Lio/github/ketraterm/session/TerminalSession;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;)Lio/github/ketraterm/session/TerminalSession;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;)Lio/github/ketraterm/session/TerminalSession;
@@ -340,6 +341,7 @@ public final class io/github/ketraterm/session/TerminalShellCompletionChannel {
 	public final fun clearPrompt ()V
 	public final fun publishCommands (Lio/github/ketraterm/session/TerminalShellCommandInventory;)V
 	public final fun ready (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public final fun ready (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public final fun respond (Ljava/lang/String;JLio/github/ketraterm/session/TerminalShellCompletionResult;)V
 }
 

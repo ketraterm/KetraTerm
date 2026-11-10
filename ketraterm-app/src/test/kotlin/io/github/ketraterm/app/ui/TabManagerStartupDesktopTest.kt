@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
@@ -23,16 +24,23 @@ import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -43,20 +51,436 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.CardLayout
 import java.awt.Component
 import java.awt.Container
+import java.awt.DefaultKeyboardFocusManager
 import java.awt.Dimension
+import java.awt.KeyEventDispatcher
+import java.awt.KeyboardFocusManager
+import java.awt.Toolkit
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
+import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.nio.file.Path
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.JButton
 import javax.swing.JFrame
 import javax.swing.JPanel
+import javax.swing.JTextArea
 import javax.swing.SwingUtilities
 import kotlin.test.*
 
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
 class TabManagerStartupDesktopTest {
+    @Test
+    fun `pane zoom is temporary and window shortcuts ignore other windows`(
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(fontSize = 16, cursorBlinkMillis = 0, smartSuggestionsEnabled = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("keys", "Keys", listOf("unused"), workingDirectory = directory)
+        val output = ByteArrayOutputStream()
+        val received = CompletableFuture<String>()
+        val previousFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val focusManager =
+            object : DefaultKeyboardFocusManager() {
+                val installed = mutableListOf<KeyEventDispatcher>()
+
+                override fun addKeyEventDispatcher(dispatcher: KeyEventDispatcher) {
+                    installed.add(dispatcher)
+                    super.addKeyEventDispatcher(dispatcher)
+                }
+            }
+        val frame =
+            onEdt {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(focusManager)
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                }
+            }
+        var manager: TabManager? = null
+        try {
+            val opened = CompletableFuture<Boolean>()
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            workspace(listener) { options ->
+                                idleSession(options, onWrite = { bytes, offset, length ->
+                                    output.write(bytes, offset, length)
+                                    val written = output.toString(Charsets.UTF_8)
+                                    if (written.endsWith("barrier")) received.complete(written)
+                                })
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            val first = onEdt { requireNotNull(manager.selectedPane) }
+            val secondOpened = CompletableFuture<Boolean>()
+            onEdt { assertTrue(manager.openTab(profile, onComplete = secondOpened::complete)) }
+            assertTrue(secondOpened.get(10, TimeUnit.SECONDS))
+
+            fun press(
+                keyCode: Int,
+                modifiers: Int,
+                character: Char = KeyEvent.CHAR_UNDEFINED,
+            ): KeyEvent {
+                val press = KeyEvent(first.terminal, KeyEvent.KEY_PRESSED, 0, modifiers, keyCode, character)
+                first.terminal.keyListeners.forEach { it.keyPressed(press) }
+                if (character != KeyEvent.CHAR_UNDEFINED) {
+                    first.terminal.keyListeners.forEach {
+                        it.keyTyped(KeyEvent(first.terminal, KeyEvent.KEY_TYPED, 0, modifiers, KeyEvent.VK_UNDEFINED, character))
+                    }
+                }
+                first.terminal.keyListeners.forEach {
+                    it.keyReleased(KeyEvent(first.terminal, KeyEvent.KEY_RELEASED, 0, modifiers, keyCode, character))
+                }
+                return press
+            }
+            onEdt {
+                val second = requireNotNull(manager.selectedPane)
+                val menu = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+                assertTrue(press(KeyEvent.VK_EQUALS, menu, '=').isConsumed)
+                assertEquals(17, first.terminal.font.size)
+                assertEquals(16, second.terminal.font.size)
+                assertEquals(16, settings.config.fontSize)
+                for (key in listOf(KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_PAGE_UP, KeyEvent.VK_PAGE_DOWN)) {
+                    assertTrue(press(key, InputEvent.SHIFT_DOWN_MASK).isConsumed)
+                }
+                press(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK, '\u0003')
+                press(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK, '\u0001')
+                press(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK, '\u000c')
+                val other = JFrame()
+                try {
+                    val field = JTextArea()
+                    other.add(field)
+                    val closeModifiers = menu or if (System.getProperty("os.name").startsWith("Mac")) 0 else InputEvent.SHIFT_DOWN_MASK
+                    assertFalse(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                field,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                closeModifiers,
+                                KeyEvent.VK_W,
+                                'w',
+                            ),
+                        ),
+                    )
+                    assertSame(second, manager.selectedPane)
+                    assertFalse(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                second.terminal,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                InputEvent.CTRL_DOWN_MASK or InputEvent.ALT_GRAPH_DOWN_MASK,
+                                KeyEvent.VK_TAB,
+                                '\t',
+                            ),
+                        ),
+                    )
+                    assertTrue(
+                        focusManager.installed.single().dispatchKeyEvent(
+                            KeyEvent(
+                                second.terminal,
+                                KeyEvent.KEY_PRESSED,
+                                0,
+                                InputEvent.CTRL_DOWN_MASK,
+                                KeyEvent.VK_TAB,
+                                '\t',
+                            ),
+                        ),
+                    )
+                    assertSame(first, manager.selectedPane)
+                } finally {
+                    other.dispose()
+                }
+            }
+            settings.update(settings.config.copy(fontSize = 20))
+            onEdt {
+                assertEquals(21, first.terminal.font.size)
+                first.zoomFont(Int.MAX_VALUE)
+                assertEquals(KetraTermConfig.FONT_SIZE_MAX, first.terminal.font.size)
+                first.zoomFont(Int.MIN_VALUE)
+                assertEquals(KetraTermConfig.FONT_SIZE_MIN, first.terminal.font.size)
+                first.zoomFont(0)
+                assertEquals(20, first.terminal.font.size)
+                assertEquals(TerminalInputAdmission.ACCEPTED, first.tab.session.submitInput(TerminalPasteEvent("barrier")))
+            }
+            assertEquals("\u0003\u0001\u000cbarrier", received.get(10, TimeUnit.SECONDS))
+            assertEquals(20, configManager.load().fontSize)
+        } finally {
+            try {
+                close(manager, frame)
+            } finally {
+                onEdt { KeyboardFocusManager.setCurrentKeyboardFocusManager(previousFocusManager) }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["nonzero", "negative", "transport", "unknown", "success", "closedBeforeDelivery", "split"])
+    fun `failed sessions retain output while successful and explicitly closed panes are retired`(
+        mode: String,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(cursorBlinkMillis = 0, smartSuggestionsEnabled = false, showForegroundProcessName = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("exit", "Exit", listOf("unused"), workingDirectory = directory)
+        val connections = LinkedBlockingQueue<TerminalConnectorListener>()
+        val queued = CompletableFuture<Unit>()
+        val presented = CompletableFuture<Unit>()
+        val firstCloseCount = AtomicInteger()
+        val created = AtomicInteger()
+        val opened = CompletableFuture<Boolean>()
+        val state = TerminalShellIntegrationState().apply { recordCommandStart(1, includeLine = true, commandText = "running") }
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                    isVisible = true
+                }
+            }
+        var manager: TabManager? = null
+        try {
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        closeConfirmation = { error("A stopped process must not require a kill confirmation") },
+                        workspaceFactory = { delegate ->
+                            val listener =
+                                object : TerminalWorkspaceListener by delegate {
+                                    override fun sessionClosed(
+                                        tab: io.github.ketraterm.workspace.TerminalWorkspaceTab,
+                                        exitCode: Int?,
+                                        failure: Throwable?,
+                                    ) {
+                                        delegate.sessionClosed(tab, exitCode, failure)
+                                        queued.complete(Unit)
+                                        SwingUtilities.invokeLater { presented.complete(Unit) }
+                                    }
+                                }
+                            workspace(listener) { options ->
+                                val first = created.getAndIncrement() == 0
+                                TerminalSession.create(
+                                    TerminalBuffers.create(options.columns, options.rows, options.maxHistory),
+                                    object : TerminalConnector {
+                                        override fun start(listener: TerminalConnectorListener) {
+                                            connections.put(listener)
+                                        }
+
+                                        override fun resize(
+                                            columns: Int,
+                                            rows: Int,
+                                        ) = Unit
+
+                                        override fun write(
+                                            bytes: ByteArray,
+                                            offset: Int,
+                                            length: Int,
+                                        ) = Unit
+
+                                        override fun close() {
+                                            if (first) firstCloseCount.incrementAndGet()
+                                        }
+                                    },
+                                    shellIntegration = TerminalShellIntegrationFactory.host(state, TerminalShellCommandLineState()),
+                                )
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            val origin = onEdt { requireNotNull(manager.selectedPane) }
+            val connection = requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+            if (mode == "split") {
+                onEdt { manager.splitPane(origin, isVertical = true) }
+                requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+            }
+            val output = "first diagnostic\r\nfinal diagnostic".encodeToByteArray()
+            connection.onBytes(output, 0, output.size)
+            val exitCode =
+                when (mode) {
+                    "success" -> 0
+                    "unknown", "transport" -> null
+                    "negative" -> -1
+                    else -> 7
+                }
+            val terminate = {
+                if (mode == "transport") connection.onError(IllegalStateException("connection lost")) else connection.onClosed(exitCode)
+            }
+            if (mode == "closedBeforeDelivery") {
+                onEdt {
+                    terminate()
+                    queued.get(10, TimeUnit.SECONDS)
+                    manager.closePane(origin)
+                }
+            } else {
+                terminate()
+            }
+            presented.get(10, TimeUnit.SECONDS)
+            assertTrue(origin.tab.session.isClosed)
+            assertEquals(1, firstCloseCount.get(), "Resources must be released before retaining the view")
+            when (mode) {
+                "success" -> {
+                    requireNotNull(connections.poll(10, TimeUnit.SECONDS))
+                    onEdt { assertNotSame(origin, manager.selectedPane) }
+                    assertEquals(2, created.get())
+                }
+                "closedBeforeDelivery" ->
+                    onEdt {
+                        assertNull(manager.selectedPane)
+                        assertEquals(1, created.get())
+                    }
+                else -> {
+                    onEdt {
+                        if (mode != "split") assertSame(origin, manager.selectedPane)
+                        assertTrue(origin.terminal.selectAll())
+                        assertContains(assertNotNull(origin.terminal.selectedText()), "final diagnostic")
+                        val banner =
+                            origin.component.components
+                                .filterIsInstance<TerminalExitBanner>()
+                                .single()
+                        assertTrue(banner.isVisible)
+                        val expected =
+                            when (mode) {
+                                "transport" -> appMessages.text("session.exit.error", "connection lost")
+                                "unknown" -> appMessages.text("session.exit.unknown")
+                                else -> appMessages.text("session.exit.failed", exitCode)
+                            }
+                        assertEquals(
+                            expected,
+                            banner.components
+                                .filterIsInstance<JTextArea>()
+                                .single()
+                                .text,
+                        )
+                        assertEquals(TerminalInputAdmission.CLOSED, origin.tab.session.submitInput(TerminalPasteEvent("ignored")))
+                    }
+                    settings.update(settings.config.copy(fontSize = 18))
+                    onEdt {
+                        if (mode != "split") assertSame(origin, manager.selectedPane)
+                        assertTrue(origin.terminal.selectAll())
+                        assertContains(assertNotNull(origin.terminal.selectedText()), "final diagnostic")
+                        origin.component.components
+                            .filterIsInstance<TerminalExitBanner>()
+                            .single()
+                            .components
+                            .filterIsInstance<JButton>()
+                            .single()
+                            .doClick(0)
+                        if (mode == "split") {
+                            val remaining = assertNotNull(manager.selectedPane)
+                            assertNotSame(origin, remaining)
+                            assertFalse(remaining.tab.session.isClosed)
+                            assertEquals(2, created.get())
+                        } else {
+                            assertNull(manager.selectedPane)
+                        }
+                    }
+                }
+            }
+        } finally {
+            close(manager, frame)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `Ctrl Space reaches the application unless a shell completion interaction starts`(
+        editable: Boolean,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(shellSuggestionsEnabled = false, cursorBlinkMillis = 0, showForegroundProcessName = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("keys", "Keys", listOf("unused"), workingDirectory = directory)
+        val commandLine = TerminalShellCommandLineState(if (editable) TerminalShellCommandLineSnapshot("", 0, 0, 0) else null)
+        val integration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
+        val received = CompletableFuture<String>()
+        val output = ByteArrayOutputStream()
+        val opened = CompletableFuture<Boolean>()
+        val frame =
+            onEdt {
+                JFrame().apply {
+                    pack()
+                    setSize(800, 500)
+                }
+            }
+        var manager: TabManager? = null
+        var providerOpens = 0
+        try {
+            manager =
+                onEdt {
+                    val content = JPanel(CardLayout())
+                    frame.contentPane = content
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        content,
+                        settings,
+                        { profile },
+                        { true },
+                        workspaceFactory = { listener ->
+                            workspace(listener) { options ->
+                                idleSession(options, shellIntegration = integration, onWrite = { bytes, offset, length ->
+                                    output.write(bytes, offset, length)
+                                    val written = output.toString(Charsets.UTF_8)
+                                    if (written.endsWith("barrier")) received.complete(written)
+                                })
+                            }
+                        },
+                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                }
+            assertTrue(opened.get(10, TimeUnit.SECONDS))
+            onEdt {
+                val pane = requireNotNull(manager.selectedPane)
+                pane.setCompletionProvider(
+                    object : SwingShellSuggestionProvider {
+                        override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                            error("Use captured source")
+
+                        override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                            providerOpens++
+                            return SwingShellSuggestionSource(flowOf(emptyList()))
+                        }
+                    },
+                )
+                val event = KeyEvent(pane.terminal, KeyEvent.KEY_PRESSED, 0, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_SPACE, ' ')
+                pane.terminal.keyListeners.forEach { it.keyPressed(event) }
+                assertEquals(if (editable) 1 else 0, providerOpens)
+                assertEquals(TerminalInputAdmission.ACCEPTED, pane.tab.session.submitInput(TerminalPasteEvent("barrier")))
+            }
+            assertEquals(if (editable) "barrier" else "\u0000barrier", received.get(10, TimeUnit.SECONDS))
+        } finally {
+            close(manager, frame)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(
         strings = [
@@ -475,8 +899,8 @@ class TabManagerStartupDesktopTest {
     }
 
     @ParameterizedTest
-    @CsvSource("110, 32", "133, 37")
-    fun `initial window waits for its pane and packs the configured grid`(
+    @CsvSource("110, 32", "133, 37", "1000, 500")
+    fun `initial window waits for its pane and fits the configured grid to the monitor`(
         columns: Int,
         rows: Int,
         @TempDir directory: Path,
@@ -500,27 +924,9 @@ class TabManagerStartupDesktopTest {
         val frame =
             onEdt {
                 object : JFrame() {
-                    private var packedSize: Dimension? = null
-
-                    override fun pack() {
-                        // Even hidden native Windows peers cap pack() to the desktop's tracking
-                        // bounds. Exercise pane installation and layout without creating a peer.
-                        contentPane.size = contentPane.preferredSize
-
-                        fun layoutTree(container: Container) {
-                            container.doLayout()
-                            container.components.filterIsInstance<Container>().forEach(::layoutTree)
-                        }
-                        layoutTree(contentPane)
-                        packedSize = preferredSize
-                    }
-
-                    override fun isDisplayable(): Boolean = packedSize != null
-
-                    override fun setLocationRelativeTo(component: Component?) = Unit
-
                     override fun setVisible(visible: Boolean) {
-                        if (visible) shown.complete(checkNotNull(packedSize)) else super.setVisible(false)
+                        super.setVisible(visible)
+                        if (visible) shown.complete(size)
                     }
                 }.apply { minimumSize = Dimension(720, 420) }
             }
@@ -557,11 +963,30 @@ class TabManagerStartupDesktopTest {
             val packed = shown.get(10, TimeUnit.SECONDS)
             assertTrue(outputStarted.get(10, TimeUnit.SECONDS), "Shell output must start after initial window packing")
             onEdt {
-                assertEquals(frame.preferredSize, packed)
+                val screen = frame.graphicsConfiguration
+                val available =
+                    screen.bounds.apply {
+                        val insets = frame.toolkit.getScreenInsets(screen)
+                        x += insets.left
+                        y += insets.top
+                        width -= insets.left + insets.right
+                        height -= insets.top + insets.bottom
+                    }
+                assertTrue(available.contains(frame.bounds), "Initial bounds ${frame.bounds} must fit $available")
                 val pane = requireNotNull(manager.selectedPane)
-                assertEquals(Dimension(columns, rows), pane.terminal.visibleGridSize())
-                assertTrue(packed.width > frame.minimumSize.width)
-                assertTrue(packed.height > frame.minimumSize.height)
+                val visible = pane.terminal.visibleGridSize()
+                assertTrue(visible.width in 2..columns)
+                assertTrue(visible.height in 1..rows)
+                if (frame.preferredSize.width <= available.width && frame.preferredSize.height <= available.height) {
+                    assertEquals(Dimension(columns, rows), visible)
+                }
+                pane.tab.session.readRenderFrame { rendered ->
+                    assertEquals(visible.width, rendered.columns)
+                    assertEquals(visible.height, rendered.rows)
+                }
+                assertEquals(columns, settings.config.columns)
+                assertEquals(rows, settings.config.rows)
+                assertEquals(frame.size, packed)
             }
         } finally {
             release.complete(Unit)
@@ -839,6 +1264,7 @@ class TabManagerStartupDesktopTest {
         options: TerminalWorkspaceOpenOptions,
         onClose: () -> Unit = {},
         shellIntegration: TerminalShellIntegrationFactory? = null,
+        onWrite: (ByteArray, Int, Int) -> Unit = { _, _, _ -> },
         onStart: () -> Unit = {},
     ): TerminalSession =
         TerminalSession.create(
@@ -855,7 +1281,7 @@ class TabManagerStartupDesktopTest {
                     bytes: ByteArray,
                     offset: Int,
                     length: Int,
-                ) = Unit
+                ) = onWrite(bytes, offset, length)
 
                 override fun close() = onClose()
             },

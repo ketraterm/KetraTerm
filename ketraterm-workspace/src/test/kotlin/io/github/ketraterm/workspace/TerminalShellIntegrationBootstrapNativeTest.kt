@@ -992,6 +992,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 val historyRecord = session.shellIntegrationState.latestCommandRecordId()
                 assertEquals(0, session.shellIntegrationState.commandMetadata(historyRecord)?.exitCode, "History setup failed")
                 val emptyContext = session.awaitLine("", "test history setup", requireShellCompletion = true)
+                assertTrue(session.confirmCommandEdit(emptyContext), "The live buffer-only binding must acknowledge an empty editor")
                 val emptyResult = assertNotNull(session.requestShellCompletions(emptyContext))
                 assertTrue(emptyResult.candidates.isNotEmpty())
                 assertTrue(emptyResult.candidates.size <= 128)
@@ -1278,7 +1279,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             )
         assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
         val readiness = result.stdout.lineSequence().first { it.contains("KetraTermCompletion;3;Ready;") }
-        assertTrue(readiness.trimEnd('\u0007', '\r').endsWith(";PrefixReset"), visibleEscapes(readiness))
+        assertTrue(readiness.contains(";PrefixReset;BufferState"), visibleEscapes(readiness))
         val messages =
             result.stdout
                 .lineSequence()
@@ -1290,7 +1291,9 @@ class TerminalShellIntegrationBootstrapNativeTest {
                 .firstOrNull { it.startsWith("APPLICATION=") }
                 ?.substringAfter('=')
                 ?.split(';')
-        assertEquals(if (application == null) 13 else 21, messages.size, visibleEscapes(result.stdout))
+        assertEquals(if (application == null) 15 else 23, messages.size, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("BUFFER_ONLY=OK"), visibleEscapes(result.stdout))
+        assertEquals("0", messages[messages.lastIndex - 1].trimEnd('\u0007', '\r').substringAfter("KetraTermCompletion;").split(';')[10])
 
         fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 

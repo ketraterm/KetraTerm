@@ -5,6 +5,7 @@ function global:__KetraTermCompletionReady {
     if (-not $global:__KetraTermCompletionInstalled) { return }
     $global:__KetraTermCompletionEpoch = [Guid]::NewGuid().ToString('N')
     $capabilities = if ($global:__KetraTermCompletionPrefixResetInstalled) { ';PrefixReset' } else { '' }
+    if ($global:__KetraTermCompletionBufferStateInstalled) { $capabilities += ';BufferState' }
     [Console]::Write(([string][char]27) + ']633;KetraTermCompletion;3;Ready;' + $global:__KetraTermCompletionEpoch + $capabilities + ([string][char]7))
 }
 
@@ -17,19 +18,57 @@ function global:__KetraTermCompletionAppend([char] $Digit) {
     $global:__KetraTermCompletionRequest += $Digit
 }
 
-function global:__KetraTermCompletionCommit {
+function global:__KetraTermCompletionCommit([bool] $BufferOnly = $false) {
     $digits = $global:__KetraTermCompletionRequest
     $global:__KetraTermCompletionRequest = $null
     if ($null -eq $digits -or $digits.Length -ne 19) { return }
     $requestId = 0L
     if ([long]::TryParse($digits, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$requestId) -and
         $requestId -gt 0) {
-        global:__KetraTermComplete $requestId
+        if ($BufferOnly) { global:__KetraTermConfirmBuffer $requestId }
+        else { global:__KetraTermComplete $requestId }
     }
 }
 
 function global:__KetraTermCompletionEncode([string] $Value) {
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Value))
+}
+
+# PSReadLine defers rendering when more than ten keys are queued within 50 ms,
+# which a 21-chord completion frame can trigger right after normal typing or edits.
+function global:__KetraTermFlushRender {
+    try {
+        $singleton = $global:__KetraTermReadLineSingleton
+        $waiting = $global:__KetraTermWaitingToRenderField
+        $forceRender = $global:__KetraTermForceRenderMethod
+        if ($null -ne $singleton -and $null -ne $waiting -and $null -ne $forceRender -and [bool]$waiting.GetValue($singleton)) {
+            [void]$forceRender.Invoke($singleton, $null)
+        }
+    } catch {
+    }
+}
+
+# Buffer confirmation must not wait for module discovery or user completers.
+function global:__KetraTermConfirmBuffer([long] $RequestId) {
+    if ($RequestId -le 0) { return }
+    $savedExitCode = $global:LASTEXITCODE
+    $prefix = 'KetraTermCompletion;3;Result;' + $global:__KetraTermCompletionEpoch + ';' + $RequestId + ';'
+    $body = $prefix + 'Failed'
+    try {
+        $line = ''
+        $cursor = 0
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        global:__KetraTermFlushRender
+        if ($line.Length -le 4096) {
+            $body = $prefix + 'Ok;' + $cursor + ';' + $cursor + ';' + $cursor + ';' +
+                (global:__KetraTermCompletionEncode $line) + ';;0'
+        }
+    } catch {
+        # An unavailable editor buffer is a failed confirmation, never terminal output.
+    } finally {
+        $global:LASTEXITCODE = $savedExitCode
+    }
+    [Console]::Write(([string][char]27) + ']633;' + $body + ([string][char]7))
 }
 
 # Suggestion acceptance reconstructs this prefix instead of guessing the editor's
@@ -59,6 +98,7 @@ function global:__KetraTermComplete([long] $RequestId) {
         $line = ''
         $cursor = 0
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        global:__KetraTermFlushRender
         if ($line.Length -le 4096) {
             $externalCommandName = ''
             if ($line.Length -gt 0) {
@@ -187,13 +227,29 @@ function global:__KetraTermComplete([long] $RequestId) {
 function global:__KetraTermInstallCompletionHandlers {
     $global:__KetraTermCompletionInstalled = $false
     $global:__KetraTermCompletionPrefixResetInstalled = $false
+    $global:__KetraTermCompletionBufferStateInstalled = $true
     $global:__KetraTermCompletionRequest = $null
+    $global:__KetraTermReadLineSingleton = $null
+    $global:__KetraTermWaitingToRenderField = $null
+    $global:__KetraTermForceRenderMethod = $null
     try {
         if (-not (Get-Module PSReadLine)) { return }
+        $readLineType = [Microsoft.PowerShell.PSConsoleReadLine]
+        $bindingFlags = [Reflection.BindingFlags]'NonPublic,Instance,Static'
+        $singletonField = $readLineType.GetField('_singleton', $bindingFlags)
+        if ($null -ne $singletonField) {
+            $global:__KetraTermReadLineSingleton = $singletonField.GetValue($null)
+        }
+        $global:__KetraTermWaitingToRenderField = $readLineType.GetField('_waitingToRender', $bindingFlags)
+        $global:__KetraTermForceRenderMethod = $readLineType.GetMethod('ForceRender', $bindingFlags, $null, [Type]::EmptyTypes, $null)
         $mode = (Get-PSReadLineOption).EditMode
         $handlers = @{
-            'q' = { $global:__KetraTermCompletionRequest = '' }
+            'q' = {
+                $global:__KetraTermCompletionRequest = ''
+                global:__KetraTermFlushRender
+            }
             'e' = { global:__KetraTermCompletionCommit }
+            'b' = { global:__KetraTermCompletionCommit $true }
             'r' = { global:__KetraTermResetCompletionPrefix }
         }
         foreach ($digit in 0..9) {
@@ -210,6 +266,10 @@ function global:__KetraTermInstallCompletionHandlers {
                     Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -ErrorAction Stop
                 }
             } catch {
+                if ($suffix -eq 'b') {
+                    $global:__KetraTermCompletionBufferStateInstalled = $false
+                    continue
+                }
                 if ($suffix -ne 'r') { throw }
                 $global:__KetraTermCompletionPrefixResetInstalled = $false
             }
