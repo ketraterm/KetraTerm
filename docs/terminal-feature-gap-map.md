@@ -34,11 +34,6 @@ Remaining work:
 | --- | --- |
 | `TODO(completion)` | Extend Git completion to custom fetch mappings, configured remote groups, wildcard/negative refspecs, and remaining unmodeled option interactions. Remote reference candidates currently use local tracking data rather than server queries. Supported modes and ordinary composite refspec edits are documented in [completion sources](features/completion.md#sources-by-host). |
 
-Inline suffix rendering is available as a caller-controlled library API. Independent
-inline provider scheduling, acceptance-key routing alongside popup results, and
-coexistence policy remain `TODO(ui/host/profile)`; see the
-[implemented rendering slice](features/completion.md#inline-suffix-presentation).
-
 ## Transports and execution environments
 
 | Owner | Remaining work |

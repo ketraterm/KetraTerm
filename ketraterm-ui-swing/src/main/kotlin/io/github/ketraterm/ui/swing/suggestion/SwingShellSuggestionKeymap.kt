@@ -59,14 +59,14 @@ public enum class SwingShellSuggestionAction {
 /**
  * Host-owned mapping from Swing key presses to semantic suggestion actions.
  *
- * The reusable popup owns action execution and state. Hosts own bindings so a
+ * The reusable suggestion controllers own action execution and state. Hosts own bindings so a
  * standalone application can use conventional Swing defaults while an IDE can
  * honor its active, user-configurable keymap.
  */
 @ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionKeymap {
     /**
-     * Resolves one key press while the suggestion popup is visible.
+     * Resolves one key press while a suggestion is visible.
      *
      * @param event Swing key-pressed event.
      * @return semantic action, or `null` when the key is not claimed.
@@ -74,6 +74,21 @@ public fun interface SwingShellSuggestionKeymap {
     public fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
 
     public companion object {
+        /** Inline-only defaults: unmodified Tab accepts the whole suffix, Escape dismisses. */
+        @JvmField
+        public val INLINE_STANDARD: SwingShellSuggestionKeymap =
+            SwingShellSuggestionKeymap { event ->
+                if (event.modifiersEx and RELEVANT_MODIFIERS != 0) {
+                    null
+                } else {
+                    when (event.keyCode) {
+                        KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                        KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
+                        else -> null
+                    }
+                }
+            }
+
         /** Conventional terminal-popup bindings used by standalone Swing hosts. */
         @JvmField
         public val STANDARD: SwingShellSuggestionKeymap =

@@ -46,12 +46,18 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onSubscription
@@ -81,6 +87,28 @@ fun showSuffix(
     expected: io.github.ketraterm.session.TerminalCommandEditContext,
     suffix: String,
 ): Boolean = view.presentInlineShellSuggestion(expected, suffix)
+
+fun requestInline(
+    view: SwingTerminal,
+    generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,
+): SwingShellSuggestionInteraction? {
+    val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    view.requestInlineShellSuggestions(
+        interaction,
+        SwingInlineShellSuggestionProvider { context ->
+            SwingShellSuggestionSource(
+                flow {
+                    val suffix = generateSuffix(context) ?: return@flow
+                    if (suffix.isNotEmpty()) {
+                        val offset = context.commandLine.cursorOffset
+                        emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
+                    }
+                },
+            )
+        },
+    )
+    return interaction
+}
 
 fun main() =
     runBlocking {

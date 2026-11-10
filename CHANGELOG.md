@@ -4,7 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
-- Added experimental caller-controlled inline suffix rendering. Ghost text reuses ordinary terminal text painting and Unicode layout, wraps through free visible cells, and stays out of live terminal content. Presentation validates edit authority and suppresses shell-text collisions and unsupported viewport states.
+- Added experimental caller-controlled inline suggestions with independent provider cancellation, guarded whole-suggestion acceptance, configurable keymaps, and popup coexistence policy. Ghost text reuses ordinary terminal text painting and Unicode layout, wraps through free visible cells, and stays out of live terminal content. Rendering-only callers retain control of their own edit tokens and input bindings.
 - Added bounded headless command-output extraction through `TerminalSession.commandOutputText`. The OSC producer returns a completed command's retained text tail with separate caller-truncation and missing-history flags, preserving graphemes and logical line breaks. Custom producers can implement the same optional contract.
 - PTY options and workspace launch profiles preserve empty arguments after the executable, including through configuration copies.
 - Added `TerminalSession.confirmCommandEdit` and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine's buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.

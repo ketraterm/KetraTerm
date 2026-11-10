@@ -380,9 +380,63 @@ geometry remove it too. The view borrows the edit context; clearing presentation
 does not cancel it. Ghost text never enters selection copying, search, command
 output, scrollback, or the live grid.
 
-This API provides rendering. Callers own request scheduling and guarded acceptance
-through `TerminalSession.submitInput(expected, events)`. Presentation does not
-install acceptance keys or merge its results with the completion popup.
+The overload above provides rendering only and claims no acceptance keys. For
+provider collection and guarded whole-suggestion acceptance, create an independent
+inline interaction on the EDT. Managed requests respect `smartSuggestionsEnabled`;
+callers still choose when to start them:
+
+```kotlin
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.flow.flow
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun requestInline(
+    view: SwingTerminal,
+    generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,
+): SwingShellSuggestionInteraction? {
+    val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    view.requestInlineShellSuggestions(interaction, SwingInlineShellSuggestionProvider { context ->
+        SwingShellSuggestionSource(flow {
+            val suffix = generateSuffix(context) ?: return@flow
+            if (suffix.isNotEmpty()) {
+                val offset = context.commandLine.cursorOffset
+                emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
+            }
+        })
+    })
+    return interaction
+}
+```
+
+Provider `open` captures context on the EDT; its cold flow is collected off the
+EDT. Each request owns its cancellation and original edit token. New inline work
+supersedes only inline work, and closing the returned interaction cancels it.
+Provider completion preserves the final result; cancellation, failure, input,
+or lost eligibility retires obsolete work. Feedback comes from the source that
+produced the accepted or dismissed publication. Custom publication uses
+`interaction.publish(candidates, selectedIndex = 0)`; an unselected item is hidden.
+
+Popup and inline results can differ. By default, inline text accompanying a
+selected embedded-popup item must extend that item's resulting command. The
+provider receives `selectedPopupCommandText` and is reopened when that context
+changes. Incompatible results stay hidden until compatible context returns.
+`setInlineShellSuggestionCoexistence(INDEPENDENT)` permits unrelated results;
+detached popup owners control that policy themselves.
+
+The inline standard keymap accepts the whole visible suggestion with Tab and
+dismisses it with Escape. Popup keys have first refusal; standard inline Tab is
+disabled while the embedded popup is visible. Enter and cursor movement retain
+normal terminal behavior. `setInlineShellSuggestionKeymap` accepts a custom map
+for acceptance/dismissal, including a map returning null to disable bindings.
+`acceptInlineShellSuggestion()` and `dismissInlineShellSuggestion()` provide the
+same guarded operations for host actions. A failed acceptance never falls through
+to accepting the other surface or sending that key to the shell.
+
+Managed rendering accepts only append-only outcomes. Clipping limits displayed
+cells; acceptance inserts the entire suggestion. Clearing managed work cancels
+its owned edit context; a token passed to the rendering-only overload remains
+caller-owned. These library APIs do not enable inline suggestions in the standalone app.
 
 ## How to Extend: Custom Host Services
 

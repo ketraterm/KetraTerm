@@ -56,6 +56,18 @@ import java.util.List;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static void inlineProvider(SwingTerminal view,
+            io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
+        var interaction = view.beginInlineShellSuggestionInteraction();
+        if (interaction != null) view.requestInlineShellSuggestions(interaction, provider);
+        view.setInlineShellSuggestionCoexistence(
+            io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionCoexistence.INDEPENDENT);
+        view.setInlineShellSuggestionKeymap(
+            io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.INLINE_STANDARD);
+        view.acceptInlineShellSuggestion();
+        view.dismissInlineShellSuggestion();
+        view.clearInlineShellSuggestion();
+    }
     public static boolean showSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix) {
         return view.presentInlineShellSuggestion(expected, suffix);
     }

@@ -264,8 +264,11 @@ cancels source work.
 Library consumers can opt into experimental append-only ghost-text rendering
 through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary terminal
 text painter, clips wrapped previews to free visible cells, and requires current
-command-edit authority. See the [rendering contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
-for eligibility, Unicode handling, collisions, and caller ownership.
+command-edit authority. Independent inline providers share the guarded interaction
+contract with popup providers, with separate cancellation, configurable keymaps,
+and a default compatibility rule for simultaneous presentation. See the
+[inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
+for eligibility, Unicode handling, collisions, provider context and caller ownership.
 The standalone application does not enable this presentation by default.
 
 ## Learning and privacy
