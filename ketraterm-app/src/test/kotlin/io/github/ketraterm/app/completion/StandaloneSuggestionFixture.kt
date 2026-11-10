@@ -242,6 +242,23 @@ internal class StandaloneSuggestionFixture private constructor(
         }
     }
 
+    /**
+     * Distinguishes a shell that never ran `exit` (lost or reordered input) from one
+     * that ran it while the transport stayed open.
+     */
+    private suspend fun awaitClosedAfterExit() {
+        try {
+            withTimeout(15.seconds) { session.state.first { it is TerminalSessionState.Closed } }
+        } catch (failure: TimeoutCancellationException) {
+            val state = session.shellIntegrationState
+            throw AssertionError(
+                "Session did not close after 'exit'; latest=${state.commandMetadata(state.latestCommandRecordId())}; " +
+                    "projection=${session.activeShellCommandLine()}, session=${session.state.value}\n${screenText()}",
+                failure,
+            )
+        }
+    }
+
     suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
         focusTerminal()
@@ -428,7 +445,7 @@ internal class StandaloneSuggestionFixture private constructor(
                         ) == TerminalInputAdmission.ACCEPTED
                     }
                 }
-                withTimeout(15.seconds) { tab.session.state.first { it is TerminalSessionState.Closed } }
+                created.awaitClosedAfterExit()
             } catch (caught: Throwable) {
                 failure = caught
             } finally {

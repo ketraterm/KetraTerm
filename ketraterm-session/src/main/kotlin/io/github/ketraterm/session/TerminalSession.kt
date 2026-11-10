@@ -1661,21 +1661,36 @@ public class TerminalSession private constructor(
             synchronized(mutationAdmission) {
                 if (isSessionClosed()) return
                 check(!processingOutput) { "Output callbacks must not reenter the session" }
+                val yielding = graphicsParser
+                var consumed = 0
+                var finished = false
                 synchronized(mutationLock) {
+                    if (isSessionClosed()) return
                     processingOutput = true
+                    try {
+                        if (yielding == null) {
+                            parser.accept(bytes, offset, length)
+                            finished = true
+                        } else {
+                            consumed = yielding.acceptUntilGraphics(bytes, offset, length)
+                            drainResponses()
+                            finished = !yielding.hasPendingGraphics && consumed >= length
+                        }
+                        if (finished && !isSessionClosed()) {
+                            runtime.shellIntegration?.outputProcessed()
+                            drainResponses()
+                        }
+                    } finally {
+                        if (finished || isSessionClosed()) {
+                            processingOutput = false
+                            completedShellQuery = finishShellCompletion()
+                            finished = true
+                        }
+                    }
                 }
-                try {
-                    val yielding = graphicsParser
-                    if (yielding == null) {
-                        synchronized(mutationLock) { parser.accept(bytes, offset, length) }
-                    } else {
-                        var consumed = 0
-                        do {
-                            synchronized(mutationLock) {
-                                if (isSessionClosed()) return
-                                consumed += yielding.acceptUntilGraphics(bytes, offset + consumed, length - consumed)
-                                drainResponses()
-                            }
+                if (!finished && yielding != null) {
+                    try {
+                        while (true) {
                             if (yielding.hasPendingGraphics) {
                                 yielding.consumePendingGraphics { command, data, used ->
                                     if (isSessionClosed()) return@consumePendingGraphics
@@ -1690,18 +1705,33 @@ public class TerminalSession private constructor(
                                     }
                                 }
                             }
-                        } while (consumed < length && !isSessionClosed())
-                    }
-                    synchronized(mutationLock) {
-                        if (!isSessionClosed()) {
-                            runtime.shellIntegration?.outputProcessed()
-                            drainResponses()
+                            var done = false
+                            synchronized(mutationLock) {
+                                if (isSessionClosed()) {
+                                    done = true
+                                } else if (consumed < length) {
+                                    consumed += yielding.acceptUntilGraphics(bytes, offset + consumed, length - consumed)
+                                    drainResponses()
+                                    done = !yielding.hasPendingGraphics && consumed >= length
+                                } else {
+                                    done = !yielding.hasPendingGraphics
+                                }
+                                if (done && !isSessionClosed()) {
+                                    runtime.shellIntegration?.outputProcessed()
+                                    drainResponses()
+                                    processingOutput = false
+                                    completedShellQuery = finishShellCompletion()
+                                }
+                            }
+                            if (done) break
                         }
-                    }
-                } finally {
-                    synchronized(mutationLock) {
-                        processingOutput = false
-                        completedShellQuery = finishShellCompletion()
+                    } finally {
+                        synchronized(mutationLock) {
+                            if (processingOutput) {
+                                processingOutput = false
+                                completedShellQuery = finishShellCompletion()
+                            }
+                        }
                     }
                 }
                 submitStartupCommand()
