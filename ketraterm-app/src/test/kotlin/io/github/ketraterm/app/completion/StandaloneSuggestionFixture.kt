@@ -46,6 +46,7 @@ import javax.swing.JFrame
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Real standalone wiring and component input, with bounded event waits and failure-safe ownership. */
@@ -155,7 +156,13 @@ internal class StandaloneSuggestionFixture private constructor(
             return withTimeout(15.seconds) {
                 var snapshot: SwingShellSuggestionViewSnapshot
                 do {
-                    val update = publications.receive()
+                    var update = publications.tryReceive().getOrNull()
+                    while (update == null) {
+                        if (!withContext(Dispatchers.Swing) { terminal.isFocusOwner }) {
+                            focusTerminal()
+                        }
+                        update = withTimeoutOrNull(250.milliseconds) { publications.receive() }
+                    }
                     lastUpdate = update
                     snapshot = update.second
                 } while (update.first != line ||
@@ -277,7 +284,10 @@ internal class StandaloneSuggestionFixture private constructor(
         }
     }
 
-    suspend fun key(code: Int) = withContext(Dispatchers.Swing) { press(code) }
+    suspend fun key(code: Int) {
+        focusTerminal()
+        withContext(Dispatchers.Swing) { press(code) }
+    }
 
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }

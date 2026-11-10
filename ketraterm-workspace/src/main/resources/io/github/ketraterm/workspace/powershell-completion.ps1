@@ -34,6 +34,19 @@ function global:__KetraTermCompletionEncode([string] $Value) {
     [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Value))
 }
 
+# PSReadLine defers rendering when more than ten keys are queued within 50 ms,
+# which a 21-chord completion frame can trigger right after normal typing or edits.
+function global:__KetraTermFlushRender([int] $Cursor) {
+    try {
+        $singleton = $global:__KetraTermReadLineSingleton
+        $waiting = $global:__KetraTermWaitingToRenderField
+        if ($null -ne $singleton -and $null -ne $waiting -and [bool]$waiting.GetValue($singleton)) {
+            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($Cursor)
+        }
+    } catch {
+    }
+}
+
 # Buffer confirmation must not wait for module discovery or user completers.
 function global:__KetraTermConfirmBuffer([long] $RequestId) {
     if ($RequestId -le 0) { return }
@@ -44,6 +57,7 @@ function global:__KetraTermConfirmBuffer([long] $RequestId) {
         $line = ''
         $cursor = 0
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        global:__KetraTermFlushRender $cursor
         if ($line.Length -le 4096) {
             $body = $prefix + 'Ok;' + $cursor + ';' + $cursor + ';' + $cursor + ';' +
                 (global:__KetraTermCompletionEncode $line) + ';;0'
@@ -83,6 +97,7 @@ function global:__KetraTermComplete([long] $RequestId) {
         $line = ''
         $cursor = 0
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        global:__KetraTermFlushRender $cursor
         if ($line.Length -le 4096) {
             $externalCommandName = ''
             if ($line.Length -gt 0) {
@@ -213,8 +228,17 @@ function global:__KetraTermInstallCompletionHandlers {
     $global:__KetraTermCompletionPrefixResetInstalled = $false
     $global:__KetraTermCompletionBufferStateInstalled = $true
     $global:__KetraTermCompletionRequest = $null
+    $global:__KetraTermReadLineSingleton = $null
+    $global:__KetraTermWaitingToRenderField = $null
     try {
         if (-not (Get-Module PSReadLine)) { return }
+        $readLineType = [Microsoft.PowerShell.PSConsoleReadLine]
+        $bindingFlags = [Reflection.BindingFlags]'NonPublic,Instance,Static'
+        $singletonField = $readLineType.GetField('_singleton', $bindingFlags)
+        if ($null -ne $singletonField) {
+            $global:__KetraTermReadLineSingleton = $singletonField.GetValue($null)
+        }
+        $global:__KetraTermWaitingToRenderField = $readLineType.GetField('_waitingToRender', $bindingFlags)
         $mode = (Get-PSReadLineOption).EditMode
         $handlers = @{
             'q' = { $global:__KetraTermCompletionRequest = '' }

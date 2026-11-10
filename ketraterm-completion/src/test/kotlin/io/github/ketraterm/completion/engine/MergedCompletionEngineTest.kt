@@ -270,6 +270,45 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    fun `empty fast source does not emit premature empty list while non-empty source is pending`(): Unit =
+        runBlocking {
+            val emptyCompleted = CompletableDeferred<Unit>()
+            val slowStarted = CompletableDeferred<Unit>()
+            val releaseSlow = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                { _, _, _ ->
+                                    emptyCompleted.complete(Unit)
+                                    emptyList()
+                                },
+                                priority = 100,
+                            ),
+                            entry(
+                                { _, _, _ ->
+                                    slowStarted.complete(Unit)
+                                    releaseSlow.await()
+                                    listOf(candidate("alpha/", source = "path"))
+                                },
+                                priority = 50,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val collected = async { engine.completions(request()).toList() }
+            emptyCompleted.await()
+            slowStarted.await()
+            yield()
+            releaseSlow.complete(Unit)
+
+            val emissions = collected.await()
+            assertEquals(listOf(listOf("alpha/")), emissions.map { list -> list.map { it.replacementText } })
+        }
+
+    @Test
     fun `specs publish directly before suspending host sources`() =
         runBlocking {
             val hostStarted = CompletableDeferred<Unit>()

@@ -1,12 +1,26 @@
 # Replace only the line-editor boundary; use the real PowerShell completion engine.
 Add-Type @'
 namespace Microsoft.PowerShell {
-    public static class PSConsoleReadLine {
+    public class PSConsoleReadLine {
+        private static readonly PSConsoleReadLine _singleton = new PSConsoleReadLine();
+        private bool _waitingToRender;
         public static string Line;
         public static int Cursor = -1;
+        public static int FlushedCursor = -1;
+        public static int FlushCount;
+        public static void SetWaitingToRender(bool waiting) {
+            _singleton._waitingToRender = waiting;
+        }
         public static void GetBufferState(ref string line, ref int cursor) {
             line = Line;
             cursor = Cursor < 0 ? Line.Length : Cursor;
+        }
+        public static void SetCursorPosition(int cursor) {
+            if (_singleton._waitingToRender) {
+                _singleton._waitingToRender = false;
+                FlushedCursor = cursor;
+                FlushCount++;
+            }
         }
     }
 }
@@ -113,12 +127,22 @@ Register-ArgumentCompleter -CommandName Get-KetraBufferOnly -ParameterName Value
 }
 [Microsoft.PowerShell.PSConsoleReadLine]::Line = 'Get-KetraBufferOnly -Value b'
 [Microsoft.PowerShell.PSConsoleReadLine]::Cursor = -1
+if ([Microsoft.PowerShell.PSConsoleReadLine]::FlushCount -ne 0) { throw 'Idle renders must not flush cursor state' }
+[Microsoft.PowerShell.PSConsoleReadLine]::SetWaitingToRender($true)
 $global:TestRequestId++
 Send-TestFrame $global:TestRequestId.ToString('D19', [Globalization.CultureInfo]::InvariantCulture) '' 'b'
 [Console]::WriteLine()
 if ($global:BufferOnlyCompleterCalls -ne 0) { throw 'Buffer confirmation invoked the candidate completer' }
+if ([Microsoft.PowerShell.PSConsoleReadLine]::FlushCount -ne 1 -or
+    [Microsoft.PowerShell.PSConsoleReadLine]::FlushedCursor -ne 'Get-KetraBufferOnly -Value b'.Length) {
+    throw 'Buffer confirmation did not flush deferred PSReadLine rendering'
+}
+[Microsoft.PowerShell.PSConsoleReadLine]::SetWaitingToRender($true)
 Complete-Test 'Get-KetraBufferOnly -Value b'
 if ($global:BufferOnlyCompleterCalls -ne 1) { throw 'A full request must still invoke the candidate completer' }
+if ([Microsoft.PowerShell.PSConsoleReadLine]::FlushCount -ne 2) {
+    throw 'Full completion did not flush deferred PSReadLine rendering'
+}
 [Console]::WriteLine('BUFFER_ONLY=OK')
 
 # Framing never calls the completer for incomplete, malformed, consumed, or overflowed tokens.

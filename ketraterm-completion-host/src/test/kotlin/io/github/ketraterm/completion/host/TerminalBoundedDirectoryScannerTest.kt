@@ -97,6 +97,28 @@ class TerminalBoundedDirectoryScannerTest {
         }
 
     @Test
+    fun `directory open latency before first entry does not exhaust scan budget`() =
+        runTest {
+            Files.createDirectory(directory.resolve("alpha"))
+            Files.createDirectory(directory.resolve("beta"))
+            var ticks = 0L
+            val scanner =
+                TerminalBoundedDirectoryScanner(
+                    maxVisitedEntries = 8_192,
+                    scanBudgetNanos = 10L,
+                    nanoTime = {
+                        ticks += 100L
+                        ticks
+                    },
+                )
+
+            val entries = scanner.scan(directory, "")
+
+            assertEquals(1, entries.size)
+            assertTrue(entries.single().name in setOf("alpha", "beta"))
+        }
+
+    @Test
     fun `scan propagates coroutine cancellation before blocking work starts`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)

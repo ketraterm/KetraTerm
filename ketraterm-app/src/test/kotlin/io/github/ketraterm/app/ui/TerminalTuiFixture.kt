@@ -241,6 +241,16 @@ internal class TerminalTuiFixture private constructor(
         }
         withTimeout(20.seconds) { completed.await() }
         session.readRenderFrame { frame -> assertEquals(columns to rows, frame.columns to frame.rows) }
+        withTimeout(20.seconds) {
+            session.renderGeneration.first {
+                withContext(Dispatchers.Swing) {
+                    val bounds = Rectangle()
+                    terminal.copyCellBounds(columns - 1, rows - 1, bounds) &&
+                        !terminal.copyCellBounds(columns, 0, bounds) &&
+                        !terminal.copyCellBounds(0, rows, bounds)
+                }
+            }
+        }
     }
 
     suspend fun exit(request: () -> Unit) {

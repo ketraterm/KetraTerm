@@ -79,20 +79,21 @@ public class TerminalBoundedDirectoryScanner
             directory: Path,
             entryNamePrefix: String,
         ): List<TerminalFileEntry> {
-            val startedAt = nanoTime()
             val entries = ArrayList<TerminalFileEntry>(minOf(maxVisitedEntries, INITIAL_SCAN_CAPACITY))
             try {
                 if (!Files.readAttributes(directory, BasicFileAttributes::class.java).isDirectory) return emptyList()
                 Files.newDirectoryStream(directory).use { stream ->
                     var visited = 0
+                    var startedAt = 0L
                     val iterator = stream.iterator()
                     while (
                         !Thread.currentThread().isInterrupted &&
                         visited < maxVisitedEntries &&
-                        nanoTime() - startedAt < scanBudgetNanos &&
+                        (visited == 0 || nanoTime() - startedAt < scanBudgetNanos) &&
                         iterator.hasNext()
                     ) {
                         val child = iterator.next()
+                        if (visited == 0) startedAt = nanoTime()
                         visited++
                         val name = child.fileName?.toString() ?: continue
                         val isDirectory =

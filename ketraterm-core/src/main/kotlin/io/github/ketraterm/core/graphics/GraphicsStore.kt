@@ -717,7 +717,7 @@ internal class GraphicsStore {
                 } else if (v[b + COLUMNS] > 0) {
                     ceil((v[b + COLUMNS].toDouble() * cw + x) * h / w / ch)
                 } else {
-                    ceil((h.toDouble() + y) / ch)
+                    ceil((h + y) / ch)
                 }
             v[b + EFFECTIVE_COLUMNS] = columns.coerceAtMost(Int.MAX_VALUE.toDouble()).toInt()
             v[b + EFFECTIVE_ROWS] = rows.coerceAtMost(Int.MAX_VALUE.toDouble()).toInt()
