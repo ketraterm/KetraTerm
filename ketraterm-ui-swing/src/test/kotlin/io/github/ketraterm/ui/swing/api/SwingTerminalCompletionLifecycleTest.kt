@@ -492,6 +492,39 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
+    fun `transient observation invalidation in commandEditChanges still refreshes automatic suggestions`() =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler), screenDerived = true)
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                runCurrent()
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val original = target.interactions.single()
+
+                fixture.transientObservationInvalidation = true
+                fixture.session.requestRender(0)
+                runCurrent()
+                assertTrue(original.isClosed)
+                assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, original.closeReason)
+
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(2, target.interactions.size, "Transient invalidation must not leave lastRequest wedged")
+                assertTrue(target.interactions.last().isActive)
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `failed confirmation reconsiders an echo completed while the request was pending`() =
         onEdtTest {
             val fixture = SessionFixture(StandardTestDispatcher(testScheduler), nativeCompletion = true, screenDerived = true)
@@ -1498,6 +1531,7 @@ class SwingTerminalCompletionLifecycleTest {
             )
         private val observations = MutableStateFlow(0L)
         private var observedCommandLine = model.value
+        var transientObservationInvalidation = false
         var afterCommandLineSample: (() -> Unit)? = null
         private lateinit var completion: TerminalShellCompletionChannel
         val session =
@@ -1527,7 +1561,14 @@ class SwingTerminalCompletionLifecycleTest {
                         if (screenDerived) {
                             object : TerminalShellIntegration by producer {
                                 override val commandLineChanges = observations
-                                override val commandLineObservationRevision: Long get() = observations.value
+                                override val commandLineObservationRevision: Long
+                                    get() =
+                                        if (transientObservationInvalidation) {
+                                            transientObservationInvalidation = false
+                                            observations.value + 1
+                                        } else {
+                                            observations.value
+                                        }
 
                                 override fun activeCommandLine(): TerminalShellCommandLineSnapshot? {
                                     val sampled = observedCommandLine

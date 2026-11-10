@@ -2312,6 +2312,7 @@ public class SwingTerminal
                                 "Active shell command changed",
                                 SwingShellSuggestionCloseReason.INVALIDATED,
                                 retainPresentation = automatic,
+                                contextInvalidated = true,
                             )
                         }
                     }
@@ -3198,6 +3199,7 @@ public class SwingTerminal
             reason: String,
             closeReason: SwingShellSuggestionCloseReason = SwingShellSuggestionCloseReason.CANCELLED,
             retainPresentation: Boolean = false,
+            contextInvalidated: Boolean = false,
         ) {
             val revision = ++suggestionRevision
             val interaction = activeSuggestionInteraction
@@ -3206,7 +3208,7 @@ public class SwingTerminal
             val refreshContext =
                 closeReason == SwingShellSuggestionCloseReason.INVALIDATED &&
                     activeSuggestionIsAutomatic &&
-                    interaction?.contextIsCurrent?.invoke() == false
+                    (contextInvalidated || interaction?.contextIsCurrent?.invoke() == false)
             val retain =
                 retainPresentation &&
                     target == null &&
