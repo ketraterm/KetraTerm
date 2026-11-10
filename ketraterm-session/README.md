@@ -161,6 +161,46 @@ or resetting the parser. It returns false after shutdown begins. See the
 [clear contract](docs/session-concurrency-locks.md#local-buffer-clear) before
 retaining selection or shell anchors across a clear.
 
+## Completed command output
+
+Use `commandOutputText` off the UI thread to capture bounded command context for
+an external suggestion provider or another consumer:
+
+```kotlin
+import io.github.ketraterm.session.TerminalCommandOutputText
+import io.github.ketraterm.session.TerminalSession
+
+fun recentOutput(session: TerminalSession, recordId: Int): TerminalCommandOutputText? =
+    session.commandOutputText(recordId, maxChars = 32_768, maxRows = 256)
+```
+
+The result contains `text`, `truncated` (caller limits omitted retained output),
+and `historyIncomplete` (a recorded range boundary is missing). Limits select the
+tail of the output, count UTF-16 code units and physical rows, and preserve stored
+graphemes. Soft wraps are joined; hard breaks and interior spaces are preserved,
+while terminal padding and trailing spaces at hard line ends are omitted.
+
+Select [`OscShellIntegration`](../ketraterm-shell-integration/README.md) with
+compatible shell hooks for the built-in implementation. Custom producers can
+implement `TerminalShellIntegration.commandOutputText`; host metadata alone does
+not provide output. The method returns `null` when unsupported, unfinished,
+unknown, fully evicted, or otherwise unavailable. Empty, untruncated text requires
+known empty output; a character limit too small for the final grapheme returns
+empty text with `truncated = true`. The OSC implementation reads the primary buffer and returns `null` while
+the alternate screen is active; retained output remains readable after closure.
+
+This is rendered terminal text, including overwrites, rather than a complete
+transcript or separate stdout/stderr streams. Metadata and text retention are
+independently bounded. Use existing command metadata for CWD, exit code, and
+timing; treat an unavailable field as unknown.
+
+The call serializes with terminal mutation and sends no input. Do not invoke it
+inside borrowed frame/cache callbacks. From a command-finished listener, enqueue
+work on a consumer-owned background dispatcher: a reentrant call during an output
+batch returns `null`, and later queued work may observe eviction. Retain the
+listener's immutable metadata when needed, and close its registration with the
+consumer's lifetime.
+
 ## Host-owned shell integration
 
 A plain session has no shell metadata producer. An embedding host can supply its

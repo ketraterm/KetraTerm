@@ -59,6 +59,21 @@ public interface TerminalShellIntegration {
     public fun activeCommandLine(): TerminalShellCommandLineSnapshot?
 
     /**
+     * Captures a bounded output tail for a completed command, or null when unsupported or unavailable.
+     * Session calls this under terminal mutation serialization with positive limits. Implementations
+     * must return detached text, copy at most [maxRows] physical output rows, and retain at most
+     * [maxChars] UTF-16 code units without splitting stored graphemes. Empty, untruncated text requires
+     * positive evidence of empty output; unknown ranges must remain null. Reads may occur after closure.
+     * Custom producers must coordinate their metadata and output snapshots and must not acquire
+     * terminal state while holding an independent producer lock. The default has no output source.
+     */
+    public fun commandOutputText(
+        recordId: Int,
+        maxChars: Int,
+        maxRows: Int,
+    ): TerminalCommandOutputText? = null
+
+    /**
      * Non-executing key sequence that removes the active editor's text before its cursor.
      *
      * The operation must preserve text after the cursor and leave the cursor at

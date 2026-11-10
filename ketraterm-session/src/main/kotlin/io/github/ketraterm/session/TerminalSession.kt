@@ -654,6 +654,40 @@ public class TerminalSession private constructor(
     }
 
     /**
+     * Captures the tail of a completed command's retained output through the selected producer.
+     *
+     * Returns null for unavailable, unfinished, unknown or evicted command ranges, unsupported
+     * producers, or a partial output batch. Retained output can still be read after closure.
+     * The built-in OSC producer reads primary-buffer rows and returns null on the alternate screen.
+     * Missing output is never inferred to be empty. Inspect both result flags before treating text
+     * as complete; rendered output does not separate stdout from stderr or preserve overwritten text.
+     *
+     * This synchronous read serializes with terminal mutation. Call off the EDT and outside borrowed
+     * render-frame/cache callbacks. No input is sent. Providers own extraction and metadata consistency.
+     *
+     * @param recordId command identifier from [shellIntegrationState].
+     * @param maxChars positive UTF-16 code-unit limit; stored graphemes are kept whole.
+     * @param maxRows positive limit on physical output rows copied from the end of the range.
+     * @throws IllegalArgumentException if either limit is nonpositive, even when output is unavailable.
+     */
+    @JvmOverloads
+    public fun commandOutputText(
+        recordId: Int,
+        maxChars: Int = 32_768,
+        maxRows: Int = 256,
+    ): TerminalCommandOutputText? {
+        require(maxChars > 0) { "maxChars must be positive" }
+        require(maxRows > 0) { "maxRows must be positive" }
+        return synchronized(mutationLock) {
+            if (processingOutput) return@synchronized null
+            val integration = runtime.shellIntegration ?: return@synchronized null
+            val revision = integration.state.revision.value
+            val result = integration.commandOutputText(recordId, maxChars, maxRows)
+            result.takeIf { revision == integration.state.revision.value }
+        }
+    }
+
+    /**
      * Captures a conditional-edit context from the selected authoritative shell
      * producer. Returns null before start, during shutdown or output processing, while the writer has
      * pending/active work, when editing is unavailable, or for a producer without

@@ -88,6 +88,13 @@ tracker while collectors are present and stops it after the last collector
 leaves. Read the snapshot after invalidation: revisions may be conflated. Use
 the session's conditional-edit APIs when admitting asynchronous suggestions.
 
+Completed output is available through
+[`TerminalSession.commandOutputText`](../ketraterm-session/README.md#completed-command-output).
+The producer resolves the recorded primary-buffer range under session
+serialization and copies only a bounded tail. The result reports caller
+truncation separately from missing history; it never reads alternate-screen text
+as primary command output.
+
 ## Readiness and trust
 
 With workspace PowerShell hooks and PSReadLine, this producer also decodes

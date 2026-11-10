@@ -30,6 +30,15 @@ If no Unix shell is discovered, the registry uses the PTY default command.
 Discovery does not enumerate WSL distributions. Other shells can be configured
 explicitly; recognition alone does not install shell hooks.
 
+## Completed command context
+
+Library consumers can read a bounded tail of a completed command's rendered
+output through `TerminalSession.commandOutputText`, with separate flags for
+caller truncation and missing history. The OSC producer supports primary-buffer
+output identified by command markers, including retained output after closure.
+Unavailable or unfinished ranges remain unknown. See the
+[consumer contract and example](../../ketraterm-session/README.md#completed-command-output).
+
 ## Prompt hooks and completion dialects
 
 Hooks emit OSC 133 prompt/command markers and OSC 7 working-directory reports.
