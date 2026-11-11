@@ -18,26 +18,29 @@ package io.github.ketraterm.app.config
 import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.KeyStroke
 
-/** Standalone suggestion shortcuts. Comma-separated Swing key strokes; an empty value disables an action. */
+/** Typed standalone shortcuts. Text parsing and serialization belong to the configuration boundary. */
 @OptIn(ExperimentalShellSuggestionsApi::class)
 internal data class SuggestionKeyBindings(
-    val popupAccept: String = "TAB",
-    val popupSelectedAccept: String = "ENTER",
-    val inlineAccept: String = "TAB, RIGHT",
-    val trigger: String = "ctrl SPACE",
+    val popupAccept: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)),
+    val inlineAccept: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0)),
+    val trigger: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)),
 ) {
-    private val popupKeys = parse(popupAccept)
-    private val selectedKeys = parse(popupSelectedAccept)
-    private val inlineKeys = parse(inlineAccept)
-    private val triggerKeys = parse(trigger)
+    init {
+        require(listOf(popupAccept, inlineAccept, trigger).all { keys -> keys.all(::isValidShortcut) }) {
+            "Suggestion shortcuts must be pressed keys"
+        }
+    }
+
+    fun effectivePopupAccept(allowEnter: Boolean): Set<KeyStroke> =
+        if (allowEnter) popupAccept else popupAccept.filterNot { it.keyCode == KeyEvent.VK_ENTER }.toSet()
 
     fun popupAction(event: KeyEvent): SwingShellSuggestionAction? =
         when (KeyStroke.getKeyStrokeForEvent(event)) {
-            in selectedKeys -> SwingShellSuggestionAction.ACCEPT_SELECTED
-            in popupKeys -> SwingShellSuggestionAction.ACCEPT_SELECTED
+            in popupAccept -> SwingShellSuggestionAction.ACCEPT_SELECTED
             else ->
                 SwingShellSuggestionKeymap.STANDARD.actionFor(event)?.takeUnless {
                     it == SwingShellSuggestionAction.ACCEPT || it == SwingShellSuggestionAction.ACCEPT_SELECTED
@@ -45,28 +48,15 @@ internal data class SuggestionKeyBindings(
         }
 
     fun inlineAction(event: KeyEvent): SwingShellSuggestionAction? =
-        if (KeyStroke.getKeyStrokeForEvent(event) in inlineKeys) {
+        if (KeyStroke.getKeyStrokeForEvent(event) in inlineAccept) {
             SwingShellSuggestionAction.ACCEPT_SELECTED
         } else {
             SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)?.takeIf { it == SwingShellSuggestionAction.DISMISS }
         }
 
-    fun triggers(event: KeyEvent): Boolean = KeyStroke.getKeyStrokeForEvent(event) in triggerKeys
+    fun triggers(event: KeyEvent): Boolean = KeyStroke.getKeyStrokeForEvent(event) in trigger
 
     companion object {
-        fun isValid(value: String): Boolean = runCatching { parse(value) }.isSuccess
-
-        private fun parse(value: String): Set<KeyStroke> {
-            if (value.isBlank()) return emptySet()
-            return value
-                .split(',')
-                .map { text ->
-                    val key = KeyStroke.getKeyStroke(text.trim())
-                    require(key != null && key.keyCode != KeyEvent.VK_UNDEFINED && !key.isOnKeyRelease) {
-                        "Expected a pressed Swing key stroke, for example TAB or ctrl SPACE"
-                    }
-                    key
-                }.toSet()
-        }
+        fun isValidShortcut(key: KeyStroke): Boolean = key.keyCode != KeyEvent.VK_UNDEFINED && !key.isOnKeyRelease
     }
 }

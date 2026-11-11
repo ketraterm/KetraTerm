@@ -105,14 +105,20 @@ command text is never included in these alerts.
 
 Suggestion bindings are comma-separated pressed Swing key strokes, such as
 `TAB`, `RIGHT`, `ctrl SPACE`, or `shift TAB`. A blank string disables the action.
-Malformed file values fall back per field; the settings dialog rejects invalid
-bindings. Popup navigation and dismissal retain their standard keys. Library
-consumers can replace the complete keymaps through the public Swing API.
+Malformed file values fall back per field. Saved values may include the explicit
+`pressed` token, for example `ctrl pressed SPACE`. Strings are confined to TOML;
+the app uses typed `KeyStroke` values internally. The Suggestions settings page
+records key presses and displays removable chips instead of editable strings.
+The two popup acceptance fields form one **Accept selected popup** row. Removing
+Enter there also disables `accept_selected_suggestion_with_enter`. Popup
+navigation and dismissal retain their standard keys. Library consumers can
+replace the complete keymaps through the public Swing API.
 
 Use the master switch to disable all suggestions. To use only inline history,
 enable it and disable `popup_suggestions_enabled`; to use only popups, leave
 inline history off. `shell_suggestions_enabled = false` keeps explicit popups
-available when the popup surface is enabled.
+available when the popup surface is enabled. These combinations appear in the
+settings page as popup modes **Off**, **On request**, and **Automatic**.
 
 Paste handling is independent of the local PTY's newline policy. Legacy `raw`
 and `normalize-line-endings` values load as `preserve`; saving writes the

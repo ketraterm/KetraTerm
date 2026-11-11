@@ -24,10 +24,8 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import javax.swing.KeyStroke
+import kotlin.test.*
 
 @OptIn(ExperimentalShellSuggestionsApi::class)
 class SuggestionKeyBindingsTest {
@@ -44,7 +42,12 @@ class SuggestionKeyBindingsTest {
 
     @Test
     fun `custom shortcuts replace defaults and blanks disable acceptance`() {
-        val bindings = SuggestionKeyBindings("ctrl J", "ctrl K", "ctrl L", "alt SPACE")
+        val bindings =
+            SuggestionKeyBindings(
+                popupAccept = setOf(stroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK), stroke(KeyEvent.VK_K, InputEvent.CTRL_DOWN_MASK)),
+                inlineAccept = setOf(stroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK)),
+                trigger = setOf(stroke(KeyEvent.VK_SPACE, InputEvent.ALT_DOWN_MASK)),
+            )
         assertNull(bindings.popupAction(key(KeyEvent.VK_TAB)))
         assertNull(bindings.popupAction(key(KeyEvent.VK_ENTER)))
         assertNull(bindings.inlineAction(key(KeyEvent.VK_RIGHT)))
@@ -53,12 +56,12 @@ class SuggestionKeyBindingsTest {
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, bindings.inlineAction(key(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK)))
         assertFalse(bindings.triggers(key(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)))
         assertTrue(bindings.triggers(key(KeyEvent.VK_SPACE, InputEvent.ALT_DOWN_MASK)))
-        val disabled = SuggestionKeyBindings("", "", "", "")
+        val disabled = SuggestionKeyBindings(emptySet(), emptySet(), emptySet())
         assertNull(disabled.popupAction(key(KeyEvent.VK_TAB)))
         assertNull(disabled.inlineAction(key(KeyEvent.VK_TAB)))
         assertFalse(disabled.triggers(key(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)))
-        for (invalid in listOf("not a key", "typed x", "released TAB", "TAB,")) {
-            assertFalse(SuggestionKeyBindings.isValid(invalid), invalid)
+        for (invalid in listOf(KeyStroke.getKeyStroke('x'), KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0, true))) {
+            assertFailsWith<IllegalArgumentException> { SuggestionKeyBindings(inlineAccept = setOf(invalid)) }
         }
     }
 
@@ -72,7 +75,12 @@ class SuggestionKeyBindingsTest {
             KetraTermConfig(
                 popupSuggestionsEnabled = false,
                 inlineHistorySuggestionsEnabled = true,
-                suggestionKeyBindings = SuggestionKeyBindings("ctrl J", "", "RIGHT", "alt SPACE"),
+                suggestionKeyBindings =
+                    SuggestionKeyBindings(
+                        popupAccept = setOf(stroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK)),
+                        inlineAccept = setOf(stroke(KeyEvent.VK_RIGHT)),
+                        trigger = setOf(stroke(KeyEvent.VK_SPACE, InputEvent.ALT_DOWN_MASK)),
+                    ),
             )
         manager.save(config)
         assertEquals(config, manager.load())
@@ -88,10 +96,50 @@ class SuggestionKeyBindingsTest {
         )
         val loaded = manager.load()
         assertFalse(loaded.popupSuggestionsEnabled)
-        assertEquals("TAB", loaded.suggestionKeyBindings.popupAccept)
-        assertEquals("ctrl L", loaded.suggestionKeyBindings.inlineAccept)
-        assertEquals("", loaded.suggestionKeyBindings.trigger)
+        assertEquals(setOf(stroke(KeyEvent.VK_TAB), stroke(KeyEvent.VK_ENTER)), loaded.suggestionKeyBindings.popupAccept)
+        assertEquals(setOf(stroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK)), loaded.suggestionKeyBindings.inlineAccept)
+        assertTrue(loaded.suggestionKeyBindings.trigger.isEmpty())
     }
+
+    @Test
+    fun `legacy popup lists merge into one typed action and retain Enter opt out`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("config.toml")
+        Files.writeString(
+            path,
+            """
+            [behavior]
+            popup_accept_keys = 'TAB, ctrl J'
+            popup_selected_accept_keys = 'ENTER, ctrl K'
+            accept_selected_suggestion_with_enter = false
+            """.trimIndent(),
+        )
+        val manager = KetraTermConfigManager(path)
+        val loaded = manager.load()
+        assertFalse(loaded.acceptSelectedSuggestionWithEnter)
+        assertEquals(
+            setOf(
+                stroke(KeyEvent.VK_TAB),
+                stroke(KeyEvent.VK_ENTER),
+                stroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK),
+                stroke(KeyEvent.VK_K, InputEvent.CTRL_DOWN_MASK),
+            ),
+            loaded.suggestionKeyBindings.popupAccept,
+        )
+        assertFalse(stroke(KeyEvent.VK_ENTER) in loaded.suggestionKeyBindings.effectivePopupAccept(false))
+        manager.save(loaded)
+        assertEquals(loaded, manager.load())
+        for (invalid in listOf("not a key", "typed x", "released TAB", "TAB,")) {
+            Files.writeString(path, "[behavior]\ninline_accept_keys = '$invalid'\n")
+            assertEquals(SuggestionKeyBindings().inlineAccept, manager.load().suggestionKeyBindings.inlineAccept)
+        }
+    }
+
+    private fun stroke(
+        code: Int,
+        modifiers: Int = 0,
+    ): KeyStroke = KeyStroke.getKeyStroke(code, modifiers)
 
     private fun key(
         code: Int,

@@ -25,8 +25,10 @@ a pane releases those UI resources; closing its workspace tab closes the session
 `InlineHistorySuggestions` supplies bounded results from retained session metadata.
 The Swing view owns independent popup/inline scheduling, request lifetime,
 rendering, collision checks, and edit admission.
-`SuggestionKeyBindings` validates and interprets the standalone acceptance and
-invocation preferences; library hosts can supply their own keymap implementations.
+`SuggestionKeyBindings` holds typed acceptance and invocation shortcuts.
+`ShortcutEditor` records pressed keys on the Suggestions settings page;
+`KetraTermConfigManager` parses and serializes their TOML representation.
+Library hosts can supply their own keymap implementations.
 
 `TerminalPasteClipboard` reviews unsafe explicit paste before returning captured
 text to the view. `TerminalBellDispatcher` bounds and coalesces per-window feedback

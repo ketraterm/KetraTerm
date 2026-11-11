@@ -103,8 +103,8 @@ the native helper.
 
 ## Completion
 
-KetraTerm suggestions are enabled by default. Use the Shell Suggestions section
-in settings to change automatic popups, Enter acceptance, and learning persistence.
+KetraTerm suggestions are enabled by default. Use the **Suggestions** settings
+page to change inline history, popup mode, shortcuts, and learning persistence.
 The master switch is also available in `config.toml`; restart the app after
 editing the file directly:
 
@@ -124,8 +124,8 @@ Suggestions combine built-in command specifications, local files and directories
 and bounded learning. WSL or remote directory reports do not provide a remote
 filesystem completion service.
 
-To try inline history, enable **Show inline suggestions from this terminal's
-history** in Shell Suggestions. This is off by default and works independently
+To try inline history, enable **Inline suggestions** on the Suggestions page.
+This is off by default and works independently
 of automatic popups. Execute a command, then type its prefix at a later prompt.
 Tab or Right accepts a visible suffix while the popup is passive. Up/Down select
 popup items and hide inline text; Tab or Enter then inserts that choice without
@@ -134,10 +134,15 @@ shell completion and Enter executes the directory already entered. Escape dismis
 [inline history contract](../../docs/features/completion.md#inline-suffix-presentation)
 for matching and shell-prediction limits.
 
-The same settings section has a separate popup enable switch and editable keys
-for popup insertion, selected-item insertion, inline insertion, and explicit popup
-invocation. Inline and popup sources can be enabled independently; the master
-switch disables both. Blank binding fields disable an action.
+Choose popup mode **Off**, **On request**, or **Automatic**. Automatic popups
+include command names by default; clear **Include command names** to show them
+only for parameters. Inline and popup sources work independently; the master
+switch disables both.
+
+The three shortcut rows control accepting inline text, accepting a selected popup
+item, and opening the popup. Click **+**, then press the shortcut to add it. Click
+a chip to remove it; removing every chip disables that action. Remove Enter from
+**Accept selected popup** to keep Enter available to the shell.
 
 Learning stays in memory unless persistence is enabled explicitly. Persisted
 learning can include plaintext command data; filtering cannot identify every

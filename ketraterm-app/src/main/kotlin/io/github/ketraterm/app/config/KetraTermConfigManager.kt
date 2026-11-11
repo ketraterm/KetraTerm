@@ -21,13 +21,32 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import java.awt.event.KeyEvent
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
+import javax.swing.KeyStroke
 
 private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_persistence_enabled"
+
+private fun suggestionKeys(
+    text: String?,
+    fallback: Set<KeyStroke>,
+): Set<KeyStroke> {
+    if (text == null) return fallback
+    if (text.isBlank()) return emptySet()
+    val keys =
+        text.split(',').map {
+            val key = KeyStroke.getKeyStroke(it.trim()) ?: return fallback
+            if (!SuggestionKeyBindings.isValidShortcut(key)) return fallback
+            key
+        }
+    return keys.toSet()
+}
+
+private fun suggestionKeysText(keys: Set<KeyStroke>): String = TomlParser.quoteString(keys.joinToString(", ") { it.toString() })
 
 /**
  * Manages loading and saving the [KetraTermConfig] TOML file.
@@ -62,6 +81,7 @@ internal class KetraTermConfigManager(
         }
 
         val default = KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY)
+        val defaultPopupKeys = default.suggestionKeyBindings.popupAccept
         val recovery = default.copy(clipboardWrite = TerminalClipboardPermission.DENY, titlePermission = TerminalTitlePermission.DENY)
         return try {
             val content = Files.readString(configPath)
@@ -227,17 +247,18 @@ internal class KetraTermConfigManager(
                 suggestionKeyBindings =
                     SuggestionKeyBindings(
                         popupAccept =
-                            behavior["popup_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
-                                ?: default.suggestionKeyBindings.popupAccept,
-                        popupSelectedAccept =
-                            behavior["popup_selected_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
-                                ?: default.suggestionKeyBindings.popupSelectedAccept,
+                            suggestionKeys(
+                                behavior["popup_accept_keys"],
+                                defaultPopupKeys.filterNot { it.keyCode == KeyEvent.VK_ENTER }.toSet(),
+                            ) +
+                                suggestionKeys(
+                                    behavior["popup_selected_accept_keys"],
+                                    defaultPopupKeys.filter { it.keyCode == KeyEvent.VK_ENTER }.toSet(),
+                                ),
                         inlineAccept =
-                            behavior["inline_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
-                                ?: default.suggestionKeyBindings.inlineAccept,
+                            suggestionKeys(behavior["inline_accept_keys"], default.suggestionKeyBindings.inlineAccept),
                         trigger =
-                            behavior["suggestions_trigger_keys"]?.takeIf(SuggestionKeyBindings::isValid)
-                                ?: default.suggestionKeyBindings.trigger,
+                            suggestionKeys(behavior["suggestions_trigger_keys"], default.suggestionKeyBindings.trigger),
                     ),
                 inlineHistorySuggestionsEnabled =
                     behavior["inline_history_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.inlineHistorySuggestionsEnabled,
@@ -375,10 +396,18 @@ internal class KetraTermConfigManager(
         smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
         popup_suggestions_enabled = ${config.popupSuggestionsEnabled}
-        popup_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.popupAccept)}
-        popup_selected_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.popupSelectedAccept)}
-        inline_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.inlineAccept)}
-        suggestions_trigger_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.trigger)}
+        popup_accept_keys = ${suggestionKeysText(
+            config.suggestionKeyBindings.popupAccept
+                .filterNot { it.keyCode == KeyEvent.VK_ENTER }
+                .toSet(),
+        )}
+        popup_selected_accept_keys = ${suggestionKeysText(
+            config.suggestionKeyBindings.popupAccept
+                .filter { it.keyCode == KeyEvent.VK_ENTER }
+                .toSet(),
+        )}
+        inline_accept_keys = ${suggestionKeysText(config.suggestionKeyBindings.inlineAccept)}
+        suggestions_trigger_keys = ${suggestionKeysText(config.suggestionKeyBindings.trigger)}
         # Opt-in history suffixes from this pane; independent of automatic popups
         inline_history_suggestions_enabled = ${config.inlineHistorySuggestionsEnabled}
         shell_suggestion_automatic_mode = "${config.shellSuggestionAutomaticMode.name.lowercase(Locale.ROOT)}"

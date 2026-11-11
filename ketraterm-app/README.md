@@ -59,15 +59,17 @@ for file locations, recognized keys, defaults, and recovery behavior. Restart th
 application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
-Suggestions are enabled by default. Use the Shell Suggestions section in settings
-to control popup and inline suggestions independently, their acceptance bindings,
-automatic popups, Enter acceptance, and learning persistence.
+Suggestions are enabled by default. The **Suggestions** settings page controls
+inline history, popup mode (**Off**, **On request**, or **Automatic**), shortcuts,
+and learning persistence. Add shortcuts by pressing the keys; click a shortcut
+chip to remove it. Removing Enter from **Accept selected popup** keeps Enter
+available to the shell.
 Ctrl+Space requests suggestions when the popup surface is enabled, even when
 automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
 
-Inline history suggestions are opt-in in the same settings section. They suggest
+Inline history suggestions are opt-in on the same page. They suggest
 recent completed commands from the current pane; see the
 [inline history contract](../docs/features/completion.md#inline-suffix-presentation)
 for matching, dismissal, and shell-prediction behavior.

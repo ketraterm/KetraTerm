@@ -24,10 +24,12 @@ Completion and automatic suggestions are **enabled by default in both products**
 for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
 Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
 explicitly, including when automatic popups are disabled.
-Settings expose the master switch, automatic popups, Enter acceptance, and optional
-learning persistence. Automatic popups can appear **Always** (the default) or
-**Only for parameters**. Parameter-only mode includes subcommands, options, and
-arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set `smart_suggestions_enabled`
+Settings expose the master switch, automatic popups, acceptance shortcuts, and
+optional learning persistence. The standalone **Suggestions** page offers popup
+modes **Off**, **On request**, and **Automatic** (the default). Clear **Include
+command names** to restrict automatic popups to parameters, including subcommands,
+options, and arguments; Ctrl+Space can still complete an executable name.
+Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Library hosts enable and configure their own provider and presentation.
 
@@ -38,7 +40,8 @@ Whole-command replays have a small row budget; learned ranking continues to
 influence live results. See the
 [history suggestion policy](../../ketraterm-completion/docs/completion-architecture.md#history-suggestion-policy).
 
-Use **Reset learned suggestions...** in settings to clear learned commands and
+Use **Reset learning…** on the standalone Suggestions page, or the IDE's learning
+reset control, to clear learned commands and
 ranking preferences. See [saved learning and reset behavior](../reference/storage.md#completion-learning).
 
 Terminal suggestions require an editable command context, normally supplied by
@@ -279,8 +282,8 @@ both default to 75 ms. Disabling automation preserves manual control,
 and automatic requests never replace a valid manual interaction. See the
 [inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
-The standalone application offers opt-in **Show inline suggestions from this
-terminal's history**, off by default. It scans at most the 200 most recent retained
+The standalone application offers opt-in **Inline suggestions** on its
+**Suggestions** settings page, off by default. It scans at most the 200 most recent retained
 command records in the current pane and chooses the newest completed single-line
 command extending the typed prefix. Matching is case-sensitive and restricted to
 the current working directory when known. Empty prefixes produce no suggestion.
