@@ -242,6 +242,13 @@ for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
+Popup and inline automation have separate switches and debounce delays. Both
+require `smartSuggestionsEnabled`; disabling either automatic switch leaves
+explicit requests available. Zero delay starts without debouncing; negative
+delays are rejected. Both surfaces default to 75 ms,
+with automatic inline disabled. Changes take effect through `reloadSettings()`.
+For fully host-owned scheduling, disable both automatic switches and use the
+explicit request APIs. Invocation shortcuts remain host-owned.
 Late shell-command inventory updates refresh eligible automatic suggestions after
 the normal debounce, even when the typed text is unchanged.
 Automatic and explicit requests both capture the current editing context before
@@ -380,10 +387,49 @@ geometry remove it too. The view borrows the edit context; clearing presentation
 does not cancel it. Ghost text never enters selection copying, search, command
 output, scrollback, or the live grid.
 
-The overload above provides rendering only and claims no acceptance keys. For
-provider collection and guarded whole-suggestion acceptance, create an independent
-inline interaction on the EDT. Managed requests respect `smartSuggestionsEnabled`;
-callers still choose when to start them:
+The overload above provides rendering only and claims no acceptance keys.
+Successful rendering-only presentation also retires pending automatic inline
+requests for the current command. For
+provider collection and guarded whole-suggestion acceptance, install an independent
+inline provider on the EDT. Optional automatic requests reuse the popup scheduler's
+eligibility, invalidation, and dismissal logic, with independent timing:
+
+```kotlin
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.suggestion.*
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun automaticSuggestionSettings() = SwingSettings.create {
+    it.smartSuggestionsEnabled = true
+    it.shellSuggestionsEnabled = true
+    it.shellSuggestionDebounceMillis = 75
+    it.inlineShellSuggestionsEnabled = true
+    it.inlineShellSuggestionDebounceMillis = 200
+}
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun configureAutomaticSuggestions(
+    view: SwingTerminal,
+    popupProvider: SwingShellSuggestionProvider,
+    inlineProvider: SwingInlineShellSuggestionProvider,
+) {
+    view.setShellSuggestionProvider(popupProvider)
+    view.setInlineShellSuggestionProvider(inlineProvider)
+}
+```
+
+Construct the view with these settings, or update its settings provider and call
+`reloadSettings()`. Inline providers survive rebinding and remain host-owned.
+Changing/removing the configured inline provider or disabling its automatic switch
+cancels automatic work without closing a manual interaction. Automatic requests
+never replace a current manual interaction. `requestActiveInlineShellSuggestions()`
+explicitly requests the configured provider even when automatic inline is disabled.
+Automatic inline needs a nonblank prefix; the popup scheduler retains its existing
+prefix threshold. Inline work does not refresh merely because popup inventory changes.
+
+For direct control over each request and provider, create an inline interaction
+on the EDT. Managed requests respect `smartSuggestionsEnabled`:
 
 ```kotlin
 import io.github.ketraterm.ui.swing.api.SwingTerminal

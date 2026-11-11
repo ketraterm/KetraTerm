@@ -323,6 +323,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun removeSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun removeShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
 	public final fun removeShellSuggestionInvalidationListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInvalidationListener;)V
+	public final fun requestActiveInlineShellSuggestions ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public final fun requestActiveInlineShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public static synthetic fun requestActiveInlineShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun requestActiveShellSuggestions ()V
 	public final fun requestActiveShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
 	public final fun requestActiveShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;)V
@@ -354,6 +357,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public static synthetic fun setHostPolicy$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setInlineShellSuggestionCoexistence (Lio/github/ketraterm/ui/swing/suggestion/SwingInlineShellSuggestionCoexistence;)V
 	public final fun setInlineShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
+	public final fun setInlineShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingInlineShellSuggestionProvider;)V
 	public final fun setSearchCaseSensitive (Z)V
 	public final fun setSearchRegex (Z)V
 	public final fun setSearchWholeWord (Z)V
@@ -629,6 +633,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public final fun getInlineShellSuggestionDebounceMillis ()I
+	public final fun getInlineShellSuggestionsEnabled ()Z
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
@@ -664,6 +670,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionDebounceMillis ()I
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -697,6 +704,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public final fun getInlineShellSuggestionDebounceMillis ()I
+	public final fun getInlineShellSuggestionsEnabled ()Z
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
@@ -731,6 +740,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionDebounceMillis ()I
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -758,6 +768,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setFractionalMetrics (Ljava/lang/Object;)V
 	public final fun setHyperlinkActivationForeground (I)V
 	public final fun setInactiveSelectionStyle (Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;)V
+	public final fun setInlineShellSuggestionDebounceMillis (I)V
+	public final fun setInlineShellSuggestionsEnabled (Z)V
 	public final fun setLineHeight (F)V
 	public final fun setMiddleClickPaste (Z)V
 	public final fun setMiddleClickPasteSource (Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;)V
@@ -792,6 +804,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationPromptDotHoverHaloColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
 	public final fun setShellSuggestionAutomaticMode (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;)V
+	public final fun setShellSuggestionDebounceMillis (I)V
 	public final fun setShellSuggestionStyle (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V

@@ -49,8 +49,16 @@ internal class InlineShellSuggestionController(
         }
     var keymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.INLINE_STANDARD
     val publication get() = active?.takeIf { it.isActive }?.snapshot
+    var isAutomatic: Boolean = false
+        private set
 
-    fun begin(feedback: SwingShellSuggestionFeedbackHandler): SwingShellSuggestionInteraction? {
+    fun isRequestCurrent(): Boolean = active?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
+
+    fun begin(
+        feedback: SwingShellSuggestionFeedbackHandler,
+        automatic: Boolean = false,
+    ): SwingShellSuggestionInteraction? {
+        if (automatic && !isAutomatic && isRequestCurrent()) return null
         val revision = sourceRevision + 1
         close(SwingShellSuggestionCloseReason.SUPERSEDED)
         if (sourceRevision != revision || active != null) return null
@@ -80,6 +88,7 @@ internal class InlineShellSuggestionController(
         interaction.sessionEditContext = expected
         interaction.contextIsCurrent = { session() === bound && eligible() && bound.isCommandEditCurrent(expected) }
         active = interaction
+        isAutomatic = automatic
         selectedPopup = if (coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION) popupCommand() else null
         interaction.addChangeListener {
             if (active === interaction) {
@@ -87,6 +96,7 @@ internal class InlineShellSuggestionController(
                     render()
                 } else {
                     active = null
+                    isAutomatic = false
                     source = null
                     sourceJob?.cancel()
                     observation?.cancel()
@@ -250,6 +260,7 @@ internal class InlineShellSuggestionController(
     fun close(reason: SwingShellSuggestionCloseReason = SwingShellSuggestionCloseReason.CANCELLED) {
         val previous = active
         active = null
+        isAutomatic = false
         source = null
         feedbackForPublication = null
         sourceRevision++

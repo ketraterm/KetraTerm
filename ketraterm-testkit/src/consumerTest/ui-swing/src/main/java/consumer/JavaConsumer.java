@@ -56,6 +56,20 @@ import java.util.List;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static SwingSettings automaticSuggestionSettings() {
+        return SwingSettings.create(draft -> {
+            draft.setSmartSuggestionsEnabled(true);
+            draft.setShellSuggestionsEnabled(true);
+            draft.setShellSuggestionDebounceMillis(75);
+            draft.setInlineShellSuggestionsEnabled(true);
+            draft.setInlineShellSuggestionDebounceMillis(200);
+        });
+    }
+    public static io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction requestConfiguredInline(
+            SwingTerminal view, io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
+        view.setInlineShellSuggestionProvider(provider);
+        return view.requestActiveInlineShellSuggestions();
+    }
     public static void inlineProvider(SwingTerminal view,
             io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
         var interaction = view.beginInlineShellSuggestionInteraction();

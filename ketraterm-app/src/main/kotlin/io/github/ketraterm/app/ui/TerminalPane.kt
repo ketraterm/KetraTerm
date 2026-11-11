@@ -54,12 +54,10 @@ internal class TerminalPane private constructor(
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
     private var fontSizeAdjustment = 0
-    private val inlineHistory =
-        InlineHistorySuggestions(
-            terminal,
-            tab.session,
-            enabled = { settings.config.smartSuggestionsEnabled && settings.config.inlineHistorySuggestionsEnabled },
-        )
+
+    init {
+        terminal.setInlineShellSuggestionProvider(InlineHistorySuggestions(tab.session))
+    }
 
     private fun currentSettings(): SwingSettings {
         val current = settings.current()
@@ -91,7 +89,6 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         terminal.setShellSuggestionProvider(completionProvider.takeIf { settings.config.popupSuggestionsEnabled })
-        inlineHistory.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
         exitBanner.refreshColors()
@@ -103,7 +100,7 @@ internal class TerminalPane private constructor(
         failure: Throwable?,
     ) {
         if (closed.get()) return
-        inlineHistory.close()
+        terminal.setInlineShellSuggestionProvider(null)
         setCompletionProvider(null)
         exitBanner.showExitStatus(exitCode, failure)
         component.revalidate()
@@ -179,7 +176,6 @@ internal class TerminalPane private constructor(
         val shortcut = shortcutController
         shortcutController = null
         var failure: Throwable? = null
-        failure = captureCleanupFailure(failure, inlineHistory::close)
         failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcut?.dispose() }

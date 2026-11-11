@@ -272,7 +272,11 @@ through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary termi
 text painter, clips wrapped previews to free visible cells, and requires current
 command-edit authority. Independent inline providers share the guarded interaction
 contract with popup providers, with separate cancellation, configurable keymaps,
-and a default compatibility rule for simultaneous presentation. See the
+and a default compatibility rule for simultaneous presentation. Both surfaces
+support optional automatic scheduling with independent debounce delays, or explicit
+caller-owned requests. Automatic inline defaults to off; popup and inline delays
+both default to 75 ms. Disabling automation preserves manual control,
+and automatic requests never replace a valid manual interaction. See the
 [inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
 The standalone application offers opt-in **Show inline suggestions from this
@@ -282,7 +286,7 @@ command extending the typed prefix. Matching is case-sensitive and restricted to
 the current working directory when known. Empty prefixes produce no suggestion.
 This source reads session metadata and adds no history file or persistence.
 
-Requests start after a 150 ms pause in command-edit activity. History and popup
+Requests start after a 75 ms pause in command-edit activity. History and popup
 sources are independent and may offer unrelated results. Tab or Right accepts
 visible inline text while the popup is passive. Deliberate popup browsing hides
 inline text, including late results; Tab or Enter then inserts the selected popup

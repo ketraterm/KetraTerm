@@ -89,6 +89,26 @@ fun showSuffix(
     suffix: String,
 ): Boolean = view.presentInlineShellSuggestion(expected, suffix)
 
+fun automaticSuggestionSettings() =
+    SwingSettings.create {
+        it.smartSuggestionsEnabled = true
+        it.shellSuggestionsEnabled = true
+        it.shellSuggestionDebounceMillis = 75
+        it.inlineShellSuggestionsEnabled = true
+        it.inlineShellSuggestionDebounceMillis = 200
+    }
+
+fun configureAutomaticSuggestions(
+    view: SwingTerminal,
+    popupProvider: SwingShellSuggestionProvider,
+    inlineProvider: SwingInlineShellSuggestionProvider,
+) {
+    view.setShellSuggestionProvider(popupProvider)
+    view.setInlineShellSuggestionProvider(inlineProvider)
+}
+
+fun requestConfiguredInline(view: SwingTerminal): SwingShellSuggestionInteraction? = view.requestActiveInlineShellSuggestions()
+
 fun requestInline(
     view: SwingTerminal,
     generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,

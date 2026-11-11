@@ -35,7 +35,7 @@ internal class SwingShellSuggestionScheduler(
     private val isRequestCurrent: () -> Boolean,
     private val requestSuggestions: (TerminalShellCommandLineSnapshot, SwingShellSuggestionFeedbackHandler) -> Boolean,
     private val hideSuggestions: (refreshing: Boolean) -> Unit,
-    private val debounceMillis: Int = 75,
+    private var debounceMillis: Int = 75,
     private val minimumNonWhitespaceCharacters: Int = 2,
 ) {
     private var observationJob: Job? = null
@@ -55,7 +55,10 @@ internal class SwingShellSuggestionScheduler(
             lastRequest = null
         }
 
-    fun start(session: TerminalSession) {
+    fun start(
+        session: TerminalSession,
+        observeCommandInventory: Boolean = true,
+    ) {
         checkEdt()
         if (session.isClosed) {
             stop()
@@ -64,9 +67,18 @@ internal class SwingShellSuggestionScheduler(
         start(
             session::activeShellCommandLine,
             session.activeShellCommandLineRevision,
-            session.shellCommandInventory,
+            if (observeCommandInventory) session.shellCommandInventory else null,
             session.commandEditChanges,
         )
+    }
+
+    /** Reschedules pending work without forgetting dismissal or explicit-request ownership. */
+    fun updateDebounceMillis(value: Int) {
+        checkEdt()
+        require(value >= 0) { "debounceMillis must be nonnegative" }
+        if (debounceMillis == value) return
+        debounceMillis = value
+        scheduleRefresh()
     }
 
     internal fun start(
@@ -122,6 +134,11 @@ internal class SwingShellSuggestionScheduler(
                             initialRevisionObserved = true
                             val invalidation = invalidatedRevision
                             if (commandRevision == invalidation) return@collect
+                            if (dismissedCommandText != null) {
+                                val current = activeCommandLine()
+                                if (lifecycleRevision != revision) return@collect
+                                if (current?.commandText != dismissedCommandText) dismissedCommandText = null
+                            }
                             if (initialRevision && invalidation != null && invalidation < 0L) {
                                 val current = activeCommandLine()
                                 if (lifecycleRevision != revision) return@collect

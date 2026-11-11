@@ -50,7 +50,7 @@ class InlineHistorySuggestionsTest {
             f.remember("git show\nunsafe")
             f.enable()
             f.dispatcher.scheduler.runCurrent()
-            f.dispatcher.scheduler.advanceTimeBy(149)
+            f.dispatcher.scheduler.advanceTimeBy(74)
             f.dispatcher.scheduler.runCurrent()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             f.advance()
@@ -69,11 +69,11 @@ class InlineHistorySuggestionsTest {
             f.enable()
             if (alreadyVisible) f.advance()
             f.enabled = false
-            f.owner.reloadSettings()
+            f.terminal.reloadSettings()
             f.advance()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             f.enable()
-            f.owner.close()
+            f.terminal.setInlineShellSuggestionProvider(null)
             f.advance()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             assertFalse(f.session.isClosed)
@@ -192,6 +192,7 @@ class InlineHistorySuggestionsTest {
                     SwingSettings.create {
                         it.smartSuggestionsEnabled = smart
                         it.shellSuggestionsEnabled = false
+                        it.inlineShellSuggestionsEnabled = enabled
                     }
                 },
                 SwingHostServices.create {
@@ -200,7 +201,6 @@ class InlineHistorySuggestionsTest {
                 },
                 dispatcher,
             )
-        val owner: InlineHistorySuggestions
         private var recordLine = 100L
 
         init {
@@ -211,7 +211,7 @@ class InlineHistorySuggestionsTest {
             focus()
             dispatcher.scheduler.runCurrent()
             history.recordCurrentWorkingDirectory("file:///project")
-            owner = InlineHistorySuggestions(terminal, session, { enabled }, dispatcher)
+            terminal.setInlineShellSuggestionProvider(InlineHistorySuggestions(session))
         }
 
         fun focus() = terminal.focusListeners.forEach { it.focusGained(FocusEvent(terminal, FocusEvent.FOCUS_GAINED)) }
@@ -232,7 +232,7 @@ class InlineHistorySuggestionsTest {
 
         fun enable() {
             enabled = true
-            owner.reloadSettings()
+            terminal.reloadSettings()
         }
 
         fun advance() {
@@ -240,7 +240,6 @@ class InlineHistorySuggestionsTest {
         }
 
         override fun close() {
-            owner.close()
             terminal.dispose()
             session.close()
             dispatcher.scheduler.runCurrent()

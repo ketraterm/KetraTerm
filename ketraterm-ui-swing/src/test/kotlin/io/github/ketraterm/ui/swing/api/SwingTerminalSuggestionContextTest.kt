@@ -45,6 +45,241 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @Test
+    fun `rendering only inline presentation retires pending automatic requests without claiming keys`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var opened = 0
+            view.setInlineShellSuggestionProvider {
+                opened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = true }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            val expected = assertNotNull(fixture.session.captureCommandEdit())
+            assertTrue(view.presentInlineShellSuggestion(expected, "tatus"))
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, opened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\t", writes.toString("UTF-8"))
+            assertFalse(expected.isCancelled)
+        }
+
+    @Test
+    fun `configured providers remain manual when automatic requests are disabled`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, popupOpened)
+            assertEquals(0, inlineOpened)
+            view.requestActiveShellSuggestions()
+            val manual = assertNotNull(view.requestActiveInlineShellSuggestions())
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(1, popupOpened)
+            assertEquals(1, inlineOpened)
+            assertTrue(manual.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `popup and inline automatic providers use independent delays and content`(inlineFirst: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                assertNull(it.selectedPopupCommandText)
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash --all"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionsEnabled = true
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionDebounceMillis = if (inlineFirst) 150 else 50
+                    it.inlineShellSuggestionDebounceMillis = if (inlineFirst) 50 else 150
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(49)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, popupOpened)
+            assertEquals(0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(if (inlineFirst) 0 else 1, popupOpened)
+            assertEquals(if (inlineFirst) 1 else 0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(99)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened + inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened)
+            assertEquals(1, inlineOpened)
+            assertTrue(view.currentShellSuggestionState().visible)
+            // Disabling automatic popups must not retire or restart the independent inline result.
+            fixture.settings = fixture.settings.copy { it.shellSuggestionsEnabled = false }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertFalse(view.currentShellSuggestionState().visible)
+            assertEquals(1, inlineOpened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `changing delays reschedules only each surface pending deadline`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionsEnabled = true
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionDebounceMillis = 200
+                    it.inlineShellSuggestionDebounceMillis = 400
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(100)
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionDebounceMillis = 20
+                    it.inlineShellSuggestionDebounceMillis = 600
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(19)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, popupOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened)
+            dispatcher.scheduler.advanceTimeBy(579)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, inlineOpened)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["disable", "provider", "replace", "unbind", "dispose", "master", "focus", "selection"])
+    fun `automatic inline pending work follows its own settings provider and binding`(change: String) =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var originalOpened = 0
+            var replacementOpened = 0
+            view.setInlineShellSuggestionProvider {
+                originalOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git status"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 100
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(50)
+            when (change) {
+                "disable" -> {
+                    fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = false }
+                    view.reloadSettings()
+                }
+                "master" -> {
+                    fixture.settings = fixture.settings.copy { it.smartSuggestionsEnabled = false }
+                    view.reloadSettings()
+                }
+                "provider" -> view.setInlineShellSuggestionProvider(null)
+                "replace" ->
+                    view.setInlineShellSuggestionProvider {
+                        replacementOpened++
+                        SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+                    }
+                "unbind" -> view.unbind()
+                "dispose" -> view.dispose()
+                "focus" -> view.focusListeners.forEach { it.focusLost(FocusEvent(view, FocusEvent.FOCUS_LOST)) }
+                "selection" -> assertTrue(view.selectAll())
+            }
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, originalOpened)
+            assertEquals(if (change == "replace") 1 else 0, replacementOpened)
+            if (change != "replace") assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @Test
+    fun `manual inline replaces delayed automatic AI and survives automatic settings and provider changes`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            var opened = 0
+            var replacementOpened = 0
+            view.setInlineShellSuggestionProvider {
+                val automatic = ++opened == 1
+                SwingShellSuggestionSource(
+                    flow {
+                        if (automatic) withContext(NonCancellable) { release.await() }
+                        emit(listOf(inlineCandidate(if (automatic) "git status" else "git stash")))
+                    },
+                )
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 0
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, opened)
+            val manual = assertNotNull(view.requestActiveInlineShellSuggestions())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(2, opened)
+            fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = false }
+            view.reloadSettings()
+            view.setInlineShellSuggestionProvider {
+                replacementOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git show"))))
+            }
+            release.complete(Unit)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(manual.isActive)
+            assertEquals(0, replacementOpened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash", writes.toString("UTF-8"))
+        }
+
     @ParameterizedTest
     @ValueSource(strings = ["popup-replace", "popup-publish", "inline-replace", "inline-publish"])
     fun `mapped Tab cannot accept a replacement interaction or publication`(change: String) =
@@ -1040,6 +1275,7 @@ class SwingTerminalSuggestionContextTest {
                     assertTrue(fixture.terminal.currentShellSuggestionState().visible)
                 }
                 release.complete(Unit)
+                onEdt { dispatcher.scheduler.runCurrent() }
                 fixture.view.awaitVisible()
                 onEdt {
                     assertEquals(visibility, fixture.view.visibilityChanges)
