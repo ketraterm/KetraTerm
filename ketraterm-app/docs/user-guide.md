@@ -115,13 +115,29 @@ smart_suggestions_enabled = true
 
 Suggestions need an editable command context from shell integration. Press
 Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
-accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
-Tab completion is separate. When no editable shell context is available,
+accept a deliberately selected item, and Escape to dismiss. Enter also accepts a
+deliberately selected suggestion by default. With no deliberate popup selection or
+visible inline text, Tab reaches the shell's own completion. When no editable shell context is available,
 Ctrl+Space reaches the running application instead.
 
 Suggestions combine built-in command specifications, local files and directories,
 and bounded learning. WSL or remote directory reports do not provide a remote
 filesystem completion service.
+
+To try inline history, enable **Show inline suggestions from this terminal's
+history** in Shell Suggestions. This is off by default and works independently
+of automatic popups. Execute a command, then type its prefix at a later prompt.
+Tab or Right accepts a visible suffix while the popup is passive. Up/Down select
+popup items and hide inline text; Tab or Enter then inserts that choice without
+execution. Fresh child suggestions remain passive for Tab and Enter: Tab invokes
+shell completion and Enter executes the directory already entered. Escape dismisses the popup first, then inline text. See the
+[inline history contract](../../docs/features/completion.md#inline-suffix-presentation)
+for matching and shell-prediction limits.
+
+The same settings section has a separate popup enable switch and editable keys
+for popup insertion, selected-item insertion, inline insertion, and explicit popup
+invocation. Inline and popup sources can be enabled independently; the master
+switch disables both. Blank binding fields disable an action.
 
 Learning stays in memory unless persistence is enabled explicitly. Persisted
 learning can include plaintext command data; filtering cannot identify every

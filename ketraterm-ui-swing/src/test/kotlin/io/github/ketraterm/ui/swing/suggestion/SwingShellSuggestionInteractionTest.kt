@@ -24,6 +24,26 @@ import javax.swing.SwingUtilities
 
 class SwingShellSuggestionInteractionTest {
     @Test
+    fun `provider and hover selection stay passive while deliberate selection survives only equivalent reranking`() =
+        onEdt {
+            val interaction = SwingShellSuggestionInteraction(SwingShellSuggestionRequest("cd x", 4))
+            val xyz = SwingShellSuggestion("xyz/", 3, 4, "paths", "PATH")
+            val other = xyz.copy(replacementText = "xxx/")
+            interaction.publish(listOf(xyz, other), selectedIndex = 0)
+            assertFalse(interaction.hasExplicitSelection)
+            interaction.previewSelection(interaction.snapshot, 1)
+            assertFalse(interaction.hasExplicitSelection)
+            interaction.select(interaction.snapshot, 1)
+            assertTrue(interaction.hasExplicitSelection)
+            interaction.publish(listOf(other, xyz), selectedIndex = 1)
+            assertTrue(interaction.hasExplicitSelection)
+            assertEquals(other, interaction.snapshot.selectedSuggestion)
+            interaction.publish(listOf(xyz), selectedIndex = 0)
+            assertFalse(interaction.hasExplicitSelection, "A new best result must not inherit deliberate selection")
+            interaction.close()
+        }
+
+    @Test
     fun `late equivalent edit retains selection and accepts the latest candidate`() =
         onEdt {
             val handler = RecordingHandler(SwingShellSuggestionAcceptanceResult.ACCEPTED)

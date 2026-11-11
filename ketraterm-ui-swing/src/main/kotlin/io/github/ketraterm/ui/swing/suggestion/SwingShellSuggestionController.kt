@@ -38,11 +38,18 @@ internal class SwingShellSuggestionController(
     private var presentationRevision = 0L
     private var visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
     private var retentionJob: Job? = null
+
+    // Losing a selected candidate must not hand the keyboard to a late inline result.
+    var isBrowsing: Boolean = false
+        private set
     var isRefreshing: Boolean = false
         private set
     private val changeListener =
         SwingShellSuggestionInteractionListener { changed ->
-            if (interaction === changed) updatePresentation()
+            if (interaction === changed) {
+                if (changed.hasExplicitSelection) isBrowsing = true
+                updatePresentation()
+            }
         }
     private val view =
         viewFactory.create(
@@ -53,7 +60,11 @@ internal class SwingShellSuggestionController(
                 ) {
                     val current = publication(snapshot) ?: return
                     if (index !in snapshot.visibleSuggestions.indices) return
-                    interaction?.select(current, snapshot.viewportStartIndex + index)
+                    if (interaction?.hasExplicitSelection !=
+                        true
+                    ) {
+                        interaction?.previewSelection(current, snapshot.viewportStartIndex + index)
+                    }
                 }
 
                 override fun onSuggestionClicked(
@@ -84,6 +95,7 @@ internal class SwingShellSuggestionController(
         )
 
     val popup get() = view.component
+    val publication get() = interaction?.takeIf { it.isActive }?.snapshot
 
     /** Reloads built-in appearance without imposing settings on a custom presentation. */
     fun reloadAppearance() {
@@ -98,6 +110,7 @@ internal class SwingShellSuggestionController(
 
     /** Keeps only the last painted rows. Their closed publication cannot admit pointer or keyboard actions. */
     fun retainPresentation() {
+        isBrowsing = false
         if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return
         presentationRevision++
         interaction?.removeChangeListener(changeListener)
@@ -125,6 +138,7 @@ internal class SwingShellSuggestionController(
         if (!host.settings.smartSuggestionsEnabled || !interaction.isActive) return false
         reloadAppearance()
         if (this.interaction !== interaction) {
+            if (!isRefreshing) isBrowsing = interaction.hasExplicitSelection
             this.interaction?.removeChangeListener(changeListener)
             this.interaction = interaction
             viewportStartIndex = 0
@@ -137,6 +151,7 @@ internal class SwingShellSuggestionController(
     }
 
     fun hide(): Boolean {
+        isBrowsing = false
         retentionJob?.cancel()
         retentionJob = null
         isRefreshing = false
@@ -151,6 +166,7 @@ internal class SwingShellSuggestionController(
     }
 
     private fun clearPresentation() {
+        if (interaction == null) isBrowsing = false
         visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
         cleanupSwingResources(
             { view.component.isVisible = false },
@@ -174,25 +190,44 @@ internal class SwingShellSuggestionController(
         )
     }
 
-    fun handleKeyPressed(event: KeyEvent): Boolean {
-        val active = interaction ?: return false
+    fun actionFor(event: KeyEvent): SwingShellSuggestionAction? {
+        val active = interaction ?: return null
         if (!host.settings.smartSuggestionsEnabled ||
             !active.isActive ||
             !view.component.isVisible ||
             active.snapshot.suggestions.isEmpty()
         ) {
-            return false
+            return null
         }
-        val action = host.suggestionKeymap.actionFor(event) ?: return false
+        val explicitSelection = active.hasExplicitSelection
+        val acceptWithEnter = host.settings.acceptSelectedSuggestionWithEnter
+        val action = host.suggestionKeymap.actionFor(event) ?: return null
+        if (action == SwingShellSuggestionAction.ACCEPT_SELECTED && !explicitSelection) return null
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
             event.keyCode == KeyEvent.VK_ENTER &&
-            !host.settings.acceptSelectedSuggestionWithEnter
+            !acceptWithEnter
         ) {
-            return false
+            return null
         }
-        val handled = handleAction(active, action)
+        return action
+    }
+
+    fun handleKeyPressed(event: KeyEvent): Boolean {
+        val expected = publication ?: return false
+        val action = actionFor(event) ?: return false
+        val handled = handleAction(action, expected)
         if (handled) event.consume()
         return handled
+    }
+
+    fun handleAction(
+        action: SwingShellSuggestionAction,
+        expected: SwingShellSuggestionSnapshot?,
+    ): Boolean {
+        if (expected == null || publication !== expected) return true
+        val active = interaction ?: return true
+        if (!active.isActive || active.snapshot.suggestions.isEmpty()) return true
+        return handleAction(active, action)
     }
 
     private fun handleAction(
@@ -244,12 +279,7 @@ internal class SwingShellSuggestionController(
                             view.maximumVisibleSuggestions
                     ).coerceIn(0, items.lastIndex.toLong()).toInt(),
                 )
-            SwingShellSuggestionAction.ACCEPT ->
-                when {
-                    selected in items.indices -> accept(active, current, selected)
-                    items.size == 1 -> accept(active, current, 0)
-                    else -> active.select(current, 0)
-                }
+            SwingShellSuggestionAction.ACCEPT -> accept(active, current, if (selected in items.indices) selected else 0)
             SwingShellSuggestionAction.ACCEPT_SELECTED -> accept(active, current, selected)
             SwingShellSuggestionAction.DISMISS -> {
                 val revision = presentationRevision
@@ -297,7 +327,7 @@ internal class SwingShellSuggestionController(
                 val current = active.snapshot
                 val retained = current.suggestions.indexOfFirst { it.commandTextAfterReplacement(active.request) == outcome }
                 if (retained >= 0 && retained != current.selectedIndex) {
-                    active.select(current, retained)
+                    active.previewSelection(current, retained)
                     return
                 }
             }

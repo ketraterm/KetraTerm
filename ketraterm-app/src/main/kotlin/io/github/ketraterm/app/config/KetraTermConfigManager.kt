@@ -223,6 +223,24 @@ internal class KetraTermConfigManager(
                 commandFinishedAlertThresholdSeconds = commandFinishedAlertThresholdSeconds,
                 smartSuggestionsEnabled = behavior["smart_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.smartSuggestionsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
+                popupSuggestionsEnabled = behavior["popup_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.popupSuggestionsEnabled,
+                suggestionKeyBindings =
+                    SuggestionKeyBindings(
+                        popupAccept =
+                            behavior["popup_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
+                                ?: default.suggestionKeyBindings.popupAccept,
+                        popupSelectedAccept =
+                            behavior["popup_selected_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
+                                ?: default.suggestionKeyBindings.popupSelectedAccept,
+                        inlineAccept =
+                            behavior["inline_accept_keys"]?.takeIf(SuggestionKeyBindings::isValid)
+                                ?: default.suggestionKeyBindings.inlineAccept,
+                        trigger =
+                            behavior["suggestions_trigger_keys"]?.takeIf(SuggestionKeyBindings::isValid)
+                                ?: default.suggestionKeyBindings.trigger,
+                    ),
+                inlineHistorySuggestionsEnabled =
+                    behavior["inline_history_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.inlineHistorySuggestionsEnabled,
                 shellSuggestionAutomaticMode =
                     SwingShellSuggestionAutomaticMode.entries.firstOrNull {
                         it.name.equals(behavior["shell_suggestion_automatic_mode"]?.trim(), ignoreCase = true)
@@ -356,6 +374,13 @@ internal class KetraTermConfigManager(
         # Whether host-provided shell suggestions may appear in the terminal UI
         smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
+        popup_suggestions_enabled = ${config.popupSuggestionsEnabled}
+        popup_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.popupAccept)}
+        popup_selected_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.popupSelectedAccept)}
+        inline_accept_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.inlineAccept)}
+        suggestions_trigger_keys = ${TomlParser.quoteString(config.suggestionKeyBindings.trigger)}
+        # Opt-in history suffixes from this pane; independent of automatic popups
+        inline_history_suggestions_enabled = ${config.inlineHistorySuggestionsEnabled}
         shell_suggestion_automatic_mode = "${config.shellSuggestionAutomaticMode.name.lowercase(Locale.ROOT)}"
         # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
         accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}

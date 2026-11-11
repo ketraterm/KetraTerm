@@ -93,6 +93,9 @@ private fun defaultFontFamily(): String {
  * @property commandFinishedAlertThresholdSeconds minimum observed command duration in whole seconds, inclusive.
  * @property smartSuggestionsEnabled whether completion, learning, and completion persistence are available.
  * @property shellSuggestionAutomaticMode automatic popup scope; explicit requests remain unrestricted.
+ * @property popupSuggestionsEnabled whether the popup surface is available, including explicit requests.
+ * @property suggestionKeyBindings standalone acceptance and explicit-popup shortcuts.
+ * @property inlineHistorySuggestionsEnabled whether recent commands from this pane appear as inline suffixes.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
  * appear automatically. Explicit requests require only [smartSuggestionsEnabled].
  * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
@@ -132,6 +135,9 @@ internal data class KetraTermConfig(
     val commandFinishedAlertThresholdSeconds: Int = DEFAULT_COMMAND_FINISHED_ALERT_THRESHOLD_SECONDS,
     val smartSuggestionsEnabled: Boolean = DEFAULT_SMART_SUGGESTIONS_ENABLED,
     val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+    val popupSuggestionsEnabled: Boolean = true,
+    val suggestionKeyBindings: SuggestionKeyBindings = SuggestionKeyBindings(),
+    val inlineHistorySuggestionsEnabled: Boolean = DEFAULT_INLINE_HISTORY_SUGGESTIONS_ENABLED,
     val shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode = SwingShellSuggestionAutomaticMode.ALWAYS,
     val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
     val persistentSuggestionLearningEnabled: Boolean = DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED,
@@ -213,6 +219,7 @@ internal data class KetraTermConfig(
         const val COMMAND_FINISHED_ALERT_THRESHOLD_MIN: Int = TerminalCommandFinishedAlerts.MINIMUM_DURATION_SECONDS
         const val COMMAND_FINISHED_ALERT_THRESHOLD_MAX: Int = TerminalCommandFinishedAlerts.MAXIMUM_DURATION_SECONDS
         const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = true
+        const val DEFAULT_INLINE_HISTORY_SUGGESTIONS_ENABLED: Boolean = false
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false

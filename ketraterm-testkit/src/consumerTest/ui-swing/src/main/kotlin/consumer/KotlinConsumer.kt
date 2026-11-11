@@ -51,6 +51,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
@@ -93,6 +94,8 @@ fun requestInline(
     generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,
 ): SwingShellSuggestionInteraction? {
     val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    check(!interaction.hasExplicitSelection)
+    view.setShellSuggestionKeymap(SwingShellSuggestionKeymap.STANDARD)
     view.requestInlineShellSuggestions(
         interaction,
         SwingInlineShellSuggestionProvider { context ->

@@ -104,6 +104,7 @@ class SwingTerminalShellSuggestionTest {
                         ?: error("Display capture failed")
                 terminal.presentShellSuggestions(interaction)
                 interaction.publish(suggestions(), selectedIndex = 1)
+                interaction.select(interaction.snapshot, 1)
                 val publication = interaction.snapshot
                 val popup = terminal.components.filterIsInstance<SwingCompletionPopupView>().single()
                 val model = popup.list.model
@@ -723,7 +724,7 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `public suggestion popup requires tab selection before tab acceptance`() {
+    fun `public suggestion popup requires deliberate selection before tab acceptance`() {
         val accepted = ArrayList<SwingShellSuggestion>()
         val indexes = ArrayList<Int>()
         val requests = ArrayList<SwingShellSuggestionRequest>()
@@ -814,16 +815,10 @@ class SwingTerminalShellSuggestionTest {
             assertEquals(-1, state.selectedIndex)
             assertNull(state.selectedSuggestion)
 
-            // First TAB highlights first suggestion
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
             component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
-            val highlightedState = component.currentShellSuggestionState()
-            assertEquals(0, highlightedState.selectedIndex)
-            assertEquals("git status", highlightedState.selectedSuggestion?.replacementText)
-
-            // Second TAB accepts the highlighted suggestion
-            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
-            component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
+            assertFalse(component.currentShellSuggestionState().visible)
         }
 
         val expectedRequest =

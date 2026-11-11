@@ -359,6 +359,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun setSearchWholeWord (Z)V
 	public final fun setSelection (Lio/github/ketraterm/ui/swing/api/TerminalSelectionRange;)Z
 	public final fun setShellSuggestionFailureHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;)V
+	public final fun setShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
 	public final fun setShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
 	public final fun setShellSuggestionTarget (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTarget;)V
 	public final fun showVisualBell ()V
@@ -1147,6 +1148,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionI
 	public final fun close (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;)V
 	public final fun dismiss (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionSnapshot;)Z
 	public final fun getCloseReason ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;
+	public final fun getHasExplicitSelection ()Z
 	public final fun getRequest ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
 	public final fun getSnapshot ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionSnapshot;
 	public final fun isActive ()Z

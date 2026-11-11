@@ -46,10 +46,10 @@ public enum class SwingShellSuggestionAction {
     /** Moves selection toward earlier suggestions by one visible page. */
     SELECT_PREVIOUS_PAGE,
 
-    /** Selects the first suggestion when none is selected, otherwise accepts the selected suggestion. */
+    /** Accepts the selected suggestion, or the first candidate when selection is passive. */
     ACCEPT,
 
-    /** Accepts an already-selected suggestion without selecting a fallback item. */
+    /** Accepts a deliberately selected popup item, or the visible managed inline suggestion. */
     ACCEPT_SELECTED,
 
     /** Explicitly dismisses the selected suggestion. */
@@ -74,7 +74,7 @@ public fun interface SwingShellSuggestionKeymap {
     public fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
 
     public companion object {
-        /** Inline-only defaults: unmodified Tab accepts the whole suffix, Escape dismisses. */
+        /** Inline defaults: unmodified Tab or Right accepts the whole visible suffix, Escape dismisses. */
         @JvmField
         public val INLINE_STANDARD: SwingShellSuggestionKeymap =
             SwingShellSuggestionKeymap { event ->
@@ -82,14 +82,14 @@ public fun interface SwingShellSuggestionKeymap {
                     null
                 } else {
                     when (event.keyCode) {
-                        KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                        KeyEvent.VK_TAB, KeyEvent.VK_RIGHT -> SwingShellSuggestionAction.ACCEPT_SELECTED
                         KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                         else -> null
                     }
                 }
             }
 
-        /** Conventional terminal-popup bindings used by standalone Swing hosts. */
+        /** Popup defaults: Tab/Enter accept deliberate selection; passive popups leave those keys to the shell. */
         @JvmField
         public val STANDARD: SwingShellSuggestionKeymap =
             SwingShellSuggestionKeymap { event ->
@@ -105,8 +105,7 @@ public fun interface SwingShellSuggestionKeymap {
                     KeyEvent.VK_END -> SwingShellSuggestionAction.SELECT_LAST
                     KeyEvent.VK_PAGE_DOWN -> SwingShellSuggestionAction.SELECT_NEXT_PAGE
                     KeyEvent.VK_PAGE_UP -> SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE
-                    KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT
-                    KeyEvent.VK_ENTER -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                    KeyEvent.VK_TAB, KeyEvent.VK_ENTER -> SwingShellSuggestionAction.ACCEPT_SELECTED
                     KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                     else -> null
                 }

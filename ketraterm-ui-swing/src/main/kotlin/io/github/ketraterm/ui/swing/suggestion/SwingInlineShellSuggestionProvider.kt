@@ -26,8 +26,9 @@ public data class SwingInlineShellSuggestionRequest(
 
 /**
  * Host-owned inline source. [open] captures resources and feedback on the EDT; keep it cheap.
- * The returned cold source is collected off the EDT. Popup selection changes cancel collection
- * and call [open] again with updated context. Closing an interaction cancels its source.
+ * The returned cold source is collected off the EDT. Providers are independent by default.
+ * Opting into EXTEND_POPUP_SELECTION reopens the source when popup context changes.
+ * Closing an interaction cancels its source.
  */
 @ExperimentalShellSuggestionsApi
 public fun interface SwingInlineShellSuggestionProvider {
@@ -41,6 +42,6 @@ public enum class SwingInlineShellSuggestionCoexistence {
     /** Show inline only when its resulting command extends the selected popup command. */
     EXTEND_POPUP_SELECTION,
 
-    /** Permit unrelated popup and inline results to remain visible together. */
+    /** Default: permit unrelated results together while the popup is passive; browsing hides inline text. */
     INDEPENDENT,
 }

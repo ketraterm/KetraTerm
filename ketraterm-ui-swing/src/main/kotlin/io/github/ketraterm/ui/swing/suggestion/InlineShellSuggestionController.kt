@@ -32,6 +32,7 @@ internal class InlineShellSuggestionController(
     private val hide: () -> Unit,
     private val visible: () -> Boolean,
     private val popupCommand: () -> String?,
+    private val popupOwnsInput: () -> Boolean,
     private val failure: (SwingShellSuggestionInteraction, Exception) -> Unit,
 ) {
     private var active: SwingShellSuggestionInteraction? = null
@@ -41,12 +42,13 @@ internal class InlineShellSuggestionController(
     private var sourceRevision = 0L
     private var selectedPopup: String? = null
     private var feedbackForPublication: ((SwingShellSuggestionFeedbackHandler) -> Unit)? = null
-    var coexistence = SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION
+    var coexistence = SwingInlineShellSuggestionCoexistence.INDEPENDENT
         set(value) {
             field = value
-            render()
+            popupChanged()
         }
     var keymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.INLINE_STANDARD
+    val publication get() = active?.takeIf { it.isActive }?.snapshot
 
     fun begin(feedback: SwingShellSuggestionFeedbackHandler): SwingShellSuggestionInteraction? {
         val revision = sourceRevision + 1
@@ -78,7 +80,7 @@ internal class InlineShellSuggestionController(
         interaction.sessionEditContext = expected
         interaction.contextIsCurrent = { session() === bound && eligible() && bound.isCommandEditCurrent(expected) }
         active = interaction
-        selectedPopup = popupCommand()
+        selectedPopup = if (coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION) popupCommand() else null
         interaction.addChangeListener {
             if (active === interaction) {
                 if (interaction.isActive) {
@@ -171,17 +173,26 @@ internal class InlineShellSuggestionController(
     }
 
     fun popupChanged() {
-        val next = popupCommand()
-        if (next == selectedPopup) return
+        val next = if (coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION) popupCommand() else null
+        val changed = next != selectedPopup
         selectedPopup = next
         val interaction = active ?: return
         val provider = source
-        if (provider != null && interaction.validateContext()) collectSource(interaction, provider) else render()
+        if (changed && provider != null && interaction.validateContext()) collectSource(interaction, provider) else render()
+    }
+
+    /** A valid result may have arrived before the copied frame caught up to its edit context. */
+    fun frameChanged() {
+        if (!visible()) render()
     }
 
     private fun render() {
         val interaction = active ?: return
         if (!interaction.validateContext()) return
+        if (popupOwnsInput()) {
+            hide()
+            return
+        }
         val current = interaction.snapshot
         val suggestion = current.selectedSuggestion
         val result = suggestion?.commandTextAfterReplacement(interaction.request)
@@ -212,13 +223,14 @@ internal class InlineShellSuggestionController(
         return visible() && interaction.dismiss(interaction.snapshot)
     }
 
-    fun keyPressed(
-        event: KeyEvent,
-        popupVisible: Boolean,
+    fun actionFor(event: KeyEvent): SwingShellSuggestionAction? = if (active != null && visible()) keymap.actionFor(event) else null
+
+    fun handleAction(
+        action: SwingShellSuggestionAction,
+        expected: SwingShellSuggestionSnapshot?,
     ): Boolean {
-        if (active == null || !visible()) return false
-        if (popupVisible && keymap === SwingShellSuggestionKeymap.INLINE_STANDARD && event.keyCode == KeyEvent.VK_TAB) return false
-        return when (keymap.actionFor(event)) {
+        if (expected == null || publication !== expected) return true
+        return when (action) {
             SwingShellSuggestionAction.ACCEPT, SwingShellSuggestionAction.ACCEPT_SELECTED -> {
                 accept()
                 true

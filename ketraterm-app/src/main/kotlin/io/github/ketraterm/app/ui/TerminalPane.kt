@@ -27,7 +27,8 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteractionListener
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.BorderLayout
@@ -53,6 +54,12 @@ internal class TerminalPane private constructor(
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
     private var fontSizeAdjustment = 0
+    private val inlineHistory =
+        InlineHistorySuggestions(
+            terminal,
+            tab.session,
+            enabled = { settings.config.smartSuggestionsEnabled && settings.config.inlineHistorySuggestionsEnabled },
+        )
 
     private fun currentSettings(): SwingSettings {
         val current = settings.current()
@@ -83,6 +90,8 @@ internal class TerminalPane private constructor(
 
     fun reloadSettings() {
         terminal.reloadSettings()
+        terminal.setShellSuggestionProvider(completionProvider.takeIf { settings.config.popupSuggestionsEnabled })
+        inlineHistory.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
         exitBanner.refreshColors()
@@ -94,6 +103,7 @@ internal class TerminalPane private constructor(
         failure: Throwable?,
     ) {
         if (closed.get()) return
+        inlineHistory.close()
         setCompletionProvider(null)
         exitBanner.showExitStatus(exitCode, failure)
         component.revalidate()
@@ -103,10 +113,11 @@ internal class TerminalPane private constructor(
     fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
         if (closed.get()) return
         completionProvider = provider
-        terminal.setShellSuggestionProvider(provider)
+        terminal.setShellSuggestionProvider(provider.takeIf { settings.config.popupSuggestionsEnabled })
     }
 
-    override fun suggestionsEnabled(): Boolean = settings.config.smartSuggestionsEnabled && terminal.hasShellSuggestionProvider
+    override fun suggestionsEnabled(): Boolean =
+        settings.config.smartSuggestionsEnabled && settings.config.popupSuggestionsEnabled && terminal.hasShellSuggestionProvider
 
     override fun hasSelection(): Boolean = terminal.currentSelection() != null
 
@@ -122,6 +133,16 @@ internal class TerminalPane private constructor(
         if (!suggestionsEnabled()) return false
         val provider = completionProvider ?: return false
         val interaction = terminal.beginActiveShellSuggestionInteraction() ?: return false
+        interaction.addChangeListener(
+            object : SwingShellSuggestionInteractionListener {
+                override fun onInteractionChanged(interaction: SwingShellSuggestionInteraction) {
+                    if (!interaction.isActive || interaction.snapshot.suggestions.isNotEmpty()) {
+                        interaction.removeChangeListener(this)
+                        if (interaction.isActive) interaction.select(interaction.snapshot, 0)
+                    }
+                }
+            },
+        )
         terminal.presentShellSuggestions(interaction)
         terminal.requestShellSuggestions(interaction, provider)
         return true
@@ -158,6 +179,7 @@ internal class TerminalPane private constructor(
         val shortcut = shortcutController
         shortcutController = null
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, inlineHistory::close)
         failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcut?.dispose() }
@@ -191,7 +213,7 @@ internal class TerminalPane private constructor(
                                         val parent = paneRef[0]?.terminal ?: return@TerminalPasteClipboard false
                                         SwingMessageDialogs.show(parent, request) == 0
                                     }
-                                draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
+                                draft.shellSuggestionKeymap = { event -> settings.config.suggestionKeyBindings.popupAction(event) }
                                 draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
                                 draft.contextMenuHandler =
                                     SwingTerminalContextMenuHandler { request ->
@@ -203,7 +225,8 @@ internal class TerminalPane private constructor(
                     )
 
                 ownedTerminal = terminal
-                terminal.setShellSuggestionProvider(completionProvider)
+                terminal.setInlineShellSuggestionKeymap { event -> settings.config.suggestionKeyBindings.inlineAction(event) }
+                terminal.setShellSuggestionProvider(completionProvider.takeIf { settings.config.popupSuggestionsEnabled })
                 terminal.bind(tab.session, onBound)
 
                 val searchBar =

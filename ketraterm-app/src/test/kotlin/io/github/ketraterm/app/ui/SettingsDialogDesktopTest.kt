@@ -330,19 +330,32 @@ class SettingsDialogDesktopTest {
                 val checkboxes = components(dialog).filterIsInstance<JCheckBox>().associateBy { it.text }
                 val smart = checkboxes.getValue("Enable suggestions (experimental)")
                 val automatic = checkboxes.getValue("Show shell suggestions automatically")
+                val inline = checkboxes.getValue("Show inline suggestions from this terminal's history")
+                val popup = checkboxes.getValue("Enable popup suggestions")
                 val enter = checkboxes.getValue("Accept selected suggestion with Enter")
                 val persistence = checkboxes.getValue("Persist suggestion learning")
                 assertTrue(smart.isSelected)
                 assertFalse(automatic.isSelected)
+                assertFalse(inline.isSelected)
+                assertTrue(popup.isSelected)
                 assertFalse(enter.isSelected)
                 assertTrue(persistence.isSelected)
                 assertFalse(button(dialog, "Apply").isEnabled)
-                for (checkbox in listOf(smart, automatic, enter, persistence)) checkbox.doClick()
+                inline.doClick()
+                val inlineKeys = components(dialog).filterIsInstance<JTextField>().single { it.text == "TAB, RIGHT" }
+                inlineKeys.text = "not a shortcut"
+                assertFalse(button(dialog, "Apply").isEnabled)
+                inlineKeys.text = "ctrl RIGHT"
+                for (checkbox in listOf(automatic, enter, persistence, popup, smart)) checkbox.doClick()
+                assertFalse(inline.isEnabled)
                 assertTrue(button(dialog, "Apply").isEnabled)
                 button(dialog, "OK").doClick()
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertFalse(settings.config.smartSuggestionsEnabled)
+            assertTrue(settings.config.inlineHistorySuggestionsEnabled)
+            assertFalse(settings.config.popupSuggestionsEnabled)
+            assertEquals("ctrl RIGHT", settings.config.suggestionKeyBindings.inlineAccept)
             assertTrue(settings.config.shellSuggestionsEnabled)
             assertTrue(settings.config.acceptSelectedSuggestionWithEnter)
             assertFalse(settings.config.persistentSuggestionLearningEnabled)

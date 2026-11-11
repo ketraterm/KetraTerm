@@ -416,27 +416,45 @@ Provider completion preserves the final result; cancellation, failure, input,
 or lost eligibility retires obsolete work. Feedback comes from the source that
 produced the accepted or dismissed publication. Custom publication uses
 `interaction.publish(candidates, selectedIndex = 0)`; an unselected item is hidden.
+If a valid result arrives before its copied render frame is ready, frame publication
+retries presentation using the original edit context and provider result.
 
-Popup and inline results can differ. By default, inline text accompanying a
-selected embedded-popup item must extend that item's resulting command. The
-provider receives `selectedPopupCommandText` and is reopened when that context
-changes. Incompatible results stay hidden until compatible context returns.
-`setInlineShellSuggestionCoexistence(INDEPENDENT)` permits unrelated results;
-detached popup owners control that policy themselves.
+Popup and inline providers are independent by default. Their results may differ;
+popup updates neither cancel nor restart inline work. Deliberate popup browsing
+hides inline presentation, including late arrivals, while retaining its valid
+request. `setInlineShellSuggestionCoexistence(EXTEND_POPUP_SELECTION)` explicitly
+opts into compatible results: the provider receives `selectedPopupCommandText`
+and is reopened when that context changes. Detached popup owners control their
+presentation and key routing themselves.
 
-The inline standard keymap accepts the whole visible suggestion with Tab and
-dismisses it with Escape. Popup keys have first refusal; standard inline Tab is
-disabled while the embedded popup is visible. Enter and cursor movement retain
-normal terminal behavior. `setInlineShellSuggestionKeymap` accepts a custom map
-for acceptance/dismissal, including a map returning null to disable bindings.
+The inline standard keymap accepts the whole visible suggestion with Tab or Right
+at the command's end while the popup is passive. Without visible inline text,
+Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+deliberately selects a popup item and hides inline text; Tab or Enter then inserts
+that choice without executing it. Enter otherwise reaches the shell. Provider
+preselection and hover never enable Tab or Enter acceptance. A refresh preserves an
+explicit choice only while an equivalent edit remains available.
+
+After popup acceptance, fresh child results are passive for Tab and Enter, and inline
+stays hidden while the accepted command is unchanged. Tab then invokes shell completion;
+Enter executes the directory already entered. Navigate to select a child explicitly. Editing,
+dismissal, focus loss, and rebinding end that browsing context. External session edits
+also retire it, even when the command later returns to identical text. Escape dismisses an
+open popup before inline text. With standard bindings, set
+`acceptSelectedSuggestionWithEnter = false` to keep Enter shell-owned.
+
+`setShellSuggestionKeymap` and `setInlineShellSuggestionKeymap` accept custom maps
+for navigation or acceptance/dismissal, including maps returning null to disable bindings.
 `acceptInlineShellSuggestion()` and `dismissInlineShellSuggestion()` provide the
 same guarded operations for host actions. A failed acceptance never falls through
-to accepting the other surface or sending that key to the shell.
+to accepting the other surface or sending that key to the shell. Each mapped gesture
+stays bound to its original publication; reentrant keymaps cannot redirect it to a new result.
 
 Managed rendering accepts only append-only outcomes. Clipping limits displayed
 cells; acceptance inserts the entire suggestion. Clearing managed work cancels
 its owned edit context; a token passed to the rendering-only overload remains
-caller-owned. These library APIs do not enable inline suggestions in the standalone app.
+caller-owned. The standalone app's opt-in history source is documented in the
+[completion catalog](../docs/features/completion.md#inline-suffix-presentation).
 
 ## How to Extend: Custom Host Services
 

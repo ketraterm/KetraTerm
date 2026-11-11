@@ -162,6 +162,14 @@ public class SwingTerminal
         private var inlineShellSuggestion: InlineShellSuggestion? = null
         private var inlineObservationJob: Job? = null
         private var inlineCompositionActive = false
+        private var popupCompletionCommand: String? = null
+            set(value) {
+                popupCompletionObservation?.cancel()
+                popupCompletionObservation = null
+                field = value
+            }
+        private var popupCompletionObservation: Job? = null
+        private var suggestionKeymap = hostServices.shellSuggestionKeymap
         private val inlineRequests by lazy {
             InlineShellSuggestionController(
                 componentScope,
@@ -184,6 +192,11 @@ public class SwingTerminal
                     activeSuggestionInteraction?.takeIf { it.isActive && shellSuggestionController?.state()?.visible == true }?.let {
                         it.snapshot.selectedSuggestion?.commandTextAfterReplacement(it.request)
                     }
+                },
+                popupOwnsInput = {
+                    shellSuggestionController?.isBrowsing == true ||
+                        activeSuggestionInteraction?.let { it.isActive && it.hasExplicitSelection } == true ||
+                        popupCompletionCommand?.let { it == session?.activeShellCommandLine()?.commandText } == true
                 },
                 failure = { interaction, error -> suggestionFailureHandler.onSuggestionFailure(interaction.request, error) },
             )
@@ -524,6 +537,7 @@ public class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (!focused) popupCompletionCommand = null
                         if (!focused) clearInlineShellSuggestion()
                         if (settings.inactiveSelectionStyle != null) repaint()
                         if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
@@ -536,9 +550,28 @@ public class SwingTerminal
 
                     override fun handleHostKeyPressed(event: KeyEvent): Boolean = hostServices.hostKeyHandler.handleKeyPressed(event)
 
-                    override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
-                        shellSuggestionController?.handleKeyPressed(event) == true ||
-                            inlineRequests.keyPressed(event, shellSuggestionController?.state()?.visible == true)
+                    override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean {
+                        val popup = shellSuggestionController
+                        val popupPublication = popup?.publication
+                        val inlinePublication = inlineRequests.publication
+                        val popupAction = popup?.actionFor(event)
+                        // Caller keymaps can synchronously replace or republish either surface.
+                        if (popupAction != null && popup.publication !== popupPublication) return true
+                        if (popupAction != null &&
+                            popupAction != SwingShellSuggestionAction.ACCEPT &&
+                            popupAction != SwingShellSuggestionAction.ACCEPT_SELECTED
+                        ) {
+                            val handled = popup.handleAction(popupAction, popupPublication)
+                            if (popupAction == SwingShellSuggestionAction.DISMISS) {
+                                popupCompletionCommand = null
+                                inlineRequests.popupChanged()
+                            }
+                            return handled
+                        }
+                        val inlineAction = inlineRequests.actionFor(event)
+                        if (inlineAction != null && inlineRequests.handleAction(inlineAction, inlinePublication)) return true
+                        return popupAction != null && popup.handleAction(popupAction, popupPublication)
+                    }
 
                     override fun invalidateShellSuggestions() {
                         invalidateShellSuggestionsOnEdt(retainPresentation = true)
@@ -1480,14 +1513,24 @@ public class SwingTerminal
             return inlineRequests.dismiss()
         }
 
-        /** Replaces inline-only Tab/Escape defaults. Popup bindings always get first refusal. */
+        /**
+         * Replaces inline Tab/Right/Escape defaults. Inline acceptance wins while the popup is
+         * passive; deliberate popup browsing hides inline text and owns its acceptance keys.
+         */
         @ExperimentalShellSuggestionsApi
         public fun setInlineShellSuggestionKeymap(keymap: SwingShellSuggestionKeymap) {
             check(SwingUtilities.isEventDispatchThread()) { "inline keymap must run on the EDT" }
             inlineRequests.keymap = keymap
         }
 
-        /** Sets compatibility with the selected popup command; defaults to EXTEND_POPUP_SELECTION. */
+        /** Replaces popup bindings on the EDT. Selected-only actions still require deliberate selection. */
+        @ExperimentalShellSuggestionsApi
+        public fun setShellSuggestionKeymap(keymap: SwingShellSuggestionKeymap) {
+            check(SwingUtilities.isEventDispatchThread()) { "popup keymap must run on the EDT" }
+            suggestionKeymap = keymap
+        }
+
+        /** Sets optional compatibility with popup content; defaults to independent providers. */
         @ExperimentalShellSuggestionsApi
         public fun setInlineShellSuggestionCoexistence(policy: SwingInlineShellSuggestionCoexistence) {
             check(SwingUtilities.isEventDispatchThread()) { "inline policy must run on the EDT" }
@@ -1573,6 +1616,7 @@ public class SwingTerminal
             onComplete: (Throwable?) -> Unit,
         ) = selectionController.deferChanges {
             if (disposed) return@deferChanges
+            popupCompletionCommand = null
             bindingIdentity.set(false)
             cleanupSwingResources(
                 ::clearInlineShellSuggestion,
@@ -1636,6 +1680,7 @@ public class SwingTerminal
                                     .collect {
                                         if (this@SwingTerminal.session === session) {
                                             handlePublishedFrameOnEdt()
+                                            inlineRequests.frameChanged()
                                         }
                                     }
                             }
@@ -1686,6 +1731,7 @@ public class SwingTerminal
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
+                popupCompletionCommand = null
                 bindingIdentity.set(false)
                 bindingIdentity = AtomicBoolean(false)
                 cleanupSwingResources(
@@ -2264,6 +2310,7 @@ public class SwingTerminal
                 return
             }
             shellSuggestionProvider = provider
+            popupCompletionCommand = null
             val revision = ++suggestionConfigurationRevision
             suggestionScheduler?.stop()
             cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider replaced")
@@ -2281,6 +2328,7 @@ public class SwingTerminal
             if (disposed || shellSuggestionTarget === target) return
             val previous = shellSuggestionTarget
             shellSuggestionTarget = target
+            popupCompletionCommand = null
             val revision = ++suggestionConfigurationRevision
             suggestionScheduler?.stop()
             val cancellationRevision = suggestionRevision + 1
@@ -2447,7 +2495,23 @@ public class SwingTerminal
                         if (disposed || session !== bound || suggestionRevision != revision) {
                             SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
                         } else {
-                            captured.tryAccept(acceptance)
+                            val identity = bindingIdentity
+                            captured.tryAccept(acceptance).also { result ->
+                                if (result == SwingShellSuggestionAcceptanceResult.ACCEPTED &&
+                                    !disposed &&
+                                    session === bound &&
+                                    bindingIdentity === identity &&
+                                    identity.get()
+                                ) {
+                                    if (bound != null && expected != null) {
+                                        popupCompletionCommand = acceptance.suggestion.commandTextAfterReplacement(acceptance.request)
+                                        observePopupCompletion(bound)
+                                    } else {
+                                        popupCompletionCommand = null
+                                    }
+                                    inlineRequests.popupChanged()
+                                }
+                            }
                         }
 
                     override fun close() = captured.close()
@@ -2717,7 +2781,11 @@ public class SwingTerminal
         @ExperimentalShellSuggestionsApi
         public fun hideShellSuggestions() {
             runOnEdt {
-                cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
+                popupCompletionCommand = null
+                cleanupSwingResources(
+                    { cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden") },
+                    inlineRequests::popupChanged,
+                )
             }
         }
 
@@ -3001,7 +3069,7 @@ public class SwingTerminal
             shellSuggestionController ?: SwingShellSuggestionController(
                 object : SwingShellSuggestionHost {
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
-                    override val suggestionKeymap get() = hostServices.shellSuggestionKeymap
+                    override val suggestionKeymap get() = this@SwingTerminal.suggestionKeymap
 
                     override fun revalidate() = this@SwingTerminal.revalidate()
 
@@ -3069,7 +3137,33 @@ public class SwingTerminal
             return true
         }
 
+        private fun observePopupCompletion(bound: TerminalSession) {
+            val command = popupCompletionCommand ?: return
+            val observation =
+                componentScope.launch(start = CoroutineStart.LAZY) {
+                    var expected: TerminalCommandEditContext? = null
+                    try {
+                        bound.commandEditChanges.collect {
+                            val current = expected
+                            if (current == null) {
+                                // Wait for the accepted command's echo. This token only tracks
+                                // browsing lifetime; it never admits a suggestion edit.
+                                if (bound.activeShellCommandLine()?.commandText == command) expected = bound.captureCommandEdit()
+                            } else if (!bound.isCommandEditCurrent(current)) {
+                                popupCompletionCommand = null
+                                inlineRequests.popupChanged()
+                            }
+                        }
+                    } finally {
+                        expected?.cancel()
+                    }
+                }
+            popupCompletionObservation = observation
+            observation.start()
+        }
+
         private fun invalidateShellSuggestionsOnEdt(retainPresentation: Boolean = false) {
+            popupCompletionCommand = null
             clearInlineShellSuggestion()
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input", retainPresentation = retainPresentation)
             suggestionScheduler?.onInvalidated()
@@ -3261,6 +3355,7 @@ public class SwingTerminal
             renderMappingChanged: Boolean,
             scrollComplete: Boolean,
         ) {
+            popupCompletionCommand = null
             clearInlineShellSuggestion()
             viewportInteractionRevision++
             val boundSession = session

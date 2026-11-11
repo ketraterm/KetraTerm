@@ -30,7 +30,7 @@ class SwingShellSuggestionKeymapTest {
         assertEquals(SwingShellSuggestionAction.SELECT_NEXT, action(KeyEvent.VK_DOWN))
         assertEquals(SwingShellSuggestionAction.SELECT_PREVIOUS, action(KeyEvent.VK_UP))
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, action(KeyEvent.VK_ENTER))
-        assertEquals(SwingShellSuggestionAction.ACCEPT, action(KeyEvent.VK_TAB))
+        assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, action(KeyEvent.VK_TAB))
         assertEquals(SwingShellSuggestionAction.DISMISS, action(KeyEvent.VK_ESCAPE))
     }
 

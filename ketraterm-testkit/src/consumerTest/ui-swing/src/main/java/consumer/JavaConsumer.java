@@ -59,6 +59,8 @@ public final class JavaConsumer {
     public static void inlineProvider(SwingTerminal view,
             io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
         var interaction = view.beginInlineShellSuggestionInteraction();
+        if (interaction != null && interaction.getHasExplicitSelection()) throw new AssertionError("New requests are passive");
+        view.setShellSuggestionKeymap(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.STANDARD);
         if (interaction != null) view.requestInlineShellSuggestions(interaction, provider);
         view.setInlineShellSuggestionCoexistence(
             io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionCoexistence.INDEPENDENT);

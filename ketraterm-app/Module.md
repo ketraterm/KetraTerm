@@ -22,6 +22,12 @@ host permissions, and shutdown through `TerminalWorkspace`. Each `TerminalPane`
 owns its terminal view, search bar, prompts, and shortcut registrations. Closing
 a pane releases those UI resources; closing its workspace tab closes the session.
 
+`InlineHistorySuggestions` owns each pane's optional history-suggestion scheduling.
+It reads retained session metadata and uses the Swing managed inline provider API;
+rendering, collision checks, and edit admission remain library-owned.
+`SuggestionKeyBindings` validates and interprets the standalone acceptance and
+invocation preferences; library hosts can supply their own keymap implementations.
+
 `TerminalPasteClipboard` reviews unsafe explicit paste before returning captured
 text to the view. `TerminalBellDispatcher` bounds and coalesces per-window feedback
 before the EDT applies current preferences and pane-lifetime checks.

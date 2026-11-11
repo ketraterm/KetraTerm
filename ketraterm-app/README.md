@@ -60,10 +60,17 @@ application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
 Suggestions are enabled by default. Use the Shell Suggestions section in settings
-to control completion, automatic popups, Enter acceptance, and learning persistence.
-Ctrl+Space requests suggestions even when automatic popups are disabled. Without
+to control popup and inline suggestions independently, their acceptance bindings,
+automatic popups, Enter acceptance, and learning persistence.
+Ctrl+Space requests suggestions when the popup surface is enabled, even when
+automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
+
+Inline history suggestions are opt-in in the same settings section. They suggest
+recent completed commands from the current pane; see the
+[inline history contract](../docs/features/completion.md#inline-suffix-presentation)
+for matching, dismissal, and shell-prediction behavior.
 
 Native local profiles receive a small `ketra` companion command:
 

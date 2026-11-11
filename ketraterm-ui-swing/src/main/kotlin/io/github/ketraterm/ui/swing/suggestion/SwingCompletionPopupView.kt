@@ -169,7 +169,8 @@ internal class SwingCompletionPopupView(
                 list.setListData(snapshot.visibleSuggestions.toTypedArray())
             }
             this.snapshot = snapshot
-            list.selectedIndex = snapshot.selectedIndex
+            list.selectedIndex =
+                if (snapshot.publication?.owner?.hasExplicitSelection == false) -1 else snapshot.selectedIndex
             list.visibleRowCount = snapshot.visibleSuggestions.size
             position.isVisible = snapshot.hasSuggestionsBefore || snapshot.hasSuggestionsAfter
             val first = if (snapshot.visibleSuggestions.isEmpty()) 0 else snapshot.viewportStartIndex + 1

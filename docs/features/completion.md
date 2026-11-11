@@ -56,6 +56,12 @@ KetraTerm does not guess how cursor-positioned rows form an editable command.
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+An automatic popup is passive: provider preselection and hover do not enable
+Tab or Enter acceptance. Deliberate navigation selects an item; Tab or Enter inserts it without
+executing when that preference is enabled. After acceptance, new results become
+passive again, so Enter executes the committed command rather than accepting a
+new child directory. With no visible inline text or deliberate popup selection,
+Tab reaches the shell for its own completion, even when there is only one candidate.
 Automatic refreshes cannot replace an active Ctrl+Space request.
 After Escape, automatic suggestions remain dismissed across cursor movement and
 focus changes until the command text changes. Completion candidates that leave the
@@ -269,7 +275,25 @@ contract with popup providers, with separate cancellation, configurable keymaps,
 and a default compatibility rule for simultaneous presentation. See the
 [inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
-The standalone application does not enable this presentation by default.
+The standalone application offers opt-in **Show inline suggestions from this
+terminal's history**, off by default. It scans at most the 200 most recent retained
+command records in the current pane and chooses the newest completed single-line
+command extending the typed prefix. Matching is case-sensitive and restricted to
+the current working directory when known. Empty prefixes produce no suggestion.
+This source reads session metadata and adds no history file or persistence.
+
+Requests start after a 150 ms pause in command-edit activity. History and popup
+sources are independent and may offer unrelated results. Tab or Right accepts
+visible inline text while the popup is passive. Deliberate popup browsing hides
+inline text, including late results; Tab or Enter then inserts the selected popup
+item. A popup acceptance keeps inline hidden while the accepted command remains
+unchanged. Fresh child suggestions require deliberate navigation before host
+acceptance; otherwise Tab invokes shell completion and Enter executes the entered command.
+Escape dismisses an open popup first, then inline text until command text changes.
+The suggestions master switch gates inline history; the automatic-popup switch
+does not. Focus loss, selection, scrolling, and stale editing authority hide
+obsolete text. Existing shell predictions or text after the cursor suppress host
+ghost text; this source does not turn off the shell's own prediction settings.
 
 ## Learning and privacy
 

@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.app.config.SuggestionKeyBindings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalStartupCommand
@@ -253,6 +254,13 @@ internal class SettingsDialog(
         JCheckBox(appMessages.text("settings.smartSuggestions"), settings.config.smartSuggestionsEnabled)
     private val shellSuggestionsCheckbox =
         JCheckBox(appMessages.text("settings.shellSuggestions"), settings.config.shellSuggestionsEnabled)
+    private val popupSuggestionsCheckbox = JCheckBox(appMessages.text("settings.popupSuggestions"), settings.config.popupSuggestionsEnabled)
+    private val popupAcceptKeys = JTextField(settings.config.suggestionKeyBindings.popupAccept, 22)
+    private val popupSelectedAcceptKeys = JTextField(settings.config.suggestionKeyBindings.popupSelectedAccept, 22)
+    private val inlineAcceptKeys = JTextField(settings.config.suggestionKeyBindings.inlineAccept, 22)
+    private val suggestionTriggerKeys = JTextField(settings.config.suggestionKeyBindings.trigger, 22)
+    private val inlineHistorySuggestionsCheckbox =
+        JCheckBox(appMessages.text("settings.inlineHistorySuggestions"), settings.config.inlineHistorySuggestionsEnabled)
     private val automaticSuggestionsAlways =
         JRadioButton(appMessages.text("settings.shellSuggestions.always")).apply {
             isSelected = settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.ALWAYS
@@ -380,10 +388,17 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(smartSuggestionsCheckbox, updateApplyState)
         registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(popupSuggestionsCheckbox, updateApplyState)
+        for (field in listOf(popupAcceptKeys, popupSelectedAcceptKeys, inlineAcceptKeys, suggestionTriggerKeys)) {
+            registerChangeListener(field, updateApplyState)
+            field.toolTipText = appMessages.text("settings.suggestionKeys.help")
+        }
+        registerChangeListener(inlineHistorySuggestionsCheckbox, updateApplyState)
         registerChangeListener(automaticSuggestionsAlways, updateApplyState)
         registerChangeListener(automaticSuggestionsParameters, updateApplyState)
         smartSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
         shellSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
+        popupSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
         updateAutomaticSuggestionModes()
         registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
         registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
@@ -635,9 +650,10 @@ internal class SettingsDialog(
         panel.add(SectionHeader(appMessages.text("settings.suggestions")))
         val suggestionsSection = createSectionPanel()
         addCheckboxRow(suggestionsSection, 0, smartSuggestionsCheckbox, appMessages.text("settings.smartSuggestions.description"))
+        addCheckboxRow(suggestionsSection, 2, popupSuggestionsCheckbox, appMessages.text("settings.popupSuggestions.description"))
         addCheckboxRow(
             suggestionsSection,
-            2,
+            4,
             shellSuggestionsCheckbox,
             appMessages.text("settings.shellSuggestions.description"),
         )
@@ -649,7 +665,7 @@ internal class SettingsDialog(
                 add(automaticSuggestionsParameters)
             },
             GridBagConstraints().apply {
-                gridy = 4
+                gridy = 6
                 gridwidth = 2
                 anchor = GridBagConstraints.WEST
                 insets = Insets(0, 24, 8, 0)
@@ -657,13 +673,19 @@ internal class SettingsDialog(
         )
         addCheckboxRow(
             suggestionsSection,
-            6,
+            8,
             acceptSelectedSuggestionWithEnterCheckbox,
             appMessages.text("settings.acceptSuggestionWithEnter.description"),
         )
         addCheckboxRow(
             suggestionsSection,
-            8,
+            10,
+            inlineHistorySuggestionsCheckbox,
+            appMessages.text("settings.inlineHistorySuggestions.description"),
+        )
+        addCheckboxRow(
+            suggestionsSection,
+            12,
             persistentSuggestionLearningCheckbox,
             appMessages.text("settings.persistSuggestionLearning.description"),
         )
@@ -675,12 +697,16 @@ internal class SettingsDialog(
                 add(learningResetStatus)
             },
             GridBagConstraints().apply {
-                gridy = 10
+                gridy = 14
                 gridwidth = 2
                 anchor = GridBagConstraints.WEST
                 insets = Insets(4, 0, 12, 0)
             },
         )
+        addFormRow(suggestionsSection, 16, appMessages.text("settings.popupAcceptKeys"), popupAcceptKeys)
+        addFormRow(suggestionsSection, 17, appMessages.text("settings.popupSelectedAcceptKeys"), popupSelectedAcceptKeys)
+        addFormRow(suggestionsSection, 18, appMessages.text("settings.inlineAcceptKeys"), inlineAcceptKeys)
+        addFormRow(suggestionsSection, 19, appMessages.text("settings.suggestionTriggerKeys"), suggestionTriggerKeys)
         panel.add(suggestionsSection)
 
         panel.add(SectionHeader(appMessages.text("settings.mouse")))
@@ -925,6 +951,13 @@ internal class SettingsDialog(
         shellRequestWindowManipulationCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
         shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
+        popupSuggestionsCheckbox.isSelected = true
+        val bindingDefaults = SuggestionKeyBindings()
+        popupAcceptKeys.text = bindingDefaults.popupAccept
+        popupSelectedAcceptKeys.text = bindingDefaults.popupSelectedAccept
+        inlineAcceptKeys.text = bindingDefaults.inlineAccept
+        suggestionTriggerKeys.text = bindingDefaults.trigger
+        inlineHistorySuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_INLINE_HISTORY_SUGGESTIONS_ENABLED
         automaticSuggestionsAlways.isSelected = true
         updateAutomaticSuggestionModes()
         acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
@@ -944,6 +977,18 @@ internal class SettingsDialog(
 
     private fun applyChanges(closeAfterSave: Boolean = false) {
         if (saving) return
+        if (!suggestionBindingsValid()) {
+            SwingMessageDialogs.show(
+                this,
+                SwingDialogRequest(
+                    appMessages.text("settings.suggestionKeys.invalidTitle"),
+                    appMessages.text("settings.suggestionKeys.help"),
+                    SwingDialogRequest.Severity.ERROR,
+                    options = listOf(appMessages.text("button.ok")),
+                ),
+            )
+            return
+        }
         val uiState = getUiState()
         try {
             TerminalStartupCommand.fromText(uiState.startupCommand)
@@ -1053,7 +1098,7 @@ internal class SettingsDialog(
     }
 
     private fun updateApplyButtonState() {
-        val hasChanges = model.hasChanges(getUiState())
+        val hasChanges = suggestionBindingsValid() && model.hasChanges(getUiState())
         applyButton.isEnabled = !saving && hasChanges
         if (hasChanges) {
             applyButton.putClientProperty("JButton.buttonType", "default")
@@ -1105,6 +1150,15 @@ internal class SettingsDialog(
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
             smartSuggestionsEnabled = smartSuggestionsCheckbox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
+            popupSuggestionsEnabled = popupSuggestionsCheckbox.isSelected,
+            suggestionKeyBindings =
+                SuggestionKeyBindings(
+                    popupAcceptKeys.text,
+                    popupSelectedAcceptKeys.text,
+                    inlineAcceptKeys.text,
+                    suggestionTriggerKeys.text,
+                ),
+            inlineHistorySuggestionsEnabled = inlineHistorySuggestionsCheckbox.isSelected,
             shellSuggestionAutomaticMode =
                 if (automaticSuggestionsParameters.isSelected) {
                     SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
@@ -1130,10 +1184,21 @@ internal class SettingsDialog(
     }
 
     private fun updateAutomaticSuggestionModes() {
-        val enabled = smartSuggestionsCheckbox.isSelected && shellSuggestionsCheckbox.isSelected
+        inlineHistorySuggestionsCheckbox.isEnabled = smartSuggestionsCheckbox.isSelected
+        popupSuggestionsCheckbox.isEnabled = smartSuggestionsCheckbox.isSelected
+        shellSuggestionsCheckbox.isEnabled = smartSuggestionsCheckbox.isSelected && popupSuggestionsCheckbox.isSelected
+        val enabled = smartSuggestionsCheckbox.isSelected && popupSuggestionsCheckbox.isSelected && shellSuggestionsCheckbox.isSelected
         automaticSuggestionsAlways.isEnabled = enabled
         automaticSuggestionsParameters.isEnabled = enabled
     }
+
+    private fun suggestionBindingsValid(): Boolean =
+        listOf(
+            popupAcceptKeys,
+            popupSelectedAcceptKeys,
+            inlineAcceptKeys,
+            suggestionTriggerKeys,
+        ).all { SuggestionKeyBindings.isValid(it.text) }
 
     private fun registerChangeListener(
         comp: Component,

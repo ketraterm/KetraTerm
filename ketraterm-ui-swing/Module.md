@@ -29,6 +29,9 @@ detached suffix cache. `InlineShellSuggestionController` independently owns mana
 inline interactions, provider collection, popup-selection context, feedback, and
 guarded key actions. It reuses `SwingShellSuggestionInteraction` and the session
 edit target; the rendering-only API still borrows a caller-owned token.
+`SwingShellSuggestionInteraction` distinguishes provider preselection from deliberate
+selection. The popup controller retains browsing intent across reranking; the view
+coordinates acceptance keys and suppresses inline presentation during popup browsing.
 
 `GridPainter` paints the detached cells through the ordinary
 `TerminalTextPainter`, preserving font fallback, shaping, and cursor layering.
