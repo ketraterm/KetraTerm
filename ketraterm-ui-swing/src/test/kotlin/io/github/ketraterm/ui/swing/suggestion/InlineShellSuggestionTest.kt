@@ -22,6 +22,7 @@ import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.render.GridPainter
+import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
@@ -29,6 +30,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.AlphaComposite
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -36,6 +39,79 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InlineShellSuggestionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["x", "e\u0301", "界", "❤️", "🚀", "xאב", "xسل"])
+    fun `block cursor redraws the first ghost glyph using ordinary cursor foreground`(suffix: String) =
+        runTest {
+            fixture { session, input, _ ->
+                input.feed("\u001b[?25h\u001b[1 q")
+                val expected = assertNotNull(session.captureCommandEdit())
+                val live = cache(session)
+                val preview = assertNotNull(session.captureCommandSuffixPreview(expected, suffix))
+                assertTrue(InlineShellSuggestion(session, expected, preview, null).reconcile(live))
+                val painter = GridPainter()
+                val (actual, metrics) = paint(live, preview, painter = painter)
+                val (repeated, _) = paint(live, preview, painter = painter)
+                val (withoutCursor, _) = paint(live, preview, cursorBlinkVisible = false)
+                val (blankCursor, _) = paint(live)
+                input.feed(suffix)
+                val ordinaryFrame = cache(session)
+                val logicalColumn = TerminalBidiLayout().row(ordinaryFrame, 0)?.logicalColumn(3) ?: 3
+                input.feed("\u001b[${logicalColumn + 1}G")
+                val (ordinary, _) = paint(cache(session))
+                var glyphPixels = 0
+                for (y in 0 until metrics.cellHeight) {
+                    for (x in 3 * metrics.cellWidth until 4 * metrics.cellWidth) {
+                        assertEquals(ordinary.getRGB(x, y), actual.getRGB(x, y), "cursor glyph $suffix at $x,$y")
+                        if (actual.getRGB(x, y) != blankCursor.getRGB(x, y)) glyphPixels++
+                    }
+                }
+                assertTrue(glyphPixels > 0, "First ghost glyph must be readable inside the block cursor")
+                for (y in 0 until actual.height) {
+                    for (x in 0 until actual.width) {
+                        if (y >= metrics.cellHeight || x !in 3 * metrics.cellWidth until 4 * metrics.cellWidth) {
+                            assertEquals(withoutCursor.getRGB(x, y), actual.getRGB(x, y), "Cursor recoloring escaped its cell at $x,$y")
+                        }
+                    }
+                }
+                assertContentEquals(pixels(actual), pixels(repeated))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["abcde", "abcdef"])
+    fun `wrapped ghost text preserves the live cursor cell and its real glyph`(prefix: String) =
+        runTest {
+            fixture(prefix = prefix) { session, input, _ ->
+                input.feed("\u001b[?25h\u001b[1 q")
+                val expected = assertNotNull(session.captureCommandEdit())
+                val live = cache(session)
+                val preview = assertNotNull(session.captureCommandSuffixPreview(expected, "界"))
+                val (actual, metrics) = paint(live, preview)
+                val (baseline, _) = paint(live)
+                for (y in 0 until metrics.cellHeight) {
+                    for (x in 5 * metrics.cellWidth until 6 * metrics.cellWidth) {
+                        assertEquals(baseline.getRGB(x, y), actual.getRGB(x, y), "Wrapped preview must preserve cursor at $x,$y")
+                    }
+                }
+                assertFalse(pixels(actual).contentEquals(pixels(baseline)), "Wrapped ghost text must still be visible")
+            }
+        }
+
+    @Test
+    fun `blinking block cursor off phase preserves ordinary muted ghost painting`() =
+        runTest {
+            fixture { session, input, _ ->
+                input.feed("\u001b[?25h\u001b[1 q")
+                val expected = assertNotNull(session.captureCommandEdit())
+                val preview = assertNotNull(session.captureCommandSuffixPreview(expected, "xyz"))
+                val (blinkHidden, _) = paint(cache(session), preview, cursorBlinkVisible = false)
+                input.feed("\u001b[?25l")
+                val (applicationHidden, _) = paint(cache(session), preview)
+                assertContentEquals(pixels(applicationHidden), pixels(blinkHidden))
+            }
+        }
+
     @Test
     fun `mid-command unconfirmed and out-of-grid anchors cannot produce previews`() =
         runTest {
@@ -291,6 +367,31 @@ class InlineShellSuggestionTest {
     }
 
     private fun cache(session: TerminalSession) = TerminalRenderCache(6, 3).apply { updateFrom(session) }
+
+    private fun paint(
+        cache: TerminalRenderCache,
+        preview: TerminalRenderCache? = null,
+        cursorBlinkVisible: Boolean = true,
+        painter: GridPainter = GridPainter(),
+    ): Pair<BufferedImage, SwingMetrics> {
+        val settings =
+            SwingSettings.create {
+                it.padding = SwingPadding(0, 0, 0, 0)
+                it.shellIntegrationDecorationGutterWidth = 0
+                it.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_ON
+            }
+        val image = BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        try {
+            painter.paint(g, cache, settings, metrics, image.width, image.height, cursorBlinkVisible, inlineSuggestion = preview)
+        } finally {
+            g.dispose()
+        }
+        return image to metrics
+    }
+
+    private fun pixels(image: BufferedImage): IntArray = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
 
     private fun rowText(
         cache: TerminalRenderCache,

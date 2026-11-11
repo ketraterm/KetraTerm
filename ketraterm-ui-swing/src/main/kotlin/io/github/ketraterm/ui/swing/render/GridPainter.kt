@@ -313,6 +313,8 @@ internal class GridPainter(
                     fontRenderContext,
                     terminalFocused = terminalFocused,
                     bidi = cellGeometry.row(cache, cache.cursorRow),
+                    foregroundCache = inlineSuggestion,
+                    foregroundBidi = inlineSuggestion?.let { inlineCellGeometry.row(it, cache.cursorRow) },
                 )
             } finally {
                 if (cursorOffset != 0) g.translate(0, -cursorOffset)

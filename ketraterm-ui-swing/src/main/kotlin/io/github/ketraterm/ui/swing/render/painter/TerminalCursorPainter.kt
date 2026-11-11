@@ -19,11 +19,8 @@ import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
-import io.github.ketraterm.ui.swing.render.TerminalDeviceGeometry
+import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
-import io.github.ketraterm.ui.swing.render.visualCellRangeSpan
-import io.github.ketraterm.ui.swing.render.visualCellRangeStart
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 import java.awt.font.FontRenderContext
@@ -40,7 +37,8 @@ internal class TerminalCursorPainter(
     private val pixels = TerminalDeviceGeometry()
 
     /**
-     * Paints the current cursor from [cache].
+     * Paints the current cursor from [cache]. Optional [foregroundCache] supplies preview
+     * text beneath a block; cursor geometry and colors still come from the live cache.
      */
     fun paint(
         g: Graphics2D,
@@ -52,6 +50,8 @@ internal class TerminalCursorPainter(
         fontRenderContext: FontRenderContext,
         terminalFocused: Boolean = true,
         bidi: TerminalBidiLayout.Row? = null,
+        foregroundCache: TerminalRenderCache? = null,
+        foregroundBidi: TerminalBidiLayout.Row? = null,
     ) {
         if (!cache.cursorVisible || (terminalFocused && cache.cursorBlinking && !cursorBlinkVisible)) return
         if (cache.cursorColumn !in 0 until cache.columns || cache.cursorRow !in 0 until cache.rows) return
@@ -92,22 +92,50 @@ internal class TerminalCursorPainter(
         }
 
         pixels.fillRect(g, x, y, width, metrics.cellHeight)
-        textPainter.paintCellForeground(
-            g = g,
-            cache = cache,
-            metrics = metrics,
-            column = startColumn,
-            row = cache.cursorRow,
-            columnSpan = columnSpan,
-            visualColumn = visualColumn,
-            foreground =
-                if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND != 0) {
-                    palette.background(cursorAttr)
-                } else {
-                    palette.cursorForeground
-                },
-            fontRenderContext = fontRenderContext,
-            textBlinkVisible = textBlinkVisible,
-        )
+        var textCache = cache
+        var textColumn = startColumn
+        var textSpan = columnSpan
+        var textVisualColumn = visualColumn
+        var textBidi = bidi
+        if (foregroundCache != null && cache.cursorRow < foregroundCache.rows && visualColumn < foregroundCache.columns) {
+            val column = foregroundBidi?.logicalColumn(visualColumn) ?: visualColumn
+            val flags = foregroundCache.flags[foregroundCache.rowOffset(cache.cursorRow) + column]
+            val start = visualCellRangeStart(flags, column)
+            val startFlags = foregroundCache.flags[foregroundCache.rowOffset(cache.cursorRow) + start]
+            if (hasDrawableText(startFlags)) {
+                textCache = foregroundCache
+                textColumn = start
+                textSpan = visualCellRangeSpan(startFlags, start, foregroundCache.columns)
+                textVisualColumn = foregroundBidi?.visualColumn(start) ?: start
+                textBidi = foregroundBidi
+            }
+        }
+        // Preview glyphs can be wider than the live blank cell. Preserve their natural
+        // geometry while recoloring only the area actually covered by the cursor.
+        val previewForeground = textCache !== cache
+        val oldClip = if (previewForeground) pixels.saveClip(g) else null
+        try {
+            if (previewForeground) pixels.clipRect(g, x, y, width, metrics.cellHeight)
+            textPainter.paintCellForeground(
+                g = g,
+                cache = textCache,
+                metrics = metrics,
+                column = textColumn,
+                row = cache.cursorRow,
+                columnSpan = textSpan,
+                visualColumn = textVisualColumn,
+                foreground =
+                    if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND != 0) {
+                        palette.background(cursorAttr)
+                    } else {
+                        palette.cursorForeground
+                    },
+                fontRenderContext = fontRenderContext,
+                textBlinkVisible = textBlinkVisible,
+                bidi = textBidi,
+            )
+        } finally {
+            if (previewForeground) pixels.restoreClip(g, oldClip)
+        }
     }
 }

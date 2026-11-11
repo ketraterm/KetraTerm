@@ -201,6 +201,7 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
         visualColumn: Int = column,
+        bidi: TerminalBidiLayout.Row? = cellGeometry.row(cache, row),
     ) {
         val index = cache.rowOffset(row) + column
         val flags = cache.flags[index]
@@ -216,7 +217,6 @@ internal class TerminalTextPainter(
                 metrics.cellWidth * maxOf(1, columnSpan),
                 metrics.cellHeight,
             )
-            val bidi = cellGeometry.row(cache, row)
             val mayBelongToShapedRun =
                 shapedTextRuns.isShapingCell(cache, index, bidi?.isRtl(column) == true) ||
                     isFastAsciiCell(flags, cache.codeWords[index]) &&
