@@ -457,6 +457,48 @@ class SwingTerminalSuggestionContextTest {
         }
 
     @Test
+    fun `rendering-only takeover preserves a managed interaction started by its close listener`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            val expected = assertNotNull(fixture.session.captureCommandEdit())
+            var newest: SwingShellSuggestionInteraction? = null
+            first.addChangeListener {
+                if (it.isClosed) {
+                    newest =
+                        assertNotNull(view.beginInlineShellSuggestionInteraction()).also { replacement ->
+                            replacement.publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+                        }
+                }
+            }
+
+            assertFalse(view.presentInlineShellSuggestion(expected, "tatus"))
+            assertTrue(assertNotNull(newest).isActive)
+            assertFalse(expected.isCancelled)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `rendering-only takeover preserves a newer rendering-only presentation after reentry`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            val older = assertNotNull(fixture.session.captureCommandEdit())
+            val newer = assertNotNull(fixture.session.captureCommandEdit())
+            first.addChangeListener { if (it.isClosed) assertTrue(view.presentInlineShellSuggestion(newer, "how")) }
+
+            assertFalse(view.presentInlineShellSuggestion(older, "tatus"))
+            assertFalse(older.isCancelled)
+            assertFalse(newer.isCancelled)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\t", writes.toString("UTF-8"))
+        }
+
+    @Test
     fun `reentrant inline replacement keeps the newest interaction`() =
         withInlineFixture { fixture, _, _ ->
             val view = fixture.terminal

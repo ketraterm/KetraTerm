@@ -376,6 +376,28 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `reversed command boundaries require the next prompt at the command-start anchor`() {
+        for (inclusive in listOf(false, true)) {
+            for (nextPrompt in listOf(0L, 10L, 11L, 12L)) {
+                val state = TerminalShellIntegrationState()
+                state.recordPromptStart(10)
+                state.recordPromptEnd(10)
+                state.recordCommandStart(12, includeLine = inclusive)
+                state.recordCommandFinished(10, exitCode = 0)
+                val recordId = state.latestCommandRecordId()
+                val range = longArrayOf(-1, -2)
+                if (nextPrompt != 0L) state.recordPromptStart(nextPrompt)
+
+                val complete = nextPrompt == 12L
+                assertEquals(complete, state.copyCommandBlockRange(recordId, range))
+                assertContentEquals(if (complete) longArrayOf(10, 10) else longArrayOf(-1, -2), range)
+                state.recordPromptStart(15)
+                assertEquals(complete, state.copyCommandBlockRange(recordId, range))
+            }
+        }
+    }
+
+    @Test
     fun `copy command block range preserves a silent command prompt while excluding the next prompt`() {
         val state = TerminalShellIntegrationState()
         val range = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS)

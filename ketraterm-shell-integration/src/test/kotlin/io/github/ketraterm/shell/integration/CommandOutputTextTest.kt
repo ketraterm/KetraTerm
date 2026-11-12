@@ -157,14 +157,34 @@ class CommandOutputTextTest {
         }
 
     @Test
+    fun `finishing above the output start remains unavailable instead of reporting silence`() =
+        runTest {
+            fixture { session, connector ->
+                connector.feedFromHost((PROMPT + "run\r\n" + START + "hello\u001b[1A\r" + FINISH + PROMPT).toByteArray())
+                val id = session.shellIntegrationState.latestCommandRecordId()
+                session.readRenderFrame { frame ->
+                    val codes = IntArray(frame.columns)
+                    frame.copyTextLine(1, codes, 0, IntArray(frame.columns), 0)
+                    assertEquals("hello", String(codes, 0, 5))
+                }
+                assertNull(session.commandOutputText(id))
+                command(session, connector, "later")
+                assertNull(session.commandOutputText(id))
+            }
+        }
+
+    @Test
     fun `empty output is distinct from unavailable and blank lines are preserved`() =
         runTest {
             fixture { session, connector ->
-                connector.feedFromHost((PROMPT + "run\r\n" + START + FINISH + PROMPT).toByteArray())
+                connector.feedFromHost((PROMPT + "run\r\n" + START + FINISH).toByteArray())
                 val id = session.shellIntegrationState.latestCommandRecordId()
+                assertNull(session.commandOutputText(id))
+                connector.feedFromHost(PROMPT.toByteArray())
                 assertEquals(TerminalCommandOutputText("", false, false), session.commandOutputText(id))
                 val blankLines = command(session, connector, "one\r\n\r\nthree")
                 assertEquals("one\n\nthree", session.commandOutputText(blankLines)?.text)
+                assertEquals(TerminalCommandOutputText("", false, false), session.commandOutputText(id))
             }
         }
 

@@ -1417,6 +1417,7 @@ public class SwingTerminal
          * the live grid, selection and copied output never include the preview. [foreground] is an
          * optional ARGB color; otherwise the current terminal foreground is used, at muted opacity.
          * This rendering API installs no provider or acceptance bindings and does not own [expected].
+         * A newer request started by a close callback takes precedence over this presentation.
          */
         @JvmOverloads
         @ExperimentalShellSuggestionsApi
@@ -1426,7 +1427,9 @@ public class SwingTerminal
             foreground: Int? = null,
         ): Boolean {
             check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            val revision = inlineRequests.revision + 1
             inlineRequests.close()
+            if (inlineRequests.revision != revision) return false
             val presented = presentInlineShellSuggestionRendering(expected, ghostText, foreground)
             if (presented) inlineSuggestionScheduler?.onExplicitRequest()
             return presented

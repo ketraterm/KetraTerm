@@ -578,6 +578,11 @@ public class TerminalShellIntegrationState(
                 if (commandStart <= commandEnd) {
                     lastCommandLineBeforeNextPromptLocked(index, commandStart, commandEnd)
                 } else {
+                    // A reversed finish is empty only when the next prompt occupies the
+                    // command-start line; otherwise output may remain below the finish anchor.
+                    var nextPrompt = index + 1
+                    while (nextPrompt < count && promptStartLineIds[nextPrompt] == NO_LINE_ID) nextPrompt++
+                    if (nextPrompt == count || promptStartLineIds[nextPrompt] != commandStart) return false
                     commandEnd
                 }
             if (blockEnd < blockStart) return false

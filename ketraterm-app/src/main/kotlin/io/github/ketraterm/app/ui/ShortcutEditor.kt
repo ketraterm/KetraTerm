@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.SuggestionKeyBindings
+import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Insets
 import java.awt.event.*
@@ -29,7 +30,7 @@ import javax.swing.KeyStroke
 internal class ShortcutEditor(
     initial: Set<KeyStroke>,
     private val actionLabel: String,
-) : JPanel(FlowLayout(FlowLayout.LEADING, 6, 0)) {
+) : JPanel(FlowLayout(FlowLayout.LEADING, 6, 4)) {
     var shortcuts: Set<KeyStroke> = initial.toSet()
         set(value) {
             require(value.all(SuggestionKeyBindings::isValidShortcut))
@@ -130,6 +131,43 @@ internal class ShortcutEditor(
         super.setEnabled(enabled)
         if (!enabled) endCapture()
         components.forEach { it.isEnabled = enabled }
+    }
+
+    override fun getPreferredSize(): Dimension {
+        val flow = layout as FlowLayout
+        val padding = insets
+        val available = if (width > 0) width - padding.left - padding.right - 2 * flow.hgap else Int.MAX_VALUE
+        var rowWidth = 0
+        var rowHeight = 0
+        var height = padding.top + padding.bottom + 2 * flow.vgap
+        for (component in components) {
+            if (!component.isVisible) continue
+            val size = component.preferredSize
+            val gap = if (rowWidth == 0) 0 else flow.hgap
+            if (rowWidth > 0 && rowWidth + gap + size.width > available) {
+                height += rowHeight + flow.vgap
+                rowWidth = 0
+                rowHeight = 0
+            }
+            if (rowWidth > 0) rowWidth += flow.hgap
+            rowWidth += size.width
+            rowHeight = maxOf(rowHeight, size.height)
+        }
+        // Let the form allocate width instead of widening the whole page for a long shortcut list.
+        return Dimension(0, height + rowHeight)
+    }
+
+    override fun getMinimumSize(): Dimension = preferredSize
+
+    override fun setBounds(
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) {
+        val resized = width != this.width
+        super.setBounds(x, y, width, height)
+        if (resized) revalidate()
     }
 
     private fun displayShortcut(key: KeyStroke): String {

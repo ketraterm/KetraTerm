@@ -88,6 +88,57 @@ class SettingsDialogDesktopTest {
     }
 
     @Test
+    fun `custom shortcut chips and recording controls remain accessible after resizing`() {
+        withDialog { _, dialog, _ ->
+            val editor =
+                onEdt {
+                    selectPage(dialog, "settings.suggestions")
+                    components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "popupAcceptKeys" }
+                }
+            val modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
+            for (width in listOf(820, 1_100, 820)) {
+                for (keys in listOf(listOf(KeyEvent.VK_S, KeyEvent.VK_D, KeyEvent.VK_F), (KeyEvent.VK_A..KeyEvent.VK_F).toList())) {
+                    onEdt {
+                        dialog.setSize(width, 600)
+                        editor.shortcuts = keys.map { KeyStroke.getKeyStroke(it, modifiers) }.toSet()
+                        dialog.validate()
+                    }
+                    onEdt {
+                        dialog.validate()
+                        editor.components
+                            .filterIsInstance<JButton>()
+                            .single { it.toolTipText == "Add shortcut" }
+                            .doClick()
+                        dialog.validate()
+                    }
+                    onEdt {
+                        dialog.validate()
+                        val viewport = SwingUtilities.getAncestorOfClass(JViewport::class.java, editor) as JViewport
+                        val controls = editor.components.filter { it.isVisible }
+                        assertTrue(controls.filterIsInstance<JButton>().any { it.text == "Cancel" })
+                        val rectangles = controls.map { SwingUtilities.convertRectangle(it.parent, it.bounds, viewport.view) }
+                        val editorBounds = SwingUtilities.convertRectangle(editor.parent, editor.bounds, viewport.view)
+                        for (bounds in rectangles) {
+                            assertTrue(viewport.viewRect.contains(bounds), "Shortcut control must fit at width $width: $bounds")
+                            assertTrue(editorBounds.contains(bounds), "The shortcut row must reserve enough height: $bounds")
+                        }
+                        for (first in rectangles.indices) {
+                            for (second in first + 1 until rectangles.size) {
+                                assertFalse(rectangles[first].intersects(rectangles[second]), "Shortcut controls must not overlap")
+                            }
+                        }
+                        editor.components
+                            .filterIsInstance<JButton>()
+                            .single { it.text == "Cancel" }
+                            .doClick()
+                        dialog.validate()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Apply preserves disabled suggestion controls after saving`() {
         withDialog { _, dialog, _ ->
             for (disableMaster in listOf(false, true)) {

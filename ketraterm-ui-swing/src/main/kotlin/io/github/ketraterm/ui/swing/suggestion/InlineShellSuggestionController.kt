@@ -40,6 +40,7 @@ internal class InlineShellSuggestionController(
     private var sourceJob: Job? = null
     private var observation: Job? = null
     private var sourceRevision = 0L
+    val revision get() = sourceRevision
     private var selectedPopup: String? = null
     private var feedbackForPublication: ((SwingShellSuggestionFeedbackHandler) -> Unit)? = null
     var coexistence = SwingInlineShellSuggestionCoexistence.INDEPENDENT

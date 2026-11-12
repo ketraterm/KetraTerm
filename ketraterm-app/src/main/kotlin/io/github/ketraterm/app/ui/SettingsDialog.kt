@@ -774,6 +774,7 @@ internal class SettingsDialog(
         gbc.gridx = 1
         gbc.weightx = 1.0
         gbc.gridwidth = 3
+        if (comp1 is ShortcutEditor) gbc.fill = GridBagConstraints.HORIZONTAL
         gbc.insets = Insets(6, 0, 6, 0)
         panel.add(comp1, gbc)
 

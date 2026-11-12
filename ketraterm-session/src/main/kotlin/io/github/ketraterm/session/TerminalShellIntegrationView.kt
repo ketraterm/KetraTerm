@@ -200,7 +200,8 @@ public interface TerminalShellIntegrationView {
      * [TerminalShellIntegrationCommandBlockRange]. A completed command with a
      * prompt selects from that prompt's visible anchor through its output. A
      * silent command selects its prompt/input only. The next prompt is always
-     * excluded. Unfinished, prompt-only, orphan-silent, unknown, and evicted
+     * excluded. Reversed bounds require a subsequent prompt at the command-start anchor.
+     * Unfinished, prompt-only, orphan-silent, unresolved, unknown, and evicted
      * records return `false` and leave the destination unchanged.
      *
      * @param recordId retained command record id.
