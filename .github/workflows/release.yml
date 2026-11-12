@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release
@@ -18,7 +19,9 @@ jobs:
     timeout-minutes: 45
     outputs:
       needed: ${{ steps.prepare.outputs.needed }}
-      revision: ${{ steps.commit.outputs.revision }}
+      revision: ${{ steps.prepare.outputs.revision }}
+      existing_tag: ${{ steps.prepare.outputs.existing_tag }}
+      verified: ${{ steps.evidence.outputs.verified }}
       tag: ${{ steps.prepare.outputs.tag }}
       prerelease: ${{ steps.prepare.outputs.prerelease }}
     env:
@@ -49,8 +52,50 @@ jobs:
             echo '::error::Configure the RELEASE_APP_CLIENT_ID Actions variable and RELEASE_APP_PRIVATE_KEY Actions secret for the release bot. See docs/development/releases.md.'
             exit 1
           fi
+      - name: Test release automation
+        if: steps.prepare.outputs.needed == 'true'
+        run: node --test .github/scripts/*.test.mjs
+      - name: Check source validation
+        if: steps.prepare.outputs.needed == 'true'
+        id: evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_SOURCE_REVISION: ${{ steps.prepare.outputs.source_revision }}
+        run: node .github/scripts/ci-verified.mjs
+
+  verify:
+    name: Verify pinned release source
+    needs: prepare
+    if: needs.prepare.outputs.needed == 'true' && needs.prepare.outputs.verified != 'true'
+    uses: ./.github/workflows/tests.yml
+    with:
+      revision: ${{ needs.prepare.outputs.revision }}
+      full: true
+    secrets: inherit
+  finalize:
+    name: Finalize validated release
+    needs: [prepare, verify]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.needed == 'true' && (needs.prepare.outputs.verified == 'true' || needs.verify.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      revision: ${{ steps.commit.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Finalize changelogs from the validated source
+        id: prepare
+        run: |
+          printf '[]' > "$RUNNER_TEMP/releases.json"
+          node .github/scripts/release.mjs prepare "$RUNNER_TEMP/releases.json"
       - name: Authenticate release bot
-        if: steps.prepare.outputs.needed == 'true' && steps.prepare.outputs.existing_tag != 'true'
+        if: needs.prepare.outputs.existing_tag != 'true'
         id: release-token
         uses: actions/create-github-app-token@v3
         with:
@@ -59,37 +104,6 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
-      - name: Setup JBR 25
-        if: steps.prepare.outputs.needed == 'true'
-        uses: actions/setup-java@v6
-        with:
-          distribution: jetbrains
-          java-version: "25"
-      - uses: gradle/actions/setup-gradle@v4
-        if: steps.prepare.outputs.needed == 'true'
-      - name: Install system dependencies
-        if: steps.prepare.outputs.needed == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb zsh fish
-      - name: Verify release before creating tag
-        if: steps.prepare.outputs.needed == 'true'
-        env:
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
-        run: |
-          node --test .github/scripts/release.test.mjs
-          xvfb-run -a ./gradlew spotlessCheck checkKotlinAbi test publicationChecks :ketraterm-app:writeNativeVersion --no-daemon
-      - name: Upload failed release verification reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-verification-reports
-          overwrite: true
-          path: |
-            **/build/reports/tests/
-            build/reports/configuration-cache/
-            build/reports/problems/
       - name: Commit changelogs and create tag atomically
         if: steps.prepare.outputs.needed == 'true'
         id: commit
@@ -112,32 +126,22 @@ jobs:
           fi
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  verify:
-    name: Verify exact release revision
-    needs: prepare
-    if: needs.prepare.outputs.needed == 'true'
-    uses: ./.github/workflows/tests.yml
-    with:
-      revision: ${{ needs.prepare.outputs.revision }}
-      full: true
-    secrets: inherit
-
   maven:
-    needs: [prepare, verify]
-    if: needs.prepare.outputs.needed == 'true'
+    needs: [prepare, finalize]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.needed == 'true' && needs.finalize.result == 'success' }}
     uses: ./.github/workflows/publish.yml
     with:
-      revision: ${{ needs.prepare.outputs.revision }}
+      revision: ${{ needs.finalize.outputs.revision }}
     secrets: inherit
 
   binaries:
-    needs: [prepare, maven]
-    if: needs.prepare.outputs.needed == 'true'
+    needs: [prepare, finalize, maven]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.maven.result == 'success' && needs.prepare.outputs.needed == 'true' }}
     permissions:
       contents: write
     uses: ./.github/workflows/publish-binaries.yml
     with:
-      revision: ${{ needs.prepare.outputs.revision }}
+      revision: ${{ needs.finalize.outputs.revision }}
       tag: ${{ needs.prepare.outputs.tag }}
       prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
     secrets: inherit

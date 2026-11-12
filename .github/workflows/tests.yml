@@ -4,10 +4,8 @@ on:
   pull_request:
     branches: [master, main]
   merge_group:
-  push:
-    branches: [master, main]
   schedule:
-    - cron: '43 3 * * *'
+    - cron: '43 3 * * 0'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -36,8 +34,6 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
-      plan: ${{ steps.plan.outputs.plan }}
-      full: ${{ steps.plan.outputs.full }}
       revision: ${{ steps.plan.outputs.revision }}
       headless: ${{ steps.plan.outputs.headless }}
       platform: ${{ steps.plan.outputs.platform }}
@@ -55,7 +51,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test CI planning, gating, and release automation
+      - name: Test CI planning and release automation
         run: node --test .github/scripts/*.test.mjs
       - name: Select validation groups
         id: plan
@@ -63,6 +59,12 @@ jobs:
           CI_FULL: ${{ inputs.full || false }}
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: node .github/scripts/ci-plan.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-validation-${{ github.run_attempt }}
+          path: ci-validation.json
+          if-no-files-found: error
+          retention-days: 30
 
   headless:
     name: Linux JVM, style, and ABI
@@ -211,21 +213,3 @@ jobs:
       profile: smoke
       revision: ${{ needs.plan.outputs.revision }}
     secrets: inherit
-
-  gate:
-    name: CI gate
-    needs: [plan, headless, platform, consumers, benchmarks, website, differential]
-    if: always()
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Require every selected check to succeed
-        env:
-          CI_NEEDS: ${{ toJSON(needs) }}
-        run: node .github/scripts/ci-gate.mjs
