@@ -60,7 +60,7 @@ application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
 Suggestions are enabled by default. The **Suggestions** settings page controls
-inline history, popup mode (**Off**, **On request**, or **Automatic**), shortcuts,
+inline previews, popup mode (**Off**, **On request**, or **Automatic**), shortcuts,
 and learning persistence. Add shortcuts by pressing the keys; click a shortcut
 chip to remove it. Removing Enter from **Accept selected popup** keeps Enter
 available to the shell.
@@ -69,10 +69,11 @@ automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
 
-Inline history suggestions are opt-in on the same page. They suggest
-recent completed commands from the current pane; see the
-[inline history contract](../docs/features/completion.md#inline-suffix-presentation)
-for matching, dismissal, and shell-prediction behavior.
+Inline suggestions are opt-in on the same page. They preview the top ranked
+completion from the popup's source pipeline, including paths, command
+specifications, shell results, and learning. They also work with popups disabled.
+See the [inline contract](../docs/features/completion.md#inline-suffix-presentation)
+for append-only eligibility, dismissal, and shell-prediction behavior.
 
 Native local profiles receive a small `ketra` companion command:
 

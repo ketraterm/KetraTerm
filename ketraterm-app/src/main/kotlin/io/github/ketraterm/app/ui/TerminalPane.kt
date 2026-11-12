@@ -56,7 +56,7 @@ internal class TerminalPane private constructor(
     private var fontSizeAdjustment = 0
 
     init {
-        terminal.setInlineShellSuggestionProvider(InlineHistorySuggestions(tab.session))
+        setCompletionProvider(completionProvider)
     }
 
     private fun currentSettings(): SwingSettings {
@@ -100,7 +100,6 @@ internal class TerminalPane private constructor(
         failure: Throwable?,
     ) {
         if (closed.get()) return
-        terminal.setInlineShellSuggestionProvider(null)
         setCompletionProvider(null)
         exitBanner.showExitStatus(exitCode, failure)
         component.revalidate()
@@ -111,6 +110,7 @@ internal class TerminalPane private constructor(
         if (closed.get()) return
         completionProvider = provider
         terminal.setShellSuggestionProvider(provider.takeIf { settings.config.popupSuggestionsEnabled })
+        terminal.setInlineShellSuggestionProvider(provider?.let(::InlineCompletionSuggestions))
     }
 
     override fun suggestionsEnabled(): Boolean =
@@ -222,7 +222,6 @@ internal class TerminalPane private constructor(
 
                 ownedTerminal = terminal
                 terminal.setInlineShellSuggestionKeymap { event -> settings.config.suggestionKeyBindings.inlineAction(event) }
-                terminal.setShellSuggestionProvider(completionProvider.takeIf { settings.config.popupSuggestionsEnabled })
                 terminal.bind(tab.session, onBound)
 
                 val searchBar =

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
+import io.github.ketraterm.app.ui.InlineCompletionSuggestions
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -102,7 +103,7 @@ class StandaloneCompletionRegistryTest {
             val registry = registry(learningStore = learningStore)
             registry.recordSuccess("git switch main", profileId = "bash", workingDirectoryUri = "file:///repo")
 
-            registry.resetLearning()
+            registry.resetLearning().await()
 
             assertTrue(learningStore.snapshot().rankingStats.isEmpty())
             assertTrue(learningStore.snapshot().replayCommands.isEmpty())
@@ -139,11 +140,16 @@ class StandaloneCompletionRegistryTest {
             assertEquals(4, learnedSuggestion.replacementStartOffset)
             assertEquals(5, learnedSuggestion.replacementEndOffset)
             assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+            val inline =
+                withContext(Dispatchers.Swing) {
+                    InlineCompletionSuggestions(provider).open(SwingInlineShellSuggestionRequest(request("git s"), null))
+                }
+            assertEquals(listOf(learnedSuggestion), inline.suggestions.last())
         }
 
     @Test
     fun `directory and learned command suggestions coexist after cd space`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-completion")
             try {
                 Files.createDirectory(directory.resolve("alpha"))
@@ -167,6 +173,11 @@ class StandaloneCompletionRegistryTest {
                 assertTrue(suggestions.none { it.replacementText == ".hidden/" })
                 assertTrue(suggestions.none { it.replacementText == "README.md" })
                 assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "learned" })
+                val inline =
+                    withContext(Dispatchers.Swing) {
+                        InlineCompletionSuggestions(provider).open(SwingInlineShellSuggestionRequest(request("cd "), null))
+                    }
+                assertEquals(listOf(suggestions.first()), inline.suggestions.last())
                 registry.closeAndFlush()
             } finally {
                 directory.toFile().deleteRecursively()
@@ -175,7 +186,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `learned nested directory is token-local and outranks its unused parent path`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-learned-directory")
             try {
                 Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
@@ -220,7 +231,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `bare path entries do not pollute command subcommand completion`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-completion")
             try {
                 Files.createDirectory(directory.resolve("status"))
@@ -299,7 +310,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `shared engine keeps pane working directories request scoped`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val firstDirectory = Files.createTempDirectory("ketraterm-first-pane")
             val secondDirectory = Files.createTempDirectory("ketraterm-second-pane")
             try {

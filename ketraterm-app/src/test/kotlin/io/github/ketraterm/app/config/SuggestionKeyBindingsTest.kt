@@ -74,7 +74,7 @@ class SuggestionKeyBindingsTest {
         val config =
             KetraTermConfig(
                 popupSuggestionsEnabled = false,
-                inlineHistorySuggestionsEnabled = true,
+                inlineSuggestionsEnabled = true,
                 suggestionKeyBindings =
                     SuggestionKeyBindings(
                         popupAccept = setOf(stroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK)),

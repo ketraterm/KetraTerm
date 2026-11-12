@@ -296,8 +296,8 @@ internal class SettingsDialog(
     private val suggestionTriggerKeys =
         ShortcutEditor(settings.config.suggestionKeyBindings.trigger, appMessages.text("settings.suggestionTriggerKeys"))
             .apply { name = "suggestionTriggerKeys" }
-    private val inlineHistorySuggestionsCheckbox =
-        JCheckBox(appMessages.text("settings.inlineHistorySuggestions"), settings.config.inlineHistorySuggestionsEnabled)
+    private val inlineSuggestionsCheckbox =
+        JCheckBox(appMessages.text("settings.inlineSuggestions"), settings.config.inlineSuggestionsEnabled)
     private val automaticCommandNamesCheckbox =
         JCheckBox(
             appMessages.text("settings.suggestions.commandNames"),
@@ -405,11 +405,11 @@ internal class SettingsDialog(
         for (field in listOf(popupAcceptKeys, inlineAcceptKeys, suggestionTriggerKeys)) {
             registerChangeListener(field, updateApplyState)
         }
-        registerChangeListener(inlineHistorySuggestionsCheckbox, updateApplyState)
+        registerChangeListener(inlineSuggestionsCheckbox, updateApplyState)
         registerChangeListener(automaticCommandNamesCheckbox, updateApplyState)
         smartSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
         popupModeCombo.addActionListener { updateAutomaticSuggestionModes() }
-        inlineHistorySuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
+        inlineSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
         updateAutomaticSuggestionModes()
         registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
@@ -703,10 +703,10 @@ internal class SettingsDialog(
                 },
             )
             val general = createSectionPanel()
-            inlineHistorySuggestionsCheckbox.toolTipText = appMessages.text("settings.inlineHistorySuggestions.description")
+            inlineSuggestionsCheckbox.toolTipText = appMessages.text("settings.inlineSuggestions.description")
             automaticCommandNamesCheckbox.toolTipText = appMessages.text("settings.suggestions.commandNames.description")
             addCheckboxRow(general, 0, smartSuggestionsCheckbox)
-            addCheckboxRow(general, 1, inlineHistorySuggestionsCheckbox)
+            addCheckboxRow(general, 1, inlineSuggestionsCheckbox)
             addFormRow(general, 2, appMessages.text("settings.popupSuggestions"), popupModeCombo)
             addCheckboxRow(general, 3, automaticCommandNamesCheckbox)
             add(general)
@@ -949,7 +949,7 @@ internal class SettingsDialog(
         popupAcceptKeys.shortcuts = bindingDefaults.popupAccept
         inlineAcceptKeys.shortcuts = bindingDefaults.inlineAccept
         suggestionTriggerKeys.shortcuts = bindingDefaults.trigger
-        inlineHistorySuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_INLINE_HISTORY_SUGGESTIONS_ENABLED
+        inlineSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_INLINE_SUGGESTIONS_ENABLED
         automaticCommandNamesCheckbox.isSelected = true
         updateAutomaticSuggestionModes()
         persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
@@ -1146,7 +1146,7 @@ internal class SettingsDialog(
                     inlineAccept = inlineAcceptKeys.shortcuts,
                     trigger = suggestionTriggerKeys.shortcuts,
                 ),
-            inlineHistorySuggestionsEnabled = inlineHistorySuggestionsCheckbox.isSelected,
+            inlineSuggestionsEnabled = inlineSuggestionsCheckbox.isSelected,
             shellSuggestionAutomaticMode =
                 if (automaticCommandNamesCheckbox.isSelected) {
                     SwingShellSuggestionAutomaticMode.ALWAYS
@@ -1179,13 +1179,13 @@ internal class SettingsDialog(
     private fun updateAutomaticSuggestionModes() {
         val enabled = smartSuggestionsCheckbox.isSelected
         val popupEnabled = popupModeCombo.selectedItem != PopupMode.OFF
-        inlineHistorySuggestionsCheckbox.isEnabled = enabled
+        inlineSuggestionsCheckbox.isEnabled = enabled
         popupModeCombo.isEnabled = enabled
         automaticCommandNamesCheckbox.isVisible = popupModeCombo.selectedItem == PopupMode.AUTOMATIC
         automaticCommandNamesCheckbox.isEnabled = enabled && popupModeCombo.selectedItem == PopupMode.AUTOMATIC
         popupAcceptKeys.isEnabled = enabled && popupEnabled
         suggestionTriggerKeys.isEnabled = enabled && popupEnabled
-        inlineAcceptKeys.isEnabled = enabled && inlineHistorySuggestionsCheckbox.isSelected
+        inlineAcceptKeys.isEnabled = enabled && inlineSuggestionsCheckbox.isSelected
         persistentSuggestionLearningCheckbox.isEnabled = enabled
     }
 

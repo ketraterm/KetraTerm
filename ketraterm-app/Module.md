@@ -22,7 +22,8 @@ host permissions, and shutdown through `TerminalWorkspace`. Each `TerminalPane`
 owns its terminal view, search bar, prompts, and shortcut registrations. Closing
 a pane releases those UI resources; closing its workspace tab closes the session.
 
-`InlineHistorySuggestions` supplies bounded results from retained session metadata.
+`InlineCompletionSuggestions` projects the popup provider's first ranked result
+into an inline source, preserving its edit range and learning feedback.
 The Swing view owns independent popup/inline scheduling, request lifetime,
 rendering, collision checks, and edit admission.
 `SuggestionKeyBindings` holds typed acceptance and invocation shortcuts.

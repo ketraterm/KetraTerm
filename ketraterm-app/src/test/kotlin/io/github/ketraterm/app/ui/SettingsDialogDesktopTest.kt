@@ -466,7 +466,7 @@ class SettingsDialogDesktopTest {
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertFalse(settings.config.smartSuggestionsEnabled)
-            assertTrue(settings.config.inlineHistorySuggestionsEnabled)
+            assertTrue(settings.config.inlineSuggestionsEnabled)
             assertFalse(settings.config.popupSuggestionsEnabled)
             assertEquals(
                 setOf(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK)),

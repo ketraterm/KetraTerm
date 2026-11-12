@@ -77,7 +77,7 @@ internal class KetraTermSettings(
             draft.lineHeight = config.lineHeight
             draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled
-            draft.inlineShellSuggestionsEnabled = config.inlineHistorySuggestionsEnabled
+            draft.inlineShellSuggestionsEnabled = config.inlineSuggestionsEnabled
             draft.shellSuggestionAutomaticMode = config.shellSuggestionAutomaticMode
             draft.acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter
             draft.scrollOnOutput = config.scrollOnOutput

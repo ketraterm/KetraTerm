@@ -260,8 +260,9 @@ internal class KetraTermConfigManager(
                         trigger =
                             suggestionKeys(behavior["suggestions_trigger_keys"], default.suggestionKeyBindings.trigger),
                     ),
-                inlineHistorySuggestionsEnabled =
-                    behavior["inline_history_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.inlineHistorySuggestionsEnabled,
+                inlineSuggestionsEnabled =
+                    (behavior["inline_suggestions_enabled"] ?: behavior["inline_history_suggestions_enabled"])
+                        ?.toBooleanStrictOrNull() ?: default.inlineSuggestionsEnabled,
                 shellSuggestionAutomaticMode =
                     SwingShellSuggestionAutomaticMode.entries.firstOrNull {
                         it.name.equals(behavior["shell_suggestion_automatic_mode"]?.trim(), ignoreCase = true)
@@ -408,8 +409,8 @@ internal class KetraTermConfigManager(
         )}
         inline_accept_keys = ${suggestionKeysText(config.suggestionKeyBindings.inlineAccept)}
         suggestions_trigger_keys = ${suggestionKeysText(config.suggestionKeyBindings.trigger)}
-        # Opt-in history suffixes from this pane; independent of automatic popups
-        inline_history_suggestions_enabled = ${config.inlineHistorySuggestionsEnabled}
+        # Opt-in preview of the top completion; independent of automatic popups
+        inline_suggestions_enabled = ${config.inlineSuggestionsEnabled}
         shell_suggestion_automatic_mode = "${config.shellSuggestionAutomaticMode.name.lowercase(Locale.ROOT)}"
         # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
         accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}

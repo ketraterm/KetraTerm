@@ -283,21 +283,23 @@ and automatic requests never replace a valid manual interaction. See the
 [inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
 The standalone application offers opt-in **Inline suggestions** on its
-**Suggestions** settings page, off by default. It scans at most the 200 most recent retained
-command records in the current pane and chooses the newest completed single-line
-command extending the typed prefix. Matching is case-sensitive and restricted to
-the current working directory when known. Empty prefixes produce no suggestion.
-This source reads session metadata and adds no history file or persistence.
+**Suggestions** settings page, off by default. Inline uses the popup's completion
+provider and previews the first result from each ranked snapshot, including
+command specifications, paths, shell completions, and learned candidates. It
+keeps the original replacement range and learning feedback. A result that does
+not strictly extend the current command is popup-only; inline never substitutes
+a lower-ranked candidate. Empty prefixes produce no inline suggestion.
+Library hosts can still provide unrelated popup and inline sources.
 
-Requests start after a 75 ms pause in command-edit activity. History and popup
-sources are independent and may offer unrelated results. Tab or Right accepts
+Requests start after a 75 ms pause in command-edit activity. Popup and inline
+requests retain independent lifetimes and presentation switches. Tab or Right accepts
 visible inline text while the popup is passive. Deliberate popup browsing hides
 inline text, including late results; Tab or Enter then inserts the selected popup
 item. A popup acceptance keeps inline hidden while the accepted command remains
 unchanged. Fresh child suggestions require deliberate navigation before host
 acceptance; otherwise Tab invokes shell completion and Enter executes the entered command.
 Escape dismisses an open popup first, then inline text until command text changes.
-The suggestions master switch gates inline history; the automatic-popup switch
+The suggestions master switch gates inline previews; the popup switch and automatic-popup switch
 does not. Focus loss, selection, scrolling, and stale editing authority hide
 obsolete text. Existing shell predictions or text after the cursor suppress host
 ghost text; this source does not turn off the shell's own prediction settings.
