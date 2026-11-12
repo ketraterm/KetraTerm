@@ -5,6 +5,15 @@ on:
     branches:
       - master
       - main
+    paths:
+      - '**/*.gradle.kts'
+      - '**/gradle.properties'
+      - 'gradle/**'
+      - 'gradlew*'
+      - 'VERSION'
+      - '**/gradle.lockfile'
+      - '.github/workflows/dependency-submission.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {appendFileSync, existsSync, readFileSync, readdirSync} from "node:fs";
+import {appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync} from "node:fs";
 import {execFileSync} from "node:child_process";
 import {resolve} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -27,6 +27,12 @@ export const platforms = [
 ];
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const modules = new Set(readdirSync(root).filter(name => name.startsWith("ketraterm-") && existsSync(resolve(root, name, "build.gradle.kts"))));
+// Known platform-independent implementations still run Linux shell/window tests.
+// Everything else keeps all three operating systems; build changes request full CI.
+const platformIndependent = new Set([
+    "ketraterm-protocol", "ketraterm-parser", "ketraterm-core", "ketraterm-host",
+    "ketraterm-input", "ketraterm-render-api", "ketraterm-render-cache", "ketraterm-completion",
+]);
 
 /** One registry is shared with Gradle; environment tags still select individual tests. */
 export function parseEnvironments(text) {
@@ -44,13 +50,13 @@ export function parseEnvironments(text) {
 }
 
 export function fullPlan(reason) {
-    return {full: true, ...Object.fromEntries(checks.map(check => [check, true])), reasons: [reason]};
+    return {full: true, ...Object.fromEntries(checks.map(check => [check, true])), platforms, reasons: [reason]};
 }
 
 /** Conservative job selection, not a second dependency graph. Gradle owns test-classpath invalidation. */
 export function planChanges(paths, environments) {
     if (!paths.length) return fullPlan("No changed paths available");
-    const plan = {full: false, ...Object.fromEntries(checks.map(check => [check, false])), reasons: []};
+    const plan = {full: false, ...Object.fromEntries(checks.map(check => [check, false])), platforms: [platforms[0]], reasons: []};
     const select = (...names) => names.forEach(name => { plan[name] = true; });
     for (const path of paths) {
         if (!path || path.startsWith("/") || path.includes("\\") || path.split("/").includes("..")) return fullPlan("Unrecognized path");
@@ -76,11 +82,15 @@ export function planChanges(paths, environments) {
             select("headless", "consumers");
         } else if (relative.startsWith("src/test/")) {
             select("headless");
-            if (environments.native.has(module) || environments.desktop.has(module)) select("platform");
+            if (environments.native.has(module) || environments.desktop.has(module)) {
+                select("platform");
+                plan.platforms = platforms;
+            }
         } else if (relative.startsWith("src/jmh/") || module === "ketraterm-benchmarks") {
             select("headless", "benchmarks");
         } else if (relative.startsWith("src/main/")) {
             select("headless", "platform");
+            if (!platformIndependent.has(module)) plan.platforms = platforms;
             if (module !== "ketraterm-app") select("consumers", "benchmarks");
             if (["ketraterm-protocol", "ketraterm-parser", "ketraterm-core", "ketraterm-host", "ketraterm-render-api", "ketraterm-render-cache", "ketraterm-testkit"].includes(module)) select("differential");
             if (path === "ketraterm-app/src/main/resources/io/github/ketraterm/app/icons/logo.svg") select("website");
@@ -112,13 +122,19 @@ function main() {
     const plan = selectPlan({event: process.env.GITHUB_EVENT_NAME, full: process.env.CI_FULL, base: process.env.CI_BASE_SHA}, environments);
     const outputs = {
         ...Object.fromEntries(checks.map(check => [check, String(plan[check])])),
-        full: String(plan.full),
-        plan: JSON.stringify(plan),
-        platform_matrix: JSON.stringify({include: platforms}),
+        platform_matrix: JSON.stringify({include: plan.platforms}),
         consumer_matrix: JSON.stringify({include: plan.full ? platforms : [platforms[0]]}),
         revision: execFileSync("git", ["rev-parse", "HEAD"], {cwd: root, encoding: "utf8"}).trim(),
     };
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
+    // Evidence is usable only after this entire workflow succeeds, not merely this job.
+    writeFileSync("ci-validation.json", JSON.stringify({
+        repository: process.env.GITHUB_REPOSITORY,
+        run: process.env.GITHUB_RUN_ID,
+        attempt: process.env.GITHUB_RUN_ATTEMPT,
+        full: plan.full,
+        tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], {cwd: root, encoding: "utf8"}).trim(),
+    }));
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
         `CI selection (${plan.full ? "full" : "affected groups"})\n\n| Check | Required |\n| --- | --- |\n${checks.map(check => `| ${check} | ${plan[check]} |`).join("\n")}\n\n${plan.reasons.join("\n")}\n`);
     console.log(JSON.stringify(outputs, null, 2));

@@ -141,6 +141,25 @@ function output(name, value) {
   appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
 }
 
+/** Recognizes only this tool's changelog-only commit when retrying an unpublished tag. */
+export function sourceBeforeRelease(git, version) {
+  const files = git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD").split("\n").filter(Boolean);
+  if (!files.length || files.some(file => !changelogs.some(([name]) => name === file))) return git("rev-parse", "HEAD");
+  const parents = git("rev-list", "--parents", "-n", "1", "HEAD").split(" ");
+  if (parents.length !== 2) return git("rev-parse", "HEAD");
+  for (const file of files) {
+    const before = git("show", `HEAD^:${file}`);
+    const after = git("show", `HEAD:${file}`);
+    const date = after.match(/^## \[[^\]]+\] - (\d{4}-\d{2}-\d{2})$/m)?.[1];
+    try {
+      if (!date || finalizeChangelog(before, version, date) !== after) return git("rev-parse", "HEAD");
+    } catch {
+      return git("rev-parse", "HEAD");
+    }
+  }
+  return parents[1];
+}
+
 function main() {
   const version = readFileSync("VERSION", "utf8").trim();
   versionParts(version);
@@ -160,6 +179,7 @@ function main() {
       if (readFileSync("VERSION", "utf8").trim() !== version)
         throw new Error(`Existing ${tag} has a different VERSION.`);
     }
+    const sourceRevision = existingTag ? sourceBeforeRelease(git, version) : git("rev-parse", "HEAD");
     const date = new Date().toISOString().slice(0, 10);
     const entries = changelogs.map(([file, title]) => {
       const source = readFileSync(file, "utf8");
@@ -169,6 +189,10 @@ function main() {
     });
     // Validate every file before changing any of them.
     for (const [file, , text] of entries) writeFileSync(file, text);
+    const changed = git("diff", "--name-only", "HEAD").split("\n").filter(Boolean);
+    if (changed.some(file => !changelogs.some(([name]) => name === file))) throw new Error("Unexpected release changes");
+    output("source_revision", sourceRevision);
+    output("revision", git("rev-parse", "HEAD"));
     output("tag", tag);
     output("existing_tag", existingTag);
     output("prerelease", version.includes("-"));

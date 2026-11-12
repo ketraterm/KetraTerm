@@ -109,11 +109,17 @@ val prepareLibraryPublicationRepository =
         group = "publishing"
         description = "Publishes all supported artifacts to a build-local Maven repository."
     }
+val publicationArtifactChecks =
+    tasks.register("publicationArtifactChecks") {
+        group = "verification"
+        description = "Checks consumers and packaged Maven artifacts before publication."
+        dependsOn(":ketraterm-testkit:publishedConsumerTest", ":ketraterm-testkit:publicationVerificationTest")
+    }
 val publicationChecks =
     tasks.register("publicationChecks") {
         group = "verification"
         description = "Checks formatting, tests, public ABI, consumers and packaged Maven artifacts."
-        dependsOn("spotlessCheck", ":ketraterm-testkit:publishedConsumerTest", ":ketraterm-testkit:publicationVerificationTest")
+        dependsOn("spotlessCheck", publicationArtifactChecks)
     }
 
 repositories {
@@ -274,14 +280,14 @@ subprojects {
             if (name.endsWith("ToPublicationValidationRepository")) {
                 dependsOn(cleanLibraryPublicationRepository)
             } else {
-                dependsOn(publicationChecks)
+                dependsOn(publicationArtifactChecks)
             }
         }
         tasks
             .matching {
                 it.name in setOf("publishToMavenCentral", "publishAndReleaseToMavenCentral", "prepareMavenCentralPublishing")
             }.configureEach {
-                dependsOn(publicationChecks)
+                dependsOn(publicationArtifactChecks)
             }
     }
 

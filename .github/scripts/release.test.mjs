@@ -26,6 +26,7 @@ import {
     finalizeChangelog,
     releaseNotes,
     shouldRelease,
+    sourceBeforeRelease,
     versionParts,
 } from "./release.mjs";
 
@@ -163,6 +164,7 @@ test("prepare command supports first release and resumes the immutable tag after
   }
   git("add", ".");
   git("commit", "-m", "Initial");
+  let sourceCommit = git("rev-parse", "HEAD");
   writeFileSync(join(root, "releases.json"), "[]");
   const output = join(root, "outputs");
   const run = () =>
@@ -182,6 +184,19 @@ test("prepare command supports first release and resumes the immutable tag after
   writeFileSync(join(root, changelogs.at(-1)[0]), pending);
   run();
   assert.match(readFileSync(output, "utf8"), /needed=true/);
+  assert.ok(readFileSync(output, "utf8").includes(`source_revision=${sourceCommit}`));
+  // A failed verification leaves no tag. A source fix can retry the same VERSION.
+  assert.equal(git("tag", "--list", "v0.4.0"), "");
+  git("restore", "--", ...changelogs.map(([file]) => file));
+  writeFileSync(join(root, "source.txt"), "Fixed source after failed validation\n");
+  git("add", "source.txt");
+  git("commit", "-m", "Fix validation failure");
+  sourceCommit = git("rev-parse", "HEAD");
+  writeFileSync(output, "");
+  run();
+  assert.ok(readFileSync(output, "utf8").includes(`revision=${sourceCommit}`));
+  assert.match(readFileSync(output, "utf8"), /existing_tag=false/);
+  assert.equal(git("tag", "--list", "v0.4.0"), "");
   for (const [file] of changelogs)
     assert.match(
       readFileSync(join(root, file), "utf8"),
@@ -193,9 +208,11 @@ test("prepare command supports first release and resumes the immutable tag after
   const releaseCommit = git("rev-parse", "HEAD");
   writeFileSync(join(root, "VERSION"), "0.4.0\n");
   git("commit", "--allow-empty", "-m", "Later development");
+  writeFileSync(output, "");
   run();
   assert.equal(git("rev-parse", "HEAD"), releaseCommit);
   assert.match(readFileSync(output, "utf8"), /existing_tag=true/);
+  assert.ok(readFileSync(output, "utf8").includes(`source_revision=${sourceCommit}`));
   writeFileSync(
     join(root, "releases.json"),
     JSON.stringify([{ tag_name: "v0.4.0", draft: false }]),
@@ -204,4 +221,28 @@ test("prepare command supports first release and resumes the immutable tag after
   run();
   assert.match(readFileSync(output, "utf8"), /needed=false/);
   assert.equal(git("rev-parse", "HEAD"), releaseCommit);
+});
+
+test("source reuse excludes only deterministic release changelog edits", () => {
+  const before = pending.trim();
+  const after = finalizeChangelog(before, "0.4.0", "2026-11-01");
+  for (const [files, parentText, releaseText, expected] of [
+    ["CHANGELOG.md", before, after, "parent"],
+    ["CHANGELOG.md\nVERSION", before, after, "head"],
+    ["CHANGELOG.md", before, after.replace("Fixed", "Changed"), "head"],
+    ["CHANGELOG.md", "# No release headings", after, "head"],
+    ["CHANGELOG.md", before, after.replace("2026-11-01", "invalid"), "head"],
+    ["", before, after, "head"],
+  ]) {
+    const git = (...args) => {
+      switch (args[0]) {
+        case "diff-tree": return files;
+        case "rev-list": return "head parent";
+        case "rev-parse": return "head";
+        case "show": return args[1].startsWith("HEAD^") ? parentText : releaseText;
+        default: throw new Error(`Unexpected git command: ${args}`);
+      }
+    };
+    assert.equal(sourceBeforeRelease(git, "0.4.0"), expected);
+  }
 });

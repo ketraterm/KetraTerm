@@ -96,7 +96,7 @@ validation groups, then runs the selected groups in parallel:
 | Group | Validation |
 | --- | --- |
 | Headless | Linux JVM tests, formatting, ABI, and native version metadata. |
-| Platform | Linux native/desktop tests; Windows and macOS JVM/native/desktop tests. Real-window suites remain serialized within each display. |
+| Platform | Linux native/desktop tests; Windows and macOS JVM/native/desktop tests for platform-sensitive or full runs. Real-window suites remain serialized within each display. |
 | Consumers | Published Kotlin/Java clients, retained clients, and publication metadata. Linux on selective PRs; all three operating systems on full runs. |
 | Benchmarks | JMH compilation and packaging. |
 | Website | Documentation, website tests, formatting, build, and links. |
@@ -104,19 +104,26 @@ validation groups, then runs the selected groups in parallel:
 
 PRs and merge groups select affected groups conservatively. Documentation changes
 run website checks; test changes run JVM tests and the module's declared environment
-suites; production changes also run platform and relevant integration groups.
+suites. Platform-independent production modules (protocol, parser, core, host,
+input, render API/cache, and completion engine) run Linux JVM and native/desktop checks, consumers,
+benchmark compilation, and relevant differential checks. Other production modules
+also run the three-platform shell/window suites. Mixed changes combine their checks.
 Gradle owns downstream test invalidation through runtime classpaths: CI does not
 maintain a second module dependency graph. Build/toolchain/CI changes, unknown
-paths, empty diffs, and failed diff discovery request all groups. Pushes to
-`master`/`main`, daily schedules, manual runs, and reusable callers default to full
-validation. Release publication waits for full validation of the exact tagged
-revision, including all three consumer platforms. Reports are retained on success
-and failure.
+paths, empty diffs, and failed diff discovery request all groups. The Test Suite does
+not run on pushes. Full validation runs weekly on Sunday at 03:43 UTC, on manual
+runs, and by default for reusable callers. Larger differential, resize/reflow, and
+cursor/wrap campaigns retain their separate daily schedule at 02:17 UTC.
+Releases reuse successful full CI for an identical source tree when available;
+otherwise they run the full suite on the pinned source before creating a new tag. Signed publication
+artifacts and consumers are checked separately before upload. See the
+[release workflow](releases.md). Reports are retained on success and failure.
 
-Require **CI gate** in branch protection. It succeeds only when planning and every
-selected group succeed; only deliberately unselected groups may skip. When
-adopting this workflow, replace the old OS test and Code Style required checks
-with this gate so deliberately skipped groups cannot leave a PR waiting forever.
+There is no aggregate required-check job. Remove obsolete required check names
+from branch protection when removing jobs. Conditional matrices and reusable
+workflows do not always emit the same check names, so requiring every expanded
+job name can leave deliberately skipped groups waiting forever. Review all selected
+checks before merging; weekly and release validation do not provide premerge protection.
 
 The shared JVM setup restores Gradle dependencies, compiled outputs, and cached
 headless test results. Native/desktop results are never cached. Trusted default
@@ -127,7 +134,7 @@ configuration-cache entries, following the
 Without that secret, including on fork PRs, verification still runs but configuration
 cache entries are not persisted between runners.
 
-Validate CI selection, gating, and release automation locally with:
+Validate CI selection and release automation locally with:
 
 ```shell
 node --test .github/scripts/*.test.mjs

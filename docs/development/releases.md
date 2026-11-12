@@ -12,25 +12,37 @@ The workflow:
 1. Reads `VERSION` and compares it with all published GitHub releases,
    including prereleases. An already published version is skipped; a downgrade
    or an alias of an existing version fails.
-2. Replaces the leading `Unreleased` heading in the library and standalone
-   changelogs with the version and the current UTC date. Older entries and already
+2. Validates finalization of the leading `Unreleased` heading in the library and
+   standalone changelogs with the version and the current UTC date. Older entries and already
    finalized dates are preserved. A finalized section with additional
    Unreleased changes is rejected to avoid ambiguous release contents.
-3. Runs formatting, ABI, tests, local publication checks, and native version
-   validation before creating the release commit.
-4. Commits the changelogs to `master` and creates `v{version}` on that commit
-   in one atomic push. If `master` advances during verification, the push
-   fails; rerun against the updated branch. Existing tags are never moved.
-5. Runs the full [CI validation set](testing.md#ci) on the exact tagged revision,
-   including native/desktop suites and three-platform consumers.
-   Publication waits for this verification to succeed.
-6. Publishes Maven artifacts, builds application binaries, and creates the
+3. Looks for a successful full Test Suite run with a validation record matching the
+   source Git tree, including build and workflow files. The lookup checks the
+   latest 30 successful runs; missing or expired evidence requires full validation.
+4. Reuses matching source validation, allowing only the release tool's deterministic
+   changelog finalization. Without matching evidence, runs the full
+   [CI validation set](testing.md#ci) on the pinned source commit, including
+   native/desktop suites and three-platform consumers. A failure creates no new tag;
+   fix the source and rerun with the same `VERSION`.
+5. Finalizes the changelogs from that validated commit, commits them to `master`,
+   and creates `v{version}` in one atomic push. If `master` advances during
+   verification, the push fails; rerun against the updated branch. Existing tags
+   are never moved, and retries continue to validate and publish their pinned contents.
+6. Checks release-mode Maven artifacts and consumers, validates native version
+   metadata, publishes Maven artifacts, builds application binaries, and creates the
    GitHub release with notes from both versioned changelog sections.
    Relative links in those notes point to the tagged source.
-7. Triggers website/documentation publication through the existing
+7. Triggers website/documentation publication through the
    `workflow_run` hook after successful completion, so downloads reflect the
-   published assets. The release bot's push can also trigger ordinary push
-   workflows before publication finishes.
+   published assets. Tags and GitHub release events do not trigger extra deployments.
+   Relevant master pushes still publish development documentation; changelog-only
+   edits publish with the next relevant push or successful release, or manually.
+
+`publicationChecks` remains the full local prepublication check (formatting, ABI,
+JVM tests, consumers, and artifact metadata). Remote publishing depends on the
+narrower `publicationArtifactChecks`: source validation is the release workflow's
+responsibility, while release-mode consumer and artifact checks run in the same
+Gradle invocation as publication. No ordinary JVM tests are repeated just to upload.
 
 ## Release bot setup
 

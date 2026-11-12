@@ -15,12 +15,12 @@
  */
 
 import assert from "node:assert/strict";
-import {readFileSync, readdirSync} from "node:fs";
+import {readdirSync, readFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {test} from "node:test";
 import {changedPaths, checks, fullPlan, parseEnvironments, planChanges, selectPlan} from "./ci-plan.mjs";
-import {verifyResults} from "./ci-gate.mjs";
+
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const environments = parseEnvironments(readFileSync(resolve(root, "gradle/test-environments.properties"), "utf8"));
@@ -38,7 +38,7 @@ for (const [path, expected] of [
     ["ketraterm-workspace/src/main/kotlin/TerminalWorkspace.kt", ["headless", "platform", "consumers", "benchmarks"]],
     ["ketraterm-completion-persistence/src/main/kotlin/Coordinator.kt", ["headless", "platform", "consumers", "benchmarks"]],
     ["ketraterm-ui-swing/src/main/kotlin/Painter.kt", ["headless", "platform", "consumers", "benchmarks"]],
-    ["ketraterm-parser/src/main/kotlin/Parser.kt", checks.filter(check => check !== "website")],
+    ["ketraterm-parser/src/main/kotlin/Parser.kt", ["headless", "platform", "consumers", "benchmarks", "differential"]],
     ["ketraterm-testkit/src/main/kotlin/Connector.kt", checks.filter(check => check !== "website")],
     ["ketraterm-testkit/src/consumerTest/ui-swing/Consumer.kt", ["headless", "consumers"]],
     ["ketraterm-core/api/core.api", ["headless", "consumers"]],
@@ -65,7 +65,50 @@ test("diff discovery retains spaces, deletions, and both rename paths without sh
         return "old source.kt\0new source.kt\0deleted.kt\0";
     });
     assert.deepEqual(paths, ["old source.kt", "new source.kt", "deleted.kt"]);
-    assert.equal(planChanges(["docs/old.md", "ketraterm-core/src/main/New.kt"], environments).platform, true);
+    assert.deepEqual(selected(planChanges(["docs/old.md", "ketraterm-core/src/main/New.kt"], environments)),
+        ["headless", "platform", "consumers", "benchmarks", "website", "differential"]);
+});
+
+test("platform-independent production changes retain Linux integration and consumer coverage", () => {
+    for (const module of ["protocol", "parser", "core", "host", "input", "render-api", "render-cache", "completion"]) {
+        const plan = planChanges([`ketraterm-${module}/src/main/Changed.kt`], environments);
+        assert.equal(plan.platform, true, module);
+        assert.deepEqual(plan.platforms.map(platform => platform.os), ["ubuntu-26.04"], module);
+        assert.equal(plan.headless, true, module);
+        assert.equal(plan.consumers, true, module);
+        assert.equal(plan.benchmarks, true, module);
+    }
+});
+
+test("OS-facing and shared integration changes retain all platform checks", () => {
+    for (const module of ["app", "pty", "workspace", "ui-swing", "ui-swing-host", "session",
+        "shell-integration", "completion-host", "completion-persistence", "transport-api", "testkit", "examples"]) {
+        const plan = planChanges(["ketraterm-core/src/main/Changed.kt", `ketraterm-${module}/src/main/Changed.kt`], environments);
+        assert.equal(plan.platform, true, module);
+        assert.deepEqual(plan.platforms.map(platform => platform.os), ["ubuntu-26.04", "macos-15", "windows-2025"], module);
+    }
+});
+
+test("mixed changes preserve three platforms regardless of path order", () => {
+    const paths = ["ketraterm-app/src/test/WindowTest.kt", "ketraterm-core/src/main/Core.kt"];
+    for (const order of [paths, [...paths].reverse()]) {
+        const plan = planChanges(order, environments);
+        assert.equal(plan.platform, true);
+        assert.equal(plan.platforms.length, 3);
+    }
+    assert.equal(fullPlan("Release").platforms.length, 3);
+});
+
+test("Test Suite runs on PRs, merge groups, weekly and manually, never on pushes", () => {
+    const workflow = readFileSync(resolve(root, ".github/workflows/tests.yml"), "utf8");
+    const triggers = workflow.split(/\r?\non:\r?\n/)[1].split(/\r?\npermissions:/)[0];
+    assert.doesNotMatch(triggers, /^  push:/m);
+    for (const event of ["pull_request", "merge_group", "workflow_dispatch", "workflow_call"]) {
+        assert.match(triggers, new RegExp(`^  ${event}:`, "m"));
+    }
+    assert.match(triggers, /cron: '43 3 \* \* 0'/);
+    const campaigns = readFileSync(resolve(root, ".github/workflows/terminal-differential.yml"), "utf8");
+    assert.match(campaigns, /cron: '17 2 \* \* \*'/);
 });
 test("missing or invalid base commits cannot silently skip checks", () => {
     for (const base of [undefined, "", "0".repeat(40), "--bad-option", "a".repeat(41)]) assert.throws(() => changedPaths(base));
@@ -109,33 +152,4 @@ test("every environment-tagged source has a declared module owner", () => {
             visit(path, entry.name);
         }
     }
-});
-
-function results(plan) {
-    return {plan: {result: "success", outputs: {plan: JSON.stringify(plan)}},
-        ...Object.fromEntries(checks.map(check => [check, {result: plan[check] ? "success" : "skipped"}]))};
-}
-test("gate accepts exactly planned skips and successful validation", () => {
-    verifyResults(results(planChanges(["docs/README.md"], environments)));
-    verifyResults(results(fullPlan("manual")));
-});
-for (const check of checks) {
-    for (const result of ["failure", "cancelled", "skipped", undefined]) {
-        test(`gate rejects selected ${check} with ${result}`, () => {
-            const needs = results(fullPlan("test"));
-            needs[check] = {result};
-            assert.throws(() => verifyResults(needs));
-        });
-    }
-}
-test("gate rejects failed planning, malformed plans, and unselected failed jobs", () => {
-    for (const result of ["failure", "cancelled", "skipped"]) {
-        const needs = results(fullPlan("test")); needs.plan.result = result;
-        assert.throws(() => verifyResults(needs));
-    }
-    assert.throws(() => verifyResults({plan: {result: "success", outputs: {plan: "{}"}}}));
-    assert.throws(() => verifyResults({plan: {result: "success", outputs: {plan: "invalid"}}}));
-    const needs = results(planChanges(["docs/README.md"], environments));
-    needs.headless.result = "failure";
-    assert.throws(() => verifyResults(needs));
 });

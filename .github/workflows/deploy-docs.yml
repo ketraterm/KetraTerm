@@ -3,10 +3,20 @@ name: Publish website and documentation
 on:
   push:
     branches: [master]
-    tags: ['v*']
+    paths:
+      - 'website/**'
+      - '**/*.md'
+      - '!CHANGELOG.md'
+      - '!ketraterm-app/CHANGELOG.md'
+      - 'docs/**'
+      - 'ketraterm-*/src/main/**'
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew*'
+      - 'VERSION'
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
-  release:
-    types: [published]
   workflow_run:
     workflows: ['Release']
     types: [completed]
