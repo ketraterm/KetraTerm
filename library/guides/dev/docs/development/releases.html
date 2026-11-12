@@ -34,26 +34,37 @@ The workflow:</p>
 <li>Reads <code>VERSION</code> and compares it with all published GitHub releases,
 including prereleases. An already published version is skipped; a downgrade
 or an alias of an existing version fails.</li>
-<li>Replaces the leading <code>Unreleased</code> heading in the library and standalone
-changelogs with the version and the current UTC date. Older entries and already
+<li>Validates finalization of the leading <code>Unreleased</code> heading in the library and
+standalone changelogs with the version and the current UTC date. Older entries and already
 finalized dates are preserved. A finalized section with additional
 Unreleased changes is rejected to avoid ambiguous release contents.</li>
-<li>Runs formatting, ABI, tests, local publication checks, and native version
-validation before creating the release commit.</li>
-<li>Commits the changelogs to <code>master</code> and creates <code>v{version}</code> on that commit
-in one atomic push. If <code>master</code> advances during verification, the push
-fails; rerun against the updated branch. Existing tags are never moved.</li>
-<li>Runs the full <a href="testing.html#ci">CI validation set</a> on the exact tagged revision,
-including native/desktop suites and three-platform consumers.
-Publication waits for this verification to succeed.</li>
-<li>Publishes Maven artifacts, builds application binaries, and creates the
+<li>Looks for a successful full Test Suite run with a validation record matching the
+source Git tree, including build and workflow files. The lookup checks the
+latest 30 successful runs; missing or expired evidence requires full validation.</li>
+<li>Reuses matching source validation, allowing only the release tool&#39;s deterministic
+changelog finalization. Without matching evidence, runs the full
+<a href="testing.html#ci">CI validation set</a> on the pinned source commit, including
+native/desktop suites and three-platform consumers. A failure creates no new tag;
+fix the source and rerun with the same <code>VERSION</code>.</li>
+<li>Finalizes the changelogs from that validated commit, commits them to <code>master</code>,
+and creates <code>v{version}</code> in one atomic push. If <code>master</code> advances during
+verification, the push fails; rerun against the updated branch. Existing tags
+are never moved, and retries continue to validate and publish their pinned contents.</li>
+<li>Checks release-mode Maven artifacts and consumers, validates native version
+metadata, publishes Maven artifacts, builds application binaries, and creates the
 GitHub release with notes from both versioned changelog sections.
 Relative links in those notes point to the tagged source.</li>
-<li>Triggers website/documentation publication through the existing
+<li>Triggers website/documentation publication through the
 <code>workflow_run</code> hook after successful completion, so downloads reflect the
-published assets. The release bot&#39;s push can also trigger ordinary push
-workflows before publication finishes.</li>
+published assets. Tags and GitHub release events do not trigger extra deployments.
+Relevant master pushes still publish development documentation; changelog-only
+edits publish with the next relevant push or successful release, or manually.</li>
 </ol>
+<p><code>publicationChecks</code> remains the full local prepublication check (formatting, ABI,
+JVM tests, consumers, and artifact metadata). Remote publishing depends on the
+narrower <code>publicationArtifactChecks</code>: source validation is the release workflow&#39;s
+responsibility, while release-mode consumer and artifact checks run in the same
+Gradle invocation as publication. No ordinary JVM tests are repeated just to upload.</p>
 <h2 id="release-bot-setup">Release bot setup</h2>
 <p>The release commit and tag are pushed as a dedicated GitHub App. Create and
 install the app on this repository with <strong>Contents: Read and write</strong>, then add
@@ -98,7 +109,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

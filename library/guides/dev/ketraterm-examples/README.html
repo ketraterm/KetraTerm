@@ -105,13 +105,13 @@ Right accepts the entire remaining suggestion. With no visible inline text,
 Ctrl+Right reaches the shell for its usual word navigation.</p>
 <p>This example opts into the binding using <code>setInlineShellSuggestionKeymap</code> and
 <code>SwingShellSuggestionAction.ACCEPT_NEXT_WORD</code> in
-<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/SuggestionExampleWindow.kt"><code>SuggestionExampleWindow</code></a>.
+<a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/SuggestionExampleWindow.kt"><code>SuggestionExampleWindow</code></a>.
 Other inline keys fall back to <code>SwingShellSuggestionKeymap.INLINE_STANDARD</code>.
 See the <a href="../ketraterm-ui-swing/README.html#inline-suffix-rendering">inline contract</a>
 for word boundaries, Unicode handling, and echo validation.</p>
 <h2 id="replacing-the-local-simulation">Replacing the local simulation</h2>
 <p>The integration is in
-<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/ExternalInlineSuggestions.kt"><code>ExternalInlineSuggestions</code></a>.
+<a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/ExternalInlineSuggestions.kt"><code>ExternalInlineSuggestions</code></a>.
 Replace <code>::simulateCompletion</code> at its construction with a suspending function
 of type <code>suspend (SuggestionContext) -&gt; String?</code>. Return a complete proposed
 command or null. Keep the model independent of popup candidates: the terminal
@@ -123,7 +123,7 @@ rendering, key routing, and conditional acceptance. Operational provider failure
 reach the view&#39;s standard diagnostics; cancellation propagates. A real network
 client remains host-owned and must support request cancellation and be closed
 with the host lifetime.</p>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/SuggestionContext.kt"><code>SuggestionContext</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-examples/src/main/kotlin/io/github/ketraterm/examples/suggestions/SuggestionContext.kt"><code>SuggestionContext</code></a>
 contains the original command and UTF-16 cursor offset, the host&#39;s shell profile
 kind, the reported working directory URI, and at most five completed command
 metadata/output pairs, newest
@@ -162,7 +162,7 @@ provider failures. Shared Swing interaction tests own the terminal&#39;s stale-e
 popup navigation, and key-routing contracts. The desktop smoke test requires an
 installed supported shell and display; it starts the real example, checks the
 controls, and waits for asynchronous workspace cleanup before window disposal.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-examples/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-examples/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -25,7 +25,7 @@
   <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Test organization and execution</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#execution-suites">Execution suites</a><a class="depth-2" href="#test-and-fixture-structure">Test and fixture structure</a><a class="depth-2" href="#ci">CI</a><a class="depth-2" href="#real-tui-integration-tests">Real TUI integration tests</a></nav></details><div class="article-content"><div class="prose"><h1 id="test-organization-and-execution">Test organization and execution</h1>
 <p>Tests belong to the module that owns the behavior. A feature name does not create
 a new CI job or execution framework. The shared Gradle convention in
-<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/gradle/test-suites.gradle.kts"><code>gradle/test-suites.gradle.kts</code></a> selects suites
+<a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/gradle/test-suites.gradle.kts"><code>gradle/test-suites.gradle.kts</code></a> selects suites
 by JUnit tags and owns JVM settings, reports, and display serialization.</p>
 <h2 id="execution-suites">Execution suites</h2>
 <div class="table-scroll"><table>
@@ -73,7 +73,7 @@ No additional property is needed to enable PTY fixtures.</p>
 <p>Each task writes its own <code>build/test-results/&lt;task&gt;/</code> XML and
 <code>build/reports/tests/&lt;task&gt;/</code> HTML. Running another suite cannot replace those
 results. Declare modules with environment-dependent tests in
-<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/gradle/test-environments.properties"><code>gradle/test-environments.properties</code></a>.
+<a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/gradle/test-environments.properties"><code>gradle/test-environments.properties</code></a>.
 Root aggregates depend only on those owners; other modules&#39; environment tasks
 skip without launching an empty test JVM. CI checks that every tagged source has
 a declared owner.</p>
@@ -118,7 +118,7 @@ same desktop. Avoid interacting with their windows during a run.</p>
 <h2 id="ci">CI</h2>
 <p>The <a href="https://github.com/ketraterm/KetraTerm-IntelliJ">IntelliJ plugin</a> owns its tests and verification in its
 separate repository.</p>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/.github/workflows/tests.yml">Test Suite workflow</a> plans independent
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/.github/workflows/tests.yml">Test Suite workflow</a> plans independent
 validation groups, then runs the selected groups in parallel:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -133,7 +133,7 @@ validation groups, then runs the selected groups in parallel:</p>
 </tr>
 <tr>
 <td>Platform</td>
-<td>Linux native/desktop tests; Windows and macOS JVM/native/desktop tests. Real-window suites remain serialized within each display.</td>
+<td>Linux native/desktop tests; Windows and macOS JVM/native/desktop tests for platform-sensitive or full runs. Real-window suites remain serialized within each display.</td>
 </tr>
 <tr>
 <td>Consumers</td>
@@ -154,18 +154,25 @@ validation groups, then runs the selected groups in parallel:</p>
 </tbody></table></div>
 <p>PRs and merge groups select affected groups conservatively. Documentation changes
 run website checks; test changes run JVM tests and the module&#39;s declared environment
-suites; production changes also run platform and relevant integration groups.
+suites. Platform-independent production modules (protocol, parser, core, host,
+input, render API/cache, and completion engine) run Linux JVM and native/desktop checks, consumers,
+benchmark compilation, and relevant differential checks. Other production modules
+also run the three-platform shell/window suites. Mixed changes combine their checks.
 Gradle owns downstream test invalidation through runtime classpaths: CI does not
 maintain a second module dependency graph. Build/toolchain/CI changes, unknown
-paths, empty diffs, and failed diff discovery request all groups. Pushes to
-<code>master</code>/<code>main</code>, daily schedules, manual runs, and reusable callers default to full
-validation. Release publication waits for full validation of the exact tagged
-revision, including all three consumer platforms. Reports are retained on success
-and failure.</p>
-<p>Require <strong>CI gate</strong> in branch protection. It succeeds only when planning and every
-selected group succeed; only deliberately unselected groups may skip. When
-adopting this workflow, replace the old OS test and Code Style required checks
-with this gate so deliberately skipped groups cannot leave a PR waiting forever.</p>
+paths, empty diffs, and failed diff discovery request all groups. The Test Suite does
+not run on pushes. Full validation runs weekly on Sunday at 03:43 UTC, on manual
+runs, and by default for reusable callers. Larger differential, resize/reflow, and
+cursor/wrap campaigns retain their separate daily schedule at 02:17 UTC.
+Releases reuse successful full CI for an identical source tree when available;
+otherwise they run the full suite on the pinned source before creating a new tag. Signed publication
+artifacts and consumers are checked separately before upload. See the
+<a href="releases.html">release workflow</a>. Reports are retained on success and failure.</p>
+<p>There is no aggregate required-check job. Remove obsolete required check names
+from branch protection when removing jobs. Conditional matrices and reusable
+workflows do not always emit the same check names, so requiring every expanded
+job name can leave deliberately skipped groups waiting forever. Review all selected
+checks before merging; weekly and release validation do not provide premerge protection.</p>
 <p>The shared JVM setup restores Gradle dependencies, compiled outputs, and cached
 headless test results. Native/desktop results are never cached. Trusted default
 branch runs populate the cache; PRs use setup-gradle&#39;s default read-only policy.
@@ -174,7 +181,7 @@ configuration-cache entries, following the
 <a href="https://github.com/gradle/actions/blob/v4/docs/setup-gradle.md#saving-configuration-cache-data">setup-gradle encryption instructions</a>.
 Without that secret, including on fork PRs, verification still runs but configuration
 cache entries are not persisted between runners.</p>
-<p>Validate CI selection, gating, and release automation locally with:</p>
+<p>Validate CI selection and release automation locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/*.test.mjs
 </code></pre>
 <p>The shell matrix is an environment contract. CI passes
@@ -215,7 +222,7 @@ on Linux/macOS and Neovim on Windows. WSL remains a configured-host check.</p>
 disposes the view/window, closes the PTY, and removes only the test&#39;s tmux server,
 including on failure. PNG captures go under the desktop suite&#39;s <code>tui/</code> artifact
 directory and are not committed. The source tests survive <code>clean</code>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/docs/development/testing.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/docs/development/testing.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
