@@ -46,27 +46,30 @@ public enum class SwingShellSuggestionAction {
     /** Moves selection toward earlier suggestions by one visible page. */
     SELECT_PREVIOUS_PAGE,
 
-    /** Selects the first suggestion when none is selected, otherwise accepts the selected suggestion. */
+    /** Accepts the selected suggestion, or the first candidate when selection is passive. */
     ACCEPT,
 
-    /** Accepts an already-selected suggestion without selecting a fallback item. */
+    /** Accepts a deliberately selected popup item, or the visible managed inline suggestion. */
     ACCEPT_SELECTED,
 
     /** Explicitly dismisses the selected suggestion. */
     DISMISS,
+
+    /** Accepts the next whitespace-delimited chunk of visible inline text. Unbound by default; inline only. */
+    ACCEPT_NEXT_WORD,
 }
 
 /**
  * Host-owned mapping from Swing key presses to semantic suggestion actions.
  *
- * The reusable popup owns action execution and state. Hosts own bindings so a
+ * The reusable suggestion controllers own action execution and state. Hosts own bindings so a
  * standalone application can use conventional Swing defaults while an IDE can
  * honor its active, user-configurable keymap.
  */
 @ExperimentalShellSuggestionsApi
 public fun interface SwingShellSuggestionKeymap {
     /**
-     * Resolves one key press while the suggestion popup is visible.
+     * Resolves one key press while a suggestion is visible.
      *
      * @param event Swing key-pressed event.
      * @return semantic action, or `null` when the key is not claimed.
@@ -74,7 +77,22 @@ public fun interface SwingShellSuggestionKeymap {
     public fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
 
     public companion object {
-        /** Conventional terminal-popup bindings used by standalone Swing hosts. */
+        /** Inline defaults: unmodified Tab or Right accepts the whole visible suffix, Escape dismisses. */
+        @JvmField
+        public val INLINE_STANDARD: SwingShellSuggestionKeymap =
+            SwingShellSuggestionKeymap { event ->
+                if (event.modifiersEx and RELEVANT_MODIFIERS != 0) {
+                    null
+                } else {
+                    when (event.keyCode) {
+                        KeyEvent.VK_TAB, KeyEvent.VK_RIGHT -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                        KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
+                        else -> null
+                    }
+                }
+            }
+
+        /** Popup defaults: Tab/Enter accept deliberate selection; passive popups leave those keys to the shell. */
         @JvmField
         public val STANDARD: SwingShellSuggestionKeymap =
             SwingShellSuggestionKeymap { event ->
@@ -90,8 +108,7 @@ public fun interface SwingShellSuggestionKeymap {
                     KeyEvent.VK_END -> SwingShellSuggestionAction.SELECT_LAST
                     KeyEvent.VK_PAGE_DOWN -> SwingShellSuggestionAction.SELECT_NEXT_PAGE
                     KeyEvent.VK_PAGE_UP -> SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE
-                    KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT
-                    KeyEvent.VK_ENTER -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                    KeyEvent.VK_TAB, KeyEvent.VK_ENTER -> SwingShellSuggestionAction.ACCEPT_SELECTED
                     KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                     else -> null
                 }

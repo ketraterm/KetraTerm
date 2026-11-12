@@ -165,6 +165,12 @@ public interface TerminalRenderFrame {
     public val cursorPendingWrap: Boolean get() = false
 
     /**
+     * Whether printable wrapping uses the full grid with unrestricted margins.
+     * Readers without this optional geometry proof return false; text previews must fail closed.
+     */
+    public val hasFullScreenMargins: Boolean get() = false
+
+    /**
      * Returns the generation for visible [row].
      *
      * The generation changes when visual cell content, attributes, hyperlink

@@ -39,6 +39,7 @@ cross-project boundaries; module guides own local implementation detail.
   benchmarks.
 - `ketraterm-workspace`: host-neutral profiles, tabs, and local-session
   workspace state.
+- `ketraterm-examples`: unpublished, runnable consumers of public library APIs.
 
 IntelliJ product integration is maintained in the separate
 [KetraTerm-IntelliJ repository](https://github.com/ketraterm/KetraTerm-IntelliJ).

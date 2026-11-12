@@ -2,10 +2,10 @@
 
 ## [Unreleased]
 
+- Added opt-in inline previews of the top ranked completion. Matching popup and inline requests share one evaluation and its learning feedback. The popup omits the visibly previewed candidate, so one Down selects the first alternative; browsing keeps the list stable. Only append-only results appear inline, including with popups disabled. Tab/Right accept visible inline text until deliberate popup browsing takes over; Tab/Enter insert a deliberate popup choice without executing it. Without visible inline text, passive popups and refreshed child results preserve shell Tab/Enter behavior. A dedicated Suggestions settings page controls inline previews, popup mode, learning, and shortcuts recorded as removable key chips. Inline is off by default; saved history-inline preferences migrate automatically.
 - PowerShell automatic suggestions confirm inline-prediction input without waiting for native candidate discovery.
 - Added temporary per-pane font zoom/reset, Windows Ctrl+Shift+C/V clipboard aliases, and window-scoped tab/pane shortcuts. History paging keeps one row of context; Shift+Home/End jumps to oldest history/live output.
 - Double- and triple-click dragging extends selection by whole words or rows. Word selection preserves complete wide characters and keeps adjacent paths out of whitespace/delimiter selections.
-
 - New configurations start at 100 × 28 cells with 10,000 scrollback lines; the initial window fits the monitor's usable area before shell output starts. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
 - Added review of explicit pastes containing line breaks or control characters, with an escaped preview and Cancel selected by default.
 - Coalesced bell bursts and limited audible, visual, and desktop-attention feedback to one delivery every 500 ms per window.

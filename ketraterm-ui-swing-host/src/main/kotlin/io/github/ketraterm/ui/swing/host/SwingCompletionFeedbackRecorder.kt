@@ -54,7 +54,7 @@ public class SwingCompletionFeedbackRecorder(
             when (feedback.kind) {
                 SwingShellSuggestionFeedbackKind.ACCEPTED -> TerminalCompletionFeedbackKind.ACCEPTED
                 SwingShellSuggestionFeedbackKind.DISMISSED -> TerminalCompletionFeedbackKind.DISMISSED
-                SwingShellSuggestionFeedbackKind.REJECTED -> return
+                SwingShellSuggestionFeedbackKind.REJECTED, SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED -> return
             }
         val context = feedback.suggestion.interactionContext as? SwingCompletionContext ?: return
         val commandLine =

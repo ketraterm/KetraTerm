@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -28,11 +29,14 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
@@ -42,6 +46,1593 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @Test
+    fun `inline presentation state reports only visible managed publications`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            assertNull(view.inlineShellSuggestionPresentation.value)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            assertSame(inline.snapshot, view.inlineShellSuggestionPresentation.value)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            popup.select(popup.snapshot, 0)
+            assertNull(view.inlineShellSuggestionPresentation.value)
+            view.hideShellSuggestions()
+            assertSame(inline.snapshot, view.inlineShellSuggestionPresentation.value)
+            assertTrue(view.presentInlineShellSuggestion(assertNotNull(fixture.session.captureCommandEdit()), "tatus"))
+            assertNull(view.inlineShellSuggestionPresentation.value, "Rendering-only previews have no managed publication")
+            view.clearInlineShellSuggestion()
+            dispatcher.scheduler.runCurrent()
+            assertNull(view.inlineShellSuggestionPresentation.value)
+        }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = ';',
+        value = [
+            "status --short;status;11", "\"hello world\";\"hello;11", "src/main/ next;src/main/;14",
+            "e\u0301 👩‍💻;e\u0301;6", "❤️ next;❤️;7", "👩‍💻 next;👩‍💻;7", "one  two;one;8", "one\u00a0two;one;8",
+        ],
+    )
+    fun `next word accepts one chunk and retains the exact remainder after echo`(
+        suffix: String,
+        chunk: String,
+        cells: Int,
+    ) = withInlineFixture("echo ") { fixture, dispatcher, writes ->
+        val view = fixture.terminal
+        val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+        val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+        val command = "echo $suffix"
+        inline.publish(listOf(SwingShellSuggestion(command, 0, 5, "ai", "COMMAND")), selectedIndex = 0)
+        val accepted = "echo $chunk"
+        assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+        assertFalse(inline.isActive)
+        dispatcher.scheduler.runCurrent()
+        val firstWrite = chunk
+        assertEquals(firstWrite, writes.toString("UTF-8"))
+        assertEquals(SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED, feedback.single().kind)
+        assertEquals(accepted, feedback.single().suggestion.commandTextAfterReplacement(feedback.single().request))
+        assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+
+        fixture.feedHost("\r\u001b[2K    $accepted")
+        fixture.editableSource.value = TerminalShellCommandLineSnapshot(accepted, accepted.length, 4 + cells, 0)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+        dispatcher.scheduler.runCurrent()
+        assertEquals(suffix, writes.toString("UTF-8"))
+        assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.last().kind)
+        assertEquals(command, feedback.last().suggestion.commandTextAfterReplacement(feedback.last().request))
+    }
+
+    @Test
+    fun `repeated next word acceptance includes leading spaces and finishes with ordinary acceptance`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+            inline.publish(listOf(inlineCandidate("git status  --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus  --short", writes.toString("UTF-8"))
+            assertEquals(
+                listOf(
+                    SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED,
+                    SwingShellSuggestionFeedbackKind.ACCEPTED,
+                ),
+                feedback.map {
+                    it.kind
+                },
+            )
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bytes", "key", "clear", "focus", "unbind", "replace"])
+    fun `pending word remainder cannot reappear after intervening changes`(change: String) =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            when (change) {
+                "bytes" -> fixture.session.submitBytes("x".toByteArray())
+                "key" -> fixture.press(KeyEvent.VK_LEFT)
+                "clear" -> view.clearInlineShellSuggestion()
+                "focus" -> view.focusListeners.forEach { it.focusLost(FocusEvent(view, FocusEvent.FOCUS_LOST)) }
+                "unbind" -> view.unbind()
+                "replace" -> assertNotNull(view.beginInlineShellSuggestionInteraction()).close()
+            }
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @Test
+    fun `custom next word key works beside passive popup but does not accept while browsing`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            view.setInlineShellSuggestionKeymap {
+                if (it.keyCode ==
+                    KeyEvent.VK_F6
+                ) {
+                    SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+                } else {
+                    SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(it)
+                }
+            }
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            fixture.press(KeyEvent.VK_DOWN)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestionNextWord())
+            fixture.press(KeyEvent.VK_ESCAPE)
+            fixture.press(KeyEvent.VK_F6)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `shared next word keymap accepts inline while a passive popup remains open`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val keymap =
+                SwingShellSuggestionKeymap { event ->
+                    if (event.keyCode ==
+                        KeyEvent.VK_F6
+                    ) {
+                        SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+                    } else {
+                        SwingShellSuggestionKeymap.STANDARD.actionFor(event)
+                    }
+                }
+            view.setShellSuggestionKeymap(keymap)
+            view.setInlineShellSuggestionKeymap(keymap)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            assertTrue(view.currentShellSuggestionState().visible)
+            assertFalse(popup.hasExplicitSelection)
+
+            assertTrue(fixture.press(KeyEvent.VK_F6).isConsumed)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("tatus", writes.toString("UTF-8"))
+            assertEquals(SwingShellSuggestionCloseReason.ACCEPTED, inline.closeReason)
+            assertEquals(-1, popup.snapshot.selectedIndex)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `next word appends to a long Unicode prefix without rewriting it`(hasRemainder: Boolean) {
+        val prefix = "echo " + "e\u0301".repeat(64) + "👩‍💻❤️ p"
+        val suffix = if (hasRemainder) "ath --verbose" else "ath"
+        withInlineFixture(prefix, columns = 200) { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot(prefix, prefix.length, 79, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+            val candidate =
+                if (hasRemainder) {
+                    SwingShellSuggestion(suffix, prefix.length, prefix.length, "ai", "COMMAND")
+                } else {
+                    SwingShellSuggestion(prefix + suffix, 0, prefix.length, "ai", "COMMAND")
+                }
+            inline.publish(listOf(candidate), selectedIndex = 0)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("ath", writes.toString("UTF-8"))
+            assertEquals(prefix + "ath", feedback.single().suggestion.commandTextAfterReplacement(feedback.single().request))
+            if (hasRemainder) {
+                fixture.feedHost("ath")
+                val accepted = prefix + "ath"
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot(accepted, accepted.length, 82, 0)
+                dispatcher.scheduler.advanceUntilIdle()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+                dispatcher.scheduler.runCurrent()
+            }
+            assertEquals(suffix, writes.toString("UTF-8"))
+            assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.last().kind)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `automatic scheduling preserves a word remainder during and after the echo wait`(automatic: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val requested = mutableListOf<String>()
+            view.setInlineShellSuggestionProvider { request ->
+                val text = request.commandText
+                requested += text
+                SwingShellSuggestionSource(flowOf(listOf(SwingShellSuggestion("git status --short", 0, text.length, "ai", "COMMAND"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 75
+                }
+            view.reloadSettings()
+            if (automatic) {
+                dispatcher.scheduler.advanceTimeBy(75)
+                dispatcher.scheduler.runCurrent()
+            } else {
+                val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+                inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            }
+            val initialRequests = if (automatic) listOf("git s") else emptyList()
+            assertEquals(initialRequests, requested)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("ta")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git sta", 7, 11, 0)
+            dispatcher.scheduler.advanceTimeBy(300)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(initialRequests, requested)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+
+            fixture.feedHost("tus")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceTimeBy(300)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(initialRequests, requested)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus --short", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `word continuation retains original source feedback and ignores its late AI publication`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(inline) {
+                SwingShellSuggestionSource(
+                    flow {
+                        emit(listOf(inlineCandidate("git status --short")))
+                        withContext(NonCancellable) { release.await() }
+                        emit(listOf(inlineCandidate("git stash --all")))
+                    },
+                    feedbackHandler = feedback::add,
+                )
+            }
+            try {
+                dispatcher.scheduler.runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+                dispatcher.scheduler.runCurrent()
+                fixture.feedHost("\r\u001b[2K    git status")
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+                dispatcher.scheduler.advanceUntilIdle()
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+                dispatcher.scheduler.runCurrent()
+                assertEquals("tatus --short", writes.toString("UTF-8"))
+                assertEquals(
+                    listOf(
+                        SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED,
+                        SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    ),
+                    feedback.map {
+                        it.kind
+                    },
+                )
+            } finally {
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+            }
+        }
+
+    @Test
+    fun `partial acceptance feedback cannot overwrite a reentrant newer inline request`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var newer: SwingShellSuggestionInteraction? = null
+            val inline =
+                assertNotNull(
+                    view.beginInlineShellSuggestionInteraction {
+                        dispatcher.scheduler.runCurrent()
+                        newer = view.beginInlineShellSuggestionInteraction()
+                        assertNotNull(newer).publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+                    },
+                )
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, assertNotNull(newer).closeReason)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @Test
+    fun `rendering only inline presentation retires pending automatic requests without claiming keys`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var opened = 0
+            view.setInlineShellSuggestionProvider {
+                opened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = true }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            val expected = assertNotNull(fixture.session.captureCommandEdit())
+            assertTrue(view.presentInlineShellSuggestion(expected, "tatus"))
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, opened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\t", writes.toString("UTF-8"))
+            assertFalse(expected.isCancelled)
+        }
+
+    @Test
+    fun `configured providers remain manual when automatic requests are disabled`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, popupOpened)
+            assertEquals(0, inlineOpened)
+            view.requestActiveShellSuggestions()
+            val manual = assertNotNull(view.requestActiveInlineShellSuggestions())
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(1, popupOpened)
+            assertEquals(1, inlineOpened)
+            assertTrue(manual.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `popup and inline automatic providers use independent delays and content`(inlineFirst: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                assertEquals("git s", it.commandText)
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash --all"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionsEnabled = true
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionDebounceMillis = if (inlineFirst) 150 else 50
+                    it.inlineShellSuggestionDebounceMillis = if (inlineFirst) 50 else 150
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(49)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, popupOpened)
+            assertEquals(0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(if (inlineFirst) 0 else 1, popupOpened)
+            assertEquals(if (inlineFirst) 1 else 0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(99)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened + inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened)
+            assertEquals(1, inlineOpened)
+            assertTrue(view.currentShellSuggestionState().visible)
+            // Disabling automatic popups must not retire or restart the independent inline result.
+            fixture.settings = fixture.settings.copy { it.shellSuggestionsEnabled = false }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertFalse(view.currentShellSuggestionState().visible)
+            assertEquals(1, inlineOpened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `changing delays reschedules only each surface pending deadline`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var popupOpened = 0
+            var inlineOpened = 0
+            view.setShellSuggestionProvider {
+                popupOpened++
+                flowOf(listOf(inlineCandidate("git status")))
+            }
+            view.setInlineShellSuggestionProvider {
+                inlineOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionsEnabled = true
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionDebounceMillis = 200
+                    it.inlineShellSuggestionDebounceMillis = 400
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(100)
+            fixture.settings =
+                fixture.settings.copy {
+                    it.shellSuggestionDebounceMillis = 20
+                    it.inlineShellSuggestionDebounceMillis = 600
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(19)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, popupOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, popupOpened)
+            dispatcher.scheduler.advanceTimeBy(579)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, inlineOpened)
+            dispatcher.scheduler.advanceTimeBy(1)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, inlineOpened)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["disable", "provider", "replace", "unbind", "dispose", "master", "focus", "selection"])
+    fun `automatic inline pending work follows its own settings provider and binding`(change: String) =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var originalOpened = 0
+            var replacementOpened = 0
+            view.setInlineShellSuggestionProvider {
+                originalOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git status"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 100
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.advanceTimeBy(50)
+            when (change) {
+                "disable" -> {
+                    fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = false }
+                    view.reloadSettings()
+                }
+                "master" -> {
+                    fixture.settings = fixture.settings.copy { it.smartSuggestionsEnabled = false }
+                    view.reloadSettings()
+                }
+                "provider" -> view.setInlineShellSuggestionProvider(null)
+                "replace" ->
+                    view.setInlineShellSuggestionProvider {
+                        replacementOpened++
+                        SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git stash"))))
+                    }
+                "unbind" -> view.unbind()
+                "dispose" -> view.dispose()
+                "focus" -> view.focusListeners.forEach { it.focusLost(FocusEvent(view, FocusEvent.FOCUS_LOST)) }
+                "selection" -> assertTrue(view.selectAll())
+            }
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(0, originalOpened)
+            assertEquals(if (change == "replace") 1 else 0, replacementOpened)
+            if (change != "replace") assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @Test
+    fun `manual inline replaces delayed automatic AI and survives automatic settings and provider changes`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            var opened = 0
+            var replacementOpened = 0
+            view.setInlineShellSuggestionProvider {
+                val automatic = ++opened == 1
+                SwingShellSuggestionSource(
+                    flow {
+                        if (automatic) withContext(NonCancellable) { release.await() }
+                        emit(listOf(inlineCandidate(if (automatic) "git status" else "git stash")))
+                    },
+                )
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 0
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, opened)
+            val manual = assertNotNull(view.requestActiveInlineShellSuggestions())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(2, opened)
+            fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = false }
+            view.reloadSettings()
+            view.setInlineShellSuggestionProvider {
+                replacementOpened++
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git show"))))
+            }
+            release.complete(Unit)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(manual.isActive)
+            assertEquals(0, replacementOpened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["popup-replace", "popup-publish", "inline-replace", "inline-publish"])
+    fun `mapped Tab cannot accept a replacement interaction or publication`(change: String) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = change.startsWith("inline")
+
+            fun begin() =
+                assertNotNull(
+                    if (inline) {
+                        view.beginInlineShellSuggestionInteraction()
+                    } else {
+                        view.beginActiveShellSuggestionInteraction()
+                    },
+                )
+            val original = begin()
+            original.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            if (!inline) {
+                original.select(original.snapshot, 0)
+                view.presentShellSuggestions(original)
+            }
+            var replacement: SwingShellSuggestionInteraction? = null
+            val keymap =
+                SwingShellSuggestionKeymap { event ->
+                    if (event.keyCode != KeyEvent.VK_TAB) {
+                        null
+                    } else {
+                        val next = if (change.endsWith("publish")) original else begin()
+                        next.publish(listOf(inlineCandidate("git stash")), selectedIndex = 0)
+                        if (!inline) view.presentShellSuggestions(next)
+                        replacement = next
+                        SwingShellSuggestionAction.ACCEPT_SELECTED
+                    }
+                }
+            if (inline) view.setInlineShellSuggestionKeymap(keymap) else view.setShellSuggestionKeymap(keymap)
+
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+
+            assertTrue(assertNotNull(replacement).isActive)
+            assertEquals("", writes.toString("UTF-8"))
+            assertTrue(fixture.feedback.isEmpty())
+        }
+
+    @Test
+    fun `current inline result retries when the copied frame catches up without reopening its provider`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.feedHost("\r\u001b[2K    git st")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git st", 6, 10, 0)
+            dispatcher.scheduler.runCurrent()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            var opened = 0
+            view.requestInlineShellSuggestions(inline) {
+                opened++
+                SwingShellSuggestionSource(flowOf(listOf(SwingShellSuggestion("git status", 0, 6, "AI", "COMMAND"))))
+            }
+            dispatcher.scheduler.runCurrent()
+            assertTrue(inline.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertTrue(inline.isActive)
+            assertEquals(1, opened)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(6) + "git status", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["close", "supersede", "input", "unbind"])
+    fun `frame arrival cannot revive obsolete inline work`(end: String) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.feedHost("\r\u001b[2K    git st")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git st", 6, 10, 0)
+            dispatcher.scheduler.runCurrent()
+            val old = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            old.publish(listOf(SwingShellSuggestion("git status", 0, 6, "AI", "COMMAND")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            var replacement: SwingShellSuggestionInteraction? = null
+            when (end) {
+                "close" -> old.close()
+                "supersede" -> {
+                    replacement = assertNotNull(view.beginInlineShellSuggestionInteraction())
+                    replacement.publish(listOf(SwingShellSuggestion("git stash", 0, 6, "AI", "COMMAND")), selectedIndex = 0)
+                }
+                "input" -> fixture.session.submitBytes("x".toByteArray())
+                "unbind" -> view.unbind()
+            }
+
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertFalse(old.isActive)
+            if (replacement != null) {
+                assertTrue(replacement.isActive)
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+                dispatcher.scheduler.runCurrent()
+                assertEquals("\u007f".repeat(6) + "git stash", writes.toString("UTF-8"))
+            } else {
+                assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+                assertEquals(if (end == "input") "x" else "", writes.toString("UTF-8"))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["input", "departure", "prompt"])
+    fun `popup continuation ends with external edits even when command text returns unchanged`(change: String) =
+        withInlineFixture("cd x") { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(SwingShellSuggestion("xyz/", 3, 4, "paths", "PATH")), selectedIndex = 0)
+            popup.select(popup.snapshot, 0)
+            view.presentShellSuggestions(popup)
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    cd xyz/")
+            val accepted = TerminalShellCommandLineSnapshot("cd xyz/", 7, 11, 0)
+            fixture.editableSource.value = accepted
+            dispatcher.scheduler.advanceUntilIdle()
+            when (change) {
+                "input" -> fixture.session.submitBytes("external".toByteArray())
+                "departure" -> fixture.editableSource.value = accepted.copy(commandText = "cd abc/")
+                "prompt" -> fixture.editableSource.value = null
+            }
+            // Even a conflated departure/return must not revive the old browsing context.
+            fixture.editableSource.value = accepted
+            fixture.feedHost("\r\u001b[2K    cd xyz/")
+            dispatcher.scheduler.advanceUntilIdle()
+            writes.reset()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(SwingShellSuggestion("ai/", 7, 7, "AI", "COMMAND")), selectedIndex = 0)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("ai/", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unselected", "unique", "preselected", "hovered"])
+    fun `Tab reaches the shell when the popup has no deliberate selection`(presentation: String) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            val items =
+                if (presentation == "unique") {
+                    listOf(inlineCandidate("git status"))
+                } else {
+                    listOf(inlineCandidate("git status"), inlineCandidate("git stash"))
+                }
+            popup.publish(items, selectedIndex = if (presentation == "preselected") 0 else -1)
+            view.presentShellSuggestions(popup)
+            if (presentation == "hovered") fixture.view.listener.onSuggestionHovered(fixture.view.snapshot, 1)
+            assertFalse(popup.hasExplicitSelection)
+
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("\t", writes.toString("UTF-8"))
+            assertNotEquals(SwingShellSuggestionCloseReason.ACCEPTED, popup.closeReason)
+            assertTrue(fixture.feedback.isEmpty())
+        }
+
+    @Test
+    fun `rendering-only suffix claims no acceptance keys`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val expected = assertNotNull(fixture.session.captureCommandEdit())
+            assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
+            val key = KeyEvent(fixture.terminal, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_TAB, KeyEvent.CHAR_UNDEFINED)
+            fixture.terminal.keyListeners.forEach { it.keyPressed(key) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\t", writes.toString("UTF-8"))
+            assertFalse(expected.isCancelled)
+        }
+
+    @Test
+    fun `rendering-only takeover preserves a managed interaction started by its close listener`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            val expected = assertNotNull(fixture.session.captureCommandEdit())
+            var newest: SwingShellSuggestionInteraction? = null
+            first.addChangeListener {
+                if (it.isClosed) {
+                    newest =
+                        assertNotNull(view.beginInlineShellSuggestionInteraction()).also { replacement ->
+                            replacement.publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+                        }
+                }
+            }
+
+            assertFalse(view.presentInlineShellSuggestion(expected, "tatus"))
+            assertTrue(assertNotNull(newest).isActive)
+            assertFalse(expected.isCancelled)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `rendering-only takeover preserves a newer rendering-only presentation after reentry`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            val older = assertNotNull(fixture.session.captureCommandEdit())
+            val newer = assertNotNull(fixture.session.captureCommandEdit())
+            first.addChangeListener { if (it.isClosed) assertTrue(view.presentInlineShellSuggestion(newer, "how")) }
+
+            assertFalse(view.presentInlineShellSuggestion(older, "tatus"))
+            assertFalse(older.isCancelled)
+            assertFalse(newer.isCancelled)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\t", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `reentrant inline replacement keeps the newest interaction`() =
+        withInlineFixture { fixture, _, _ ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            var newest: SwingShellSuggestionInteraction? = null
+            first.addChangeListener { if (it.isClosed) newest = view.beginInlineShellSuggestionInteraction() }
+            assertNull(view.beginInlineShellSuggestionInteraction())
+            assertTrue(assertNotNull(newest).isActive)
+            assertTrue(assertNotNull(newest).publish(listOf(inlineCandidate("git status")), selectedIndex = 0))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unbind", "dispose", "rebind"])
+    fun `binding cleanup rejects reentrant inline requests`(change: String) =
+        withInlineFixture { fixture, _, writes ->
+            val view = fixture.terminal
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            var closed = false
+            first.addChangeListener {
+                if (it.isClosed) {
+                    closed = true
+                    assertNull(view.beginInlineShellSuggestionInteraction())
+                }
+            }
+            when (change) {
+                "unbind" -> view.unbind()
+                "dispose" -> view.dispose()
+                "rebind" -> view.bind(fixture.session)
+            }
+            assertTrue(closed)
+            assertFalse(first.isActive)
+            assertEquals("", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `passive popup reranking does not filter an independent inline result`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status"), inlineCandidate("git stash")), selectedIndex = 0)
+            view.presentShellSuggestions(popup)
+            assertTrue(inline.isActive)
+            popup.publish(listOf(inlineCandidate("git status"), inlineCandidate("git stash")), selectedIndex = 1, preserveSelection = false)
+            assertTrue(inline.isActive)
+            assertTrue(popup.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git status --short", writes.toString("UTF-8"))
+            assertFalse(popup.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `removeNotify completes peer cleanup when inline close listeners throw`(cancelled: Boolean) =
+        withInlineFixture { fixture, _, _ ->
+            val view = fixture.terminal
+            val failure = if (cancelled) CancellationException("close cancelled") else IllegalStateException("close failed")
+            view.addNotify()
+            try {
+                assertTrue(view.isDisplayable)
+                view.focusListeners.forEach { it.focusGained(FocusEvent(view, FocusEvent.FOCUS_GAINED)) }
+                val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+                inline.addChangeListener { if (it.isClosed) throw failure }
+                assertSame(failure, assertFailsWith<RuntimeException> { view.removeNotify() })
+                assertFalse(view.isDisplayable)
+                assertTrue(view.isCoroutineScopeActive)
+                assertFalse(fixture.session.isClosed)
+            } finally {
+                if (view.isDisplayable) view.removeNotify()
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `rebinding completes when inline close listeners throw`(cancelled: Boolean) =
+        withInlineFixture { fixture, _, _ ->
+            val view = fixture.terminal
+            val failure = if (cancelled) CancellationException("close cancelled") else IllegalStateException("close failed")
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.addChangeListener { if (it.isClosed) throw failure }
+            var completed = false
+            assertSame(
+                failure,
+                assertFailsWith<RuntimeException> {
+                    view.bind(fixture.replacementSession) {
+                        assertNull(it)
+                        completed = true
+                    }
+                },
+            )
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertTrue(completed)
+            assertFalse(fixture.session.isClosed)
+            assertFalse(fixture.replacementSession.isClosed)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `settings finish applying when inline close listeners throw`(cancelled: Boolean) =
+        withInlineFixture { fixture, _, _ ->
+            val view = fixture.terminal
+            val failure = if (cancelled) CancellationException("close cancelled") else IllegalStateException("close failed")
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.addChangeListener { if (it.isClosed) throw failure }
+            val previousSize = view.preferredSize
+            fixture.settings =
+                fixture.settings.copy {
+                    it.smartSuggestionsEnabled = false
+                    it.font = it.font.deriveFont(it.font.size2D + 3f)
+                }
+            assertSame(failure, assertFailsWith<RuntimeException> { view.reloadSettings() })
+            assertEquals(fixture.settings.font, view.font)
+            assertNotEquals(previousSize, view.preferredSize)
+            assertEquals(view.preferredGridSize(fixture.settings.columns, fixture.settings.rows), view.preferredSize)
+            assertNull(view.beginInlineShellSuggestionInteraction())
+            view.reloadSettings()
+            assertEquals(fixture.settings.font, view.font)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selection cancels pending inline work before any result exists`(lateCompletion: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            var started = false
+            var finished = false
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(
+                inline,
+            ) {
+                SwingShellSuggestionSource(
+                    flow {
+                        started = true
+                        try {
+                            if (lateCompletion) withContext(NonCancellable) { release.await() } else release.await()
+                            emit(listOf(inlineCandidate("git status")))
+                        } finally {
+                            finished = true
+                        }
+                    },
+                )
+            }
+            try {
+                dispatcher.scheduler.runCurrent()
+                assertTrue(started)
+                assertTrue(view.selectAll())
+                assertTrue(inline.isClosed)
+                dispatcher.scheduler.runCurrent()
+                if (!lateCompletion) assertTrue(finished, "Selection must cancel a suspended source before it produces a result")
+                view.clearSelection()
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+                assertTrue(finished)
+                assertFalse(inline.publish(listOf(inlineCandidate("git status")), selectedIndex = 0))
+                assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+                assertEquals("", writes.toString("UTF-8"))
+            } finally {
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `Tab accepts visible inline text with or without a popup`(dismissPopupFirst: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")), selectedIndex = if (dismissPopupFirst) 0 else -1)
+            view.presentShellSuggestions(popup)
+
+            fun press(key: Int) {
+                val event = KeyEvent(view, KeyEvent.KEY_PRESSED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
+                view.keyListeners.forEach { it.keyPressed(event) }
+                assertTrue(event.isConsumed)
+                val released = KeyEvent(view, KeyEvent.KEY_RELEASED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
+                view.keyListeners.forEach { it.keyReleased(released) }
+            }
+            if (dismissPopupFirst) {
+                press(KeyEvent.VK_ESCAPE)
+                assertEquals(SwingShellSuggestionCloseReason.DISMISSED, popup.closeReason)
+                assertTrue(inline.isActive)
+            }
+            press(KeyEvent.VK_TAB)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git status --short", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `stale inline Tab does not select a popup item or forward Tab`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")))
+            view.presentShellSuggestions(popup)
+            view.setInlineShellSuggestionKeymap {
+                fixture.session.submitBytes("x".toByteArray())
+                SwingShellSuggestionAction.ACCEPT_SELECTED
+            }
+            val tab = KeyEvent(view, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_TAB, KeyEvent.CHAR_UNDEFINED)
+            view.keyListeners.forEach { it.keyPressed(tab) }
+            assertTrue(tab.isConsumed)
+            assertEquals(-1, popup.snapshot.selectedIndex)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("x", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["open", "collect", "cancel"])
+    fun `inline provider failures close only the inline slot`(where: String) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val failures = ArrayList<Exception>()
+            view.setShellSuggestionFailureHandler { _, error -> failures += error }
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            view.presentShellSuggestions(popup)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(
+                inline,
+            ) {
+                if (where == "open") throw IllegalStateException("open failed")
+                SwingShellSuggestionSource(
+                    flow {
+                        if (where == "cancel") throw CancellationException("source cancelled")
+                        throw IllegalStateException("collection failed")
+                    },
+                )
+            }
+            dispatcher.scheduler.runCurrent()
+            assertTrue(inline.isClosed)
+            assertTrue(popup.isActive)
+            assertEquals(if (where == "cancel") 0 else 1, failures.size)
+            assertEquals("", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `custom inline keys retain source feedback`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val feedback = ArrayList<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(
+                inline,
+            ) {
+                SwingShellSuggestionSource(
+                    flowOf(listOf(inlineCandidate("git status"))),
+                    feedbackHandler = { feedback += it },
+                )
+            }
+            dispatcher.scheduler.runCurrent()
+            view.setInlineShellSuggestionKeymap { event ->
+                if (event.keyCode == KeyEvent.VK_RIGHT) SwingShellSuggestionAction.ACCEPT_SELECTED else null
+            }
+            val key = KeyEvent(view, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED)
+            view.keyListeners.forEach { it.keyPressed(key) }
+            assertTrue(key.isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git status", writes.toString("UTF-8"))
+            assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), feedback.map { it.kind })
+        }
+
+    @Test
+    fun `explicit source replacement retires the previous inline publication before new results arrive`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(
+                inline,
+            ) {
+                SwingShellSuggestionSource(flowOf(listOf(inlineCandidate("git status --short"))))
+            }
+            dispatcher.scheduler.runCurrent()
+            val previous = inline.snapshot
+            assertNotNull(previous.selectedSuggestion)
+            view.requestInlineShellSuggestions(inline) { SwingShellSuggestionSource(flow { awaitCancellation() }) }
+            assertTrue(inline.snapshot.suggestions.isEmpty())
+            assertEquals(SwingShellSuggestionAcceptanceResult.STALE_CONTEXT, inline.tryAccept(previous, 0))
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertTrue(inline.isActive)
+            assertEquals("", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `popup updates navigation and dismissal preserve the independent inline provider`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val requests = ArrayList<SwingShellSuggestionRequest>()
+            var cancelled = 0
+            val feedback = ArrayList<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            val provider =
+                SwingInlineShellSuggestionProvider { request ->
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    requests += request
+                    SwingShellSuggestionSource(
+                        flow {
+                            try {
+                                emit(listOf(inlineCandidate("git status --verbose")))
+                                awaitCancellation()
+                            } finally {
+                                cancelled++
+                            }
+                        },
+                        feedbackHandler = { feedback += it },
+                    )
+                }
+            view.requestInlineShellSuggestions(inline, provider)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(listOf(inline.request), requests)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status"), inlineCandidate("git stash")), selectedIndex = 0)
+            view.presentShellSuggestions(popup)
+            dispatcher.scheduler.runCurrent()
+            popup.publish(listOf(inlineCandidate("git stash"), inlineCandidate("git status")), selectedIndex = 0, preserveSelection = false)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(listOf(inline.request), requests)
+            assertEquals(0, cancelled)
+            assertTrue(fixture.press(KeyEvent.VK_DOWN).isConsumed)
+            assertEquals(1, popup.snapshot.selectedIndex)
+            assertTrue(fixture.press(KeyEvent.VK_UP).isConsumed)
+            assertEquals(0, popup.snapshot.selectedIndex)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(listOf(inline.request), requests)
+            assertEquals(0, cancelled)
+            assertTrue(inline.isActive)
+            assertFalse(view.dismissInlineShellSuggestion(), "Deliberate popup selection hides inline presentation")
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertEquals("", writes.toString("UTF-8"))
+            assertTrue(feedback.isEmpty())
+            assertTrue(fixture.press(KeyEvent.VK_ESCAPE).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(SwingShellSuggestionCloseReason.DISMISSED, popup.closeReason)
+            assertTrue(inline.isActive)
+            assertEquals(listOf(inline.request), requests)
+            assertEquals(0, cancelled)
+            assertTrue(fixture.press(KeyEvent.VK_RIGHT).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, cancelled)
+            assertEquals(SwingShellSuggestionCloseReason.ACCEPTED, inline.closeReason)
+            assertEquals("\u007f".repeat(5) + "git status --verbose", writes.toString("UTF-8"))
+            assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), feedback.map { it.kind })
+        }
+
+    @ParameterizedTest
+    @CsvSource("true,TAB", "false,TAB", "true,RIGHT", "false,RIGHT", "true,ENTER", "false,ENTER")
+    fun `independent AI leaves passive popup content and selection unchanged in either arrival order`(
+        inlineFirst: Boolean,
+        key: String,
+    ) = withInlineFixture { fixture, dispatcher, writes ->
+        val view = fixture.terminal
+        val release = CompletableDeferred<Unit>()
+        val feedback = ArrayList<SwingShellSuggestionFeedback>()
+        val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+        view.requestInlineShellSuggestions(inline) {
+            SwingShellSuggestionSource(
+                flow {
+                    release.await()
+                    emit(listOf(inlineCandidate("git stash --all")))
+                },
+                feedbackHandler = { feedback += it },
+            )
+        }
+        dispatcher.scheduler.runCurrent()
+        if (inlineFirst) {
+            release.complete(Unit)
+            dispatcher.scheduler.runCurrent()
+        }
+        val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+        val items = listOf(inlineCandidate("git status"), inlineCandidate("git show"))
+        popup.publish(items)
+        view.presentShellSuggestions(popup)
+        val publication = popup.snapshot
+        val presentation = fixture.view.snapshot
+        if (!inlineFirst) {
+            release.complete(Unit)
+            dispatcher.scheduler.runCurrent()
+        }
+        assertSame(publication, popup.snapshot)
+        assertSame(presentation, fixture.view.snapshot)
+        assertEquals(items, fixture.view.snapshot.visibleSuggestions)
+        assertEquals(-1, popup.snapshot.selectedIndex)
+        assertFalse(popup.hasExplicitSelection)
+        assertTrue(inline.isActive)
+        assertEquals("git stash --all", inline.snapshot.selectedSuggestion?.replacementText)
+
+        val keyCode =
+            when (key) {
+                "TAB" -> KeyEvent.VK_TAB
+                "RIGHT" -> KeyEvent.VK_RIGHT
+                else -> KeyEvent.VK_ENTER
+            }
+        assertTrue(fixture.press(keyCode).isConsumed)
+        dispatcher.scheduler.runCurrent()
+        assertNotEquals(SwingShellSuggestionCloseReason.ACCEPTED, popup.closeReason)
+        if (key == "ENTER") {
+            assertEquals("\r", writes.toString("UTF-8"))
+            assertTrue(feedback.isEmpty())
+        } else {
+            assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))
+            assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), feedback.map { it.kind })
+        }
+    }
+
+    @Test
+    fun `late independent AI cannot override a deliberately selected popup item`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            var opened = 0
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(inline) { request ->
+                opened++
+                assertSame(inline.request, request)
+                SwingShellSuggestionSource(
+                    flow {
+                        release.await()
+                        emit(listOf(inlineCandidate("git stash --all")))
+                    },
+                )
+            }
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            view.presentShellSuggestions(popup)
+            assertFalse(popup.hasExplicitSelection)
+            popup.select(popup.snapshot, 0)
+            assertTrue(popup.hasExplicitSelection)
+            release.complete(Unit)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, opened)
+            assertTrue(inline.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + "git status", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["enter", "tab", "deeper"])
+    fun `directory completion resets selection and keeps late AI out of continued browsing`(nextAction: String) =
+        withInlineFixture("cd x") { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+
+            fun press(code: Int) {
+                assertTrue(fixture.press(code).isConsumed)
+                val up = KeyEvent(view, KeyEvent.KEY_RELEASED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED)
+                view.keyListeners.forEach { it.keyReleased(up) }
+                dispatcher.scheduler.runCurrent()
+            }
+
+            fun echo(command: String) {
+                fixture.feedHost("\r\u001b[2K    $command")
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot(command, command.length, command.length + 4, 0)
+                dispatcher.scheduler.advanceUntilIdle()
+            }
+
+            fun popup(
+                text: String,
+                start: Int,
+                end: Int,
+            ): SwingShellSuggestionInteraction {
+                val interaction = assertNotNull(view.beginActiveShellSuggestionInteraction())
+                interaction.publish(listOf(SwingShellSuggestion(text, start, end, "paths", "PATH")))
+                view.presentShellSuggestions(interaction)
+                return interaction
+            }
+            popup("xyz/", 3, 4)
+            press(KeyEvent.VK_DOWN)
+            press(KeyEvent.VK_TAB)
+            echo("cd xyz/")
+            val child = popup("abc/", 7, 7)
+            val release = CompletableDeferred<Unit>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(inline) {
+                SwingShellSuggestionSource(
+                    flow {
+                        release.await()
+                        emit(listOf(SwingShellSuggestion("ai/", 7, 7, "AI", "COMMAND")))
+                    },
+                )
+            }
+            release.complete(Unit)
+            dispatcher.scheduler.runCurrent()
+            assertFalse(child.hasExplicitSelection)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            if (nextAction == "deeper") {
+                press(KeyEvent.VK_DOWN)
+                press(KeyEvent.VK_TAB)
+                echo("cd xyz/abc/")
+                popup("def/", 11, 11)
+            }
+            press(if (nextAction == "tab") KeyEvent.VK_TAB else KeyEvent.VK_ENTER)
+            val expected = "\u007fxyz/" + (if (nextAction == "deeper") "abc/" else "") + (if (nextAction == "tab") "\t" else "\r")
+            assertEquals(expected, writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `stale inline publication and late provider completion cannot revive a superseded request`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            val first = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(
+                first,
+            ) {
+                SwingShellSuggestionSource(
+                    flow {
+                        withContext(NonCancellable) { release.await() }
+                        emit(listOf(inlineCandidate("git status")))
+                    },
+                )
+            }
+            dispatcher.scheduler.runCurrent()
+            val next = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            next.publish(listOf(inlineCandidate("git stash")), selectedIndex = 0)
+            release.complete(Unit)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(SwingShellSuggestionCloseReason.SUPERSEDED, first.closeReason)
+            assertFalse(first.publish(listOf(inlineCandidate("git status")), selectedIndex = 0))
+            assertTrue(next.isActive)
+            fixture.editableSource.value = snapshot().copy(commandText = "changed", cursorOffset = 7, cursorColumn = 11)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertEquals("", writes.toString("UTF-8"))
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `custom overlapping bindings follow deliberate popup intent`(choosePopup: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            view.setShellSuggestionKeymap { if (it.keyCode == KeyEvent.VK_F2) SwingShellSuggestionAction.ACCEPT else null }
+            view.setInlineShellSuggestionKeymap { if (it.keyCode == KeyEvent.VK_F2) SwingShellSuggestionAction.ACCEPT_SELECTED else null }
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            view.presentShellSuggestions(popup)
+            if (choosePopup) popup.select(popup.snapshot, 0)
+            assertTrue(fixture.press(KeyEvent.VK_F2).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(5) + if (choosePopup) "git status" else "git stash --all", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `reranking away a popup choice neither arms Enter nor hands Tab to late inline text`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git status")))
+            view.presentShellSuggestions(popup)
+            popup.select(popup.snapshot, 0)
+            popup.publish(listOf(inlineCandidate("git show")), selectedIndex = 0)
+            assertFalse(popup.hasExplicitSelection)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            assertTrue(fixture.press(KeyEvent.VK_ENTER).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\r", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `explicitly hiding the popup releases inline suppression after directory acceptance`() =
+        withInlineFixture("cd x") { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(SwingShellSuggestion("xyz/", 3, 4, "paths", "PATH")))
+            view.presentShellSuggestions(popup)
+            popup.select(popup.snapshot, 0)
+            assertTrue(fixture.press(KeyEvent.VK_TAB).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    cd xyz/")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("cd xyz/", 7, 11, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            val child = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            child.publish(listOf(SwingShellSuggestion("abc/", 7, 7, "paths", "PATH")))
+            view.presentShellSuggestions(child)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(SwingShellSuggestion("ai/", 7, 7, "AI", "COMMAND")), selectedIndex = 0)
+            assertTrue(inline.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+            view.hideShellSuggestions()
+            dispatcher.scheduler.runCurrent()
+            assertFalse(child.isActive)
+            assertTrue(inline.isActive)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007fxyz/ai/", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `Enter inserts a deliberate directory choice and a second Enter executes without accepting its child`() =
+        withInlineFixture("cd x") { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(SwingShellSuggestion("xyz/", 3, 4, "paths", "PATH")))
+            view.presentShellSuggestions(popup)
+            popup.select(popup.snapshot, 0)
+            assertTrue(fixture.press(KeyEvent.VK_ENTER).isConsumed)
+            val up = KeyEvent(view, KeyEvent.KEY_RELEASED, 0L, 0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED)
+            view.keyListeners.forEach { it.keyReleased(up) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007fxyz/", writes.toString("UTF-8"))
+            fixture.feedHost("\r\u001b[2K    cd xyz/")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("cd xyz/", 7, 11, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            val child = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            child.publish(listOf(SwingShellSuggestion("abc/", 7, 7, "paths", "PATH")), selectedIndex = 0)
+            view.presentShellSuggestions(child)
+            assertFalse(child.hasExplicitSelection)
+            assertTrue(fixture.press(KeyEvent.VK_ENTER).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007fxyz/\r", writes.toString("UTF-8"))
+        }
+
+    private fun inlineCandidate(command: String) = SwingShellSuggestion(command, 0, 5, "test", "COMMAND")
+
+    private fun withInlineFixture(
+        command: String = "git s",
+        columns: Int = 30,
+        block: (Fixture, kotlinx.coroutines.test.TestDispatcher, java.io.ByteArrayOutputStream) -> Unit,
+    ) {
+        val dispatcher = StandardTestDispatcher()
+        val writes = java.io.ByteArrayOutputStream()
+        lateinit var ingress: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    ingress = listener
+                }
+
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    writes.write(bytes, offset, length)
+                }
+            }
+        Fixture(
+            sessionHandler = true,
+            connector = connector,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+            suggestionDispatcher = dispatcher,
+            uiDispatcher = TerminalUiDispatcher { it.run() },
+        ).use { fixture ->
+            onEdt {
+                fixture.session.start(columns, 4)
+                fixture.feedHost = { text ->
+                    val bytes = text.toByteArray()
+                    ingress.onBytes(bytes, 0, bytes.size)
+                }
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot(command, command.length, 4 + command.length, 0)
+                val bytes = "    $command".toByteArray()
+                ingress.onBytes(bytes, 0, bytes.size)
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                dispatcher.scheduler.runCurrent()
+                block(fixture, dispatcher, writes)
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["clear", "focus", "input", "unbind", "dispose", "model", "selection", "composition"])
+    fun `inline presentation disappears without changing terminal text`(change: String) {
+        val dispatcher = StandardTestDispatcher()
+        lateinit var ingress: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    ingress = listener
+                }
+            }
+        Fixture(
+            sessionHandler = true,
+            connector = connector,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
+            uiDispatcher = TerminalUiDispatcher { it.run() },
+        ).use { fixture ->
+            onEdt {
+                fixture.session.start(30, 4)
+                val bytes = "    git s".toByteArray()
+                ingress.onBytes(bytes, 0, bytes.size)
+                fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                dispatcher.scheduler.runCurrent()
+                val expected = assertNotNull(fixture.session.captureCommandEdit())
+
+                val before = pixels(fixture.terminal)
+                assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
+                assertFalse(before.contentEquals(pixels(fixture.terminal)))
+                when (change) {
+                    "clear" -> fixture.terminal.clearInlineShellSuggestion()
+                    "focus" -> fixture.terminal.focusListeners.forEach { it.focusLost(FocusEvent(fixture.terminal, FocusEvent.FOCUS_LOST)) }
+                    "input" ->
+                        fixture.terminal.keyListeners.forEach {
+                            it.keyTyped(KeyEvent(fixture.terminal, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 'x'))
+                        }
+                    "unbind" -> fixture.terminal.unbind()
+                    "dispose" -> fixture.terminal.dispose()
+                    "model" -> fixture.editableSource.value = snapshot().copy(commandText = "git st", cursorOffset = 6, cursorColumn = 10)
+                    "selection" -> {
+                        assertTrue(fixture.terminal.selectAll())
+                        assertFalse(
+                            fixture.terminal
+                                .selectedText()
+                                .orEmpty()
+                                .contains("tatus"),
+                        )
+                    }
+                    "composition" -> {
+                        val text = java.text.AttributedString("x").iterator
+                        val event =
+                            java.awt.event.InputMethodEvent(
+                                fixture.terminal,
+                                java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                                text,
+                                0,
+                                null,
+                                null,
+                            )
+                        fixture.terminal.inputMethodListeners.forEach { it.inputMethodTextChanged(event) }
+                    }
+                }
+                dispatcher.scheduler.runCurrent()
+                val after = pixels(fixture.terminal)
+                fixture.terminal.clearInlineShellSuggestion()
+                assertContentEquals(after, pixels(fixture.terminal), "preview survived $change")
+                assertFalse(expected.isCancelled && change == "clear", "clearing presentation cancelled caller authority")
+                fixture.session.readRenderFrame { frame ->
+                    val codes = IntArray(frame.columns)
+                    frame.copyTextLine(0, codes, flags = IntArray(frame.columns))
+                    assertEquals('s'.code, codes[8])
+                    assertEquals(0, codes[9])
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bytes", "key", "batch"])
+    fun `external input hides inline text before a blocked writer retires`(kind: String) {
+        val dispatcher = StandardTestDispatcher()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        lateinit var ingress: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    ingress = listener
+                }
+
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    entered.countDown()
+                    release.await()
+                }
+            }
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
+            Fixture(sessionHandler = true, connector = connector, workerDispatcher = dispatcher, ioDispatcher = io).use { fixture ->
+                try {
+                    onEdt {
+                        fixture.session.start(30, 4)
+                        val bytes = "    git s".toByteArray()
+                        ingress.onBytes(bytes, 0, bytes.size)
+                        fixture.terminal.focusListeners.forEach { it.focusGained(FocusEvent(fixture.terminal, FocusEvent.FOCUS_GAINED)) }
+                        dispatcher.scheduler.runCurrent()
+                        val expected = assertNotNull(fixture.session.captureCommandEdit())
+                        val before = pixels(fixture.terminal)
+                        assertTrue(fixture.terminal.presentInlineShellSuggestion(expected, "tatus"))
+                        dispatcher.scheduler.runCurrent()
+                        assertFalse(before.contentEquals(pixels(fixture.terminal)))
+                        val key = TerminalKeyEvent.text("x")
+                        val admission =
+                            when (kind) {
+                                "bytes" -> fixture.session.submitBytes(byteArrayOf('x'.code.toByte()))
+                                "key" -> fixture.session.submitInput(key)
+                                else -> fixture.session.submitInput(expected, listOf(key))
+                            }
+                        assertEquals(TerminalInputAdmission.ACCEPTED, admission)
+                        assertTrue(entered.await(5, TimeUnit.SECONDS), "writer did not enter connector.write")
+                        assertFalse(fixture.session.isCommandEditCurrent(expected))
+                        dispatcher.scheduler.runCurrent()
+                        assertContentEquals(before, pixels(fixture.terminal), "stale ghost remained while $kind input was blocked")
+                    }
+                } finally {
+                    release.countDown()
+                }
+            }
+        }
+    }
+
+    private fun pixels(view: SwingTerminal): IntArray {
+        val image = java.awt.image.BufferedImage(view.width, view.height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        try {
+            view.paint(graphics)
+        } finally {
+            graphics.dispose()
+        }
+        return image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+    }
+
     @Test
     fun `automatic popup stays mounted through shell echo debounce and a delayed provider`() {
         val dispatcher = StandardTestDispatcher()
@@ -91,6 +1682,7 @@ class SwingTerminalSuggestionContextTest {
                     assertTrue(fixture.terminal.currentShellSuggestionState().visible)
                 }
                 release.complete(Unit)
+                onEdt { dispatcher.scheduler.runCurrent() }
                 fixture.view.awaitVisible()
                 onEdt {
                     assertEquals(visibility, fixture.view.visibilityChanges)
@@ -1012,7 +2604,8 @@ class SwingTerminalSuggestionContextTest {
         connector: TerminalConnector = NoOpConnector,
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : AutoCloseable {
-        private val mutationDispatcher = StandardTestDispatcher()
+        var feedHost: (String) -> Unit = { error("Host input is not installed in this fixture") }
+        val mutationDispatcher = StandardTestDispatcher()
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(snapshot())
         val editableSource = TerminalShellCommandLineState(snapshot())
         val session =
@@ -1032,6 +2625,8 @@ class SwingTerminalSuggestionContextTest {
             TerminalSession.create(
                 terminal = TerminalBuffers.create(width = 30, height = 4),
                 connector = NoOpConnector,
+                workerDispatcher = workerDispatcher,
+                ioDispatcher = ioDispatcher,
             )
         val requests = LinkedBlockingQueue<SwingShellSuggestionRequest>()
         val accepted = ArrayList<SwingShellSuggestionAcceptance>()

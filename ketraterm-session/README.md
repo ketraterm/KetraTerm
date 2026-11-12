@@ -238,7 +238,10 @@ in a command-finished listener before later bounded eviction. Custom shell views
 may return null when elapsed time is unavailable.
 Publish unknown editing state as null. For asynchronous suggestions, capture
 `captureCommandEdit()` and submit with `submitInput(expected, events)` so stale
-edits are rejected. If native confirmation is required, pass that same context to
+edits are rejected. For stepwise edits, `awaitCommandEditAfterInput(expected, text)`
+waits for the accepted text and returns fresh authority only while that admission's
+input, geometry, and metadata remain current; callers own cancellation of the wait.
+If native confirmation is required, pass that same context to
 `confirmCommandEdit(expected)` and proceed only when it returns true. Capable
 producers read only the editor buffer, without running candidate completers;
 other producers fall back to a full native query. Use

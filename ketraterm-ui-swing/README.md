@@ -242,6 +242,13 @@ for subcommands, options, and arguments; the default is `ALWAYS`. An explicit
 `requestActiveShellSuggestions()` uses the bound session's command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
+Popup and inline automation have separate switches and debounce delays. Both
+require `smartSuggestionsEnabled`; disabling either automatic switch leaves
+explicit requests available. Zero delay starts without debouncing; negative
+delays are rejected. Both surfaces default to 75 ms,
+with automatic inline disabled. Changes take effect through `reloadSettings()`.
+For fully host-owned scheduling, disable both automatic switches and use the
+explicit request APIs. Invocation shortcuts remain host-owned.
 Late shell-command inventory updates refresh eligible automatic suggestions after
 the normal debounce, even when the typed text is unchanged.
 Automatic and explicit requests both capture the current editing context before
@@ -341,6 +348,209 @@ collection. Lifecycle changes invalidate obsolete results and edits.
 `setShellSuggestionTarget(null)` restores embedded presentation. Use
 `copyCellBounds` to anchor a host popup and `setShellSuggestionFailureHandler`
 for view-owned diagnostics.
+
+### Inline suffix rendering
+
+The experimental inline API paints caller-supplied ghost text through the same
+text renderer as ordinary terminal cells. Capture edit authority before starting
+asynchronous work, then present the result on the EDT:
+
+```kotlin
+import io.github.ketraterm.session.TerminalCommandEditContext
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun showSuffix(view: SwingTerminal, expected: TerminalCommandEditContext, suffix: String): Boolean =
+    view.presentInlineShellSuggestion(expected, suffix)
+```
+
+The bound session must match the captured context. Presentation requires a
+confirmed command-end cursor, focus, no selection or IME composition, and the
+live primary viewport with full-screen margins and automatic wrapping. A visible
+shell suffix suppresses host ghost text. Preview text is single-line,
+control-free, well-formed UTF-16, at most 16,384 code units, and cannot attach to
+or modify the command's final grapheme. Invalid or unavailable presentation returns
+`false` and clears any previous preview.
+
+Wrapping uses the session's Unicode and ambiguous-width policy. Rendering stops
+before an occupied cell or image, preserving whole wide cells and clusters, and
+clips at the bottom without scrolling. Directional layouts are suppressed when
+they would move existing text or the preview into the command prefix. Font
+fallback, shaping, row geometry, and cursor painting use the ordinary renderer.
+The optional `foreground` argument supplies ARGB; the default uses the current
+terminal foreground at muted opacity.
+
+`clearInlineShellSuggestion()` removes the presentation. Input, invalid edit
+authority, focus loss, selection, scrolling, rebind, disposal, or incompatible
+geometry remove it too. The view borrows the edit context; clearing presentation
+does not cancel it. Ghost text never enters selection copying, search, command
+output, scrollback, or the live grid.
+
+The overload above provides rendering only and claims no acceptance keys.
+Successful rendering-only presentation also retires pending automatic inline
+requests for the current command. For
+provider collection and guarded whole-suggestion acceptance, install an independent
+inline provider on the EDT. Optional automatic requests reuse the popup scheduler's
+eligibility, invalidation, and dismissal logic, with independent timing.
+
+The [runnable consumer example](../ketraterm-examples/README.md) combines normal
+local popup completion with an independent delayed inline provider and bounded
+command/output context, using public APIs throughout.
+
+```kotlin
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.suggestion.*
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun automaticSuggestionSettings() = SwingSettings.create {
+    it.smartSuggestionsEnabled = true
+    it.shellSuggestionsEnabled = true
+    it.shellSuggestionDebounceMillis = 75
+    it.inlineShellSuggestionsEnabled = true
+    it.inlineShellSuggestionDebounceMillis = 200
+}
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun configureAutomaticSuggestions(
+    view: SwingTerminal,
+    popupProvider: SwingShellSuggestionProvider,
+    inlineProvider: SwingInlineShellSuggestionProvider,
+) {
+    view.setShellSuggestionProvider(popupProvider)
+    view.setInlineShellSuggestionProvider(inlineProvider)
+}
+```
+
+Construct the view with these settings, or update its settings provider and call
+`reloadSettings()`. Inline providers survive rebinding and remain host-owned.
+Changing/removing the configured inline provider or disabling its automatic switch
+cancels automatic work without closing a manual interaction. Automatic requests
+never replace a current manual interaction. `requestActiveInlineShellSuggestions()`
+explicitly requests the configured provider even when automatic inline is disabled.
+Automatic inline needs a nonblank prefix; the popup scheduler retains its existing
+prefix threshold. Inline work does not refresh merely because popup inventory changes.
+
+For direct control over each request and provider, create an inline interaction
+on the EDT. Managed requests respect `smartSuggestionsEnabled`:
+
+```kotlin
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.flow.flow
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun requestInline(
+    view: SwingTerminal,
+    generateSuffix: suspend (SwingShellSuggestionRequest) -> String?,
+): SwingShellSuggestionInteraction? {
+    val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    view.requestInlineShellSuggestions(interaction, SwingInlineShellSuggestionProvider { context ->
+        SwingShellSuggestionSource(flow {
+            val suffix = generateSuffix(context) ?: return@flow
+            if (suffix.isNotEmpty()) {
+                val offset = context.cursorOffset
+                emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
+            }
+        })
+    })
+    return interaction
+}
+```
+
+Provider `open` captures context on the EDT; its cold flow is collected off the
+EDT. Each request owns its cancellation and original edit token. New inline work
+supersedes only inline work, and closing the returned interaction cancels it.
+Provider completion preserves the final result; cancellation, failure, input,
+or lost eligibility retires obsolete work. Feedback comes from the source that
+produced the accepted or dismissed publication. Custom publication uses
+`interaction.publish(candidates, selectedIndex = 0)`; an unselected item is hidden.
+If a valid result arrives before its copied render frame is ready, frame publication
+retries presentation using the original edit context and provider result.
+
+Popup and inline providers are independent. Their results may differ; inline
+results never insert, reorder, or select popup entries, and popup updates neither
+cancel nor restart inline work. Deliberate popup browsing
+hides inline presentation, including late arrivals, while retaining its valid
+request. Dismissing the popup can reveal the retained inline result without another
+provider request. Inline providers receive the command-line request directly;
+popup selection is not part of their context. Detached popup owners control their
+presentation and key routing themselves.
+
+Hosts can observe `inlineShellSuggestionPresentation`, a read-only `StateFlow`
+containing the currently displayed managed publication or null when hidden.
+It reflects rendering eligibility, including collision checks, rather than just
+provider availability. Updates are conflated and do not report acceptance;
+rendering-only previews have no managed publication. Observation does not change
+popup content or keyboard routing.
+
+The inline standard keymap accepts the whole visible suggestion with Tab or Right
+at the command's end while the popup is passive. Without visible inline text,
+Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+deliberately selects a popup item and hides inline text; Tab or Enter then inserts
+that choice without executing it. Enter otherwise reaches the shell. Provider
+preselection and hover never enable Tab or Enter acceptance. A refresh preserves an
+explicit choice only while an equivalent edit remains available.
+
+After popup acceptance, fresh child results are passive for Tab and Enter, and inline
+stays hidden while the accepted command is unchanged. Tab then invokes shell completion;
+Enter executes the directory already entered. Navigate to select a child explicitly. Editing,
+dismissal, focus loss, and rebinding end that browsing context. External session edits
+also retire it, even when the command later returns to identical text. Escape dismisses an
+open popup before inline text. With standard bindings, set
+`acceptSelectedSuggestionWithEnter = false` to keep Enter shell-owned.
+
+`setShellSuggestionKeymap` and `setInlineShellSuggestionKeymap` accept custom maps
+for navigation or acceptance/dismissal, including maps returning null to disable bindings.
+`acceptInlineShellSuggestion()` and `dismissInlineShellSuggestion()` provide the
+same guarded operations for host actions. A failed acceptance never falls through
+to accepting the other surface or sending that key to the shell. Each mapped gesture
+stays bound to its original publication; reentrant keymaps cannot redirect it to a new result.
+
+For long suggestions, hosts can opt into `acceptInlineShellSuggestionNextWord()` or
+map `SwingShellSuggestionAction.ACCEPT_NEXT_WORD` in the inline keymap. It is
+**unbound by default**. For example, to add Ctrl+Right while retaining the defaults:
+
+```kotlin
+view.setInlineShellSuggestionKeymap { event ->
+    if (event.keyCode == java.awt.event.KeyEvent.VK_RIGHT &&
+        event.modifiersEx == java.awt.event.InputEvent.CTRL_DOWN_MASK
+    ) {
+        SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+    } else {
+        SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+    }
+}
+```
+
+The popup ignores `ACCEPT_NEXT_WORD`, so a shared custom keymap can expose it on
+both surfaces without intercepting inline acceptance.
+
+Each step includes leading whitespace and the next non-whitespace run. This is a
+text operation with the same rules in every shell; it does not parse shell syntax.
+Paths stay together and spaces split quoted arguments too. Examples:
+
+| Current command | Suggestion | After one step |
+| --- | --- | --- |
+| `git s` | `git status --short` | `git status` |
+| `git status` | `git status  --short` | `git status  --short` |
+| `cd ` | `cd src/main/ test/` | `cd src/main/` |
+| `echo ` | `echo "hello world"` | `echo "hello` |
+
+Grapheme clusters remain intact. Acceptance never executes input. The remainder
+is hidden until the shell reports the accepted text and end cursor, with the writer
+idle. Intervening input, resize, shell metadata changes, clearing, or a newer request
+discard it. A shell that never acknowledges the prefix cannot restore the remainder.
+The saved candidate and its source feedback are retained; no provider rerun is needed.
+`PARTIALLY_ACCEPTED` feedback describes only the admitted prefix; the completion-learning
+adapter ignores it. Finishing the candidate emits ordinary `ACCEPTED` feedback.
+
+Managed rendering accepts only append-only outcomes. Clipping limits displayed
+cells; whole-suggestion acceptance inserts the entire suggestion. Clearing managed work cancels
+its owned edit context; a token passed to the rendering-only overload remains
+caller-owned. The standalone app's opt-in completion source is documented in the
+[completion catalog](../docs/features/completion.md#inline-suffix-presentation).
 
 ## How to Extend: Custom Host Services
 

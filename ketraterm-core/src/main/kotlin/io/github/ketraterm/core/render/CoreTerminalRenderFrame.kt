@@ -43,6 +43,13 @@ internal class CoreTerminalRenderFrame(
     }
 
     private val attrTranslator = RenderAttrTranslator()
+    override val hasFullScreenMargins: Boolean get() {
+        checkValid()
+        return state.scrollTop == 0 &&
+            state.scrollBottom == state.dimensions.height - 1 &&
+            state.effectiveLeftMargin == 0 &&
+            state.effectiveRightMargin == state.dimensions.width - 1
+    }
     private val clusterScratch = IntArray(MAX_CLUSTER_CODEPOINTS)
 
     @PublishedApi internal var isValid: Boolean = false

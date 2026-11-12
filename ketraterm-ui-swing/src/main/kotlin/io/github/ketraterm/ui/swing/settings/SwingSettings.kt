@@ -311,6 +311,18 @@ public class SwingSettings private constructor(
     @ExperimentalShellSuggestionsApi
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
 
+    /** Debounce for automatic popup requests in milliseconds; zero requests without a delay. */
+    @ExperimentalShellSuggestionsApi
+    public val shellSuggestionDebounceMillis: Int = builder.shellSuggestionDebounceMillis
+
+    /** Enables automatic requests from the configured inline provider. Manual requests remain available. */
+    @ExperimentalShellSuggestionsApi
+    public val inlineShellSuggestionsEnabled: Boolean = builder.inlineShellSuggestionsEnabled
+
+    /** Independent debounce for automatic inline requests in milliseconds; zero requests without a delay. */
+    @ExperimentalShellSuggestionsApi
+    public val inlineShellSuggestionDebounceMillis: Int = builder.inlineShellSuggestionDebounceMillis
+
     /** Scope of automatic completion requests; explicit requests remain unrestricted. */
     @ExperimentalShellSuggestionsApi
     public val shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode = builder.shellSuggestionAutomaticMode
@@ -555,6 +567,19 @@ public class SwingSettings private constructor(
         @ExperimentalShellSuggestionsApi
         public var shellSuggestionsEnabled: Boolean = source?.shellSuggestionsEnabled ?: true
 
+        /** Draft value for [SwingSettings.shellSuggestionDebounceMillis]; must be nonnegative. */
+        @ExperimentalShellSuggestionsApi
+        public var shellSuggestionDebounceMillis: Int = source?.shellSuggestionDebounceMillis ?: DEFAULT_SUGGESTION_DEBOUNCE_MILLIS
+
+        /** Draft value for [SwingSettings.inlineShellSuggestionsEnabled]; defaults to false. */
+        @ExperimentalShellSuggestionsApi
+        public var inlineShellSuggestionsEnabled: Boolean = source?.inlineShellSuggestionsEnabled ?: false
+
+        /** Draft value for [SwingSettings.inlineShellSuggestionDebounceMillis]; must be nonnegative. */
+        @ExperimentalShellSuggestionsApi
+        public var inlineShellSuggestionDebounceMillis: Int =
+            source?.inlineShellSuggestionDebounceMillis ?: DEFAULT_SUGGESTION_DEBOUNCE_MILLIS
+
         /** Draft value for [SwingSettings.shellSuggestionAutomaticMode]. */
         @ExperimentalShellSuggestionsApi
         public var shellSuggestionAutomaticMode: SwingShellSuggestionAutomaticMode =
@@ -639,6 +664,9 @@ public class SwingSettings private constructor(
             middleClickPasteSource == other.middleClickPasteSource &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
+            shellSuggestionDebounceMillis == other.shellSuggestionDebounceMillis &&
+            inlineShellSuggestionsEnabled == other.inlineShellSuggestionsEnabled &&
+            inlineShellSuggestionDebounceMillis == other.inlineShellSuggestionDebounceMillis &&
             shellSuggestionAutomaticMode == other.shellSuggestionAutomaticMode &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
             shellSuggestionStyle == other.shellSuggestionStyle &&
@@ -701,6 +729,9 @@ public class SwingSettings private constructor(
         result = 31 * result + middleClickPasteSource.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
+        result = 31 * result + shellSuggestionDebounceMillis
+        result = 31 * result + inlineShellSuggestionsEnabled.hashCode()
+        result = 31 * result + inlineShellSuggestionDebounceMillis
         result = 31 * result + shellSuggestionAutomaticMode.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
         result = 31 * result + shellSuggestionStyle.hashCode()
@@ -732,6 +763,8 @@ public class SwingSettings private constructor(
         )
 
     init {
+        require(shellSuggestionDebounceMillis >= 0) { "shellSuggestionDebounceMillis must be nonnegative" }
+        require(inlineShellSuggestionDebounceMillis >= 0) { "inlineShellSuggestionDebounceMillis must be nonnegative" }
         require(font.size2D.isFinite() && font.size2D > 0f) {
             "font size must be finite and > 0, was ${font.size2D}"
         }
@@ -773,6 +806,8 @@ public class SwingSettings private constructor(
     }
 
     public companion object {
+        private const val DEFAULT_SUGGESTION_DEBOUNCE_MILLIS = 75
+
         /** Creates a fresh caller-confined draft initialized to defaults. */
         @JvmStatic
         public fun builder(): Builder = Builder()

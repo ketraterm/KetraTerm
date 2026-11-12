@@ -15,9 +15,11 @@
  */
 package io.github.ketraterm.app.ui
 
+import com.formdev.flatlaf.FlatDarkLaf
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.app.config.SuggestionKeyBindings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
@@ -30,15 +32,16 @@ import kotlinx.coroutines.Deferred
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Tag
 import java.awt.*
-import java.awt.event.AWTEventListener
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
+import java.awt.event.*
+import java.awt.image.BufferedImage
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.imageio.ImageIO
 import javax.swing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,26 +51,188 @@ import kotlin.test.assertTrue
 @Tag("desktop")
 class SettingsDialogDesktopTest {
     @Test
+    fun `suggestions page contains only its controls and fits the standard dialog`() {
+        withDialog(configure = {
+            it.copy(shellSuggestionsEnabled = true, acceptSelectedSuggestionWithEnter = true, persistentSuggestionLearningEnabled = false)
+        }) { _, dialog, _ ->
+            onEdt {
+                dialog.setSize(820, 600)
+                val behavior = components(dialog).single { it.name == "settings.behavior.page" }
+                val viewport = SwingUtilities.getAncestorOfClass(JViewport::class.java, behavior) as JViewport
+                selectPage(dialog, "settings.behavior")
+                dialog.validate()
+                viewport.viewPosition = Point(0, 80)
+                selectPage(dialog, "settings.suggestions")
+                dialog.validate()
+                val page = components(dialog).single { it.name == "settings.suggestions.page" }
+                assertTrue(page.isVisible)
+                assertEquals(Point(0, 0), viewport.viewPosition)
+                assertEquals(3, components(page).filterIsInstance<ShortcutEditor>().count())
+                assertTrue(components(page).none { it is JTextField })
+                assertTrue(components(behavior).none { it is ShortcutEditor })
+                val reset = button(dialog, "Reset learning…")
+                val resetBounds = SwingUtilities.convertRectangle(reset.parent, reset.bounds, viewport.view)
+                assertTrue(viewport.viewRect.contains(resetBounds), "All suggestion controls should fit without scrolling: $resetBounds")
+                val image = BufferedImage(dialog.contentPane.width, dialog.contentPane.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    dialog.contentPane.printAll(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                val path = Path.of("build", "reports", "screenshots", "suggestions-settings.png")
+                Files.createDirectories(path.parent)
+                ImageIO.write(image, "png", path.toFile())
+            }
+        }
+    }
+
+    @Test
+    fun `custom shortcut chips and recording controls remain accessible after resizing`() {
+        withDialog { _, dialog, _ ->
+            val editor =
+                onEdt {
+                    selectPage(dialog, "settings.suggestions")
+                    components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "popupAcceptKeys" }
+                }
+            val modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
+            for (width in listOf(820, 1_100, 820)) {
+                for (keys in listOf(listOf(KeyEvent.VK_S, KeyEvent.VK_D, KeyEvent.VK_F), (KeyEvent.VK_A..KeyEvent.VK_F).toList())) {
+                    onEdt {
+                        dialog.setSize(width, 600)
+                        editor.shortcuts = keys.map { KeyStroke.getKeyStroke(it, modifiers) }.toSet()
+                        dialog.validate()
+                    }
+                    onEdt {
+                        dialog.validate()
+                        editor.components
+                            .filterIsInstance<JButton>()
+                            .single { it.toolTipText == "Add shortcut" }
+                            .doClick()
+                        dialog.validate()
+                    }
+                    onEdt {
+                        dialog.validate()
+                        val viewport = SwingUtilities.getAncestorOfClass(JViewport::class.java, editor) as JViewport
+                        val controls = editor.components.filter { it.isVisible }
+                        assertTrue(controls.filterIsInstance<JButton>().any { it.text == "Cancel" })
+                        val rectangles = controls.map { SwingUtilities.convertRectangle(it.parent, it.bounds, viewport.view) }
+                        val editorBounds = SwingUtilities.convertRectangle(editor.parent, editor.bounds, viewport.view)
+                        for (bounds in rectangles) {
+                            assertTrue(viewport.viewRect.contains(bounds), "Shortcut control must fit at width $width: $bounds")
+                            assertTrue(editorBounds.contains(bounds), "The shortcut row must reserve enough height: $bounds")
+                        }
+                        for (first in rectangles.indices) {
+                            for (second in first + 1 until rectangles.size) {
+                                assertFalse(rectangles[first].intersects(rectangles[second]), "Shortcut controls must not overlap")
+                            }
+                        }
+                        editor.components
+                            .filterIsInstance<JButton>()
+                            .single { it.text == "Cancel" }
+                            .doClick()
+                        dialog.validate()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Apply preserves disabled suggestion controls after saving`() {
+        withDialog { _, dialog, _ ->
+            for (disableMaster in listOf(false, true)) {
+                val saved = CountDownLatch(1)
+                onEdt {
+                    val mode = components(dialog).filterIsInstance<JComboBox<*>>().single { it.name == "popupSuggestionMode" }
+                    mode.selectedIndex = 0
+                    if (disableMaster) {
+                        components(dialog).filterIsInstance<JCheckBox>().single { it.text == "Enable suggestions" }.doClick()
+                    }
+                    button(dialog, "OK").addPropertyChangeListener("enabled") { if (it.newValue == true) saved.countDown() }
+                    button(dialog, "Apply").doClick()
+                }
+                assertTrue(saved.await(5, TimeUnit.SECONDS))
+                onEdt {
+                    assertTrue(components(dialog).filterIsInstance<ShortcutEditor>().all { !it.isEnabled })
+                    val mode = components(dialog).filterIsInstance<JComboBox<*>>().single { it.name == "popupSuggestionMode" }
+                    assertEquals(!disableMaster, mode.isEnabled)
+                    val learning = components(dialog).filterIsInstance<JCheckBox>().single { it.text == "Remember suggestion rankings" }
+                    assertEquals(!disableMaster, learning.isEnabled)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `removing the Enter chip disables Enter acceptance without changing other bindings`() {
+        withDialog(configure = { it.copy(acceptSelectedSuggestionWithEnter = true) }) { settings, dialog, closed ->
+            onEdt {
+                val editor = components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "popupAcceptKeys" }
+                val label = KeyEvent.getKeyText(KeyEvent.VK_ENTER) + " ×"
+                editor.components
+                    .filterIsInstance<JButton>()
+                    .single { it.text == label }
+                    .doClick()
+                assertEquals(setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)), editor.shortcuts)
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertFalse(settings.config.acceptSelectedSuggestionWithEnter)
+            assertEquals(setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)), settings.config.suggestionKeyBindings.popupAccept)
+            assertEquals(settings.config, KetraTermConfigManager(settings.configPath).load())
+        }
+    }
+
+    @Test
+    fun `Tab and Enter shortcut events are consumed without saving the dialog`() {
+        withDialog(
+            configure = { it.copy(suggestionKeyBindings = SuggestionKeyBindings(popupAccept = emptySet())) },
+        ) { settings, dialog, closed ->
+            onEdt {
+                selectPage(dialog, "settings.suggestions")
+                val editor = components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "popupAcceptKeys" }
+                for (code in listOf(KeyEvent.VK_TAB, KeyEvent.VK_ENTER)) {
+                    val add = editor.components.filterIsInstance<JButton>().single { it.toolTipText == "Add shortcut" }
+                    add.doClick()
+                    assertFalse(add.focusTraversalKeysEnabled)
+                    val pressed = KeyEvent(add, KeyEvent.KEY_PRESSED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED)
+                    KeyboardFocusManager.getCurrentKeyboardFocusManager().redispatchEvent(add, pressed)
+                    KeyboardFocusManager.getCurrentKeyboardFocusManager().redispatchEvent(
+                        add,
+                        KeyEvent(add, KeyEvent.KEY_RELEASED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED),
+                    )
+                    assertTrue(pressed.isConsumed)
+                    assertTrue(KeyStroke.getKeyStroke(code, 0) in editor.shortcuts)
+                    assertTrue(add.focusTraversalKeysEnabled)
+                    assertEquals(1L, closed.count)
+                }
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertTrue(settings.config.acceptSelectedSuggestionWithEnter)
+        }
+    }
+
+    @Test
     fun `automatic popup modes preserve disabled selection and persist through the settings dialog`() {
         withDialog { settings, dialog, closed ->
             onEdt {
-                val buttons = components(dialog).filterIsInstance<AbstractButton>().associateBy { it.text }
-                val always = buttons.getValue("Always")
-                val parameters = buttons.getValue("Only for parameters")
-                val automatic = buttons.getValue("Show shell suggestions automatically")
-                assertTrue(always.isSelected)
-                assertFalse(parameters.isEnabled)
-                automatic.doClick()
-                parameters.doClick()
-                assertTrue(parameters.isSelected)
-                assertFalse(always.isSelected)
+                val commandNames = components(dialog).filterIsInstance<JCheckBox>().single { it.text == "Include command names" }
+                val mode = components(dialog).filterIsInstance<JComboBox<*>>().single { it.name == "popupSuggestionMode" }
+                assertEquals("On request", mode.selectedItem?.toString())
+                assertTrue(commandNames.isSelected)
+                assertFalse(commandNames.isVisible)
+                mode.selectedIndex = 2
+                commandNames.doClick()
+                assertFalse(commandNames.isSelected)
                 assertTrue(button(dialog, "Apply").isEnabled)
-                automatic.doClick()
-                assertFalse(parameters.isEnabled)
-                assertFalse(always.isEnabled)
-                automatic.doClick()
-                assertTrue(parameters.isEnabled)
-                assertTrue(parameters.isSelected)
+                mode.selectedIndex = 0
+                assertFalse(commandNames.isEnabled)
+                assertFalse(commandNames.isVisible)
+                mode.selectedIndex = 2
+                assertTrue(commandNames.isEnabled)
+                assertFalse(commandNames.isSelected)
                 button(dialog, "OK").doClick()
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
@@ -328,22 +493,37 @@ class SettingsDialogDesktopTest {
         withDialog { settings, dialog, closed ->
             onEdt {
                 val checkboxes = components(dialog).filterIsInstance<JCheckBox>().associateBy { it.text }
-                val smart = checkboxes.getValue("Enable suggestions (experimental)")
-                val automatic = checkboxes.getValue("Show shell suggestions automatically")
-                val enter = checkboxes.getValue("Accept selected suggestion with Enter")
-                val persistence = checkboxes.getValue("Persist suggestion learning")
+                val smart = checkboxes.getValue("Enable suggestions")
+                val inline = checkboxes.getValue("Inline suggestions")
+                val persistence = checkboxes.getValue("Remember suggestion rankings")
+                val popup = components(dialog).filterIsInstance<JComboBox<*>>().single { it.name == "popupSuggestionMode" }
+                val popupKeys = components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "popupAcceptKeys" }
                 assertTrue(smart.isSelected)
-                assertFalse(automatic.isSelected)
-                assertFalse(enter.isSelected)
+                assertEquals("On request", popup.selectedItem?.toString())
+                assertFalse(inline.isSelected)
+                assertFalse(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0) in popupKeys.shortcuts)
                 assertTrue(persistence.isSelected)
                 assertFalse(button(dialog, "Apply").isEnabled)
-                for (checkbox in listOf(smart, automatic, enter, persistence)) checkbox.doClick()
+                inline.doClick()
+                val inlineKeys = components(dialog).filterIsInstance<ShortcutEditor>().single { it.name == "inlineAcceptKeys" }
+                inlineKeys.shortcuts = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK))
+                popupKeys.shortcuts = popupKeys.shortcuts + KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
+                popup.selectedIndex = 0
+                persistence.doClick()
+                smart.doClick()
+                assertFalse(inline.isEnabled)
                 assertTrue(button(dialog, "Apply").isEnabled)
                 button(dialog, "OK").doClick()
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertFalse(settings.config.smartSuggestionsEnabled)
-            assertTrue(settings.config.shellSuggestionsEnabled)
+            assertTrue(settings.config.inlineSuggestionsEnabled)
+            assertFalse(settings.config.popupSuggestionsEnabled)
+            assertEquals(
+                setOf(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK)),
+                settings.config.suggestionKeyBindings.inlineAccept,
+            )
+            assertFalse(settings.config.shellSuggestionsEnabled)
             assertTrue(settings.config.acceptSelectedSuggestionWithEnter)
             assertFalse(settings.config.persistentSuggestionLearningEnabled)
         }
@@ -400,17 +580,17 @@ class SettingsDialogDesktopTest {
         }) { settings, dialog, _ ->
             settings.update(settings.config.copy(smartSuggestionsEnabled = false, persistentSuggestionLearningEnabled = false))
             onEdt {
-                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertTrue(button(dialog, "Reset learning…").isEnabled)
                 respondToReset(dialog, "Cancel")
                 assertEquals(0, calls)
                 respondToReset(dialog, "Reset")
                 assertEquals(1, calls)
-                assertFalse(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertFalse(button(dialog, "Reset learning…").isEnabled)
                 assertTrue(components(dialog).filterIsInstance<JLabel>().any { it.text == "Clearing learned suggestions..." })
             }
             reset.complete(Unit)
             onEdt {
-                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertTrue(button(dialog, "Reset learning…").isEnabled)
                 assertTrue(components(dialog).filterIsInstance<JLabel>().any { it.text == "Learned suggestions cleared." })
                 assertFalse(button(dialog, "Apply").isEnabled)
             }
@@ -424,7 +604,7 @@ class SettingsDialogDesktopTest {
             onEdt { respondToReset(dialog, "Reset") }
             reset.completeExceptionally(IOException("Read-only destination"))
             onEdt {
-                assertTrue(button(dialog, "Reset learned suggestions...").isEnabled)
+                assertTrue(button(dialog, "Reset learning…").isEnabled)
                 val status =
                     components(
                         dialog,
@@ -454,7 +634,7 @@ class SettingsDialogDesktopTest {
             }
         Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.WINDOW_EVENT_MASK)
         try {
-            button(dialog, "Reset learned suggestions...").doClick()
+            button(dialog, "Reset learning…").doClick()
         } finally {
             Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
         }
@@ -465,6 +645,7 @@ class SettingsDialogDesktopTest {
         shellPath: String = KetraTermConfig.DEFAULT_SHELL_PATH,
         fontFamily: String = KetraTermConfig.DEFAULT_FONT_FAMILY,
         resetLearning: () -> Deferred<Unit> = { error("Unexpected learning reset") },
+        configure: (KetraTermConfig) -> KetraTermConfig = { it },
         block: (KetraTermSettings, SettingsDialog, CountDownLatch) -> Unit,
     ) {
         assumeFalse(GraphicsEnvironment.isHeadless())
@@ -472,20 +653,23 @@ class SettingsDialogDesktopTest {
         val path = directory.resolve("config.toml")
         val manager = KetraTermConfigManager(path)
         manager.save(
-            KetraTermConfig(
-                shellPath = shellPath,
-                fontFamily = fontFamily,
-                theme = TerminalTheme.TOKYO_NIGHT.id,
-                smartSuggestionsEnabled = true,
-                shellSuggestionsEnabled = false,
-                acceptSelectedSuggestionWithEnter = false,
-                persistentSuggestionLearningEnabled = true,
-                clipboardWrite = TerminalClipboardPermission.DENY,
-                clipboardRead = TerminalClipboardPermission.DENY,
+            configure(
+                KetraTermConfig(
+                    shellPath = shellPath,
+                    fontFamily = fontFamily,
+                    theme = TerminalTheme.TOKYO_NIGHT.id,
+                    smartSuggestionsEnabled = true,
+                    shellSuggestionsEnabled = false,
+                    acceptSelectedSuggestionWithEnter = false,
+                    persistentSuggestionLearningEnabled = true,
+                    clipboardWrite = TerminalClipboardPermission.DENY,
+                    clipboardRead = TerminalClipboardPermission.DENY,
+                ),
             ),
         )
         val settings = KetraTermSettings(manager)
         val closed = CountDownLatch(1)
+        val previousLookAndFeel = onEdt { UIManager.getLookAndFeel().also { UIManager.setLookAndFeel(FlatDarkLaf()) } }
         val (frame, dialog) =
             onEdt {
                 val frame = JFrame()
@@ -506,6 +690,7 @@ class SettingsDialogDesktopTest {
             onEdt {
                 dialog.dispose()
                 frame.dispose()
+                UIManager.setLookAndFeel(previousLookAndFeel)
             }
             Files.deleteIfExists(path)
             Files.deleteIfExists(directory)
@@ -516,6 +701,14 @@ class SettingsDialogDesktopTest {
         dialog: SettingsDialog,
         text: String,
     ): JButton = components(dialog).filterIsInstance<JButton>().first { it.text == text }
+
+    private fun selectPage(
+        dialog: SettingsDialog,
+        name: String,
+    ) {
+        val category = components(dialog).single { it.name == name }
+        category.dispatchEvent(MouseEvent(category, MouseEvent.MOUSE_CLICKED, 0L, 0, 1, 1, 1, false))
+    }
 
     private fun components(root: Component): Sequence<Component> =
         sequence {

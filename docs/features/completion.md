@@ -24,10 +24,12 @@ Completion and automatic suggestions are **enabled by default in both products**
 for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
 Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
 explicitly, including when automatic popups are disabled.
-Settings expose the master switch, automatic popups, Enter acceptance, and optional
-learning persistence. Automatic popups can appear **Always** (the default) or
-**Only for parameters**. Parameter-only mode includes subcommands, options, and
-arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set `smart_suggestions_enabled`
+Settings expose the master switch, automatic popups, acceptance shortcuts, and
+optional learning persistence. The standalone **Suggestions** page offers popup
+modes **Off**, **On request**, and **Automatic** (the default). Clear **Include
+command names** to restrict automatic popups to parameters, including subcommands,
+options, and arguments; Ctrl+Space can still complete an executable name.
+Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Library hosts enable and configure their own provider and presentation.
 
@@ -38,7 +40,8 @@ Whole-command replays have a small row budget; learned ranking continues to
 influence live results. See the
 [history suggestion policy](../../ketraterm-completion/docs/completion-architecture.md#history-suggestion-policy).
 
-Use **Reset learned suggestions...** in settings to clear learned commands and
+Use **Reset learning…** on the standalone Suggestions page, or the IDE's learning
+reset control, to clear learned commands and
 ranking preferences. See [saved learning and reset behavior](../reference/storage.md#completion-learning).
 
 Terminal suggestions require an editable command context, normally supplied by
@@ -56,6 +59,12 @@ KetraTerm does not guess how cursor-positioned rows form an editable command.
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+An automatic popup is passive: provider preselection and hover do not enable
+Tab or Enter acceptance. Deliberate navigation selects an item; Tab or Enter inserts it without
+executing when that preference is enabled. After acceptance, new results become
+passive again, so Enter executes the committed command rather than accepting a
+new child directory. With no visible inline text or deliberate popup selection,
+Tab reaches the shell for its own completion, even when there is only one candidate.
 Automatic refreshes cannot replace an active Ctrl+Space request.
 After Escape, automatic suggestions remain dismissed across cursor movement and
 focus changes until the command text changes. Completion candidates that leave the
@@ -258,6 +267,51 @@ The engine performs no host I/O itself. Source adapters use host-supplied data;
 the Gradle adapter does not run Gradle to discover tasks. Ordinary source
 exceptions are reported while other sources continue; request cancellation
 cancels source work.
+
+## Inline suffix presentation
+
+Library consumers can opt into experimental append-only ghost-text rendering
+through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary terminal
+text painter, clips wrapped previews to free visible cells, and requires current
+command-edit authority. Independent inline providers share the guarded interaction
+contract with popup providers, with separate cancellation and configurable keymaps.
+Both surfaces can appear together while the popup is passive. Hosts can also bind
+next-word inline acceptance; it is unbound by default and retains the remaining
+text only after a guarded shell echo. Both surfaces
+support optional automatic scheduling with independent debounce delays, or explicit
+caller-owned requests. Automatic inline defaults to off; popup and inline delays
+both default to 75 ms. Disabling automation preserves manual control,
+and automatic requests never replace a valid manual interaction. See the
+[inline contract](../../ketraterm-ui-swing/README.md#inline-suffix-rendering)
+for eligibility, Unicode handling, collisions, provider context and caller ownership.
+The standalone application offers opt-in **Inline suggestions** on its
+**Suggestions** settings page, off by default. Inline uses the popup's completion
+provider and shares one evaluation for matching command context and options. It
+previews the first result from each ranked snapshot, including
+command specifications, paths, shell completions, and learned candidates. It
+keeps the original replacement range and learning feedback. A result that does
+not strictly extend the current command is popup-only; inline never substitutes
+a lower-ranked candidate. Empty prefixes produce no inline suggestion.
+The popup drops the first row of the shared result only after its inline preview becomes visible.
+Down selects the first alternative and hides inline; the omitted candidate stays
+out during that browsing session so the list does not shift under navigation.
+If inline cannot render, the full ranking remains in the popup. Disabling inline
+restores the candidate in a passive popup. Library hosts can still provide unrelated
+popup and inline sources.
+
+Requests start after a 75 ms pause in command-edit activity. Popup and inline
+presentations retain independent lifetimes and switches; closing one keeps shared
+work alive for the other. Tab or Right accepts
+visible inline text while the popup is passive. Deliberate popup browsing hides
+inline text, including late results; Tab or Enter then inserts the selected popup
+item. A popup acceptance keeps inline hidden while the accepted command remains
+unchanged. Fresh child suggestions require deliberate navigation before host
+acceptance; otherwise Tab invokes shell completion and Enter executes the entered command.
+Escape dismisses an open popup first, then inline text until command text changes.
+The suggestions master switch gates inline previews; the popup switch and automatic-popup switch
+does not. Focus loss, selection, scrolling, and stale editing authority hide
+obsolete text. Existing shell predictions or text after the cursor suppress host
+ghost text; this source does not turn off the shell's own prediction settings.
 
 ## Learning and privacy
 

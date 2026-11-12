@@ -59,11 +59,23 @@ for file locations, recognized keys, defaults, and recovery behavior. Restart th
 application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
 
-Suggestions are enabled by default. Use the Shell Suggestions section in settings
-to control completion, automatic popups, Enter acceptance, and learning persistence.
-Ctrl+Space requests suggestions even when automatic popups are disabled. Without
+Suggestions are enabled by default. The **Suggestions** settings page controls
+inline previews, popup mode (**Off**, **On request**, or **Automatic**), shortcuts,
+and learning persistence. Add shortcuts by pressing the keys; click a shortcut
+chip to remove it. Removing Enter from **Accept selected popup** keeps Enter
+available to the shell.
+Ctrl+Space requests suggestions when the popup surface is enabled, even when
+automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.
 See [completion availability](../docs/features/completion.md) for shell requirements.
+
+Inline suggestions are opt-in on the same page. They preview the top ranked
+completion from the popup's source pipeline, including paths, command
+specifications, shell results, and learning. Matching popup and inline requests
+share one evaluation. While that candidate appears inline, the popup starts with
+the alternatives, so one Down selects the next completion. Inline also works with popups disabled.
+See the [inline contract](../docs/features/completion.md#inline-suffix-presentation)
+for append-only eligibility, dismissal, and shell-prediction behavior.
 
 Native local profiles receive a small `ketra` companion command:
 

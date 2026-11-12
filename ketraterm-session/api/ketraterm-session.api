@@ -94,7 +94,9 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/cache/TerminalRenderPublisher;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/core/api/TerminalHostResponseReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/parser/api/TerminalOutputParser;Lio/github/ketraterm/input/api/TerminalInputEncoderFactory;Lio/github/ketraterm/session/TerminalHyperlinkResolver;Lio/github/ketraterm/host/HostCommandAdapter;Lio/github/ketraterm/input/policy/TerminalInputPolicy;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final synthetic fun acquirePublishedFrame ()Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun activeShellCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public final fun awaitCommandEditAfterInput (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun captureCommandEdit ()Lio/github/ketraterm/session/TerminalCommandEditContext;
+	public final fun captureCommandSuffixPreview (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;)Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun clearBuffer ()Z
 	public fun close ()V
 	public final fun commandOutputText (I)Lio/github/ketraterm/session/TerminalCommandOutputText;

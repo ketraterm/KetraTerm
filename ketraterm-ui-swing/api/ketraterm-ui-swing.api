@@ -258,6 +258,8 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;)V
 	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;)V
 	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun acceptInlineShellSuggestion ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAcceptanceResult;
+	public final fun acceptInlineShellSuggestionNextWord ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAcceptanceResult;
 	public fun addNotify ()V
 	public final fun addSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun addShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
@@ -267,6 +269,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun beginActiveShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun beginActiveShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public static synthetic fun beginActiveShellSuggestionInteraction$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public final fun beginInlineShellSuggestionInteraction ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public final fun beginInlineShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public static synthetic fun beginInlineShellSuggestionInteraction$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun beginShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun beginShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun beginShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
@@ -275,6 +280,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun bind (Lio/github/ketraterm/session/TerminalSession;)V
 	public final fun bind (Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun bind$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun clearInlineShellSuggestion ()V
 	public final fun clearScreen ()Z
 	public final fun clearSearch ()V
 	public final fun clearSelection ()V
@@ -293,9 +299,11 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun currentSelection ()Lio/github/ketraterm/ui/swing/api/CellSelection;
 	public final fun currentSelectionRange ()Lio/github/ketraterm/ui/swing/api/TerminalSelectionRange;
 	public final fun currentShellSuggestionState ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionState;
+	public final fun dismissInlineShellSuggestion ()Z
 	public final fun dispose ()V
 	public fun doLayout ()V
 	public final fun getHasShellSuggestionProvider ()Z
+	public final fun getInlineShellSuggestionPresentation ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getSearchState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun hideShellSuggestions ()V
 	public final fun isAutomaticShellSuggestionEligible ()Z
@@ -304,6 +312,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun preferredGridSize (II)Ljava/awt/Dimension;
 	public final fun preferredGridSize (IILio/github/ketraterm/render/api/TerminalRenderBufferKind;)Ljava/awt/Dimension;
 	public static synthetic fun preferredGridSize$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;IILio/github/ketraterm/render/api/TerminalRenderBufferKind;ILjava/lang/Object;)Ljava/awt/Dimension;
+	public final fun presentInlineShellSuggestion (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;)Z
+	public final fun presentInlineShellSuggestion (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;Ljava/lang/Integer;)Z
+	public static synthetic fun presentInlineShellSuggestion$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Z
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;)V
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;I)V
 	public final fun presentShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;II)V
@@ -314,10 +325,14 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun removeSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun removeShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
 	public final fun removeShellSuggestionInvalidationListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInvalidationListener;)V
+	public final fun requestActiveInlineShellSuggestions ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public final fun requestActiveInlineShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
+	public static synthetic fun requestActiveInlineShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun requestActiveShellSuggestions ()V
 	public final fun requestActiveShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
 	public final fun requestActiveShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;)V
 	public static synthetic fun requestActiveShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;ILjava/lang/Object;)V
+	public final fun requestInlineShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;Lio/github/ketraterm/ui/swing/suggestion/SwingInlineShellSuggestionProvider;)V
 	public final fun requestShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
 	public final fun requestShellSuggestions (Ljava/lang/String;III)V
 	public final fun requestShellSuggestions (Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
@@ -342,11 +357,14 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun setHostPolicy$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun setInlineShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
+	public final fun setInlineShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingInlineShellSuggestionProvider;)V
 	public final fun setSearchCaseSensitive (Z)V
 	public final fun setSearchRegex (Z)V
 	public final fun setSearchWholeWord (Z)V
 	public final fun setSelection (Lio/github/ketraterm/ui/swing/api/TerminalSelectionRange;)Z
 	public final fun setShellSuggestionFailureHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;)V
+	public final fun setShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
 	public final fun setShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
 	public final fun setShellSuggestionTarget (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTarget;)V
 	public final fun showVisualBell ()V
@@ -616,6 +634,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public final fun getInlineShellSuggestionDebounceMillis ()I
+	public final fun getInlineShellSuggestionsEnabled ()Z
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
@@ -651,6 +671,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionDebounceMillis ()I
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -684,6 +705,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getInactiveSelectionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;
+	public final fun getInlineShellSuggestionDebounceMillis ()I
+	public final fun getInlineShellSuggestionsEnabled ()Z
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
 	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
@@ -718,6 +741,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getShellIntegrationPromptDotHoverHaloColor ()Ljava/lang/Integer;
 	public final fun getShellIntegrationPromptDotsVisible ()Z
 	public final fun getShellSuggestionAutomaticMode ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;
+	public final fun getShellSuggestionDebounceMillis ()I
 	public final fun getShellSuggestionStyle ()Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
@@ -745,6 +769,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setFractionalMetrics (Ljava/lang/Object;)V
 	public final fun setHyperlinkActivationForeground (I)V
 	public final fun setInactiveSelectionStyle (Lio/github/ketraterm/ui/swing/settings/SwingSelectionStyle;)V
+	public final fun setInlineShellSuggestionDebounceMillis (I)V
+	public final fun setInlineShellSuggestionsEnabled (Z)V
 	public final fun setLineHeight (F)V
 	public final fun setMiddleClickPaste (Z)V
 	public final fun setMiddleClickPasteSource (Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;)V
@@ -779,6 +805,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setShellIntegrationPromptDotHoverHaloColor (Ljava/lang/Integer;)V
 	public final fun setShellIntegrationPromptDotsVisible (Z)V
 	public final fun setShellSuggestionAutomaticMode (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAutomaticMode;)V
+	public final fun setShellSuggestionDebounceMillis (I)V
 	public final fun setShellSuggestionStyle (Lio/github/ketraterm/ui/swing/settings/SwingShellSuggestionStyle;)V
 	public final fun setShellSuggestionsEnabled (Z)V
 	public final fun setSmartSuggestionsEnabled (Z)V
@@ -899,6 +926,10 @@ public final class io/github/ketraterm/ui/swing/settings/TerminalTheme$Companion
 public abstract interface annotation class io/github/ketraterm/ui/swing/suggestion/ExperimentalShellSuggestionsApi : java/lang/annotation/Annotation {
 }
 
+public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingInlineShellSuggestionProvider {
+	public abstract fun open (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionSource;
+}
+
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestion {
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;)V
 	public fun <init> (Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
@@ -991,6 +1022,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionA
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction : java/lang/Enum {
 	public static final field ACCEPT Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
+	public static final field ACCEPT_NEXT_WORD Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field ACCEPT_SELECTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field DISMISS Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field SELECT_FIRST Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
@@ -1082,6 +1114,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionF
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind : java/lang/Enum {
 	public static final field ACCEPTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static final field DISMISSED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
+	public static final field PARTIALLY_ACCEPTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static final field REJECTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
@@ -1110,6 +1143,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionI
 	public final fun close (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;)V
 	public final fun dismiss (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionSnapshot;)Z
 	public final fun getCloseReason ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionCloseReason;
+	public final fun getHasExplicitSelection ()Z
 	public final fun getRequest ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;
 	public final fun getSnapshot ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionSnapshot;
 	public final fun isActive ()Z
@@ -1133,6 +1167,7 @@ public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShe
 
 public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap {
 	public static final field Companion Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap$Companion;
+	public static final field INLINE_STANDARD Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
 	public static final field STANDARD Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
 	public abstract fun actionFor (Ljava/awt/event/KeyEvent;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 }

@@ -37,6 +37,11 @@ admission. Optional OSC interpretation and grid extraction belong to
 completed-output extraction. Session validates limits, serializes the read, and
 rejects results when the producer's metadata revision changes during capture.
 
+`captureCommandSuffixPreview` creates caller-owned render cells through a bounded
+isolated parser/core pipeline. It checks editing authority, margin geometry and
+width policy without changing the live terminal; the renderer owns presentation
+and collision checks.
+
 `TerminalShellCommandInventory` owns a validated immutable command snapshot, its
 binary prefix lookup, and cached alias definitions. `TerminalShellCompletionChannel`
 publishes readiness/status and snapshots without copying them per request. It

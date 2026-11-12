@@ -46,12 +46,19 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onSubscription
@@ -75,6 +82,77 @@ private const val URL = "https://example.test/consumer"
 private const val COLUMNS = 80
 private const val ROWS = 3
 private const val HOST_PASTE = "primary selection from published consumer"
+
+fun showSuffix(
+    view: SwingTerminal,
+    expected: io.github.ketraterm.session.TerminalCommandEditContext,
+    suffix: String,
+): Boolean = view.presentInlineShellSuggestion(expected, suffix)
+
+fun configureNextWordAcceptance(view: SwingTerminal) {
+    view.setInlineShellSuggestionKeymap { event ->
+        if (event.keyCode == java.awt.event.KeyEvent.VK_RIGHT &&
+            event.modifiersEx == java.awt.event.InputEvent.CTRL_DOWN_MASK
+        ) {
+            SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+        } else {
+            SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+        }
+    }
+    view.acceptInlineShellSuggestionNextWord()
+}
+
+suspend fun awaitAcceptedPrefix(
+    session: TerminalSession,
+    original: io.github.ketraterm.session.TerminalCommandEditContext,
+    prefix: String,
+) = session.awaitCommandEditAfterInput(original, prefix)
+
+fun automaticSuggestionSettings() =
+    SwingSettings.create {
+        it.smartSuggestionsEnabled = true
+        it.shellSuggestionsEnabled = true
+        it.shellSuggestionDebounceMillis = 75
+        it.inlineShellSuggestionsEnabled = true
+        it.inlineShellSuggestionDebounceMillis = 200
+    }
+
+fun configureAutomaticSuggestions(
+    view: SwingTerminal,
+    popupProvider: SwingShellSuggestionProvider,
+    inlineProvider: SwingInlineShellSuggestionProvider,
+) {
+    view.setShellSuggestionProvider(popupProvider)
+    view.setInlineShellSuggestionProvider(inlineProvider)
+}
+
+fun requestConfiguredInline(view: SwingTerminal): SwingShellSuggestionInteraction? = view.requestActiveInlineShellSuggestions()
+
+fun visibleInlinePublication(view: SwingTerminal) = view.inlineShellSuggestionPresentation.value
+
+fun requestInline(
+    view: SwingTerminal,
+    generateSuffix: suspend (SwingShellSuggestionRequest) -> String?,
+): SwingShellSuggestionInteraction? {
+    val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    check(!interaction.hasExplicitSelection)
+    view.setShellSuggestionKeymap(SwingShellSuggestionKeymap.STANDARD)
+    view.requestInlineShellSuggestions(
+        interaction,
+        SwingInlineShellSuggestionProvider { context ->
+            SwingShellSuggestionSource(
+                flow {
+                    val suffix = generateSuffix(context) ?: return@flow
+                    if (suffix.isNotEmpty()) {
+                        val offset = context.cursorOffset
+                        emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
+                    }
+                },
+            )
+        },
+    )
+    return interaction
+}
 
 fun main() =
     runBlocking {

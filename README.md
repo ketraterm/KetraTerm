@@ -72,6 +72,8 @@ The host owns the session and must close it when it is no longer needed.
 
 See the [PTY guide](ketraterm-pty/README.md#how-to-use) for process startup and
 the [Swing example](ketraterm-ui-swing/README.md#how-to-use) for view setup.
+The [runnable suggestion example](ketraterm-examples/README.md) embeds a real shell
+with independent popup and inline providers and bounded command/output context.
 
 ## Documentation
 

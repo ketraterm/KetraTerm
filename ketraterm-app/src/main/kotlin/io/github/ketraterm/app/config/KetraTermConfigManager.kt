@@ -21,13 +21,32 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
+import java.awt.event.KeyEvent
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
+import javax.swing.KeyStroke
 
 private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_persistence_enabled"
+
+private fun suggestionKeys(
+    text: String?,
+    fallback: Set<KeyStroke>,
+): Set<KeyStroke> {
+    if (text == null) return fallback
+    if (text.isBlank()) return emptySet()
+    val keys =
+        text.split(',').map {
+            val key = KeyStroke.getKeyStroke(it.trim()) ?: return fallback
+            if (!SuggestionKeyBindings.isValidShortcut(key)) return fallback
+            key
+        }
+    return keys.toSet()
+}
+
+private fun suggestionKeysText(keys: Set<KeyStroke>): String = TomlParser.quoteString(keys.joinToString(", ") { it.toString() })
 
 /**
  * Manages loading and saving the [KetraTermConfig] TOML file.
@@ -62,6 +81,7 @@ internal class KetraTermConfigManager(
         }
 
         val default = KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY)
+        val defaultPopupKeys = default.suggestionKeyBindings.popupAccept
         val recovery = default.copy(clipboardWrite = TerminalClipboardPermission.DENY, titlePermission = TerminalTitlePermission.DENY)
         return try {
             val content = Files.readString(configPath)
@@ -223,6 +243,26 @@ internal class KetraTermConfigManager(
                 commandFinishedAlertThresholdSeconds = commandFinishedAlertThresholdSeconds,
                 smartSuggestionsEnabled = behavior["smart_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.smartSuggestionsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
+                popupSuggestionsEnabled = behavior["popup_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.popupSuggestionsEnabled,
+                suggestionKeyBindings =
+                    SuggestionKeyBindings(
+                        popupAccept =
+                            suggestionKeys(
+                                behavior["popup_accept_keys"],
+                                defaultPopupKeys.filterNot { it.keyCode == KeyEvent.VK_ENTER }.toSet(),
+                            ) +
+                                suggestionKeys(
+                                    behavior["popup_selected_accept_keys"],
+                                    defaultPopupKeys.filter { it.keyCode == KeyEvent.VK_ENTER }.toSet(),
+                                ),
+                        inlineAccept =
+                            suggestionKeys(behavior["inline_accept_keys"], default.suggestionKeyBindings.inlineAccept),
+                        trigger =
+                            suggestionKeys(behavior["suggestions_trigger_keys"], default.suggestionKeyBindings.trigger),
+                    ),
+                inlineSuggestionsEnabled =
+                    (behavior["inline_suggestions_enabled"] ?: behavior["inline_history_suggestions_enabled"])
+                        ?.toBooleanStrictOrNull() ?: default.inlineSuggestionsEnabled,
                 shellSuggestionAutomaticMode =
                     SwingShellSuggestionAutomaticMode.entries.firstOrNull {
                         it.name.equals(behavior["shell_suggestion_automatic_mode"]?.trim(), ignoreCase = true)
@@ -356,6 +396,21 @@ internal class KetraTermConfigManager(
         # Whether host-provided shell suggestions may appear in the terminal UI
         smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
+        popup_suggestions_enabled = ${config.popupSuggestionsEnabled}
+        popup_accept_keys = ${suggestionKeysText(
+            config.suggestionKeyBindings.popupAccept
+                .filterNot { it.keyCode == KeyEvent.VK_ENTER }
+                .toSet(),
+        )}
+        popup_selected_accept_keys = ${suggestionKeysText(
+            config.suggestionKeyBindings.popupAccept
+                .filter { it.keyCode == KeyEvent.VK_ENTER }
+                .toSet(),
+        )}
+        inline_accept_keys = ${suggestionKeysText(config.suggestionKeyBindings.inlineAccept)}
+        suggestions_trigger_keys = ${suggestionKeysText(config.suggestionKeyBindings.trigger)}
+        # Opt-in preview of the top completion; independent of automatic popups
+        inline_suggestions_enabled = ${config.inlineSuggestionsEnabled}
         shell_suggestion_automatic_mode = "${config.shellSuggestionAutomaticMode.name.lowercase(Locale.ROOT)}"
         # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
         accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}

@@ -29,6 +29,32 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingShellSuggestionSchedulerTest {
     @Test
+    fun `changing debounce preserves dismissal until an observed edit even if text returns before the deadline`() =
+        onEdtTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.start()
+            runCurrent()
+            fixture.scheduler.onInvalidated(dismissed = true)
+            fixture.scheduler.updateDebounceMillis(0)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+            fixture.scheduler.updateDebounceMillis(100)
+            fixture.active = snapshot("git st")
+            fixture.revisions.value++
+            runCurrent()
+            fixture.active = snapshot("git s")
+            fixture.revisions.value++
+            runCurrent()
+            advanceTimeBy(99.milliseconds)
+            runCurrent()
+            assertTrue(fixture.requests.isEmpty())
+            advanceTimeBy(1.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s")), fixture.requests)
+            fixture.scheduler.stop()
+        }
+
+    @Test
     fun `admission wakeups do not postpone a pending editing refresh`() =
         onEdtTest {
             val fixture = Fixture(backgroundScope)

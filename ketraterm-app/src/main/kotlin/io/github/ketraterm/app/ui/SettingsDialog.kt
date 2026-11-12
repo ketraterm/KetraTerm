@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.app.config.SuggestionKeyBindings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalStartupCommand
@@ -33,6 +34,7 @@ import io.github.ketraterm.workspace.TerminalProfileRegistry
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.DisposableHandle
 import java.awt.*
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.IOException
@@ -60,9 +62,19 @@ internal class SettingsDialog(
 
     // Opaque panel is critical for CardLayout to clear previous artifacts correctly
     private val cardPanel =
-        JPanel(cardLayout).apply {
+        object : JPanel(cardLayout) {
+            override fun getPreferredSize(): Dimension = components.firstOrNull { it.isVisible }?.preferredSize ?: super.getPreferredSize()
+        }.apply {
             isOpaque = true
             background = Chrome.surface
+        }
+    private val pageScrollPane =
+        JScrollPane(cardPanel).apply {
+            isOpaque = true
+            viewport.isOpaque = true
+            viewport.background = Chrome.surface
+            border = BorderFactory.createMatteBorder(0, 1, 0, 0, Chrome.border)
+            horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
         }
     private val sidebarPanel =
         JPanel().apply {
@@ -251,28 +263,46 @@ internal class SettingsDialog(
 
     private val smartSuggestionsCheckbox =
         JCheckBox(appMessages.text("settings.smartSuggestions"), settings.config.smartSuggestionsEnabled)
-    private val shellSuggestionsCheckbox =
-        JCheckBox(appMessages.text("settings.shellSuggestions"), settings.config.shellSuggestionsEnabled)
-    private val automaticSuggestionsAlways =
-        JRadioButton(appMessages.text("settings.shellSuggestions.always")).apply {
-            isSelected = settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.ALWAYS
-            isOpaque = false
-        }
-    private val automaticSuggestionsParameters =
-        JRadioButton(appMessages.text("settings.shellSuggestions.parameters")).apply {
-            isSelected = settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
-            isOpaque = false
-        }
 
-    init {
-        ButtonGroup().apply {
-            add(automaticSuggestionsAlways)
-            add(automaticSuggestionsParameters)
-        }
+    private enum class PopupMode(
+        private val labelKey: String,
+    ) {
+        OFF("settings.popupMode.off"),
+        MANUAL("settings.popupMode.manual"),
+        AUTOMATIC("settings.popupMode.automatic"),
+        ;
+
+        override fun toString(): String = appMessages.text(labelKey)
     }
 
-    private val acceptSelectedSuggestionWithEnterCheckbox =
-        JCheckBox(appMessages.text("settings.acceptSuggestionWithEnter"), settings.config.acceptSelectedSuggestionWithEnter)
+    private val popupModeCombo =
+        createComboBox(
+            PopupMode.entries.toTypedArray(),
+            when {
+                !settings.config.popupSuggestionsEnabled -> PopupMode.OFF
+                settings.config.shellSuggestionsEnabled -> PopupMode.AUTOMATIC
+                else -> PopupMode.MANUAL
+            },
+            170,
+        ).apply { name = "popupSuggestionMode" }
+    private val popupAcceptKeys =
+        ShortcutEditor(
+            settings.config.suggestionKeyBindings.effectivePopupAccept(settings.config.acceptSelectedSuggestionWithEnter),
+            appMessages.text("settings.popupAcceptKeys"),
+        ).apply { name = "popupAcceptKeys" }
+    private val inlineAcceptKeys =
+        ShortcutEditor(settings.config.suggestionKeyBindings.inlineAccept, appMessages.text("settings.inlineAcceptKeys"))
+            .apply { name = "inlineAcceptKeys" }
+    private val suggestionTriggerKeys =
+        ShortcutEditor(settings.config.suggestionKeyBindings.trigger, appMessages.text("settings.suggestionTriggerKeys"))
+            .apply { name = "suggestionTriggerKeys" }
+    private val inlineSuggestionsCheckbox =
+        JCheckBox(appMessages.text("settings.inlineSuggestions"), settings.config.inlineSuggestionsEnabled)
+    private val automaticCommandNamesCheckbox =
+        JCheckBox(
+            appMessages.text("settings.suggestions.commandNames"),
+            settings.config.shellSuggestionAutomaticMode == SwingShellSuggestionAutomaticMode.ALWAYS,
+        )
     private val persistentSuggestionLearningCheckbox =
         JCheckBox(appMessages.text("settings.persistSuggestionLearning"), settings.config.persistentSuggestionLearningEnabled)
     private val scrollOnOutputCheckbox = JCheckBox(appMessages.text("settings.scrollOnOutput"), settings.config.scrollOnOutput)
@@ -323,16 +353,7 @@ internal class SettingsDialog(
                 isOpaque = true
                 background = Chrome.surface
                 add(sidebarPanel, BorderLayout.WEST)
-                add(
-                    JScrollPane(cardPanel).apply {
-                        isOpaque = true
-                        viewport.isOpaque = true
-                        viewport.background = Chrome.surface
-                        border = BorderFactory.createMatteBorder(0, 1, 0, 0, Chrome.border)
-                        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-                    },
-                    BorderLayout.CENTER,
-                )
+                add(pageScrollPane, BorderLayout.CENTER)
             }
 
         add(splitPane, BorderLayout.CENTER)
@@ -342,6 +363,7 @@ internal class SettingsDialog(
         addPage("settings.general", buildGeneralPanel())
         addPage("settings.appearance", buildAppearancePanel())
         addPage("settings.behavior", buildBehaviorPanel())
+        addPage("settings.suggestions", buildSuggestionsPanel())
         addPage("settings.security", buildSecurityPanel())
 
         selectCategory(categories.first().categoryId)
@@ -379,13 +401,16 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(smartSuggestionsCheckbox, updateApplyState)
-        registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
-        registerChangeListener(automaticSuggestionsAlways, updateApplyState)
-        registerChangeListener(automaticSuggestionsParameters, updateApplyState)
+        registerChangeListener(popupModeCombo, updateApplyState)
+        for (field in listOf(popupAcceptKeys, inlineAcceptKeys, suggestionTriggerKeys)) {
+            registerChangeListener(field, updateApplyState)
+        }
+        registerChangeListener(inlineSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(automaticCommandNamesCheckbox, updateApplyState)
         smartSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
-        shellSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
+        popupModeCombo.addActionListener { updateAutomaticSuggestionModes() }
+        inlineSuggestionsCheckbox.addActionListener { updateAutomaticSuggestionModes() }
         updateAutomaticSuggestionModes()
-        registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
         registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
         registerChangeListener(showForegroundProcessNameCheckbox, updateApplyState)
@@ -420,7 +445,7 @@ internal class SettingsDialog(
         categoryId: String,
         panel: JPanel,
     ) {
-        val categoryLabel = CategoryLabel(categoryId)
+        val categoryLabel = CategoryLabel(categoryId).apply { name = categoryId }
         categories.add(categoryLabel)
         sidebarPanel.add(categoryLabel)
 
@@ -429,6 +454,7 @@ internal class SettingsDialog(
             JPanel(BorderLayout()).apply {
                 isOpaque = true
                 background = Chrome.surface
+                name = "$categoryId.page"
                 border = EmptyBorder(0, 16, 16, 16)
                 add(panel, BorderLayout.NORTH)
             }
@@ -447,6 +473,8 @@ internal class SettingsDialog(
     private fun selectCategory(categoryId: String) {
         categories.forEach { it.updateState(it.categoryId == categoryId) }
         cardLayout.show(cardPanel, categoryId)
+        cardPanel.revalidate()
+        pageScrollPane.viewport.viewPosition = Point(0, 0)
     }
 
     private fun buildGeneralPanel(): JPanel {
@@ -632,57 +660,6 @@ internal class SettingsDialog(
         )
         panel.add(keyboardSection)
 
-        panel.add(SectionHeader(appMessages.text("settings.suggestions")))
-        val suggestionsSection = createSectionPanel()
-        addCheckboxRow(suggestionsSection, 0, smartSuggestionsCheckbox, appMessages.text("settings.smartSuggestions.description"))
-        addCheckboxRow(
-            suggestionsSection,
-            2,
-            shellSuggestionsCheckbox,
-            appMessages.text("settings.shellSuggestions.description"),
-        )
-        suggestionsSection.add(
-            JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                isOpaque = false
-                add(automaticSuggestionsAlways)
-                add(automaticSuggestionsParameters)
-            },
-            GridBagConstraints().apply {
-                gridy = 4
-                gridwidth = 2
-                anchor = GridBagConstraints.WEST
-                insets = Insets(0, 24, 8, 0)
-            },
-        )
-        addCheckboxRow(
-            suggestionsSection,
-            6,
-            acceptSelectedSuggestionWithEnterCheckbox,
-            appMessages.text("settings.acceptSuggestionWithEnter.description"),
-        )
-        addCheckboxRow(
-            suggestionsSection,
-            8,
-            persistentSuggestionLearningCheckbox,
-            appMessages.text("settings.persistSuggestionLearning.description"),
-        )
-        suggestionsSection.add(
-            JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
-                isOpaque = false
-                add(resetLearningButton)
-                add(Box.createHorizontalStrut(12))
-                add(learningResetStatus)
-            },
-            GridBagConstraints().apply {
-                gridy = 10
-                gridwidth = 2
-                anchor = GridBagConstraints.WEST
-                insets = Insets(4, 0, 12, 0)
-            },
-        )
-        panel.add(suggestionsSection)
-
         panel.add(SectionHeader(appMessages.text("settings.mouse")))
         val mouseSection = createSectionPanel()
         addCheckboxRow(
@@ -715,6 +692,49 @@ internal class SettingsDialog(
 
         return panel
     }
+
+    private fun buildSuggestionsPanel(): JPanel =
+        JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            isOpaque = false
+            add(
+                SectionHeader(appMessages.text("settings.suggestions")).apply {
+                    toolTipText = appMessages.text("settings.suggestions.experimental")
+                },
+            )
+            val general = createSectionPanel()
+            inlineSuggestionsCheckbox.toolTipText = appMessages.text("settings.inlineSuggestions.description")
+            automaticCommandNamesCheckbox.toolTipText = appMessages.text("settings.suggestions.commandNames.description")
+            addCheckboxRow(general, 0, smartSuggestionsCheckbox)
+            addCheckboxRow(general, 1, inlineSuggestionsCheckbox)
+            addFormRow(general, 2, appMessages.text("settings.popupSuggestions"), popupModeCombo)
+            addCheckboxRow(general, 3, automaticCommandNamesCheckbox)
+            add(general)
+            add(SectionHeader(appMessages.text("settings.shortcuts")))
+            val shortcuts = createSectionPanel()
+            addFormRow(shortcuts, 0, appMessages.text("settings.inlineAcceptKeys"), inlineAcceptKeys)
+            addFormRow(shortcuts, 1, appMessages.text("settings.popupAcceptKeys"), popupAcceptKeys)
+            addFormRow(shortcuts, 2, appMessages.text("settings.suggestionTriggerKeys"), suggestionTriggerKeys)
+            add(shortcuts)
+            add(SectionHeader(appMessages.text("settings.learning")))
+            val learning = createSectionPanel()
+            persistentSuggestionLearningCheckbox.toolTipText = appMessages.text("settings.persistSuggestionLearning.description")
+            addCheckboxRow(learning, 0, persistentSuggestionLearningCheckbox)
+            learning.add(
+                JPanel(FlowLayout(FlowLayout.LEADING, 0, 8)).apply {
+                    isOpaque = false
+                    add(resetLearningButton)
+                    add(Box.createHorizontalStrut(12))
+                    add(learningResetStatus)
+                },
+                GridBagConstraints().apply {
+                    gridy = 1
+                    gridwidth = 2
+                    anchor = GridBagConstraints.WEST
+                },
+            )
+            add(learning)
+        }
 
     private fun createSectionPanel(): JPanel =
         JPanel(GridBagLayout()).apply {
@@ -754,6 +774,7 @@ internal class SettingsDialog(
         gbc.gridx = 1
         gbc.weightx = 1.0
         gbc.gridwidth = 3
+        if (comp1 is ShortcutEditor) gbc.fill = GridBagConstraints.HORIZONTAL
         gbc.insets = Insets(6, 0, 6, 0)
         panel.add(comp1, gbc)
 
@@ -924,10 +945,14 @@ internal class SettingsDialog(
         shellRequestResizeWindowCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
-        shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
-        automaticSuggestionsAlways.isSelected = true
+        popupModeCombo.selectedItem = PopupMode.AUTOMATIC
+        val bindingDefaults = SuggestionKeyBindings()
+        popupAcceptKeys.shortcuts = bindingDefaults.popupAccept
+        inlineAcceptKeys.shortcuts = bindingDefaults.inlineAccept
+        suggestionTriggerKeys.shortcuts = bindingDefaults.trigger
+        inlineSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_INLINE_SUGGESTIONS_ENABLED
+        automaticCommandNamesCheckbox.isSelected = true
         updateAutomaticSuggestionModes()
-        acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
         persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = KetraTermConfig.DEFAULT_SCROLL_ON_OUTPUT
         showForegroundProcessNameCheckbox.isSelected = KetraTermConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
@@ -1040,6 +1065,7 @@ internal class SettingsDialog(
             if (component is Container) component.components.forEach(::updateEnabled)
         }
         updateEnabled(contentPane)
+        if (!value) updateAutomaticSuggestionModes()
         resetLearningButton.isEnabled = !value && learningResetObserver == null
         updateApplyButtonState()
     }
@@ -1075,7 +1101,11 @@ internal class SettingsDialog(
             } else {
                 customShellField.text
             }
-        return settings.config.copy(
+        val current = settings.config
+        val popupKeysChanged =
+            popupAcceptKeys.shortcuts !=
+                current.suggestionKeyBindings.effectivePopupAccept(current.acceptSelectedSuggestionWithEnter)
+        return current.copy(
             theme = (themeCombo.selectedItem as TerminalTheme).id,
             treatAmbiguousAsWide = treatAmbiguousCheckbox.isSelected,
             fontFamily = fontFamilyCombo.selectedItem as? String ?: "",
@@ -1104,14 +1134,32 @@ internal class SettingsDialog(
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
             smartSuggestionsEnabled = smartSuggestionsCheckbox.isSelected,
-            shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
-            shellSuggestionAutomaticMode =
-                if (automaticSuggestionsParameters.isSelected) {
-                    SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
-                } else {
-                    SwingShellSuggestionAutomaticMode.ALWAYS
+            shellSuggestionsEnabled =
+                when (popupModeCombo.selectedItem) {
+                    PopupMode.OFF -> current.shellSuggestionsEnabled
+                    PopupMode.AUTOMATIC -> true
+                    else -> false
                 },
-            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
+            popupSuggestionsEnabled = popupModeCombo.selectedItem != PopupMode.OFF,
+            suggestionKeyBindings =
+                SuggestionKeyBindings(
+                    popupAccept = if (popupKeysChanged) popupAcceptKeys.shortcuts else current.suggestionKeyBindings.popupAccept,
+                    inlineAccept = inlineAcceptKeys.shortcuts,
+                    trigger = suggestionTriggerKeys.shortcuts,
+                ),
+            inlineSuggestionsEnabled = inlineSuggestionsCheckbox.isSelected,
+            shellSuggestionAutomaticMode =
+                if (automaticCommandNamesCheckbox.isSelected) {
+                    SwingShellSuggestionAutomaticMode.ALWAYS
+                } else {
+                    SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY
+                },
+            acceptSelectedSuggestionWithEnter =
+                if (popupKeysChanged) {
+                    popupAcceptKeys.shortcuts.any { it.keyCode == KeyEvent.VK_ENTER }
+                } else {
+                    current.acceptSelectedSuggestionWithEnter
+                },
             persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
             clipboardWrite = clipboardWriteCombo.selectedItem as TerminalClipboardPermission,
             clipboardRead = clipboardReadCombo.selectedItem as TerminalClipboardPermission,
@@ -1130,9 +1178,16 @@ internal class SettingsDialog(
     }
 
     private fun updateAutomaticSuggestionModes() {
-        val enabled = smartSuggestionsCheckbox.isSelected && shellSuggestionsCheckbox.isSelected
-        automaticSuggestionsAlways.isEnabled = enabled
-        automaticSuggestionsParameters.isEnabled = enabled
+        val enabled = smartSuggestionsCheckbox.isSelected
+        val popupEnabled = popupModeCombo.selectedItem != PopupMode.OFF
+        inlineSuggestionsCheckbox.isEnabled = enabled
+        popupModeCombo.isEnabled = enabled
+        automaticCommandNamesCheckbox.isVisible = popupModeCombo.selectedItem == PopupMode.AUTOMATIC
+        automaticCommandNamesCheckbox.isEnabled = enabled && popupModeCombo.selectedItem == PopupMode.AUTOMATIC
+        popupAcceptKeys.isEnabled = enabled && popupEnabled
+        suggestionTriggerKeys.isEnabled = enabled && popupEnabled
+        inlineAcceptKeys.isEnabled = enabled && inlineSuggestionsCheckbox.isSelected
+        persistentSuggestionLearningCheckbox.isEnabled = enabled
     }
 
     private fun registerChangeListener(
@@ -1140,6 +1195,7 @@ internal class SettingsDialog(
         callback: () -> Unit,
     ) {
         when (comp) {
+            is ShortcutEditor -> comp.addPropertyChangeListener("shortcuts") { callback() }
             is JTextField ->
                 comp.document.addDocumentListener(
                     object : javax.swing.event.DocumentListener {

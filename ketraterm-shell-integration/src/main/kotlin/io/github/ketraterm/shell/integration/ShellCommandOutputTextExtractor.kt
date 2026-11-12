@@ -37,7 +37,7 @@ internal class ShellCommandOutputTextExtractor {
 
         val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
         val hasOutput = state.copyCommandOutputRange(recordId, range)
-        // A completed selectable block with no output range positively identifies a silent command.
+        // A missing output range is not enough: the command block must also be unambiguous.
         if (!hasOutput && !state.copyCommandBlockRange(recordId, LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS))) {
             return null
         }

@@ -84,9 +84,15 @@ All keys below belong to `[behavior]`. Boolean values are `true` or `false`.
 | `command_finished_alerts_enabled` | `false` | Notify when a long-running command finishes while its originating pane is unfocused; requires shell integration. |
 | `command_finished_alert_threshold_seconds` | `10` | Inclusive minimum observed command duration; clamped to `1..86400` seconds. |
 | `smart_suggestions_enabled` | `true` | Master switch for completion and learning. |
-| `shell_suggestions_enabled` | `true` | Automatic suggestions for eligible shell profiles, including PowerShell, when the master switch is enabled. Explicit requests need only the master switch. |
+| `shell_suggestions_enabled` | `true` | Automatic popups for eligible shell profiles, including PowerShell; requires the master and popup switches. Explicit requests do not require this automatic-popup switch. |
+| `popup_suggestions_enabled` | `true` | Enable the popup surface, including explicit requests; independent of inline previews. |
+| `popup_accept_keys` | `"TAB"` | Insert a deliberately selected popup item; passive popups leave the key to inline suggestions or the shell. |
+| `popup_selected_accept_keys` | `"ENTER"` | Insert only a deliberately selected popup item, without execution. |
+| `inline_accept_keys` | `"TAB, RIGHT"` | Insert the whole visible inline suggestion while the popup is passive. |
+| `suggestions_trigger_keys` | `"ctrl SPACE"` | Explicitly open the popup and select its first available item. |
+| `inline_suggestions_enabled` | `false` | Preview the top ranked completion as an append-only inline suffix, when the master switch is enabled. Independent of popup presentation; see [inline previews](../../docs/features/completion.md#inline-suffix-presentation). |
 | `shell_suggestion_automatic_mode` | `"always"` | `"always"` or `"parameters_only"`. The latter suppresses executable-name popups; subcommands, options, arguments, and explicit completion remain available. |
-| `accept_selected_suggestion_with_enter` | `true` | Enter accepts an already selected suggestion; otherwise it reaches the shell. |
+| `accept_selected_suggestion_with_enter` | `true` | Enter inserts a deliberately selected suggestion without execution; automatic highlighting and hover remain shell-owned. Disable to keep Enter shell-owned. |
 | `suggestion_learning_persistence_enabled` | `false` | Persist compact completion-learning metadata when completion is enabled. |
 | `sticky_command_headers_enabled` | `true` | Repeat the full original prompt/input row above scrolled command output, with unchanged terminal typography. |
 | `scroll_on_output` | `false` | Return to live output when new rows enter history. Typing and accepted paste always reveal live input. |
@@ -96,6 +102,27 @@ Command-finished alerts use monotonic time between shell markers and recheck the
 originating pane's keyboard focus, current preferences, and lifetime before display.
 Pending completions coalesce to one alert per session while the UI is busy;
 command text is never included in these alerts.
+
+Suggestion bindings are comma-separated pressed Swing key strokes, such as
+`TAB`, `RIGHT`, `ctrl SPACE`, or `shift TAB`. A blank string disables the action.
+Malformed file values fall back per field. Saved values may include the explicit
+`pressed` token, for example `ctrl pressed SPACE`. Strings are confined to TOML;
+the app uses typed `KeyStroke` values internally. The Suggestions settings page
+records key presses and displays removable chips instead of editable strings.
+The two popup acceptance fields form one **Accept selected popup** row. Removing
+Enter there also disables `accept_selected_suggestion_with_enter`. Popup
+navigation and dismissal retain their standard keys. Library consumers can
+replace the complete keymaps through the public Swing API.
+
+The former `inline_history_suggestions_enabled` key is read when
+`inline_suggestions_enabled` is absent. Saving writes the current key and preserves
+the saved on/off choice.
+
+Use the master switch to disable all suggestions. To use only inline previews,
+enable it and disable `popup_suggestions_enabled`; to use only popups, leave
+inline previews off. `shell_suggestions_enabled = false` keeps explicit popups
+available when the popup surface is enabled. These combinations appear in the
+settings page as popup modes **Off**, **On request**, and **Automatic**.
 
 Paste handling is independent of the local PTY's newline policy. Legacy `raw`
 and `normalize-line-endings` values load as `preserve`; saving writes the

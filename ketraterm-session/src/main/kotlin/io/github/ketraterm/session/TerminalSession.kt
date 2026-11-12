@@ -42,6 +42,7 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.*
@@ -473,16 +474,18 @@ public class TerminalSession private constructor(
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
 
+    private val inputAdmissions = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     /**
      * Conflated opportunities to retry [captureCommandEdit], including an initial sample.
-     * Observes output publication, producer revisions, outbound write retirement, and lifecycle.
+     * Observes input admission, output publication, producer revisions, outbound write retirement, and lifecycle.
      * A wakeup neither guarantees capture will succeed nor invalidates a retained edit context;
      * callers must perform the atomic capture or admission check again. In particular, a native
      * query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement.
      * Collectors own cancellation and should stop waiting when [isClosed] becomes true.
      */
     public val commandEditChanges: Flow<Unit> by lazy {
-        merge<Any>(renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
+        merge<Any>(inputAdmissions, renderGeneration, activeShellCommandLineRevision, outboundWriter.idleRevision, state).map { }.conflate()
     }
 
     private val outboundJob: Job
@@ -742,6 +745,59 @@ public class TerminalSession private constructor(
         }
 
     /**
+     * Waits for the producer to report [commandText] after a nonempty conditional input admitted
+     * with [expected]. Writer idleness alone is insufficient: the full text and end cursor must
+     * match, and the new context must not require native confirmation. Returns null if no such
+     * admission exists or intervening input, geometry, shell metadata, or shutdown invalidates it.
+     * Cancellation of [expected] after admission does not retract its receipt.
+     *
+     * This sends no input and never reuses the consumed editing authority. The caller owns the
+     * wait's coroutine lifetime; an unacknowledged edit can wait indefinitely. Revalidate the
+     * returned context before use, just as with [captureCommandEdit].
+     */
+    public suspend fun awaitCommandEditAfterInput(
+        expected: TerminalCommandEditContext,
+        commandText: String,
+    ): TerminalCommandEditContext? {
+        val integration = runtime.shellIntegration ?: return null
+        var result: TerminalCommandEditContext? = null
+        merge(commandEditChanges, integration.state.revision).first {
+            synchronized(mutationLock) {
+                val valid =
+                    synchronized(outboundWriteLock) {
+                        expected.owner === editContextOwner &&
+                            expected.admittedInputRevision != null &&
+                            expected.admittedInputRevision == inputRevision &&
+                            expected.geometryRevision == geometryRevision &&
+                            expected.admittedMetadataRevision == integration.state.revision.value &&
+                            isAcceptingInput()
+                    }
+                if (!valid) return@synchronized true
+                val next = captureCommandEdit() ?: return@synchronized false
+                if (next.inputRevision != expected.admittedInputRevision ||
+                    expected.admittedMetadataRevision != integration.state.revision.value
+                ) {
+                    next.cancel()
+                    return@synchronized true
+                }
+                if (next.commandLine.commandText == commandText &&
+                    next.commandLine.cursorOffset == commandText.length &&
+                    (next.shellRevision != expected.shellRevision || next.observationRevision != expected.observationRevision) &&
+                    !next.commandLine.requiresShellConfirmation &&
+                    next.prefixResetKeys == expected.prefixResetKeys
+                ) {
+                    result = next
+                    true
+                } else {
+                    next.cancel()
+                    false
+                }
+            }
+        }
+        return result
+    }
+
+    /**
      * Whether [expected] still represents a viable editing request, without sending input.
      * Native-confirmed or pending buffers survive repainting. Provisional buffers with a ready
      * native hook remain viable until confirmation; this does not authorize their edits.
@@ -767,6 +823,50 @@ public class TerminalSession private constructor(
                 }
             } == true
         }
+
+    /**
+     * Builds detached render cells for an append-only suffix using the terminal's parser and width
+     * policy. Returns null for invalid text, stale/unconfirmed edits, a non-end cursor, unsupported
+     * screen state, or a suffix that changes the preceding grapheme. Text must be single-line,
+     * control-free, well-formed UTF-16 and at most 16,384 code units. Layout clips at the bottom
+     * without scrolling. The caller owns the returned mutable cache; it never contains live cells.
+     *
+     * This cold-path operation serializes with mutation. Capture before painting; presentation must
+     * independently check occupancy, viewport eligibility and freshness. No input is sent.
+     */
+    public fun captureCommandSuffixPreview(
+        expected: TerminalCommandEditContext,
+        suffix: String,
+    ): TerminalRenderCache? {
+        if (!CommandSuffixPreview.validText(suffix)) return null
+        return synchronized(mutationLock) {
+            if (processingOutput ||
+                !isCommandEditCurrent(expected) ||
+                expected.commandLine.requiresShellConfirmation ||
+                expected.commandLine.cursorOffset != expected.commandLine.commandText.length ||
+                runtime.shellIntegration?.state?.hasRunningCommand() != false
+            ) {
+                return@synchronized null
+            }
+            val modes = terminal.getModeSnapshot()
+            if (modes.isOriginMode || modes.isLeftRightMarginMode || !modes.isAutoWrap) return@synchronized null
+            var result: TerminalRenderCache? = null
+            renderReader.readRenderFrame { frame ->
+                if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY &&
+                    frame.hasFullScreenMargins &&
+                    frame.cursor.row == expected.commandLine.cursorRow &&
+                    (
+                        frame.cursor.column == expected.commandLine.cursorColumn ||
+                            frame.cursorPendingWrap &&
+                            expected.commandLine.cursorColumn == frame.columns
+                    )
+                ) {
+                    result = CommandSuffixPreview.capture(frame, suffix, modes.treatAmbiguousAsWide)
+                }
+            }
+            result.takeIf { isCommandEditCurrent(expected) }
+        }
+    }
 
     private fun commandEditAuthorityIsCurrent(
         expected: TerminalCommandEditContext,
@@ -1013,6 +1113,10 @@ public class TerminalSession private constructor(
                                 TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)
+                                if (events.isNotEmpty()) {
+                                    expected.admittedInputRevision = inputRevision
+                                    expected.admittedMetadataRevision = integration.state.revision.value
+                                }
                                 TerminalInputAdmission.ACCEPTED
                             }
                         }
@@ -1458,7 +1562,10 @@ public class TerminalSession private constructor(
     private inline fun finishAdmission(block: () -> TerminalInputAdmission): TerminalInputAdmission {
         try {
             val result = block()
-            if (result == TerminalInputAdmission.ACCEPTED) outboundWriter.signalPending()
+            if (result == TerminalInputAdmission.ACCEPTED) {
+                inputAdmissions.tryEmit(Unit)
+                outboundWriter.signalPending()
+            }
             return result
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)

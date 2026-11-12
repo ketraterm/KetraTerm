@@ -43,4 +43,5 @@ include(
     ":ketraterm-ui-swing-host",
     ":ketraterm-benchmarks",
     ":ketraterm-render-cache",
+    ":ketraterm-examples",
 )

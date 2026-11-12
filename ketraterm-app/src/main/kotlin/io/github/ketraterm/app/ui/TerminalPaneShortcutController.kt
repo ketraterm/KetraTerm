@@ -18,11 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
-import java.awt.event.ActionEvent
-import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
+import java.awt.event.*
 import javax.swing.AbstractAction
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
@@ -109,6 +105,9 @@ internal class TerminalPaneShortcutController(
     }
 
     private fun handlePaneAction(event: KeyEvent): Boolean {
+        if (settings.config.suggestionKeyBindings.triggers(event)) {
+            return actionRegistry.perform(SwingTerminalHostAction.REQUEST_SUGGESTIONS, pane)
+        }
         val action =
             shortcutMap.actionFor(event.keyCode, event.modifiersEx)
                 ?: when {
@@ -122,7 +121,7 @@ internal class TerminalPaneShortcutController(
                     else -> null
                 } ?: return false
         if (!actionRegistry.isEnabled(action, pane)) return false
-        if (action == SwingTerminalHostAction.REQUEST_SUGGESTIONS) return actionRegistry.perform(action, pane)
+        if (action == SwingTerminalHostAction.REQUEST_SUGGESTIONS) return false
         actionRegistry.perform(action, pane)
         return true
     }

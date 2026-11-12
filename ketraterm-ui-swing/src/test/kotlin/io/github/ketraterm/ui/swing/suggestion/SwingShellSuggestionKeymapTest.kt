@@ -26,11 +26,42 @@ class SwingShellSuggestionKeymapTest {
     private val source = Canvas()
 
     @Test
+    fun `next word has no default binding and whole inline acceptance remains unchanged`() {
+        for (modifiers in listOf(
+            0,
+            InputEvent.CTRL_DOWN_MASK,
+            InputEvent.ALT_DOWN_MASK,
+            InputEvent.SHIFT_DOWN_MASK,
+            InputEvent.META_DOWN_MASK,
+        )) {
+            for (key in KeyEvent.VK_TAB..KeyEvent.VK_CONTEXT_MENU) {
+                val event = KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, modifiers, key, KeyEvent.CHAR_UNDEFINED)
+                org.junit.jupiter.api.Assertions.assertNotEquals(
+                    SwingShellSuggestionAction.ACCEPT_NEXT_WORD,
+                    SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event),
+                )
+                org.junit.jupiter.api.Assertions.assertNotEquals(
+                    SwingShellSuggestionAction.ACCEPT_NEXT_WORD,
+                    SwingShellSuggestionKeymap.STANDARD.actionFor(event),
+                )
+            }
+        }
+        for (key in listOf(KeyEvent.VK_TAB, KeyEvent.VK_RIGHT)) {
+            assertEquals(
+                SwingShellSuggestionAction.ACCEPT_SELECTED,
+                SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(
+                    KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED),
+                ),
+            )
+        }
+    }
+
+    @Test
     fun `standard keymap resolves conventional popup actions`() {
         assertEquals(SwingShellSuggestionAction.SELECT_NEXT, action(KeyEvent.VK_DOWN))
         assertEquals(SwingShellSuggestionAction.SELECT_PREVIOUS, action(KeyEvent.VK_UP))
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, action(KeyEvent.VK_ENTER))
-        assertEquals(SwingShellSuggestionAction.ACCEPT, action(KeyEvent.VK_TAB))
+        assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, action(KeyEvent.VK_TAB))
         assertEquals(SwingShellSuggestionAction.DISMISS, action(KeyEvent.VK_ESCAPE))
     }
 

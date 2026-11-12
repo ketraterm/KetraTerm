@@ -103,8 +103,8 @@ the native helper.
 
 ## Completion
 
-KetraTerm suggestions are enabled by default. Use the Shell Suggestions section
-in settings to change automatic popups, Enter acceptance, and learning persistence.
+KetraTerm suggestions are enabled by default. Use the **Suggestions** settings
+page to change inline previews, popup mode, shortcuts, and learning persistence.
 The master switch is also available in `config.toml`; restart the app after
 editing the file directly:
 
@@ -115,13 +115,36 @@ smart_suggestions_enabled = true
 
 Suggestions need an editable command context from shell integration. Press
 Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
-accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
-Tab completion is separate. When no editable shell context is available,
+accept a deliberately selected item, and Escape to dismiss. Enter also accepts a
+deliberately selected suggestion by default. With no deliberate popup selection or
+visible inline text, Tab reaches the shell's own completion. When no editable shell context is available,
 Ctrl+Space reaches the running application instead.
 
 Suggestions combine built-in command specifications, local files and directories,
 and bounded learning. WSL or remote directory reports do not provide a remote
 filesystem completion service.
+
+Enable **Inline suggestions** on the Suggestions page to preview the first ranked
+completion as ghost text. This is off by default and works even when popups are
+disabled. Both surfaces use the same completion sources and ranking. If the top
+result would rewrite existing text, it remains popup-only; inline does not skip
+to another result.
+Tab or Right accepts a visible suffix while the popup is passive. Up/Down select
+popup items and hide inline text; Tab or Enter then inserts that choice without
+execution. Fresh child suggestions remain passive for Tab and Enter: Tab invokes
+shell completion and Enter executes the directory already entered. Escape dismisses the popup first, then inline text. See the
+[inline contract](../../docs/features/completion.md#inline-suffix-presentation)
+for matching and shell-prediction limits.
+
+Choose popup mode **Off**, **On request**, or **Automatic**. Automatic popups
+include command names by default; clear **Include command names** to show them
+only for parameters. Inline and popup presentation can be enabled independently; the master
+switch disables both.
+
+The three shortcut rows control accepting inline text, accepting a selected popup
+item, and opening the popup. Click **+**, then press the shortcut to add it. Click
+a chip to remove it; removing every chip disables that action. Remove Enter from
+**Accept selected popup** to keep Enter available to the shell.
 
 Learning stays in memory unless persistence is enabled explicitly. Persisted
 learning can include plaintext command data; filtering cannot identify every

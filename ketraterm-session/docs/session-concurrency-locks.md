@@ -94,13 +94,21 @@ synchronized revision checks. Submit the resulting semantic events with
 `submitInput(expected, events)` using that same context.
 
 Use `commandEditChanges` to await another capture opportunity. This conflated
-flow includes an initial sample and observes render publication, producer
-revisions, outbound write retirement, and session lifecycle. Recheck the desired
+flow includes an initial sample and observes input admission, render publication,
+producer revisions, outbound write retirement, and session lifecycle. Recheck the desired
 command and perform `captureCommandEdit()` on each wakeup; the notification
 does not reserve input or guarantee that capture succeeds. Rendering and editor
 revisions alone are insufficient: the final prompt can be rendered while a
 connector write is still active, with no later screen change when it retires.
 Collectors own cancellation and must stop waiting when the session closes.
+
+For a conditional edit that will be continued in steps, `awaitCommandEditAfterInput`
+waits for an exact full-text/end-cursor acknowledgement and returns a fresh token.
+The original token carries the successful nonempty admission's input and metadata
+receipt. Later input, geometry changes, metadata changes, or shutdown reject that
+receipt even if observations are conflated or text later returns to the same value.
+Cancellation of the consumed token does not retract admitted input or its receipt.
+This observational wait sends no input; callers own its coroutine cancellation.
 
 Admission wakeups do not invalidate retained contexts or cancel in-flight native
 queries. A query's own write retirement is an opportunity to recheck capture,

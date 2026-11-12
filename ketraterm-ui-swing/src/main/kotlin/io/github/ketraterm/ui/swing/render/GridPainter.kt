@@ -60,6 +60,7 @@ internal class GridPainter(
     private val clipScratch = Rectangle()
     private val graphicsPainter = GraphicsPainter()
     private val pixels = TerminalDeviceGeometry()
+    private val inlineCellGeometry = TerminalBidiLayout()
 
     fun prepareFrame(cache: TerminalRenderCache) {
         graphicsPainter.prepare(cache.images)
@@ -102,6 +103,8 @@ internal class GridPainter(
         hyperlinkHover: TerminalHyperlinkHover? = null,
         hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
         followedHyperlinkId: Int = 0,
+        inlineSuggestion: TerminalRenderCache? = null,
+        inlineForeground: Int? = null,
     ) {
         val palette = cache.palette
         val selectionStyle = if (terminalFocused) settings.selectionStyle else settings.inactiveSelectionStyle ?: settings.selectionStyle
@@ -263,6 +266,39 @@ internal class GridPainter(
 
             graphicsPainter.paint(g, cache.images, metrics, geometry, 2, cache.columns, cache.rows)
 
+            if (inlineSuggestion != null) {
+                val previousComposite = g.composite
+                g.composite = java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 0.55f)
+                val inlinePalette = if (inlineForeground == null) palette else palette.copy(defaultForeground = inlineForeground)
+                try {
+                    for (inlineRow in firstRow until minOf(rows, inlineSuggestion.rows)) {
+                        val shift =
+                            (
+                                geometry?.rowTop(inlineRow)
+                                    ?: (inlineRow * metrics.cellHeight)
+                            ) - inlineRow * metrics.cellHeight
+                        if (shift != 0) g.translate(0, shift)
+                        try {
+                            textPainter.paintRow(
+                                g,
+                                inlineSuggestion,
+                                inlinePalette,
+                                metrics,
+                                inlineRow,
+                                fontRenderContext,
+                                bidi = inlineCellGeometry.row(inlineSuggestion, inlineRow),
+                            )
+                        } finally {
+                            if (shift != 0) g.translate(0, -shift)
+                        }
+                    }
+                } finally {
+                    g.composite = previousComposite
+                }
+            } else {
+                inlineCellGeometry.reset()
+            }
+
             val cursorOffset =
                 (geometry?.rowTop(cache.cursorRow) ?: (cache.cursorRow * metrics.cellHeight)) - cache.cursorRow * metrics.cellHeight
             if (cursorOffset != 0) g.translate(0, cursorOffset)
@@ -277,6 +313,8 @@ internal class GridPainter(
                     fontRenderContext,
                     terminalFocused = terminalFocused,
                     bidi = cellGeometry.row(cache, cache.cursorRow),
+                    foregroundCache = inlineSuggestion,
+                    foregroundBidi = inlineSuggestion?.let { inlineCellGeometry.row(it, cache.cursorRow) },
                 )
             } finally {
                 if (cursorOffset != 0) g.translate(0, -cursorOffset)

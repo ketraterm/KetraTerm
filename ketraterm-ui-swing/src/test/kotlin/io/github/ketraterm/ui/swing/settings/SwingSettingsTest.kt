@@ -34,6 +34,33 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @Test
+    fun `suggestion scheduling defaults and independent copied settings`() {
+        val defaults = SwingSettings()
+        assertTrue(defaults.shellSuggestionsEnabled)
+        assertFalse(defaults.inlineShellSuggestionsEnabled)
+        assertEquals(75, defaults.shellSuggestionDebounceMillis)
+        assertEquals(75, defaults.inlineShellSuggestionDebounceMillis)
+        val changed =
+            defaults.copy {
+                it.shellSuggestionsEnabled = false
+                it.inlineShellSuggestionsEnabled = true
+                it.shellSuggestionDebounceMillis = 0
+                it.inlineShellSuggestionDebounceMillis = Int.MAX_VALUE
+            }
+        assertFalse(changed.shellSuggestionsEnabled)
+        assertTrue(changed.inlineShellSuggestionsEnabled)
+        assertEquals(0, changed.shellSuggestionDebounceMillis)
+        assertEquals(Int.MAX_VALUE, changed.inlineShellSuggestionDebounceMillis)
+        assertEquals(changed, changed.toBuilder().build())
+        assertEquals(changed.hashCode(), changed.copy {}.hashCode())
+        assertNotEquals(defaults, defaults.copy { it.shellSuggestionDebounceMillis++ })
+        assertNotEquals(defaults, defaults.copy { it.inlineShellSuggestionDebounceMillis++ })
+        assertNotEquals(defaults, defaults.copy { it.inlineShellSuggestionsEnabled = true })
+        assertFailsWith<IllegalArgumentException> { defaults.copy { it.shellSuggestionDebounceMillis = -1 } }
+        assertFailsWith<IllegalArgumentException> { defaults.copy { it.inlineShellSuggestionDebounceMillis = -1 } }
+    }
+
+    @Test
     fun `automatic alternate padding follows copied settings while explicit padding stays fixed`() {
         val original = SwingSettings()
         assertEquals(SwingPadding(4, 9, 4, 9), original.alternateScreenPadding)

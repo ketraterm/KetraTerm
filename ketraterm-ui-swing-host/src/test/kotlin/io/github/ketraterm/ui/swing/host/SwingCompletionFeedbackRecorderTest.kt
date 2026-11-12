@@ -27,6 +27,22 @@ import kotlin.test.assertTrue
 
 class SwingCompletionFeedbackRecorderTest {
     @Test
+    fun `partial acceptance does not learn a complete command`() {
+        val store = TerminalCompletionLearningStore()
+        recorder(store, clockEpochMillis = { error("Partial acceptance must not record a timestamp") }).record(
+            feedback(
+                kind = SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED,
+                commandText = "git s",
+                replacementText = "git status",
+                replacementStartOffset = 0,
+                replacementEndOffset = 5,
+            ),
+        )
+        assertTrue(store.snapshot().rankingStats.isEmpty())
+        assertTrue(store.snapshot().replayCommands.isEmpty())
+    }
+
+    @Test
     fun `rejected admission leaves completion learning unchanged`() {
         val store = TerminalCompletionLearningStore()
         val recorder = recorder(store, clockEpochMillis = { error("Rejected admission must not record a timestamp") })
@@ -216,7 +232,7 @@ class SwingCompletionFeedbackRecorderTest {
             val provider =
                 SwingCompletionSuggestionProvider(
                     engine =
-                        TerminalCompletionEngine {
+                        {
                             flowOf(
                                 listOf(
                                     TerminalCompletionCandidate(

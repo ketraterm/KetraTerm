@@ -46,6 +46,10 @@ public class TerminalCommandEditContext internal constructor(
 
     private val cancelled = AtomicBoolean()
 
+    // Receipt for a nonempty conditional admission, guarded by the session's outbound lock.
+    internal var admittedInputRevision: Long? = null
+    internal var admittedMetadataRevision: Long? = null
+
     /** Whether the owner has cancelled this request. Cancellation is permanent. */
     public val isCancelled: Boolean get() = cancelled.get()
 

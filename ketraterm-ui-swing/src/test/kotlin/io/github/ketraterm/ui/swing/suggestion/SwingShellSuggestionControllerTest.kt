@@ -297,7 +297,7 @@ class SwingShellSuggestionControllerTest {
     @ParameterizedTest
     @ValueSource(
         ints = [
-            KeyEvent.VK_TAB, KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_PAGE_UP,
+            KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_PAGE_UP,
             KeyEvent.VK_PAGE_DOWN, KeyEvent.VK_HOME, KeyEvent.VK_END,
         ],
     )
@@ -566,6 +566,7 @@ class SwingShellSuggestionControllerTest {
             val request = request(commandText = "git sw", cursorOffset = 6)
             val items = suggestions(2, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = 1)
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_END))
             val enter = keyPressed(KeyEvent.VK_ENTER)
 
             assertTrue(controller.handleKeyPressed(enter))
@@ -586,6 +587,7 @@ class SwingShellSuggestionControllerTest {
             val controller = SuggestionPresentationFixture(host)
             val items = suggestions(1)
             controller.show(request(), items, selectedIndex = 0)
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN))
 
             assertThrows(IllegalStateException::class.java) {
                 controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB))
@@ -610,6 +612,7 @@ class SwingShellSuggestionControllerTest {
             val controller = SuggestionPresentationFixture(host)
             val items = suggestions(2)
             controller.show(request(), items, selectedIndex = 1)
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_END))
             val enter = keyPressed(KeyEvent.VK_ENTER)
 
             assertFalse(controller.handleKeyPressed(enter))
@@ -621,41 +624,36 @@ class SwingShellSuggestionControllerTest {
             assertFalse(enter.isConsumed)
         }
 
-    @Test
-    fun `tab selects first suggestion before accepting it`() =
+    @ParameterizedTest
+    @ValueSource(ints = [1, 2])
+    fun `tab leaves passive suggestions to the shell even when only one candidate exists`(count: Int) =
         onEdt {
             val host = RecordingSuggestionHost()
             val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "cd ", cursorOffset = 3)
-            val items = suggestions(2, endOffset = request.commandText.length)
+            val items = suggestions(count, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = -1)
 
             val firstTab = keyPressed(KeyEvent.VK_TAB)
-            assertTrue(controller.handleKeyPressed(firstTab))
-            assertEquals(0, controller.state().selectedIndex)
+            assertFalse(controller.handleKeyPressed(firstTab))
+
+            assertTrue(controller.state().visible)
+            assertEquals(-1, controller.state().selectedIndex)
             assertTrue(host.acceptedSuggestions.isEmpty())
-
-            val secondTab = keyPressed(KeyEvent.VK_TAB)
-            assertTrue(controller.handleKeyPressed(secondTab))
-
-            assertFalse(controller.state().visible)
-            assertEquals(listOf(0), host.acceptedIndexes)
-            assertEquals(listOf(items[0]), host.acceptedSuggestions)
-            assertEquals(listOf(request), host.acceptedRequests)
-            assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
-            assertEquals(listOf(items[0]), host.feedbackSuggestions)
-            assertEquals(1, host.focusRequests)
-            assertTrue(secondTab.isConsumed)
+            assertTrue(host.feedbackKinds.isEmpty())
+            assertEquals(0, host.focusRequests)
+            assertFalse(firstTab.isConsumed)
         }
 
     @Test
-    fun `tab on unique suggestion accepts immediately when passive`() =
+    fun `tab on unique suggestion accepts after deliberate selection`() =
         onEdt {
             val host = RecordingSuggestionHost()
             val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "cd ", cursorOffset = 3)
             val items = suggestions(1, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = -1)
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN))
 
             val tab = keyPressed(KeyEvent.VK_TAB)
             assertTrue(controller.handleKeyPressed(tab))

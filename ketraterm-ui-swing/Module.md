@@ -24,6 +24,22 @@ frame. Search, selection extraction, and discovery may take synchronized source
 reads. Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly.
 
+`InlineShellSuggestion` checks copied live cells for collisions and clips its
+detached suffix cache. `InlineShellSuggestionController` independently owns managed
+inline interactions, provider collection, feedback, and
+guarded key actions. It reuses `SwingShellSuggestionInteraction` and the session
+edit target; the rendering-only API still borrows a caller-owned token.
+Popup and inline automation use separate `SwingShellSuggestionScheduler` instances
+with independently configured debounce delays. Manual requests retain priority;
+the host owns providers and invocation shortcuts.
+`SwingShellSuggestionInteraction` distinguishes provider preselection from deliberate
+selection. The popup controller retains browsing intent across reranking; the view
+coordinates acceptance keys and suppresses inline presentation during popup browsing.
+
+`GridPainter` paints the detached cells through the ordinary
+`TerminalTextPainter`, preserving font fallback, shaping, and cursor layering.
+Session prepares the cells through the existing printable parser/core pipeline.
+
 `GridPainter` owns image composition and its raster cache. Installing a frame
 prepares rasters by immutable resource identity and reserves text-row scratch; paint reuses them.
 Painters share `TerminalDeviceGeometry`'s device-edge rounding and exact clip

@@ -159,11 +159,53 @@ public class SwingTerminal
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionInteraction: SwingShellSuggestionInteraction? = null
+        private var inlineShellSuggestion: InlineShellSuggestion? = null
+        private val inlineSuggestionPresentation = MutableStateFlow<SwingShellSuggestionSnapshot?>(null)
+
+        /**
+         * Current managed inline publication when its ghost text can be displayed, otherwise null.
+         * This read-only state includes rendering eligibility, not merely provider availability.
+         * Updates are conflated; collectors must not infer acceptance from disappearance. Rendering-only
+         * presentations have no managed publication. Observing this state does not change input routing.
+         */
+        @ExperimentalShellSuggestionsApi
+        public val inlineShellSuggestionPresentation: StateFlow<SwingShellSuggestionSnapshot?> = inlineSuggestionPresentation.asStateFlow()
+
+        private var inlineObservationJob: Job? = null
+        private var inlineCompositionActive = false
+        private var popupCompletionCommand: String? = null
+            set(value) {
+                popupCompletionObservation?.cancel()
+                popupCompletionObservation = null
+                field = value
+            }
+        private var popupCompletionObservation: Job? = null
+        private var suggestionKeymap = hostServices.shellSuggestionKeymap
+        private val inlineRequests by lazy {
+            InlineShellSuggestionController(
+                componentScope,
+                suggestionDispatcher ?: Dispatchers.Default,
+                session = { session },
+                eligible = ::isInlineSuggestionEligibleOnEdt,
+                present = { expected, suffix -> presentInlineShellSuggestionRendering(expected, suffix, null) },
+                hide = { clearInlineShellSuggestionRendering() },
+                visible = { inlineShellSuggestion != null },
+                popupOwnsInput = {
+                    shellSuggestionController?.isBrowsing == true ||
+                        activeSuggestionInteraction?.let { it.isActive && it.hasExplicitSelection } == true ||
+                        popupCompletionCommand?.let { it == session?.activeShellCommandLine()?.commandText } == true
+                },
+                failure = { interaction, error -> suggestionFailureHandler.onSuggestionFailure(interaction.request, error) },
+            )
+        }
         private var suggestionRevision = 0L
         private var shellSuggestionProvider: SwingShellSuggestionProvider? = null
+        private var inlineShellSuggestionProvider: SwingInlineShellSuggestionProvider? = null
         private var shellSuggestionTarget: SwingShellSuggestionTarget? = null
         private var suggestionConfigurationRevision = 0L
         private var suggestionScheduler: SwingShellSuggestionScheduler? = null
+        private var inlineSuggestionScheduler: SwingShellSuggestionScheduler? = null
+        private var inlineSuggestionEligible = false
         private var suggestionAnchorColumn = 0
         private var suggestionAnchorRow = 0
         private var activeSuggestionIsAutomatic: Boolean = false
@@ -495,8 +537,16 @@ public class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (!focused) popupCompletionCommand = null
+                        if (!focused) clearInlineShellSuggestion()
                         if (settings.inactiveSelectionStyle != null) repaint()
-                        if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
+                        if (focused) {
+                            suggestionScheduler?.onFocusGained()
+                            inlineSuggestionScheduler?.onFocusGained()
+                        } else {
+                            suggestionScheduler?.onFocusLost()
+                            inlineSuggestionScheduler?.onFocusLost()
+                        }
                         if (focused) reconcileHyperlinksOnEdt() else clearPointerHover()
                     }
 
@@ -506,8 +556,28 @@ public class SwingTerminal
 
                     override fun handleHostKeyPressed(event: KeyEvent): Boolean = hostServices.hostKeyHandler.handleKeyPressed(event)
 
-                    override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
-                        shellSuggestionController?.handleKeyPressed(event) == true
+                    override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean {
+                        val popup = shellSuggestionController
+                        val popupPublication = popup?.publication
+                        val inlinePublication = inlineRequests.publication
+                        val popupAction = popup?.actionFor(event)
+                        // Caller keymaps can synchronously replace or republish either surface.
+                        if (popupAction != null && popup.publication !== popupPublication) return true
+                        if (popupAction != null &&
+                            popupAction != SwingShellSuggestionAction.ACCEPT &&
+                            popupAction != SwingShellSuggestionAction.ACCEPT_SELECTED
+                        ) {
+                            val handled = popup.handleAction(popupAction, popupPublication)
+                            if (popupAction == SwingShellSuggestionAction.DISMISS) {
+                                popupCompletionCommand = null
+                                inlineRequests.refreshPresentation()
+                            }
+                            return handled
+                        }
+                        val inlineAction = inlineRequests.actionFor(event)
+                        if (inlineAction != null && inlineRequests.handleAction(inlineAction, inlinePublication)) return true
+                        return popupAction != null && popup.handleAction(popupAction, popupPublication)
+                    }
 
                     override fun invalidateShellSuggestions() {
                         invalidateShellSuggestionsOnEdt(retainPresentation = true)
@@ -697,9 +767,15 @@ public class SwingTerminal
 
         private val windowFocusListener =
             object : WindowAdapter() {
-                override fun windowGainedFocus(event: WindowEvent) = reconcileHyperlinksOnEdt()
+                override fun windowGainedFocus(event: WindowEvent) {
+                    reconcileHyperlinksOnEdt()
+                    inlineSuggestionScheduler?.onFocusGained()
+                }
 
-                override fun windowLostFocus(event: WindowEvent) = clearPointerHover()
+                override fun windowLostFocus(event: WindowEvent) {
+                    clearInlineShellSuggestion()
+                    clearPointerHover()
+                }
             }
 
         private val windowStateListener =
@@ -828,7 +904,23 @@ public class SwingTerminal
             isFocusable = true
             focusTraversalKeysEnabled = false
             addFocusListener(inputController.focusListener)
+            selectionController.addListener { _, current ->
+                if (current != null) clearInlineShellSuggestion()
+                updateInlineSuggestionEligibilityOnEdt()
+            }
             addKeyListener(inputController.keyListener)
+            addInputMethodListener(
+                object : InputMethodListener {
+                    override fun inputMethodTextChanged(event: InputMethodEvent) {
+                        val text = event.text
+                        inlineCompositionActive = text != null && text.endIndex - text.beginIndex > event.committedCharacterCount
+                        clearInlineShellSuggestion()
+                        updateInlineSuggestionEligibilityOnEdt()
+                    }
+
+                    override fun caretPositionChanged(event: InputMethodEvent) = Unit
+                },
+            )
             addMouseListener(terminalMouseListener)
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
@@ -1238,6 +1330,7 @@ public class SwingTerminal
         override fun removeNotify() {
             terminalFocused = false
             cleanupSwingResources(
+                ::clearInlineShellSuggestion,
                 cursorTimer::stop,
                 visualBellController::stop,
                 viewportController::finishScroll,
@@ -1322,8 +1415,209 @@ public class SwingTerminal
             popup.setBounds(popupX, popupY, popupWidth, popupHeight)
         }
 
+        /**
+         * Presents a literal append-only ghost suffix against a previously captured edit context.
+         * Call on the EDT after asynchronous provider work. Returns false and clears the previous
+         * preview for stale, unconfirmed, unsupported or obstructed input. Text is single-line,
+         * control-free UTF-16, bounded to 16,384 code units. Wrapping clips to free visible cells;
+         * the live grid, selection and copied output never include the preview. [foreground] is an
+         * optional ARGB color; otherwise the current terminal foreground is used, at muted opacity.
+         * This rendering API installs no provider or acceptance bindings and does not own [expected].
+         * A newer request started by a close callback takes precedence over this presentation.
+         */
+        @JvmOverloads
+        @ExperimentalShellSuggestionsApi
+        public fun presentInlineShellSuggestion(
+            expected: TerminalCommandEditContext,
+            ghostText: String,
+            foreground: Int? = null,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            val revision = inlineRequests.revision + 1
+            inlineRequests.close()
+            if (inlineRequests.revision != revision) return false
+            val presented = presentInlineShellSuggestionRendering(expected, ghostText, foreground)
+            if (presented) inlineSuggestionScheduler?.onExplicitRequest()
+            return presented
+        }
+
+        private fun presentInlineShellSuggestionRendering(
+            expected: TerminalCommandEditContext,
+            ghostText: String,
+            foreground: Int?,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            clearInlineShellSuggestionRendering(notify = false)
+            try {
+                val bound = session ?: return false
+                if (disposed ||
+                    !bindingIdentity.get() ||
+                    !terminalFocused ||
+                    ancestorWindow?.isFocused == false ||
+                    inlineCompositionActive ||
+                    !isLiveViewportOnEdt() ||
+                    selectionController.currentRange() != null
+                ) {
+                    return false
+                }
+                val cells = bound.captureCommandSuffixPreview(expected, ghostText) ?: return false
+                refreshRenderCacheFromSession(bound)
+                val inline = InlineShellSuggestion(bound, expected, cells, foreground)
+                if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) return false
+                inlineShellSuggestion = inline
+                inlineObservationJob =
+                    componentScope.launch {
+                        bound.commandEditChanges.collect {
+                            if (inlineShellSuggestion === inline) {
+                                if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
+                                repaint()
+                            }
+                        }
+                    }
+                repaint()
+                return true
+            } finally {
+                inlineSuggestionPresentation.value = if (inlineShellSuggestion != null) inlineRequests.publication else null
+            }
+        }
+
+        /**
+         * Closes managed inline work and removes its presentation on the EDT. A token passed to
+         * the low-level rendering overload remains caller-owned and is not cancelled.
+         */
+        @ExperimentalShellSuggestionsApi
+        public fun clearInlineShellSuggestion() {
+            check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
+            inlineRequests.close()
+        }
+
+        private fun clearInlineShellSuggestionRendering(notify: Boolean = true) {
+            inlineObservationJob?.cancel()
+            inlineObservationJob = null
+            if (notify) inlineSuggestionPresentation.value = null
+            if (inlineShellSuggestion == null) return
+            inlineShellSuggestion = null
+            repaint()
+        }
+
+        /** Captures an independent session-backed inline interaction on the EDT, before provider work. */
+        @JvmOverloads
+        @ExperimentalShellSuggestionsApi
+        public fun beginInlineShellSuggestionInteraction(
+            feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        ): SwingShellSuggestionInteraction? {
+            check(SwingUtilities.isEventDispatchThread()) { "inline requests must run on the EDT" }
+            return inlineRequests.begin(feedbackHandler)?.also { inlineSuggestionScheduler?.onExplicitRequest() }
+        }
+
+        /**
+         * Installs a host-owned inline provider for optional automatic and explicit requests.
+         * Call on the EDT before or after binding. Replacement cancels automatic inline work;
+         * manual interactions remain caller-owned. Providers survive rebinding and are never closed here.
+         */
+        @ExperimentalShellSuggestionsApi
+        public fun setInlineShellSuggestionProvider(provider: SwingInlineShellSuggestionProvider?) {
+            check(SwingUtilities.isEventDispatchThread()) { "inline providers must be configured on the EDT" }
+            if (disposed) return
+            if (inlineShellSuggestionProvider !== provider) {
+                inlineShellSuggestionProvider = provider
+                inlineSuggestionScheduler?.stop()
+                if (inlineRequests.isAutomatic) inlineRequests.close()
+            }
+            reconcileInlineSuggestionSchedulerOnEdt()
+        }
+
+        /**
+         * Explicitly requests the configured inline provider, even when automatic inline requests are disabled.
+         * Call on the EDT. Returns the caller-owned interaction, or null when no provider or editable context is available.
+         */
+        @JvmOverloads
+        @ExperimentalShellSuggestionsApi
+        public fun requestActiveInlineShellSuggestions(
+            feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        ): SwingShellSuggestionInteraction? {
+            check(SwingUtilities.isEventDispatchThread()) { "inline requests must run on the EDT" }
+            val provider = inlineShellSuggestionProvider ?: return null
+            val interaction = beginInlineShellSuggestionInteraction(feedbackHandler) ?: return null
+            requestInlineShellSuggestions(interaction, provider)
+            return interaction
+        }
+
+        /** Opens one inline provider on the EDT and collects its source off the EDT. Popup requests remain independent. */
+        @ExperimentalShellSuggestionsApi
+        public fun requestInlineShellSuggestions(
+            interaction: SwingShellSuggestionInteraction,
+            provider: SwingInlineShellSuggestionProvider,
+        ) {
+            check(SwingUtilities.isEventDispatchThread()) { "inline requests must run on the EDT" }
+            inlineRequests.request(interaction, provider)
+        }
+
+        /** Attempts the entire currently visible inline edit once, using its original captured authority. */
+        @ExperimentalShellSuggestionsApi
+        public fun acceptInlineShellSuggestion(): SwingShellSuggestionAcceptanceResult {
+            check(SwingUtilities.isEventDispatchThread()) { "inline acceptance must run on the EDT" }
+            return inlineRequests.accept()
+        }
+
+        /**
+         * Accepts leading whitespace and the next non-whitespace run of the visible inline suffix.
+         * Paths stay together; spaces split quoted arguments too. Grapheme clusters stay intact.
+         * The remainder is hidden until the shell reports the accepted prefix without intervening
+         * input, resize, or shell metadata changes. Runs on the EDT; unbound in the default keymap.
+         */
+        @ExperimentalShellSuggestionsApi
+        public fun acceptInlineShellSuggestionNextWord(): SwingShellSuggestionAcceptanceResult {
+            check(SwingUtilities.isEventDispatchThread()) { "inline acceptance must run on the EDT" }
+            return inlineRequests.acceptNextWord()
+        }
+
+        /** Explicitly dismisses the visible inline publication and reports its preference feedback. */
+        @ExperimentalShellSuggestionsApi
+        public fun dismissInlineShellSuggestion(): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "inline dismissal must run on the EDT" }
+            return inlineRequests.dismiss()
+        }
+
+        /**
+         * Replaces inline Tab/Right/Escape defaults. Inline acceptance wins while the popup is
+         * passive; deliberate popup browsing hides inline text and owns its acceptance keys.
+         */
+        @ExperimentalShellSuggestionsApi
+        public fun setInlineShellSuggestionKeymap(keymap: SwingShellSuggestionKeymap) {
+            check(SwingUtilities.isEventDispatchThread()) { "inline keymap must run on the EDT" }
+            inlineRequests.keymap = keymap
+        }
+
+        /** Replaces popup bindings on the EDT. Selected-only actions still require deliberate selection. */
+        @ExperimentalShellSuggestionsApi
+        public fun setShellSuggestionKeymap(keymap: SwingShellSuggestionKeymap) {
+            check(SwingUtilities.isEventDispatchThread()) { "popup keymap must run on the EDT" }
+            suggestionKeymap = keymap
+        }
+
         override fun paintComponent(graphics: Graphics) {
             super.paintComponent(graphics)
+
+            val inline =
+                inlineShellSuggestion?.takeIf {
+                    val valid =
+                        !disposed &&
+                            terminalFocused &&
+                            ancestorWindow?.isFocused != false &&
+                            session === it.session &&
+                            isLiveViewportOnEdt() &&
+                            selectionController.currentRange() == null &&
+                            it.reconcile(renderCache)
+                    if (!valid) {
+                        clearInlineShellSuggestionRendering()
+                        val expected = it.expected
+                        SwingUtilities.invokeLater {
+                            inlineRequests.invalidate(expected)
+                        }
+                    }
+                    valid
+                }
 
             val g = graphics.create() as Graphics2D
             try {
@@ -1352,6 +1646,8 @@ public class SwingTerminal
                     hyperlinkHover = hyperlinkController.hover,
                     hyperlinkPresentations = hyperlinkDiscoveryController.hyperlinkPresentationsFor(renderCache),
                     followedHyperlinkId = hyperlinkDiscoveryController.followedHyperlinkId,
+                    inlineSuggestion = inline?.cells,
+                    inlineForeground = inline?.foreground,
                 )
                 stickyCommandHeader.paint(g)
                 if (hostServices.scrollbarOverlayEnabled) {
@@ -1379,118 +1675,130 @@ public class SwingTerminal
             onComplete: (Throwable?) -> Unit,
         ) = selectionController.deferChanges {
             if (disposed) return@deferChanges
+            popupCompletionCommand = null
             bindingIdentity.set(false)
-            bindingIdentity = AtomicBoolean(true)
-            synchronized(resizePublicationLock) { resizeResultPending = false }
-            resizePublicationSession = null
-            suggestionScheduler?.stop()
-            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
-            mouseController.resetInput()
-            this.session = session
-            acceptedSessionSettings = null
-            chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
-            // Binding can remove the initial shell gutter reservation. Keep packing
-            // geometry consistent with the chrome used to calculate the visible grid.
-            preferredSize = preferredGridSize(settings.columns, settings.rows)
-            revalidate()
-            retainedViewport = null
-            resetRenderCaches()
-            var remaining = 3
-            var initializationFailure: Throwable? = null
-            val initialized: (Throwable?) -> Unit = { failure ->
-                if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
-                remaining--
-                if (remaining == 0) onComplete(initializationFailure)
-            }
-            updateMinimizedStateFromAncestor(initialized)
-            applySettingsToSession(session, settings, onComplete = initialized)
-            resetScrollbackState()
-            selectionController.resetBinding()
-            searchController.reset(renderCache.rows)
-            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
-            shellIntegrationDecorations.reset()
-            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-            visualGeometry.reset()
-            selectionController.stopSelectionDrag()
-            visualBellController.stop()
-            lastResizedColumns = NO_RESIZE_DIMENSION
-            lastResizedRows = NO_RESIZE_DIMENSION
-            lastResizedPixelWidth = NO_RESIZE_DIMENSION
-            lastResizedPixelHeight = NO_RESIZE_DIMENSION
-            renderFrameController.reset()
-            clearPointerHover()
-            hyperlinkDiscoveryController.reset()
-            resizeSessionToVisibleGridOnEdt(initialBinding = true, onComplete = initialized)
-            bindingJob =
-                componentScope.launch {
-                    launch {
-                        session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
-                            if (this@SwingTerminal.session === session) {
-                                suggestionScheduler?.stop()
-                                cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
-                                mouseController.resetInput()
-                                handlePublishedFrameOnEdt()
-                            }
-                        }
+            cleanupSwingResources(
+                ::clearInlineShellSuggestion,
+                {
+                    bindingIdentity = AtomicBoolean(true)
+                    synchronized(resizePublicationLock) { resizeResultPending = false }
+                    resizePublicationSession = null
+                    suggestionScheduler?.stop()
+                    inlineSuggestionScheduler?.stop()
+                    bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
+                    mouseController.resetInput()
+                    this.session = session
+                    acceptedSessionSettings = null
+                    chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
+                    // Binding can remove the initial shell gutter reservation. Keep packing
+                    // geometry consistent with the chrome used to calculate the visible grid.
+                    preferredSize = preferredGridSize(settings.columns, settings.rows)
+                    revalidate()
+                    retainedViewport = null
+                    resetRenderCaches()
+                    var remaining = 3
+                    var initializationFailure: Throwable? = null
+                    val initialized: (Throwable?) -> Unit = { failure ->
+                        if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                        remaining--
+                        if (remaining == 0) onComplete(initializationFailure)
                     }
-                    launch {
-                        session.renderGeneration
-                            .filter { it >= 0L }
-                            .collect {
-                                if (this@SwingTerminal.session === session) {
-                                    handlePublishedFrameOnEdt()
+                    updateMinimizedStateFromAncestor(initialized)
+                    applySettingsToSession(session, settings, onComplete = initialized)
+                    resetScrollbackState()
+                    selectionController.resetBinding()
+                    searchController.reset(renderCache.rows)
+                    cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+                    shellIntegrationDecorations.reset()
+                    if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
+                    visualGeometry.reset()
+                    selectionController.stopSelectionDrag()
+                    visualBellController.stop()
+                    lastResizedColumns = NO_RESIZE_DIMENSION
+                    lastResizedRows = NO_RESIZE_DIMENSION
+                    lastResizedPixelWidth = NO_RESIZE_DIMENSION
+                    lastResizedPixelHeight = NO_RESIZE_DIMENSION
+                    renderFrameController.reset()
+                    clearPointerHover()
+                    hyperlinkDiscoveryController.reset()
+                    resizeSessionToVisibleGridOnEdt(initialBinding = true, onComplete = initialized)
+                    bindingJob =
+                        componentScope.launch {
+                            launch {
+                                session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
+                                    if (this@SwingTerminal.session === session) {
+                                        suggestionScheduler?.stop()
+                                        inlineSuggestionScheduler?.stop()
+                                        cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
+                                        mouseController.resetInput()
+                                        handlePublishedFrameOnEdt()
+                                    }
                                 }
                             }
-                    }
-                    combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
-                        .takeWhile { it !is TerminalSessionState.Closed }
-                        .collect {
-                            // Host metadata can be published inside a borrowed frame callback.
-                            // Defer header preparation, source reads and gutter resize until that frame is released.
-                            if (settings.stickyCommandHeadersEnabled ||
-                                settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
-                                !chrome.promptDecorationsAvailable &&
-                                session.shellIntegrationState.recordCount() > 0
-                            ) {
-                                yield()
+                            launch {
+                                session.renderGeneration
+                                    .filter { it >= 0L }
+                                    .collect {
+                                        if (this@SwingTerminal.session === session) {
+                                            handlePublishedFrameOnEdt()
+                                            inlineRequests.frameChanged()
+                                        }
+                                    }
                             }
-                            if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
-                            if (refreshShellIntegrationDecorations(session)) {
-                                if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
-                                    !shellIntegrationDecorations.isPromptMarkerInteractiveAt(hoveredPromptMarkerRow)
-                                ) {
-                                    updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                            combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
+                                .takeWhile { it !is TerminalSessionState.Closed }
+                                .collect {
+                                    // Host metadata can be published inside a borrowed frame callback.
+                                    // Defer header preparation, source reads and gutter resize until that frame is released.
+                                    if (settings.stickyCommandHeadersEnabled ||
+                                        settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                                        !chrome.promptDecorationsAvailable &&
+                                        session.shellIntegrationState.recordCount() > 0
+                                    ) {
+                                        yield()
+                                    }
+                                    if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
+                                    if (refreshShellIntegrationDecorations(session)) {
+                                        if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
+                                            !shellIntegrationDecorations.isPromptMarkerInteractiveAt(hoveredPromptMarkerRow)
+                                        ) {
+                                            updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                                        }
+                                        if (renderCache.scrollbackOffset !=
+                                            viewportController.requestedOffset
+                                        ) {
+                                            requestRenderFromSession(session)
+                                        }
+                                        publishViewportState(renderCache.historySize)
+                                        renderFrameController.repaintFrame(forceFullRepaint = true)
+                                    }
                                 }
-                                if (renderCache.scrollbackOffset !=
-                                    viewportController.requestedOffset
-                                ) {
-                                    requestRenderFromSession(session)
-                                }
-                                publishViewportState(renderCache.historySize)
-                                renderFrameController.repaintFrame(forceFullRepaint = true)
-                            }
                         }
-                }
-            var publishedFrameAvailable = false
-            session.readPublishedFrame {
-                publishedFrameAvailable = true
-            }
-            if (publishedFrameAvailable) {
-                handlePublishedFrameOnEdt()
-            }
-            requestRenderFromSession(session)
-            reconcileHyperlinksOnEdt()
-            publishViewportState(renderCache.historySize)
-            reconcileSuggestionSchedulerOnEdt()
-            repaint()
+                    var publishedFrameAvailable = false
+                    session.readPublishedFrame {
+                        publishedFrameAvailable = true
+                    }
+                    if (publishedFrameAvailable) {
+                        handlePublishedFrameOnEdt()
+                    }
+                    requestRenderFromSession(session)
+                    reconcileHyperlinksOnEdt()
+                    publishViewportState(renderCache.historySize)
+                    reconcileSuggestionSchedulerOnEdt()
+                    repaint()
+                },
+            )
         }
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
+                popupCompletionCommand = null
                 bindingIdentity.set(false)
                 bindingIdentity = AtomicBoolean(false)
                 cleanupSwingResources(
+                    ::clearInlineShellSuggestion,
                     { suggestionScheduler?.stop() },
+                    { inlineSuggestionScheduler?.stop() },
                     {
                         val job = bindingJob
                         bindingJob = null
@@ -1550,8 +1858,10 @@ public class SwingTerminal
                 suggestionEligibilityListeners::clear,
                 {
                     shellSuggestionProvider = null
+                    inlineShellSuggestionProvider = null
                     shellSuggestionTarget = null
                     suggestionScheduler = null
+                    inlineSuggestionScheduler = null
                 },
                 { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
                 {
@@ -1648,6 +1958,7 @@ public class SwingTerminal
                 applySettingsToSession(it, settings)
                 resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
             }
+            if (!settings.smartSuggestionsEnabled) clearInlineShellSuggestion()
         }
 
         /**
@@ -2063,6 +2374,7 @@ public class SwingTerminal
                 return
             }
             shellSuggestionProvider = provider
+            popupCompletionCommand = null
             val revision = ++suggestionConfigurationRevision
             suggestionScheduler?.stop()
             cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider replaced")
@@ -2080,6 +2392,7 @@ public class SwingTerminal
             if (disposed || shellSuggestionTarget === target) return
             val previous = shellSuggestionTarget
             shellSuggestionTarget = target
+            popupCompletionCommand = null
             val revision = ++suggestionConfigurationRevision
             suggestionScheduler?.stop()
             val cancellationRevision = suggestionRevision + 1
@@ -2105,6 +2418,7 @@ public class SwingTerminal
         }
 
         private fun reconcileSuggestionSchedulerOnEdt() {
+            reconcileInlineSuggestionSchedulerOnEdt()
             val bound = session
             if (disposed ||
                 bound == null ||
@@ -2154,8 +2468,74 @@ public class SwingTerminal
                             cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden", retainPresentation = refreshing)
                         }
                     },
+                    debounceMillis = settings.shellSuggestionDebounceMillis,
                 ).also { suggestionScheduler = it }
+            scheduler.updateDebounceMillis(settings.shellSuggestionDebounceMillis)
             scheduler.start(bound)
+        }
+
+        private fun reconcileInlineSuggestionSchedulerOnEdt() {
+            val bound = session
+            if (disposed ||
+                bound == null ||
+                bound.isClosed ||
+                !settings.smartSuggestionsEnabled ||
+                !settings.inlineShellSuggestionsEnabled ||
+                inlineShellSuggestionProvider == null
+            ) {
+                inlineSuggestionScheduler?.stop()
+                if (inlineRequests.isAutomatic) inlineRequests.close()
+                return
+            }
+            val scheduler =
+                inlineSuggestionScheduler ?: SwingShellSuggestionScheduler(
+                    observationScope = componentScope,
+                    edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
+                    isFocused = { terminalFocused },
+                    isEligible = ::isInlineSuggestionEligibleOnEdt,
+                    isRequestCurrent = inlineRequests::isRequestCurrent,
+                    requestSuggestions = { _, feedback ->
+                        val provider = inlineShellSuggestionProvider
+                        val interaction =
+                            if (provider == null) {
+                                null
+                            } else {
+                                inlineRequests.begin(
+                                    feedback = { event ->
+                                        feedback.onSuggestionFeedback(event)
+                                        if (event.kind == SwingShellSuggestionFeedbackKind.DISMISSED) {
+                                            inlineSuggestionScheduler?.onInvalidated(dismissed = true)
+                                        }
+                                    },
+                                    automatic = true,
+                                )
+                            }
+                        if (interaction != null && provider != null) inlineRequests.request(interaction, provider)
+                        interaction != null
+                    },
+                    hideSuggestions = { if (inlineRequests.isAutomatic) inlineRequests.close() },
+                    debounceMillis = settings.inlineShellSuggestionDebounceMillis,
+                    minimumNonWhitespaceCharacters = 1,
+                ).also { inlineSuggestionScheduler = it }
+            scheduler.updateDebounceMillis(settings.inlineShellSuggestionDebounceMillis)
+            scheduler.start(bound, observeCommandInventory = false)
+        }
+
+        private fun isInlineSuggestionEligibleOnEdt(): Boolean =
+            !disposed &&
+                bindingIdentity.get() &&
+                settings.smartSuggestionsEnabled &&
+                terminalFocused &&
+                ancestorWindow?.isFocused != false &&
+                !inlineCompositionActive &&
+                isLiveViewportOnEdt() &&
+                selectionController.currentRange() == null
+
+        private fun updateInlineSuggestionEligibilityOnEdt() {
+            val eligible = isInlineSuggestionEligibleOnEdt()
+            if (inlineSuggestionEligible == eligible) return
+            inlineSuggestionEligible = eligible
+            inlineSuggestionScheduler?.onEligibilityChanged(eligible)
         }
 
         /**
@@ -2246,7 +2626,23 @@ public class SwingTerminal
                         if (disposed || session !== bound || suggestionRevision != revision) {
                             SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
                         } else {
-                            captured.tryAccept(acceptance)
+                            val identity = bindingIdentity
+                            captured.tryAccept(acceptance).also { result ->
+                                if (result == SwingShellSuggestionAcceptanceResult.ACCEPTED &&
+                                    !disposed &&
+                                    session === bound &&
+                                    bindingIdentity === identity &&
+                                    identity.get()
+                                ) {
+                                    if (bound != null && expected != null) {
+                                        popupCompletionCommand = acceptance.suggestion.commandTextAfterReplacement(acceptance.request)
+                                        observePopupCompletion(bound)
+                                    } else {
+                                        popupCompletionCommand = null
+                                    }
+                                    inlineRequests.refreshPresentation()
+                                }
+                            }
                         }
 
                     override fun close() = captured.close()
@@ -2420,7 +2816,7 @@ public class SwingTerminal
                 }
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
             interaction.attachFeedback(source.feedbackHandler)
-            val publications = source.suggestions.flowOn(Dispatchers.Default).conflate()
+            val publications = source.suggestions.flowOn(suggestionDispatcher ?: Dispatchers.Default).conflate()
             scope.launch {
                 try {
                     if (requiresConfirmation) {
@@ -2516,7 +2912,11 @@ public class SwingTerminal
         @ExperimentalShellSuggestionsApi
         public fun hideShellSuggestions() {
             runOnEdt {
-                cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
+                popupCompletionCommand = null
+                cleanupSwingResources(
+                    { cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden") },
+                    inlineRequests::refreshPresentation,
+                )
             }
         }
 
@@ -2800,11 +3200,14 @@ public class SwingTerminal
             shellSuggestionController ?: SwingShellSuggestionController(
                 object : SwingShellSuggestionHost {
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
-                    override val suggestionKeymap get() = hostServices.shellSuggestionKeymap
+                    override val suggestionKeymap get() = this@SwingTerminal.suggestionKeymap
 
                     override fun revalidate() = this@SwingTerminal.revalidate()
 
-                    override fun repaint() = this@SwingTerminal.repaint()
+                    override fun repaint() {
+                        inlineRequests.refreshPresentation()
+                        this@SwingTerminal.repaint()
+                    }
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
@@ -2865,9 +3268,37 @@ public class SwingTerminal
             return true
         }
 
+        private fun observePopupCompletion(bound: TerminalSession) {
+            val command = popupCompletionCommand ?: return
+            val observation =
+                componentScope.launch(start = CoroutineStart.LAZY) {
+                    var expected: TerminalCommandEditContext? = null
+                    try {
+                        bound.commandEditChanges.collect {
+                            val current = expected
+                            if (current == null) {
+                                // Wait for the accepted command's echo. This token only tracks
+                                // browsing lifetime; it never admits a suggestion edit.
+                                if (bound.activeShellCommandLine()?.commandText == command) expected = bound.captureCommandEdit()
+                            } else if (!bound.isCommandEditCurrent(current)) {
+                                popupCompletionCommand = null
+                                inlineRequests.refreshPresentation()
+                            }
+                        }
+                    } finally {
+                        expected?.cancel()
+                    }
+                }
+            popupCompletionObservation = observation
+            observation.start()
+        }
+
         private fun invalidateShellSuggestionsOnEdt(retainPresentation: Boolean = false) {
+            popupCompletionCommand = null
+            clearInlineShellSuggestion()
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input", retainPresentation = retainPresentation)
             suggestionScheduler?.onInvalidated()
+            inlineSuggestionScheduler?.onInvalidated()
             suggestionInvalidationListeners.forEach { listener ->
                 listener.onShellSuggestionsInvalidated()
             }
@@ -3056,6 +3487,8 @@ public class SwingTerminal
             renderMappingChanged: Boolean,
             scrollComplete: Boolean,
         ) {
+            popupCompletionCommand = null
+            clearInlineShellSuggestion()
             viewportInteractionRevision++
             val boundSession = session
             if (boundSession != null && pendingGeometryRequests > 0) {
@@ -3143,6 +3576,7 @@ public class SwingTerminal
         }
 
         private fun updateAutomaticSuggestionEligibilityOnEdt() {
+            updateInlineSuggestionEligibilityOnEdt()
             val changed = applyAutomaticSuggestionEligibilityOnEdt()
             notifyAutomaticSuggestionEligibilityOnEdt(changed, automaticSuggestionEligibilityRevision)
         }
@@ -3159,6 +3593,7 @@ public class SwingTerminal
             revision: Long,
         ) {
             if (revision != automaticSuggestionEligibilityRevision) return
+            updateInlineSuggestionEligibilityOnEdt()
             val liveViewport = isLiveViewportOnEdt()
             var failure: Throwable? = null
             if (!settings.smartSuggestionsEnabled ||
@@ -3550,6 +3985,10 @@ public class SwingTerminal
                 }
                 painter.prepareFrame(renderCache)
                 selectionController.updateFrame(renderCache)
+                inlineShellSuggestion?.let { inline ->
+                    if (!session.isCommandEditCurrent(inline.expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
+                    repaint()
+                }
                 hyperlinkDiscoveryController.scheduleForFrame()
                 selectionController.publishChange()
             }

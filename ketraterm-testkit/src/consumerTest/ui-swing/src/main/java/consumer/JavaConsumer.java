@@ -56,6 +56,43 @@ import java.util.List;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static SwingSettings automaticSuggestionSettings() {
+        return SwingSettings.create(draft -> {
+            draft.setSmartSuggestionsEnabled(true);
+            draft.setShellSuggestionsEnabled(true);
+            draft.setShellSuggestionDebounceMillis(75);
+            draft.setInlineShellSuggestionsEnabled(true);
+            draft.setInlineShellSuggestionDebounceMillis(200);
+        });
+    }
+    public static io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction requestConfiguredInline(
+            SwingTerminal view, io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
+        view.setInlineShellSuggestionProvider(provider);
+        return view.requestActiveInlineShellSuggestions();
+    }
+    public static void inlineProvider(SwingTerminal view,
+            io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider provider) {
+        var interaction = view.beginInlineShellSuggestionInteraction();
+        if (interaction != null && interaction.getHasExplicitSelection()) throw new AssertionError("New requests are passive");
+        view.setShellSuggestionKeymap(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.STANDARD);
+        if (interaction != null) view.requestInlineShellSuggestions(interaction, provider);
+        view.setInlineShellSuggestionKeymap(
+            io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.INLINE_STANDARD);
+        view.acceptInlineShellSuggestion();
+        view.acceptInlineShellSuggestionNextWord();
+        view.dismissInlineShellSuggestion();
+        view.clearInlineShellSuggestion();
+    }
+    public static boolean showSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix) {
+        return view.presentInlineShellSuggestion(expected, suffix);
+    }
+    public static io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSnapshot visibleInlinePublication(SwingTerminal view) {
+        return view.getInlineShellSuggestionPresentation().getValue();
+    }
+    public static boolean showColoredSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix, int color) {
+        return view.presentInlineShellSuggestion(expected, suffix, color);
+    }
+    public static void clearInline(SwingTerminal view) { view.clearInlineShellSuggestion(); }
     public static void verifySelection(SwingTerminal terminal) {
         var events = new AtomicInteger();
         io.github.ketraterm.ui.swing.api.TerminalSelectionListener listener = (previous, current) -> {

@@ -96,6 +96,10 @@ public class SwingShellSuggestionInteraction(
     public var snapshot: SwingShellSuggestionSnapshot = SwingShellSuggestionSnapshot(this, emptyList(), -1)
         private set
 
+    /** True after deliberate selection, rather than provider preselection or pointer hover. */
+    public var hasExplicitSelection: Boolean = false
+        private set
+
     /** Whether new publications and user actions can still be admitted. */
     public val isActive: Boolean get() = phase == Phase.ACTIVE
 
@@ -127,27 +131,47 @@ public class SwingShellSuggestionInteraction(
         val previous = snapshot.selectedSuggestion.takeIf { preserveSelection }
         val copied = Collections.unmodifiableList(ArrayList(suggestions))
         var selection = selectedIndex
+        var retainedSelection = false
         val previousOutcome = previous?.commandTextAfterReplacement(request)
         if (previousOutcome != null) {
             val retained =
                 copied.indexOfFirst {
                     it.commandTextAfterReplacement(request) == previousOutcome
                 }
-            if (retained >= 0) selection = retained
+            if (retained >= 0) {
+                selection = retained
+                retainedSelection = true
+            }
         }
+        hasExplicitSelection = hasExplicitSelection && retainedSelection
         snapshot = SwingShellSuggestionSnapshot(this, copied, selection)
         notifyChanged()
         return isActive
     }
 
-    /** Selects an index only if [publication] still belongs to the current candidate publication. */
+    /**
+     * Records deliberate selection only while [publication] is current. Use [publish] for
+     * passive provider preselection; this operation may enable the host's Enter acceptance.
+     */
     public fun select(
         publication: SwingShellSuggestionSnapshot,
         index: Int,
+    ): Boolean = select(publication, index, explicit = true)
+
+    internal fun previewSelection(
+        publication: SwingShellSuggestionSnapshot,
+        index: Int,
+    ): Boolean = select(publication, index, explicit = false)
+
+    private fun select(
+        publication: SwingShellSuggestionSnapshot,
+        index: Int,
+        explicit: Boolean,
     ): Boolean {
         checkEdt()
         if (!owns(publication) || index !in snapshot.suggestions.indices) return false
-        if (snapshot.selectedIndex == index) return true
+        if (snapshot.selectedIndex == index && hasExplicitSelection == explicit) return true
+        hasExplicitSelection = explicit
         snapshot = SwingShellSuggestionSnapshot(this, snapshot.suggestions, index)
         notifyChanged()
         return isActive
@@ -160,10 +184,17 @@ public class SwingShellSuggestionInteraction(
     public fun tryAccept(
         publication: SwingShellSuggestionSnapshot,
         index: Int,
+    ): SwingShellSuggestionAcceptanceResult = tryAccept(publication, index, null, partial = false)
+
+    internal fun tryAccept(
+        publication: SwingShellSuggestionSnapshot,
+        index: Int,
+        edit: SwingShellSuggestion?,
+        partial: Boolean,
     ): SwingShellSuggestionAcceptanceResult {
         checkEdt()
         if (!owns(publication) || index !in snapshot.suggestions.indices) return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
-        val acceptance = SwingShellSuggestionAcceptance(snapshot.suggestions[index], index, request)
+        val acceptance = SwingShellSuggestionAcceptance(edit ?: snapshot.suggestions[index], index, request)
         phase = Phase.ACCEPTING
         try {
             notifyChanged()
@@ -180,13 +211,15 @@ public class SwingShellSuggestionInteraction(
                 { notifyChanged() },
                 {
                     if (feedbackHandler !== SwingShellSuggestionFeedbackHandler.NONE) {
+                        val kind =
+                            when {
+                                result != SwingShellSuggestionAcceptanceResult.ACCEPTED -> SwingShellSuggestionFeedbackKind.REJECTED
+                                partial -> SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED
+                                else -> SwingShellSuggestionFeedbackKind.ACCEPTED
+                            }
                         feedbackHandler.onSuggestionFeedback(
                             SwingShellSuggestionFeedback(
-                                if (result == SwingShellSuggestionAcceptanceResult.ACCEPTED) {
-                                    SwingShellSuggestionFeedbackKind.ACCEPTED
-                                } else {
-                                    SwingShellSuggestionFeedbackKind.REJECTED
-                                },
+                                kind,
                                 acceptance.suggestion,
                                 index,
                                 request,

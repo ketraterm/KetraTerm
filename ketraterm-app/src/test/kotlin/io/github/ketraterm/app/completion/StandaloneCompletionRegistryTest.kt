@@ -102,7 +102,7 @@ class StandaloneCompletionRegistryTest {
             val registry = registry(learningStore = learningStore)
             registry.recordSuccess("git switch main", profileId = "bash", workingDirectoryUri = "file:///repo")
 
-            registry.resetLearning()
+            registry.resetLearning().await()
 
             assertTrue(learningStore.snapshot().rankingStats.isEmpty())
             assertTrue(learningStore.snapshot().replayCommands.isEmpty())
@@ -143,7 +143,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `directory and learned command suggestions coexist after cd space`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-completion")
             try {
                 Files.createDirectory(directory.resolve("alpha"))
@@ -175,7 +175,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `learned nested directory is token-local and outranks its unused parent path`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-learned-directory")
             try {
                 Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
@@ -220,7 +220,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `bare path entries do not pollute command subcommand completion`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val directory = Files.createTempDirectory("ketraterm-completion")
             try {
                 Files.createDirectory(directory.resolve("status"))
@@ -299,7 +299,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `shared engine keeps pane working directories request scoped`() =
-        runBlocking {
+        runBlocking(Dispatchers.IO) {
             val firstDirectory = Files.createTempDirectory("ketraterm-first-pane")
             val secondDirectory = Files.createTempDirectory("ketraterm-second-pane")
             try {
