@@ -52,6 +52,10 @@ admission. Optional OSC interpretation and grid extraction belong to
 <p><code>TerminalCommandOutputText</code> is the detached result of optional producer-owned
 completed-output extraction. Session validates limits, serializes the read, and
 rejects results when the producer&#39;s metadata revision changes during capture.</p>
+<p><code>captureCommandSuffixPreview</code> creates caller-owned render cells through a bounded
+isolated parser/core pipeline. It checks editing authority, margin geometry and
+width policy without changing the live terminal; the renderer owns presentation
+and collision checks.</p>
 <p><code>TerminalShellCommandInventory</code> owns a validated immutable command snapshot, its
 binary prefix lookup, and cached alias definitions. <code>TerminalShellCompletionChannel</code>
 publishes readiness/status and snapshots without copying them per request. It
@@ -85,7 +89,7 @@ guidance.</li>
 <p>Run <code>./gradlew :ketraterm-session:test</code> from the repository root. This includes
 <code>defaultDispatcherTest</code> in a separate JVM with one ordinary I/O worker, so cleanup
 independence is checked against actual defaults without changing other tests&#39; schedulers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

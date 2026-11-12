@@ -26,20 +26,14 @@
 <p>Release notes for library consumers and embedders. Product-specific changes are recorded in the <a href="https://github.com/ketraterm/KetraTerm-IntelliJ/blob/master/CHANGELOG.md">IntelliJ plugin changelog</a> and <a href="https://ketraterm.github.io/KetraTerm/changelog.html">standalone application changelog</a>.</p>
 <h2 id="unreleased">[Unreleased]</h2>
 <ul>
-<li><p>Added bounded headless command-output extraction through <code>TerminalSession.commandOutputText</code>. The OSC producer returns a completed command&#39;s retained text tail with separate caller-truncation and missing-history flags, preserving graphemes and logical line breaks. Custom producers can implement the same optional contract.</p>
-</li>
-<li><p>PTY options and workspace launch profiles preserve empty arguments after the executable, including through configuration copies.</p>
-</li>
-<li><p>Added <code>TerminalSession.confirmCommandEdit</code> and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine&#39;s buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.</p>
-</li>
-<li><p>PTY and workspace options reject retained row capacity overflow during construction, before process creation. Swing settings reject non-positive or non-finite primary font sizes while preserving fractional sizes and host overrides. See <a href="docs/library/configuration.html#library-defaults">library defaults</a>.</p>
-</li>
-<li><p>The default Swing hyperlink handler rejects malformed URIs without throwing and rejects unsupported schemes before contacting the desktop.</p>
-</li>
-<li><p>Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while preserving the initial selection when direction changes.</p>
-</li>
-<li><p>Shell-profile discovery honors case-insensitive Windows environment names, accepts quoted Windows PATH directories, and skips malformed PATH entries. Unix lookup remains case-sensitive and requires execute permission; custom executable predicates retain control over discovery and validation.</p>
-</li>
+<li>Added experimental caller-controlled inline suggestions with independent providers, optional popup/inline automatic scheduling with separate configurable delays, guarded acceptance and configurable keymaps. Hosts can opt into next-word acceptance, unbound by default, with echo-validated remainder retention and distinct partial feedback. Manual requests remain available with automation disabled and take priority over automatic refreshes. Passive popups coexist with inline results: Tab/Right accepts visible inline text, while Enter executes the entered command. Without visible inline text, passive popups preserve shell Tab. Deliberate popup browsing hides inline text and enables selected-item insertion without execution. Fresh results never inherit deliberate selection. Ghost text shares ordinary terminal painting, Unicode layout, and cursor foreground rendering without changing live content; rendering-only callers retain edit-token and input ownership.</li>
+<li>Added bounded headless command-output extraction through <code>TerminalSession.commandOutputText</code>. The OSC producer returns a completed command&#39;s retained text tail with separate caller-truncation and missing-history flags, preserving graphemes and logical line breaks. Custom producers can implement the same optional contract.</li>
+<li>PTY options and workspace launch profiles preserve empty arguments after the executable, including through configuration copies.</li>
+<li>Added <code>TerminalSession.confirmCommandEdit</code> and optional buffer-only native confirmation. PowerShell suggestion validation reads PSReadLine&#39;s buffer without invoking candidate completers; full completion requests retain their candidates and editing checks.</li>
+<li>PTY and workspace options reject retained row capacity overflow during construction, before process creation. Swing settings reject non-positive or non-finite primary font sizes while preserving fractional sizes and host overrides. See <a href="docs/library/configuration.html#library-defaults">library defaults</a>.</li>
+<li>The default Swing hyperlink handler rejects malformed URIs without throwing and rejects unsupported schemes before contacting the desktop.</li>
+<li>Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while preserving the initial selection when direction changes.</li>
+<li>Shell-profile discovery honors case-insensitive Windows environment names, accepts quoted Windows PATH directories, and skips malformed PATH entries. Unix lookup remains case-sensitive and requires execute permission; custom executable predicates retain control over discovery and validation.</li>
 </ul>
 <h2 id="050---2026-11-09">[0.5.0] - 2026-11-09</h2>
 <ul>
@@ -273,7 +267,7 @@
 <li>Integrated local pseudo-terminal (PTY) transport for zsh, zli/zsh, bash, sh, PowerShell, and cmd.exe.</li>
 <li>Configurable typography, default colors, palettes, and scrollback capacity.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

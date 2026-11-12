@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a aria-current="page" href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Command completion</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#stability-experimental">Stability: experimental</a><a class="depth-2" href="#availability">Availability</a><a class="depth-2" href="#using-suggestions">Using suggestions</a><a class="depth-3" href="#argument-hints">Argument hints</a><a class="depth-2" href="#sources-by-host">Sources by host</a><a class="depth-3" href="#working-directory-and-remote-shells">Working directory and remote shells</a><a class="depth-3" href="#git-suggestions">Git suggestions</a><a class="depth-3" href="#powershell-suggestions">PowerShell suggestions</a><a class="depth-3" href="#bash-and-zsh-suggestions">Bash and zsh suggestions</a><a class="depth-2" href="#built-in-command-catalog">Built-in command catalog</a><a class="depth-2" href="#matching-and-interaction">Matching and interaction</a><a class="depth-2" href="#library-customization">Library customization</a><a class="depth-2" href="#learning-and-privacy">Learning and privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="command-completion">Command completion</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a aria-current="page" href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Command completion</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#stability-experimental">Stability: experimental</a><a class="depth-2" href="#availability">Availability</a><a class="depth-2" href="#using-suggestions">Using suggestions</a><a class="depth-3" href="#argument-hints">Argument hints</a><a class="depth-2" href="#sources-by-host">Sources by host</a><a class="depth-3" href="#working-directory-and-remote-shells">Working directory and remote shells</a><a class="depth-3" href="#git-suggestions">Git suggestions</a><a class="depth-3" href="#powershell-suggestions">PowerShell suggestions</a><a class="depth-3" href="#bash-and-zsh-suggestions">Bash and zsh suggestions</a><a class="depth-2" href="#built-in-command-catalog">Built-in command catalog</a><a class="depth-2" href="#matching-and-interaction">Matching and interaction</a><a class="depth-2" href="#library-customization">Library customization</a><a class="depth-2" href="#inline-suffix-presentation">Inline suffix presentation</a><a class="depth-2" href="#learning-and-privacy">Learning and privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="command-completion">Command completion</h1>
 <p>KetraTerm&#39;s optional completion engine combines command specifications, paths,
 host-provided sources, and bounded local learning. It can run independently of
 a terminal or use the Swing/IntelliJ suggestion UI.</p>
@@ -42,10 +42,12 @@ the same stability contract.</p>
 for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
 Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
 explicitly, including when automatic popups are disabled.
-Settings expose the master switch, automatic popups, Enter acceptance, and optional
-learning persistence. Automatic popups can appear <strong>Always</strong> (the default) or
-<strong>Only for parameters</strong>. Parameter-only mode includes subcommands, options, and
-arguments, while Ctrl+Space can still complete an executable name. Standalone users can also set <code>smart_suggestions_enabled</code>
+Settings expose the master switch, automatic popups, acceptance shortcuts, and
+optional learning persistence. The standalone <strong>Suggestions</strong> page offers popup
+modes <strong>Off</strong>, <strong>On request</strong>, and <strong>Automatic</strong> (the default). Clear <strong>Include
+command names</strong> to restrict automatic popups to parameters, including subcommands,
+options, and arguments; Ctrl+Space can still complete an executable name.
+Standalone users can also set <code>smart_suggestions_enabled</code>
 in the <a href="https://ketraterm.github.io/KetraTerm/settings.html">TOML configuration</a>.
 Library hosts enable and configure their own provider and presentation.</p>
 <p>History suggestions are selective: command names use ordinary discovery, and
@@ -54,7 +56,8 @@ command does not make its full history entry appear after an empty argument.
 Whole-command replays have a small row budget; learned ranking continues to
 influence live results. See the
 <a href="../../ketraterm-completion/docs/completion-architecture.html#history-suggestion-policy">history suggestion policy</a>.</p>
-<p>Use <strong>Reset learned suggestions...</strong> in settings to clear learned commands and
+<p>Use <strong>Reset learning…</strong> on the standalone Suggestions page, or the IDE&#39;s learning
+reset control, to clear learned commands and
 ranking preferences. See <a href="../reference/storage.html#completion-learning">saved learning and reset behavior</a>.</p>
 <p>Terminal suggestions require an editable command context, normally supplied by
 <a href="shells.html#prompt-hooks-and-completion-dialects">shell hooks</a>.
@@ -68,6 +71,12 @@ KetraTerm does not guess how cursor-positioned rows form an editable command.</p
 <h2 id="using-suggestions">Using suggestions</h2>
 <p>With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+An automatic popup is passive: provider preselection and hover do not enable
+Tab or Enter acceptance. Deliberate navigation selects an item; Tab or Enter inserts it without
+executing when that preference is enabled. After acceptance, new results become
+passive again, so Enter executes the committed command rather than accepting a
+new child directory. With no visible inline text or deliberate popup selection,
+Tab reaches the shell for its own completion, even when there is only one candidate.
 Automatic refreshes cannot replace an active Ctrl+Space request.
 After Escape, automatic suggestions remain dismissed across cursor movement and
 focus changes until the command text changes. Completion candidates that leave the
@@ -379,6 +388,48 @@ not an exhaustive schema for every version of these tools.</p>
 the Gradle adapter does not run Gradle to discover tasks. Ordinary source
 exceptions are reported while other sources continue; request cancellation
 cancels source work.</p>
+<h2 id="inline-suffix-presentation">Inline suffix presentation</h2>
+<p>Library consumers can opt into experimental append-only ghost-text rendering
+through <code>SwingTerminal.presentInlineShellSuggestion</code>. It uses the ordinary terminal
+text painter, clips wrapped previews to free visible cells, and requires current
+command-edit authority. Independent inline providers share the guarded interaction
+contract with popup providers, with separate cancellation and configurable keymaps.
+Both surfaces can appear together while the popup is passive. Hosts can also bind
+next-word inline acceptance; it is unbound by default and retains the remaining
+text only after a guarded shell echo. Both surfaces
+support optional automatic scheduling with independent debounce delays, or explicit
+caller-owned requests. Automatic inline defaults to off; popup and inline delays
+both default to 75 ms. Disabling automation preserves manual control,
+and automatic requests never replace a valid manual interaction. See the
+<a href="../../ketraterm-ui-swing/README.html#inline-suffix-rendering">inline contract</a>
+for eligibility, Unicode handling, collisions, provider context and caller ownership.
+The standalone application offers opt-in <strong>Inline suggestions</strong> on its
+<strong>Suggestions</strong> settings page, off by default. Inline uses the popup&#39;s completion
+provider and shares one evaluation for matching command context and options. It
+previews the first result from each ranked snapshot, including
+command specifications, paths, shell completions, and learned candidates. It
+keeps the original replacement range and learning feedback. A result that does
+not strictly extend the current command is popup-only; inline never substitutes
+a lower-ranked candidate. Empty prefixes produce no inline suggestion.
+The popup drops the first row of the shared result only after its inline preview becomes visible.
+Down selects the first alternative and hides inline; the omitted candidate stays
+out during that browsing session so the list does not shift under navigation.
+If inline cannot render, the full ranking remains in the popup. Disabling inline
+restores the candidate in a passive popup. Library hosts can still provide unrelated
+popup and inline sources.</p>
+<p>Requests start after a 75 ms pause in command-edit activity. Popup and inline
+presentations retain independent lifetimes and switches; closing one keeps shared
+work alive for the other. Tab or Right accepts
+visible inline text while the popup is passive. Deliberate popup browsing hides
+inline text, including late results; Tab or Enter then inserts the selected popup
+item. A popup acceptance keeps inline hidden while the accepted command remains
+unchanged. Fresh child suggestions require deliberate navigation before host
+acceptance; otherwise Tab invokes shell completion and Enter executes the entered command.
+Escape dismisses an open popup first, then inline text until command text changes.
+The suggestions master switch gates inline previews; the popup switch and automatic-popup switch
+does not. Focus loss, selection, scrolling, and stale editing authority hide
+obsolete text. Existing shell predictions or text after the cursor suppress host
+ghost text; this source does not turn off the shell&#39;s own prediction settings.</p>
 <h2 id="learning-and-privacy">Learning and privacy</h2>
 <p>Learning adjusts matching candidates using executions, acceptance, and explicit
 dismissal. Successful commands admitted by the replay policy can also supply
@@ -395,7 +446,7 @@ for location, retention, and encoding.</p>
 <p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
 <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
 and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

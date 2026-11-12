@@ -107,14 +107,16 @@ dependencies {
 bind a <code>SwingTerminal</code> on the Swing event dispatch thread, then start the session.
 The host owns the session and must close it when it is no longer needed.</p>
 <p>See the <a href="ketraterm-pty/README.html#how-to-use">PTY guide</a> for process startup and
-the <a href="ketraterm-ui-swing/README.html#how-to-use">Swing example</a> for view setup.</p>
+the <a href="ketraterm-ui-swing/README.html#how-to-use">Swing example</a> for view setup.
+The <a href="ketraterm-examples/README.html">runnable suggestion example</a> embeds a real shell
+with independent popup and inline providers and bounded command/output context.</p>
 <h2 id="documentation">Documentation</h2>
 <p>Browse the <a href="docs/README.html">documentation</a> for feature catalogs, embedding guides,
 protocol references, and contributor resources. The <a href="docs/terminal-feature-map.html">feature map</a>
 describes supported capabilities; the <a href="docs/terminal-feature-gap-map.html">gap map</a>
 tracks remaining work. Consumer-visible changes are in the <a href="CHANGELOG.html">library changelog</a>.</p>
 <h2 id="development">Development</h2>
-<p>Use the JetBrains Runtime SDK pinned in the <a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/gradle/jbr-checksums.properties">runtime manifest</a>
+<p>Use the JetBrains Runtime SDK pinned in the <a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/gradle/jbr-checksums.properties">runtime manifest</a>
 and the included Gradle wrapper (<code>gradlew</code> / <code>gradlew.bat</code>). Set <code>JAVA_HOME</code> and
 IntelliJ&#39;s Gradle JVM to that SDK.</p>
 <pre><code class="language-bash">./gradlew :ketraterm-app:run
@@ -142,8 +144,8 @@ checks and product development commands.</p>
 <hr>
 <h2 id="license">License</h2>
 <p>Copyright 2026 Gagik Sargsyan. Licensed under the
-<a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/LICENSE">Apache License, Version 2.0</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/README.md">View source on GitHub ↗</a></div></div></main></div>
+<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/LICENSE">Apache License, Version 2.0</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

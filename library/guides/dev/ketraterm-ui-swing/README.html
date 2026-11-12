@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm UI Swing (:ketraterm-ui-swing)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-3" href="#binding-and-configuration-ownership">Binding and configuration ownership</a><a class="depth-3" href="#sticky-command-headers">Sticky command headers</a><a class="depth-3" href="#search">Search</a><a class="depth-3" href="#manual-paste">Manual paste</a><a class="depth-3" href="#middle-button-paste">Middle-button paste</a><a class="depth-3" href="#selection-and-cell-coordinates">Selection and cell coordinates</a><a class="depth-3" href="#cursor-presentation">Cursor presentation</a><a class="depth-3" href="#suggestion-request-ownership">Suggestion request ownership</a><a class="depth-2" href="#how-to-extend-custom-host-services">How to Extend: Custom Host Services</a><a class="depth-2" href="#hyperlink-detection">Hyperlink detection</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-ui-swing-ketraterm-ui-swing">KetraTerm UI Swing (<code>:ketraterm-ui-swing</code>)</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm UI Swing (:ketraterm-ui-swing)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-3" href="#binding-and-configuration-ownership">Binding and configuration ownership</a><a class="depth-3" href="#sticky-command-headers">Sticky command headers</a><a class="depth-3" href="#search">Search</a><a class="depth-3" href="#manual-paste">Manual paste</a><a class="depth-3" href="#middle-button-paste">Middle-button paste</a><a class="depth-3" href="#selection-and-cell-coordinates">Selection and cell coordinates</a><a class="depth-3" href="#cursor-presentation">Cursor presentation</a><a class="depth-3" href="#suggestion-request-ownership">Suggestion request ownership</a><a class="depth-3" href="#inline-suffix-rendering">Inline suffix rendering</a><a class="depth-2" href="#how-to-extend-custom-host-services">How to Extend: Custom Host Services</a><a class="depth-2" href="#hyperlink-detection">Hyperlink detection</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-ui-swing-ketraterm-ui-swing">KetraTerm UI Swing (<code>:ketraterm-ui-swing</code>)</h1>
 <p><code>SwingTerminal</code> is a reusable Swing <code>JComponent</code> for a <code>TerminalSession</code>. It paints
 terminal frames and routes user input through the session. The host supplies the
 connection, session lifetime, and optional clipboard, font, hyperlink, and action
@@ -189,7 +189,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -229,6 +229,13 @@ for subcommands, options, and arguments; the default is <code>ALWAYS</code>. An 
 <code>requestActiveShellSuggestions()</code> uses the bound session&#39;s command source and
 remains available when automatic popups are disabled or limited to parameters.
 Automatic refreshes cannot replace an active explicit request.
+Popup and inline automation have separate switches and debounce delays. Both
+require <code>smartSuggestionsEnabled</code>; disabling either automatic switch leaves
+explicit requests available. Zero delay starts without debouncing; negative
+delays are rejected. Both surfaces default to 75 ms,
+with automatic inline disabled. Changes take effect through <code>reloadSettings()</code>.
+For fully host-owned scheduling, disable both automatic switches and use the
+explicit request APIs. Invocation shortcuts remain host-owned.
 Late shell-command inventory updates refresh eligible automatic suggestions after
 the normal debounce, even when the typed text is unchanged.
 Automatic and explicit requests both capture the current editing context before
@@ -332,6 +339,203 @@ collection. Lifecycle changes invalidate obsolete results and edits.</p>
 <p><code>setShellSuggestionTarget(null)</code> restores embedded presentation. Use
 <code>copyCellBounds</code> to anchor a host popup and <code>setShellSuggestionFailureHandler</code>
 for view-owned diagnostics.</p>
+<h3 id="inline-suffix-rendering">Inline suffix rendering</h3>
+<p>The experimental inline API paints caller-supplied ghost text through the same
+text renderer as ordinary terminal cells. Capture edit authority before starting
+asynchronous work, then present the result on the EDT:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.session.TerminalCommandEditContext
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun showSuffix(view: SwingTerminal, expected: TerminalCommandEditContext, suffix: String): Boolean =
+    view.presentInlineShellSuggestion(expected, suffix)
+</code></pre>
+<p>The bound session must match the captured context. Presentation requires a
+confirmed command-end cursor, focus, no selection or IME composition, and the
+live primary viewport with full-screen margins and automatic wrapping. A visible
+shell suffix suppresses host ghost text. Preview text is single-line,
+control-free, well-formed UTF-16, at most 16,384 code units, and cannot attach to
+or modify the command&#39;s final grapheme. Invalid or unavailable presentation returns
+<code>false</code> and clears any previous preview.</p>
+<p>Wrapping uses the session&#39;s Unicode and ambiguous-width policy. Rendering stops
+before an occupied cell or image, preserving whole wide cells and clusters, and
+clips at the bottom without scrolling. Directional layouts are suppressed when
+they would move existing text or the preview into the command prefix. Font
+fallback, shaping, row geometry, and cursor painting use the ordinary renderer.
+The optional <code>foreground</code> argument supplies ARGB; the default uses the current
+terminal foreground at muted opacity.</p>
+<p><code>clearInlineShellSuggestion()</code> removes the presentation. Input, invalid edit
+authority, focus loss, selection, scrolling, rebind, disposal, or incompatible
+geometry remove it too. The view borrows the edit context; clearing presentation
+does not cancel it. Ghost text never enters selection copying, search, command
+output, scrollback, or the live grid.</p>
+<p>The overload above provides rendering only and claims no acceptance keys.
+Successful rendering-only presentation also retires pending automatic inline
+requests for the current command. For
+provider collection and guarded whole-suggestion acceptance, install an independent
+inline provider on the EDT. Optional automatic requests reuse the popup scheduler&#39;s
+eligibility, invalidation, and dismissal logic, with independent timing.</p>
+<p>The <a href="../ketraterm-examples/README.html">runnable consumer example</a> combines normal
+local popup completion with an independent delayed inline provider and bounded
+command/output context, using public APIs throughout.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.suggestion.*
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun automaticSuggestionSettings() = SwingSettings.create {
+    it.smartSuggestionsEnabled = true
+    it.shellSuggestionsEnabled = true
+    it.shellSuggestionDebounceMillis = 75
+    it.inlineShellSuggestionsEnabled = true
+    it.inlineShellSuggestionDebounceMillis = 200
+}
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun configureAutomaticSuggestions(
+    view: SwingTerminal,
+    popupProvider: SwingShellSuggestionProvider,
+    inlineProvider: SwingInlineShellSuggestionProvider,
+) {
+    view.setShellSuggestionProvider(popupProvider)
+    view.setInlineShellSuggestionProvider(inlineProvider)
+}
+</code></pre>
+<p>Construct the view with these settings, or update its settings provider and call
+<code>reloadSettings()</code>. Inline providers survive rebinding and remain host-owned.
+Changing/removing the configured inline provider or disabling its automatic switch
+cancels automatic work without closing a manual interaction. Automatic requests
+never replace a current manual interaction. <code>requestActiveInlineShellSuggestions()</code>
+explicitly requests the configured provider even when automatic inline is disabled.
+Automatic inline needs a nonblank prefix; the popup scheduler retains its existing
+prefix threshold. Inline work does not refresh merely because popup inventory changes.</p>
+<p>For direct control over each request and provider, create an inline interaction
+on the EDT. Managed requests respect <code>smartSuggestionsEnabled</code>:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.flow.flow
+
+@OptIn(ExperimentalShellSuggestionsApi::class)
+fun requestInline(
+    view: SwingTerminal,
+    generateSuffix: suspend (SwingShellSuggestionRequest) -&gt; String?,
+): SwingShellSuggestionInteraction? {
+    val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
+    view.requestInlineShellSuggestions(interaction, SwingInlineShellSuggestionProvider { context -&gt;
+        SwingShellSuggestionSource(flow {
+            val suffix = generateSuffix(context) ?: return@flow
+            if (suffix.isNotEmpty()) {
+                val offset = context.cursorOffset
+                emit(listOf(SwingShellSuggestion(suffix, offset, offset, &quot;AI&quot;, &quot;COMMAND&quot;)))
+            }
+        })
+    })
+    return interaction
+}
+</code></pre>
+<p>Provider <code>open</code> captures context on the EDT; its cold flow is collected off the
+EDT. Each request owns its cancellation and original edit token. New inline work
+supersedes only inline work, and closing the returned interaction cancels it.
+Provider completion preserves the final result; cancellation, failure, input,
+or lost eligibility retires obsolete work. Feedback comes from the source that
+produced the accepted or dismissed publication. Custom publication uses
+<code>interaction.publish(candidates, selectedIndex = 0)</code>; an unselected item is hidden.
+If a valid result arrives before its copied render frame is ready, frame publication
+retries presentation using the original edit context and provider result.</p>
+<p>Popup and inline providers are independent. Their results may differ; inline
+results never insert, reorder, or select popup entries, and popup updates neither
+cancel nor restart inline work. Deliberate popup browsing
+hides inline presentation, including late arrivals, while retaining its valid
+request. Dismissing the popup can reveal the retained inline result without another
+provider request. Inline providers receive the command-line request directly;
+popup selection is not part of their context. Detached popup owners control their
+presentation and key routing themselves.</p>
+<p>Hosts can observe <code>inlineShellSuggestionPresentation</code>, a read-only <code>StateFlow</code>
+containing the currently displayed managed publication or null when hidden.
+It reflects rendering eligibility, including collision checks, rather than just
+provider availability. Updates are conflated and do not report acceptance;
+rendering-only previews have no managed publication. Observation does not change
+popup content or keyboard routing.</p>
+<p>The inline standard keymap accepts the whole visible suggestion with Tab or Right
+at the command&#39;s end while the popup is passive. Without visible inline text,
+Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+deliberately selects a popup item and hides inline text; Tab or Enter then inserts
+that choice without executing it. Enter otherwise reaches the shell. Provider
+preselection and hover never enable Tab or Enter acceptance. A refresh preserves an
+explicit choice only while an equivalent edit remains available.</p>
+<p>After popup acceptance, fresh child results are passive for Tab and Enter, and inline
+stays hidden while the accepted command is unchanged. Tab then invokes shell completion;
+Enter executes the directory already entered. Navigate to select a child explicitly. Editing,
+dismissal, focus loss, and rebinding end that browsing context. External session edits
+also retire it, even when the command later returns to identical text. Escape dismisses an
+open popup before inline text. With standard bindings, set
+<code>acceptSelectedSuggestionWithEnter = false</code> to keep Enter shell-owned.</p>
+<p><code>setShellSuggestionKeymap</code> and <code>setInlineShellSuggestionKeymap</code> accept custom maps
+for navigation or acceptance/dismissal, including maps returning null to disable bindings.
+<code>acceptInlineShellSuggestion()</code> and <code>dismissInlineShellSuggestion()</code> provide the
+same guarded operations for host actions. A failed acceptance never falls through
+to accepting the other surface or sending that key to the shell. Each mapped gesture
+stays bound to its original publication; reentrant keymaps cannot redirect it to a new result.</p>
+<p>For long suggestions, hosts can opt into <code>acceptInlineShellSuggestionNextWord()</code> or
+map <code>SwingShellSuggestionAction.ACCEPT_NEXT_WORD</code> in the inline keymap. It is
+<strong>unbound by default</strong>. For example, to add Ctrl+Right while retaining the defaults:</p>
+<pre><code class="language-kotlin">view.setInlineShellSuggestionKeymap { event -&gt;
+    if (event.keyCode == java.awt.event.KeyEvent.VK_RIGHT &amp;&amp;
+        event.modifiersEx == java.awt.event.InputEvent.CTRL_DOWN_MASK
+    ) {
+        SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+    } else {
+        SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+    }
+}
+</code></pre>
+<p>The popup ignores <code>ACCEPT_NEXT_WORD</code>, so a shared custom keymap can expose it on
+both surfaces without intercepting inline acceptance.</p>
+<p>Each step includes leading whitespace and the next non-whitespace run. This is a
+text operation with the same rules in every shell; it does not parse shell syntax.
+Paths stay together and spaces split quoted arguments too. Examples:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Current command</th>
+<th>Suggestion</th>
+<th>After one step</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>git s</code></td>
+<td><code>git status --short</code></td>
+<td><code>git status</code></td>
+</tr>
+<tr>
+<td><code>git status</code></td>
+<td><code>git status  --short</code></td>
+<td><code>git status  --short</code></td>
+</tr>
+<tr>
+<td><code>cd </code></td>
+<td><code>cd src/main/ test/</code></td>
+<td><code>cd src/main/</code></td>
+</tr>
+<tr>
+<td><code>echo </code></td>
+<td><code>echo &quot;hello world&quot;</code></td>
+<td><code>echo &quot;hello</code></td>
+</tr>
+</tbody></table></div>
+<p>Grapheme clusters remain intact. Acceptance never executes input. The remainder
+is hidden until the shell reports the accepted text and end cursor, with the writer
+idle. Intervening input, resize, shell metadata changes, clearing, or a newer request
+discard it. A shell that never acknowledges the prefix cannot restore the remainder.
+The saved candidate and its source feedback are retained; no provider rerun is needed.
+<code>PARTIALLY_ACCEPTED</code> feedback describes only the admitted prefix; the completion-learning
+adapter ignores it. Finishing the candidate emits ordinary <code>ACCEPTED</code> feedback.</p>
+<p>Managed rendering accepts only append-only outcomes. Clipping limits displayed
+cells; whole-suggestion acceptance inserts the entire suggestion. Clearing managed work cancels
+its owned edit context; a token passed to the rendering-only overload remains
+caller-owned. The standalone app&#39;s opt-in completion source is documented in the
+<a href="../docs/features/completion.html#inline-suffix-presentation">completion catalog</a>.</p>
 <h2 id="how-to-extend-custom-host-services">How to Extend: Custom Host Services</h2>
 <p><code>SwingHostServices</code> is an immutable snapshot of host-owned services, supplied at
 construction. <code>create</code>, <code>copy</code>, or <code>builder</code> configure selected services without
@@ -425,7 +629,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

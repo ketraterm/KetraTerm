@@ -126,13 +126,20 @@ an editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 <code>submitInput(expected, events)</code> using that same context.</p>
 <p>Use <code>commandEditChanges</code> to await another capture opportunity. This conflated
-flow includes an initial sample and observes render publication, producer
-revisions, outbound write retirement, and session lifecycle. Recheck the desired
+flow includes an initial sample and observes input admission, render publication,
+producer revisions, outbound write retirement, and session lifecycle. Recheck the desired
 command and perform <code>captureCommandEdit()</code> on each wakeup; the notification
 does not reserve input or guarantee that capture succeeds. Rendering and editor
 revisions alone are insufficient: the final prompt can be rendered while a
 connector write is still active, with no later screen change when it retires.
 Collectors own cancellation and must stop waiting when the session closes.</p>
+<p>For a conditional edit that will be continued in steps, <code>awaitCommandEditAfterInput</code>
+waits for an exact full-text/end-cursor acknowledgement and returns a fresh token.
+The original token carries the successful nonempty admission&#39;s input and metadata
+receipt. Later input, geometry changes, metadata changes, or shutdown reject that
+receipt even if observations are conflated or text later returns to the same value.
+Cancellation of the consumed token does not retract admitted input or its receipt.
+This observational wait sends no input; callers own its coroutine cancellation.</p>
 <p>Admission wakeups do not invalidate retained contexts or cancel in-flight native
 queries. A query&#39;s own write retirement is an opportunity to recheck capture,
 not evidence that the buffer changed. Writer idleness never acknowledges remote
@@ -523,7 +530,7 @@ An eager I/O dispatcher is suitable for byte fixtures, but scheduling tests need
 one controlled scheduler or explicit entered/release/completed handshakes.
 Submission return and fake-process exit do not prove queued output was written.
 PTY reply tests must keep the child alive until expected output completes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

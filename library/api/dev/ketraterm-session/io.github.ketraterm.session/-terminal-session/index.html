@@ -172,7 +172,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-edit-changes.html">commandEditChanges</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/Flow///PointingToDeclaration/">Flow</span><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Conflated opportunities to retry <a href="capture-command-edit.html">captureCommandEdit</a>, including an initial sample. Observes output publication, producer revisions, outbound write retirement, and lifecycle. A wakeup neither guarantees capture will succeed nor invalidates a retained edit context; callers must perform the atomic capture or admission check again. In particular, a native query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement. Collectors own cancellation and should stop waiting when <a href="is-closed.html">isClosed</a> becomes true.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-edit-changes.html">commandEditChanges</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/Flow///PointingToDeclaration/">Flow</span><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Conflated opportunities to retry <a href="capture-command-edit.html">captureCommandEdit</a>, including an initial sample. Observes input admission, output publication, producer revisions, outbound write retirement, and lifecycle. A wakeup neither guarantees capture will succeed nor invalidates a retained edit context; callers must perform the atomic capture or admission check again. In particular, a native query's own write retirement must not cancel that query. Writer idleness is not shell acknowledgement. Collectors own cancellation and should stop waiting when <a href="is-closed.html">isClosed</a> becomes true.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -436,6 +436,21 @@
               </div>
             </div>
           </div>
+<a data-name="395526945%2FFunctions%2F-1853948372" anchor-label="awaitCommandEditAfterInput" id="395526945%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="await-command-edit-after-input.html"><span>await</span><wbr><span>Command</span><wbr><span>Edit</span><wbr><span>After</span><wbr><span><span>Input</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="395526945%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="await-command-edit-after-input.html"><span class="token function">awaitCommandEditAfterInput</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">expected<span class="token operator">: </span><a href="../-terminal-command-edit-context/index.html">TerminalCommandEditContext</a><span class="token punctuation">, </span></span><span class="parameter ">commandText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-command-edit-context/index.html">TerminalCommandEditContext</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Waits for the producer to report <a href="await-command-edit-after-input.html">commandText</a> after a nonempty conditional input admitted with <a href="await-command-edit-after-input.html">expected</a>. Writer idleness alone is insufficient: the full text and end cursor must match, and the new context must not require native confirmation. Returns null if no such admission exists or intervening input, geometry, shell metadata, or shutdown invalidates it. Cancellation of <a href="await-command-edit-after-input.html">expected</a> after admission does not retract its receipt.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-654351068%2FFunctions%2F-1853948372" anchor-label="captureCommandEdit" id="-654351068%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
             <div class="main-subrow keyValue ">
@@ -447,6 +462,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="capture-command-edit.html"><span class="token function">captureCommandEdit</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-command-edit-context/index.html">TerminalCommandEditContext</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Captures a conditional-edit context from the selected authoritative shell producer. Returns null before start, during shutdown or output processing, while the writer has pending/active work, when editing is unavailable, or for a producer without atomic revision support (including the legacy StateFlow-only host factory).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-983861584%2FFunctions%2F-1853948372" anchor-label="captureCommandSuffixPreview" id="-983861584%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="capture-command-suffix-preview.html"><span>capture</span><wbr><span>Command</span><wbr><span>Suffix</span><wbr><span><span>Preview</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-983861584%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="capture-command-suffix-preview.html"><span class="token function">captureCommandSuffixPreview</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">expected<span class="token operator">: </span><a href="../-terminal-command-edit-context/index.html">TerminalCommandEditContext</a><span class="token punctuation">, </span></span><span class="parameter ">suffix<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../../ketraterm-render-cache/io.github.ketraterm.render.cache/-terminal-render-cache/index.html">TerminalRenderCache</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Builds detached render cells for an append-only suffix using the terminal's parser and width policy. Returns null for invalid text, stale/unconfirmed edits, a non-end cursor, unsupported screen state, or a suffix that changes the preceding grapheme. Text must be single-line, control-free, well-formed UTF-16 and at most 16,384 code units. Layout clips at the bottom without scrolling. The caller owns the returned mutable cache; it never contains live cells.</p></div></div></div>
                 </div>
               </div>
             </div>

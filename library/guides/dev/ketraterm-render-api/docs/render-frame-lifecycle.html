@@ -28,6 +28,10 @@ synchronous and supports copying primitive data without requiring per-cell
 objects. Allocation and synchronization depend on the reader and consumer
 implementations.</p>
 <h2 id="1-frame-reader--consumer-synchronization">1. Frame Reader &amp; Consumer Synchronization</h2>
+<p><code>hasFullScreenMargins</code> is an optional geometry proof for consumers laying out
+printable previews. Core reports whether the current scrolling and horizontal
+margins cover the full grid. Custom readers default to <code>false</code>; copied caches
+preserve the value. It does not authorize editing or describe viewport focus.</p>
 <p><code>TerminalRenderFrameReader.readRenderFrame</code> invokes
 <code>TerminalRenderFrameConsumer.accept</code> before returning. An implementation may hold
 a mutation lock while invoking the callback. Keep callbacks short: copy rows,
@@ -171,7 +175,7 @@ provider must override it to resolve the range and expose the frame atomically.
 <code>TerminalSession</code> provides that serialization for its readers. For bounded copied
 range data, see
 <a href="../../ketraterm-render-cache/README.html"><code>TerminalRenderRangeCopy</code></a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

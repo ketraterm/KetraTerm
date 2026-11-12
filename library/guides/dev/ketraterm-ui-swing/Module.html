@@ -41,6 +41,20 @@ testing share visual geometry; routine painting does not read a live session
 frame. Search, selection extraction, and discovery may take synchronized source
 reads. Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly.</p>
+<p><code>InlineShellSuggestion</code> checks copied live cells for collisions and clips its
+detached suffix cache. <code>InlineShellSuggestionController</code> independently owns managed
+inline interactions, provider collection, feedback, and
+guarded key actions. It reuses <code>SwingShellSuggestionInteraction</code> and the session
+edit target; the rendering-only API still borrows a caller-owned token.
+Popup and inline automation use separate <code>SwingShellSuggestionScheduler</code> instances
+with independently configured debounce delays. Manual requests retain priority;
+the host owns providers and invocation shortcuts.
+<code>SwingShellSuggestionInteraction</code> distinguishes provider preselection from deliberate
+selection. The popup controller retains browsing intent across reranking; the view
+coordinates acceptance keys and suppresses inline presentation during popup browsing.</p>
+<p><code>GridPainter</code> paints the detached cells through the ordinary
+<code>TerminalTextPainter</code>, preserving font fallback, shaping, and cursor layering.
+Session prepares the cells through the existing printable parser/core pipeline.</p>
 <p><code>GridPainter</code> owns image composition and its raster cache. Installing a frame
 prepares rasters by immutable resource identity and reserves text-row scratch; paint reuses them.
 Painters share <code>TerminalDeviceGeometry</code>&#39;s device-edge rounding and exact clip
@@ -107,12 +121,12 @@ public consumption and ABI checks are described below.</p>
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
 <h2 id="consumer-and-abi-verification">Consumer and ABI verification</h2>
-<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
+<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
 <pre><code class="language-shell">./gradlew :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 </code></pre>
 <p>See the <a href="../docs/library/compatibility.html">compatibility contract</a> before updating ABI baselines.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc42330e286a39dc96ed9d59ec24bc5ef54d7ad2/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/774a2d557396e9bf3a8930e97aa02b282907186e/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
