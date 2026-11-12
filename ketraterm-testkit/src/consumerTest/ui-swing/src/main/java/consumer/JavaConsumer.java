@@ -86,6 +86,9 @@ public final class JavaConsumer {
     public static boolean showSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix) {
         return view.presentInlineShellSuggestion(expected, suffix);
     }
+    public static io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSnapshot visibleInlinePublication(SwingTerminal view) {
+        return view.getInlineShellSuggestionPresentation().getValue();
+    }
     public static boolean showColoredSuffix(SwingTerminal view, TerminalCommandEditContext expected, String suffix, int color) {
         return view.presentInlineShellSuggestion(expected, suffix, color);
     }

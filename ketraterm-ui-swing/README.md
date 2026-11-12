@@ -478,6 +478,13 @@ provider request. Inline providers receive the command-line request directly;
 popup selection is not part of their context. Detached popup owners control their
 presentation and key routing themselves.
 
+Hosts can observe `inlineShellSuggestionPresentation`, a read-only `StateFlow`
+containing the currently displayed managed publication or null when hidden.
+It reflects rendering eligibility, including collision checks, rather than just
+provider availability. Updates are conflated and do not report acceptance;
+rendering-only previews have no managed publication. Observation does not change
+popup content or keyboard routing.
+
 The inline standard keymap accepts the whole visible suggestion with Tab or Right
 at the command's end while the popup is passive. Without visible inline text,
 Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation

@@ -46,6 +46,28 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @Test
+    fun `inline presentation state reports only visible managed publications`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            assertNull(view.inlineShellSuggestionPresentation.value)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status")), selectedIndex = 0)
+            assertSame(inline.snapshot, view.inlineShellSuggestionPresentation.value)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            popup.select(popup.snapshot, 0)
+            assertNull(view.inlineShellSuggestionPresentation.value)
+            view.hideShellSuggestions()
+            assertSame(inline.snapshot, view.inlineShellSuggestionPresentation.value)
+            assertTrue(view.presentInlineShellSuggestion(assertNotNull(fixture.session.captureCommandEdit()), "tatus"))
+            assertNull(view.inlineShellSuggestionPresentation.value, "Rendering-only previews have no managed publication")
+            view.clearInlineShellSuggestion()
+            dispatcher.scheduler.runCurrent()
+            assertNull(view.inlineShellSuggestionPresentation.value)
+        }
+
     @ParameterizedTest
     @CsvSource(
         delimiter = ';',

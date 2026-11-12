@@ -303,6 +303,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun dispose ()V
 	public fun doLayout ()V
 	public final fun getHasShellSuggestionProvider ()Z
+	public final fun getInlineShellSuggestionPresentation ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getSearchState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun hideShellSuggestions ()V
 	public final fun isAutomaticShellSuggestionEligible ()Z

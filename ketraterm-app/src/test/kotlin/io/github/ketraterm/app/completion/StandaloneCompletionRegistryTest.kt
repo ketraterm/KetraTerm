@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.app.ui.InlineCompletionSuggestions
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -140,11 +139,6 @@ class StandaloneCompletionRegistryTest {
             assertEquals(4, learnedSuggestion.replacementStartOffset)
             assertEquals(5, learnedSuggestion.replacementEndOffset)
             assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
-            val inline =
-                withContext(Dispatchers.Swing) {
-                    InlineCompletionSuggestions(provider).open(request("git s"))
-                }
-            assertEquals(listOf(learnedSuggestion), inline.suggestions.last())
         }
 
     @Test
@@ -173,11 +167,6 @@ class StandaloneCompletionRegistryTest {
                 assertTrue(suggestions.none { it.replacementText == ".hidden/" })
                 assertTrue(suggestions.none { it.replacementText == "README.md" })
                 assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "learned" })
-                val inline =
-                    withContext(Dispatchers.Swing) {
-                        InlineCompletionSuggestions(provider).open(request("cd "))
-                    }
-                assertEquals(listOf(suggestions.first()), inline.suggestions.last())
                 registry.closeAndFlush()
             } finally {
                 directory.toFile().deleteRecursively()

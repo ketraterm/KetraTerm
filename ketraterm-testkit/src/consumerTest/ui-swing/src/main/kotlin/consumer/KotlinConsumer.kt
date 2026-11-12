@@ -128,6 +128,8 @@ fun configureAutomaticSuggestions(
 
 fun requestConfiguredInline(view: SwingTerminal): SwingShellSuggestionInteraction? = view.requestActiveInlineShellSuggestions()
 
+fun visibleInlinePublication(view: SwingTerminal) = view.inlineShellSuggestionPresentation.value
+
 fun requestInline(
     view: SwingTerminal,
     generateSuffix: suspend (SwingShellSuggestionRequest) -> String?,

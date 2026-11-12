@@ -160,6 +160,17 @@ public class SwingTerminal
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionInteraction: SwingShellSuggestionInteraction? = null
         private var inlineShellSuggestion: InlineShellSuggestion? = null
+        private val inlineSuggestionPresentation = MutableStateFlow<SwingShellSuggestionSnapshot?>(null)
+
+        /**
+         * Current managed inline publication when its ghost text can be displayed, otherwise null.
+         * This read-only state includes rendering eligibility, not merely provider availability.
+         * Updates are conflated; collectors must not infer acceptance from disappearance. Rendering-only
+         * presentations have no managed publication. Observing this state does not change input routing.
+         */
+        @ExperimentalShellSuggestionsApi
+        public val inlineShellSuggestionPresentation: StateFlow<SwingShellSuggestionSnapshot?> = inlineSuggestionPresentation.asStateFlow()
+
         private var inlineObservationJob: Job? = null
         private var inlineCompositionActive = false
         private var popupCompletionCommand: String? = null
@@ -1436,34 +1447,38 @@ public class SwingTerminal
             foreground: Int?,
         ): Boolean {
             check(SwingUtilities.isEventDispatchThread()) { "inline presentation must run on the EDT" }
-            clearInlineShellSuggestionRendering()
-            val bound = session ?: return false
-            if (disposed ||
-                !bindingIdentity.get() ||
-                !terminalFocused ||
-                ancestorWindow?.isFocused == false ||
-                inlineCompositionActive ||
-                !isLiveViewportOnEdt() ||
-                selectionController.currentRange() != null
-            ) {
-                return false
-            }
-            val cells = bound.captureCommandSuffixPreview(expected, ghostText) ?: return false
-            refreshRenderCacheFromSession(bound)
-            val inline = InlineShellSuggestion(bound, expected, cells, foreground)
-            if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) return false
-            inlineShellSuggestion = inline
-            inlineObservationJob =
-                componentScope.launch {
-                    bound.commandEditChanges.collect {
-                        if (inlineShellSuggestion === inline) {
-                            if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
-                            repaint()
+            clearInlineShellSuggestionRendering(notify = false)
+            try {
+                val bound = session ?: return false
+                if (disposed ||
+                    !bindingIdentity.get() ||
+                    !terminalFocused ||
+                    ancestorWindow?.isFocused == false ||
+                    inlineCompositionActive ||
+                    !isLiveViewportOnEdt() ||
+                    selectionController.currentRange() != null
+                ) {
+                    return false
+                }
+                val cells = bound.captureCommandSuffixPreview(expected, ghostText) ?: return false
+                refreshRenderCacheFromSession(bound)
+                val inline = InlineShellSuggestion(bound, expected, cells, foreground)
+                if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) return false
+                inlineShellSuggestion = inline
+                inlineObservationJob =
+                    componentScope.launch {
+                        bound.commandEditChanges.collect {
+                            if (inlineShellSuggestion === inline) {
+                                if (!bound.isCommandEditCurrent(expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
+                                repaint()
+                            }
                         }
                     }
-                }
-            repaint()
-            return true
+                repaint()
+                return true
+            } finally {
+                inlineSuggestionPresentation.value = if (inlineShellSuggestion != null) inlineRequests.publication else null
+            }
         }
 
         /**
@@ -1476,9 +1491,10 @@ public class SwingTerminal
             inlineRequests.close()
         }
 
-        private fun clearInlineShellSuggestionRendering() {
+        private fun clearInlineShellSuggestionRendering(notify: Boolean = true) {
             inlineObservationJob?.cancel()
             inlineObservationJob = null
+            if (notify) inlineSuggestionPresentation.value = null
             if (inlineShellSuggestion == null) return
             inlineShellSuggestion = null
             repaint()

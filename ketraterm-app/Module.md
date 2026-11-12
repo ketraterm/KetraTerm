@@ -22,10 +22,12 @@ host permissions, and shutdown through `TerminalWorkspace`. Each `TerminalPane`
 owns its terminal view, search bar, prompts, and shortcut registrations. Closing
 a pane releases those UI resources; closing its workspace tab closes the session.
 
-`InlineCompletionSuggestions` projects the popup provider's first ranked result
-into an inline source, preserving its edit range and learning feedback.
-The Swing view owns independent popup/inline scheduling, request lifetime,
-rendering, collision checks, and edit admission.
+`StandaloneCompletionSuggestions` shares matching popup/inline requests within a
+pane, preserving progressive rankings and source feedback. It supplies the first
+candidate to inline and omits that candidate from the popup while the preview is
+visible, retaining the omission during browsing to keep navigation stable.
+The Swing view owns independent popup/inline scheduling, interaction lifetime,
+rendering, collision checks, and edit admission. The pane closes shared work.
 `SuggestionKeyBindings` holds typed acceptance and invocation shortcuts.
 `ShortcutEditor` records pressed keys on the Suggestions settings page;
 `KetraTermConfigManager` parses and serializes their TOML representation.
