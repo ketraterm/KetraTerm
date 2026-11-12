@@ -481,46 +481,46 @@ class TerminalCommandEditTest {
         }
 
     @Test
-    fun `producer updates input and output serialize with the final edit reservation`() =
-        runTest {
-            val connector = MockConnector()
-            val model = TerminalShellCommandLineState(snapshot())
-            session(connector, model).use { session ->
-                session.start(10, 3)
-                val expected = checkNotNull(session.captureCommandEdit())
-                val entered = CountDownLatch(1)
-                val release = CountDownLatch(1)
-                val events =
-                    object : AbstractList<TerminalInputEvent>() {
-                        override val size = 1
+    fun `producer updates input and output serialize with the final edit reservation`() {
+        val scope = TestScope()
+        val connector = MockConnector()
+        val model = TerminalShellCommandLineState(snapshot())
+        scope.session(connector, model).use { session ->
+            session.start(10, 3)
+            val expected = checkNotNull(session.captureCommandEdit())
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val events =
+                object : AbstractList<TerminalInputEvent>() {
+                    override val size = 1
 
-                        override fun get(index: Int): TerminalInputEvent {
-                            entered.countDown()
-                            release.await()
-                            return TerminalTextReplacementEvent(0, 1, "status")
-                        }
+                    override fun get(index: Int): TerminalInputEvent {
+                        entered.countDown()
+                        release.await()
+                        return TerminalTextReplacementEvent(0, 1, "status")
                     }
-                val admission = SessionTestThread("conditional-edit") { assertEquals(ACCEPTED, session.submitInput(expected, events)) }
-                val contenders = ArrayList<SessionTestThread>()
-                try {
-                    assertTrue(entered.await(10, TimeUnit.SECONDS))
-                    contenders += SessionTestThread("metadata-update") { model.value = snapshot().copy(commandText = "changed") }
-                    contenders += SessionTestThread("other-input") { assertEquals(ACCEPTED, session.submitBytes("x".toByteArray())) }
-                    contenders += SessionTestThread("other-output") { connector.feedFromHost("paint".toByteArray()) }
-                    contenders.forEach { it.awaitBlockedBy(admission) }
-                    release.countDown()
-                    admission.awaitCompletion()
-                    contenders.forEach { it.awaitCompletion() }
-                    runCurrent()
-                    assertEquals("\u007fstatusx", connector.writtenBytes.toString(Charsets.UTF_8))
-                    assertEquals(STALE_CONTEXT, session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
-                } finally {
-                    release.countDown()
-                    admission.close()
-                    contenders.forEach { it.close() }
                 }
+            val admission = SessionTestThread("conditional-edit") { assertEquals(ACCEPTED, session.submitInput(expected, events)) }
+            val contenders = ArrayList<SessionTestThread>()
+            try {
+                assertTrue(entered.await(10, TimeUnit.SECONDS))
+                contenders += SessionTestThread("metadata-update") { model.value = snapshot().copy(commandText = "changed") }
+                contenders += SessionTestThread("other-input") { assertEquals(ACCEPTED, session.submitBytes("x".toByteArray())) }
+                contenders += SessionTestThread("other-output") { connector.feedFromHost("paint".toByteArray()) }
+                contenders.forEach { it.awaitBlockedBy(admission) }
+                release.countDown()
+                admission.awaitCompletion()
+                contenders.forEach { it.awaitCompletion() }
+                scope.runCurrent()
+                assertEquals("\u007fstatusx", connector.writtenBytes.toString(Charsets.UTF_8))
+                assertEquals(STALE_CONTEXT, session.submitInput(expected, listOf(TerminalKeyEvent.text("never"))))
+            } finally {
+                release.countDown()
+                admission.close()
+                contenders.forEach { it.close() }
             }
         }
+    }
 
     private fun TestScope.session(
         connector: MockConnector,
