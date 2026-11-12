@@ -1549,6 +1549,18 @@ public class SwingTerminal
             return inlineRequests.accept()
         }
 
+        /**
+         * Accepts leading whitespace and the next non-whitespace run of the visible inline suffix.
+         * Paths stay together; spaces split quoted arguments too. Grapheme clusters stay intact.
+         * The remainder is hidden until the shell reports the accepted prefix without intervening
+         * input, resize, or shell metadata changes. Runs on the EDT; unbound in the default keymap.
+         */
+        @ExperimentalShellSuggestionsApi
+        public fun acceptInlineShellSuggestionNextWord(): SwingShellSuggestionAcceptanceResult {
+            check(SwingUtilities.isEventDispatchThread()) { "inline acceptance must run on the EDT" }
+            return inlineRequests.acceptNextWord()
+        }
+
         /** Explicitly dismisses the visible inline publication and reports its preference feedback. */
         @ExperimentalShellSuggestionsApi
         public fun dismissInlineShellSuggestion(): Boolean {

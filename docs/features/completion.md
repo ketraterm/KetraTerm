@@ -275,7 +275,9 @@ through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary termi
 text painter, clips wrapped previews to free visible cells, and requires current
 command-edit authority. Independent inline providers share the guarded interaction
 contract with popup providers, with separate cancellation, configurable keymaps,
-and a default compatibility rule for simultaneous presentation. Both surfaces
+and a default compatibility rule for simultaneous presentation. Hosts can also bind
+next-word inline acceptance; it is unbound by default and retains the remaining
+text only after a guarded shell echo. Both surfaces
 support optional automatic scheduling with independent debounce delays, or explicit
 caller-owned requests. Automatic inline defaults to off; popup and inline delays
 both default to 75 ms. Disabling automation preserves manual control,

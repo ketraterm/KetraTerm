@@ -745,6 +745,59 @@ public class TerminalSession private constructor(
         }
 
     /**
+     * Waits for the producer to report [commandText] after a nonempty conditional input admitted
+     * with [expected]. Writer idleness alone is insufficient: the full text and end cursor must
+     * match, and the new context must not require native confirmation. Returns null if no such
+     * admission exists or intervening input, geometry, shell metadata, or shutdown invalidates it.
+     * Cancellation of [expected] after admission does not retract its receipt.
+     *
+     * This sends no input and never reuses the consumed editing authority. The caller owns the
+     * wait's coroutine lifetime; an unacknowledged edit can wait indefinitely. Revalidate the
+     * returned context before use, just as with [captureCommandEdit].
+     */
+    public suspend fun awaitCommandEditAfterInput(
+        expected: TerminalCommandEditContext,
+        commandText: String,
+    ): TerminalCommandEditContext? {
+        val integration = runtime.shellIntegration ?: return null
+        var result: TerminalCommandEditContext? = null
+        merge(commandEditChanges, integration.state.revision).first {
+            synchronized(mutationLock) {
+                val valid =
+                    synchronized(outboundWriteLock) {
+                        expected.owner === editContextOwner &&
+                            expected.admittedInputRevision != null &&
+                            expected.admittedInputRevision == inputRevision &&
+                            expected.geometryRevision == geometryRevision &&
+                            expected.admittedMetadataRevision == integration.state.revision.value &&
+                            isAcceptingInput()
+                    }
+                if (!valid) return@synchronized true
+                val next = captureCommandEdit() ?: return@synchronized false
+                if (next.inputRevision != expected.admittedInputRevision ||
+                    expected.admittedMetadataRevision != integration.state.revision.value
+                ) {
+                    next.cancel()
+                    return@synchronized true
+                }
+                if (next.commandLine.commandText == commandText &&
+                    next.commandLine.cursorOffset == commandText.length &&
+                    (next.shellRevision != expected.shellRevision || next.observationRevision != expected.observationRevision) &&
+                    !next.commandLine.requiresShellConfirmation &&
+                    next.prefixResetKeys == expected.prefixResetKeys
+                ) {
+                    result = next
+                    true
+                } else {
+                    next.cancel()
+                    false
+                }
+            }
+        }
+        return result
+    }
+
+    /**
      * Whether [expected] still represents a viable editing request, without sending input.
      * Native-confirmed or pending buffers survive repainting. Provisional buffers with a ready
      * native hook remain viable until confirmation; this does not authorize their edits.
@@ -1060,6 +1113,10 @@ public class TerminalSession private constructor(
                                 TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)
+                                if (events.isNotEmpty()) {
+                                    expected.admittedInputRevision = inputRevision
+                                    expected.admittedMetadataRevision = integration.state.revision.value
+                                }
                                 TerminalInputAdmission.ACCEPTED
                             }
                         }

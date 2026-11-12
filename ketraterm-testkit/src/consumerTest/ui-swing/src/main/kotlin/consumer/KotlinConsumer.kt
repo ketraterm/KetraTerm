@@ -49,6 +49,7 @@ import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
@@ -88,6 +89,25 @@ fun showSuffix(
     expected: io.github.ketraterm.session.TerminalCommandEditContext,
     suffix: String,
 ): Boolean = view.presentInlineShellSuggestion(expected, suffix)
+
+fun configureNextWordAcceptance(view: SwingTerminal) {
+    view.setInlineShellSuggestionKeymap { event ->
+        if (event.keyCode == java.awt.event.KeyEvent.VK_RIGHT &&
+            event.modifiersEx == java.awt.event.InputEvent.CTRL_DOWN_MASK
+        ) {
+            SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+        } else {
+            SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+        }
+    }
+    view.acceptInlineShellSuggestionNextWord()
+}
+
+suspend fun awaitAcceptedPrefix(
+    session: TerminalSession,
+    original: io.github.ketraterm.session.TerminalCommandEditContext,
+    prefix: String,
+) = session.awaitCommandEditAfterInput(original, prefix)
 
 fun automaticSuggestionSettings() =
     SwingSettings.create {

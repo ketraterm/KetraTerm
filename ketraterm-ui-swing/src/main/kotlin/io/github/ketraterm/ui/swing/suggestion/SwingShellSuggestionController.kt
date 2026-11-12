@@ -202,6 +202,7 @@ internal class SwingShellSuggestionController(
         val explicitSelection = active.hasExplicitSelection
         val acceptWithEnter = host.settings.acceptSelectedSuggestionWithEnter
         val action = host.suggestionKeymap.actionFor(event) ?: return null
+        if (action == SwingShellSuggestionAction.ACCEPT_NEXT_WORD) return null
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED && !explicitSelection) return null
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
             event.keyCode == KeyEvent.VK_ENTER &&
@@ -239,6 +240,7 @@ internal class SwingShellSuggestionController(
         val selected = current.selectedIndex
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED && selected !in items.indices) return false
         when (action) {
+            SwingShellSuggestionAction.ACCEPT_NEXT_WORD -> return false
             SwingShellSuggestionAction.SELECT_FIRST -> active.select(current, 0)
             SwingShellSuggestionAction.SELECT_LAST -> active.select(current, items.lastIndex)
             SwingShellSuggestionAction.SELECT_NEXT ->

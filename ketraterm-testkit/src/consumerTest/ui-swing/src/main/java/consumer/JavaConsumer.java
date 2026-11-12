@@ -81,6 +81,7 @@ public final class JavaConsumer {
         view.setInlineShellSuggestionKeymap(
             io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.INLINE_STANDARD);
         view.acceptInlineShellSuggestion();
+        view.acceptInlineShellSuggestionNextWord();
         view.dismissInlineShellSuggestion();
         view.clearInlineShellSuggestion();
     }

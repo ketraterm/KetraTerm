@@ -184,10 +184,17 @@ public class SwingShellSuggestionInteraction(
     public fun tryAccept(
         publication: SwingShellSuggestionSnapshot,
         index: Int,
+    ): SwingShellSuggestionAcceptanceResult = tryAccept(publication, index, null, partial = false)
+
+    internal fun tryAccept(
+        publication: SwingShellSuggestionSnapshot,
+        index: Int,
+        edit: SwingShellSuggestion?,
+        partial: Boolean,
     ): SwingShellSuggestionAcceptanceResult {
         checkEdt()
         if (!owns(publication) || index !in snapshot.suggestions.indices) return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
-        val acceptance = SwingShellSuggestionAcceptance(snapshot.suggestions[index], index, request)
+        val acceptance = SwingShellSuggestionAcceptance(edit ?: snapshot.suggestions[index], index, request)
         phase = Phase.ACCEPTING
         try {
             notifyChanged()
@@ -204,13 +211,15 @@ public class SwingShellSuggestionInteraction(
                 { notifyChanged() },
                 {
                     if (feedbackHandler !== SwingShellSuggestionFeedbackHandler.NONE) {
+                        val kind =
+                            when {
+                                result != SwingShellSuggestionAcceptanceResult.ACCEPTED -> SwingShellSuggestionFeedbackKind.REJECTED
+                                partial -> SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED
+                                else -> SwingShellSuggestionFeedbackKind.ACCEPTED
+                            }
                         feedbackHandler.onSuggestionFeedback(
                             SwingShellSuggestionFeedback(
-                                if (result == SwingShellSuggestionAcceptanceResult.ACCEPTED) {
-                                    SwingShellSuggestionFeedbackKind.ACCEPTED
-                                } else {
-                                    SwingShellSuggestionFeedbackKind.REJECTED
-                                },
+                                kind,
                                 acceptance.suggestion,
                                 index,
                                 request,

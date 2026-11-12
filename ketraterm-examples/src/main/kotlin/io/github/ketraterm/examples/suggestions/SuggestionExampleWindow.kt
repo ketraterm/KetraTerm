@@ -31,6 +31,8 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
@@ -127,8 +129,12 @@ internal class SuggestionExampleWindow(
                 border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
                 add(
                     JLabel(
-                        "Ctrl+Space: popup · Ctrl+Shift+Space: inline · " +
-                            "Tab/→: accept inline · ↑/↓: select popup · Escape: dismiss",
+                        "Ctrl+Space: popup · Ctrl+Shift+Space: inline",
+                    ),
+                )
+                add(
+                    JLabel(
+                        "Tab/→: accept inline · Ctrl+→: next word · ↑/↓: select popup · Escape: dismiss",
                     ),
                 )
                 add(status)
@@ -198,6 +204,13 @@ internal class SuggestionExampleWindow(
                         },
                 )
             terminal = view
+            view.setInlineShellSuggestionKeymap { event ->
+                if (KeyStroke.getKeyStrokeForEvent(event) == NEXT_WORD_SHORTCUT) {
+                    SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+                } else {
+                    SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+                }
+            }
             view.setShellSuggestionProvider(popup)
             view.setInlineShellSuggestionProvider(
                 ExternalInlineSuggestions(tab.session, ::simulateCompletion, shellKind = tab.profile.kind),
@@ -242,6 +255,7 @@ internal class SuggestionExampleWindow(
         val POPUP_SHORTCUT: KeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)
         val INLINE_SHORTCUT: KeyStroke =
             KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+        val NEXT_WORD_SHORTCUT: KeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK)
     }
 }
 

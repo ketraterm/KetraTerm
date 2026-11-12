@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
@@ -45,6 +46,300 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = ';',
+        value = [
+            "status --short;status;11", "\"hello world\";\"hello;11", "src/main/ next;src/main/;14",
+            "e\u0301 👩‍💻;e\u0301;6", "❤️ next;❤️;7", "👩‍💻 next;👩‍💻;7", "one  two;one;8", "one\u00a0two;one;8",
+        ],
+    )
+    fun `next word accepts one chunk and retains the exact remainder after echo`(
+        suffix: String,
+        chunk: String,
+        cells: Int,
+    ) = withInlineFixture("echo ") { fixture, dispatcher, writes ->
+        val view = fixture.terminal
+        val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+        val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+        val command = "echo $suffix"
+        inline.publish(listOf(SwingShellSuggestion(command, 0, 5, "ai", "COMMAND")), selectedIndex = 0)
+        val accepted = "echo $chunk"
+        assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+        assertFalse(inline.isActive)
+        dispatcher.scheduler.runCurrent()
+        val firstWrite = chunk
+        assertEquals(firstWrite, writes.toString("UTF-8"))
+        assertEquals(SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED, feedback.single().kind)
+        assertEquals(accepted, feedback.single().suggestion.commandTextAfterReplacement(feedback.single().request))
+        assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+
+        fixture.feedHost("\r\u001b[2K    $accepted")
+        fixture.editableSource.value = TerminalShellCommandLineSnapshot(accepted, accepted.length, 4 + cells, 0)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+        dispatcher.scheduler.runCurrent()
+        assertEquals(suffix, writes.toString("UTF-8"))
+        assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.last().kind)
+        assertEquals(command, feedback.last().suggestion.commandTextAfterReplacement(feedback.last().request))
+    }
+
+    @Test
+    fun `repeated next word acceptance includes leading spaces and finishes with ordinary acceptance`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+            inline.publish(listOf(inlineCandidate("git status  --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus  --short", writes.toString("UTF-8"))
+            assertEquals(
+                listOf(
+                    SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED,
+                    SwingShellSuggestionFeedbackKind.ACCEPTED,
+                ),
+                feedback.map {
+                    it.kind
+                },
+            )
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bytes", "key", "clear", "focus", "unbind", "replace"])
+    fun `pending word remainder cannot reappear after intervening changes`(change: String) =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            when (change) {
+                "bytes" -> fixture.session.submitBytes("x".toByteArray())
+                "key" -> fixture.press(KeyEvent.VK_LEFT)
+                "clear" -> view.clearInlineShellSuggestion()
+                "focus" -> view.focusListeners.forEach { it.focusLost(FocusEvent(view, FocusEvent.FOCUS_LOST)) }
+                "unbind" -> view.unbind()
+                "replace" -> assertNotNull(view.beginInlineShellSuggestionInteraction()).close()
+            }
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
+    @Test
+    fun `custom next word key works beside passive popup but does not accept while browsing`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            view.setInlineShellSuggestionKeymap {
+                if (it.keyCode ==
+                    KeyEvent.VK_F6
+                ) {
+                    SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+                } else {
+                    SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(it)
+                }
+            }
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            fixture.press(KeyEvent.VK_DOWN)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestionNextWord())
+            fixture.press(KeyEvent.VK_ESCAPE)
+            fixture.press(KeyEvent.VK_F6)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `shared next word keymap accepts inline while a passive popup remains open`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val keymap =
+                SwingShellSuggestionKeymap { event ->
+                    if (event.keyCode ==
+                        KeyEvent.VK_F6
+                    ) {
+                        SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+                    } else {
+                        SwingShellSuggestionKeymap.STANDARD.actionFor(event)
+                    }
+                }
+            view.setShellSuggestionKeymap(keymap)
+            view.setInlineShellSuggestionKeymap(keymap)
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+            popup.publish(listOf(inlineCandidate("git stash")))
+            view.presentShellSuggestions(popup)
+            assertTrue(view.currentShellSuggestionState().visible)
+            assertFalse(popup.hasExplicitSelection)
+
+            assertTrue(fixture.press(KeyEvent.VK_F6).isConsumed)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("tatus", writes.toString("UTF-8"))
+            assertEquals(SwingShellSuggestionCloseReason.ACCEPTED, inline.closeReason)
+            assertEquals(-1, popup.snapshot.selectedIndex)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `next word appends to a long Unicode prefix without rewriting it`(hasRemainder: Boolean) {
+        val prefix = "echo " + "e\u0301".repeat(64) + "👩‍💻❤️ p"
+        val suffix = if (hasRemainder) "ath --verbose" else "ath"
+        withInlineFixture(prefix, columns = 200) { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot(prefix, prefix.length, 79, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction(feedback::add))
+            val candidate =
+                if (hasRemainder) {
+                    SwingShellSuggestion(suffix, prefix.length, prefix.length, "ai", "COMMAND")
+                } else {
+                    SwingShellSuggestion(prefix + suffix, 0, prefix.length, "ai", "COMMAND")
+                }
+            inline.publish(listOf(candidate), selectedIndex = 0)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("ath", writes.toString("UTF-8"))
+            assertEquals(prefix + "ath", feedback.single().suggestion.commandTextAfterReplacement(feedback.single().request))
+            if (hasRemainder) {
+                fixture.feedHost("ath")
+                val accepted = prefix + "ath"
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot(accepted, accepted.length, 82, 0)
+                dispatcher.scheduler.advanceUntilIdle()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+                dispatcher.scheduler.runCurrent()
+            }
+            assertEquals(suffix, writes.toString("UTF-8"))
+            assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, feedback.last().kind)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `automatic scheduling preserves a word remainder during and after the echo wait`(automatic: Boolean) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val requested = mutableListOf<String>()
+            view.setInlineShellSuggestionProvider { request ->
+                val text = request.commandLine.commandText
+                requested += text
+                SwingShellSuggestionSource(flowOf(listOf(SwingShellSuggestion("git status --short", 0, text.length, "ai", "COMMAND"))))
+            }
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.inlineShellSuggestionDebounceMillis = 75
+                }
+            view.reloadSettings()
+            if (automatic) {
+                dispatcher.scheduler.advanceTimeBy(75)
+                dispatcher.scheduler.runCurrent()
+            } else {
+                val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+                inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            }
+            val initialRequests = if (automatic) listOf("git s") else emptyList()
+            assertEquals(initialRequests, requested)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("ta")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git sta", 7, 11, 0)
+            dispatcher.scheduler.advanceTimeBy(300)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(initialRequests, requested)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+
+            fixture.feedHost("tus")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceTimeBy(300)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(initialRequests, requested)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("tatus --short", writes.toString("UTF-8"))
+        }
+
+    @Test
+    fun `word continuation retains original source feedback and ignores its late AI publication`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            val release = CompletableDeferred<Unit>()
+            val feedback = mutableListOf<SwingShellSuggestionFeedback>()
+            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+            view.requestInlineShellSuggestions(inline) {
+                SwingShellSuggestionSource(
+                    flow {
+                        emit(listOf(inlineCandidate("git status --short")))
+                        withContext(NonCancellable) { release.await() }
+                        emit(listOf(inlineCandidate("git stash --all")))
+                    },
+                    feedbackHandler = feedback::add,
+                )
+            }
+            try {
+                dispatcher.scheduler.runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+                dispatcher.scheduler.runCurrent()
+                fixture.feedHost("\r\u001b[2K    git status")
+                fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+                dispatcher.scheduler.advanceUntilIdle()
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+                dispatcher.scheduler.runCurrent()
+                assertEquals("tatus --short", writes.toString("UTF-8"))
+                assertEquals(
+                    listOf(
+                        SwingShellSuggestionFeedbackKind.PARTIALLY_ACCEPTED,
+                        SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    ),
+                    feedback.map {
+                        it.kind
+                    },
+                )
+            } finally {
+                release.complete(Unit)
+                dispatcher.scheduler.runCurrent()
+            }
+        }
+
+    @Test
+    fun `partial acceptance feedback cannot overwrite a reentrant newer inline request`() =
+        withInlineFixture { fixture, dispatcher, _ ->
+            val view = fixture.terminal
+            var newer: SwingShellSuggestionInteraction? = null
+            val inline =
+                assertNotNull(
+                    view.beginInlineShellSuggestionInteraction {
+                        dispatcher.scheduler.runCurrent()
+                        newer = view.beginInlineShellSuggestionInteraction()
+                        assertNotNull(newer).publish(listOf(inlineCandidate("git stash --all")), selectedIndex = 0)
+                    },
+                )
+            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+            fixture.feedHost("\r\u001b[2K    git status")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git status", 10, 14, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, assertNotNull(newer).closeReason)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, view.acceptInlineShellSuggestion())
+        }
+
     @Test
     fun `rendering only inline presentation retires pending automatic requests without claiming keys`() =
         withInlineFixture { fixture, dispatcher, writes ->
@@ -1081,6 +1376,7 @@ class SwingTerminalSuggestionContextTest {
 
     private fun withInlineFixture(
         command: String = "git s",
+        columns: Int = 30,
         block: (Fixture, kotlinx.coroutines.test.TestDispatcher, java.io.ByteArrayOutputStream) -> Unit,
     ) {
         val dispatcher = StandardTestDispatcher()
@@ -1109,7 +1405,7 @@ class SwingTerminalSuggestionContextTest {
             uiDispatcher = TerminalUiDispatcher { it.run() },
         ).use { fixture ->
             onEdt {
-                fixture.session.start(30, 4)
+                fixture.session.start(columns, 4)
                 fixture.feedHost = { text ->
                     val bytes = text.toByteArray()
                     ingress.onBytes(bytes, 0, bytes.size)

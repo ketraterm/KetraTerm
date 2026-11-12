@@ -330,6 +330,9 @@ public enum class SwingShellSuggestionFeedbackKind {
 
     /** The editing authority rejected an acceptance attempt; this is not negative user preference. */
     REJECTED,
+
+    /** Only a prefix was admitted. [SwingShellSuggestionFeedback.suggestion] describes that edit, not the full candidate. */
+    PARTIALLY_ACCEPTED,
 }
 
 /**
@@ -512,4 +515,4 @@ private fun String.isUtf16Boundary(offset: Int): Boolean {
     return !afterHighSurrogate && !beforeLowSurrogate
 }
 
-private val EXTENDED_GRAPHEME_CLUSTER: Pattern = Pattern.compile("\\X")
+internal val EXTENDED_GRAPHEME_CLUSTER: Pattern = Pattern.compile("\\X")

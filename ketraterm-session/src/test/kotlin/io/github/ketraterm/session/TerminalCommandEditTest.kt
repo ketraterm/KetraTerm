@@ -20,7 +20,11 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.session.TerminalInputAdmission.*
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.transport.TerminalConnector
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -33,10 +37,162 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCommandEditTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `matching echo during a blocked write waits for retirement or rejects intervening input`(interveningInput: Boolean) =
+        runTest {
+            val entered = CompletableDeferred<Unit>()
+            val release = CountDownLatch(1)
+            val writes = MockConnector()
+            val connector =
+                object : TerminalConnector by writes {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        entered.complete(Unit)
+                        release.await()
+                        writes.write(bytes, offset, length)
+                    }
+                }
+            val model = TerminalShellCommandLineState(snapshot())
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(20, 3),
+                        connector,
+                        shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
+                        workerDispatcher = dispatcher,
+                        ioDispatcher = io,
+                        cleanupDispatcher = dispatcher,
+                    ).use { session ->
+                        try {
+                            session.start(20, 3)
+                            val original = checkNotNull(session.captureCommandEdit())
+                            assertEquals(ACCEPTED, session.submitInput(original, listOf(TerminalTextReplacementEvent(0, 0, "tatus"))))
+                            entered.await()
+                            model.value = snapshot().copy(commandText = "git status", cursorOffset = 10, cursorColumn = 10)
+                            val next = async { session.awaitCommandEditAfterInput(original, "git status") }
+                            runCurrent()
+
+                            assertFalse(next.isCompleted, "An exact matching echo cannot bypass an active writer")
+                            assertNull(session.captureCommandEdit())
+                            if (interveningInput) {
+                                assertEquals(ACCEPTED, session.submitBytes("x".toByteArray()))
+                                runCurrent()
+                                assertTrue(next.isCompleted, "Admission must invalidate the receipt before the blocked writer finishes")
+                                assertNull(next.await())
+                            } else {
+                                release.countDown()
+                                val captured = checkNotNull(next.await())
+                                assertEquals("git status", captured.commandLine.commandText)
+                                assertTrue(session.isCommandEditCurrent(captured))
+                                assertEquals("tatus", writes.writtenBytes.toString(Charsets.UTF_8))
+                                captured.cancel()
+                            }
+                        } finally {
+                            release.countDown()
+                        }
+                    }
+            }
+        }
+
+    @Test
+    fun `unchanged preadmission text is not an acknowledgement`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            session(connector, model).use { session ->
+                session.start(10, 3)
+                val original = checkNotNull(session.captureCommandEdit())
+                assertEquals(ACCEPTED, session.submitInput(original, listOf(TerminalKeyEvent.key(TerminalKey.END))))
+                val next = async { session.awaitCommandEditAfterInput(original, "git s") }
+                runCurrent()
+                assertFalse(next.isCompleted)
+                model.value = snapshot()
+                runCurrent()
+                assertNotNull(next.await())
+            }
+        }
+
+    @Test
+    fun `follow up waits for exact producer echo and returns fresh editing authority`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            session(connector, model).use { session ->
+                session.start(10, 3)
+                val original = checkNotNull(session.captureCommandEdit())
+                assertEquals(ACCEPTED, session.submitInput(original, listOf(TerminalTextReplacementEvent(0, 0, "tatus"))))
+                original.cancel()
+                val next = async { session.awaitCommandEditAfterInput(original, "git status") }
+                runCurrent()
+                assertFalse(next.isCompleted, "Writer idleness is not shell acknowledgement")
+                model.value = snapshot().copy(commandText = "git stat", cursorOffset = 8)
+                runCurrent()
+                assertFalse(next.isCompleted)
+                model.value = snapshot().copy(commandText = "git status", cursorOffset = 9)
+                runCurrent()
+                assertFalse(next.isCompleted, "The cursor must also match")
+                model.value = snapshot().copy(commandText = "git status", cursorOffset = 10)
+                runCurrent()
+                val captured = checkNotNull(next.await())
+                assertTrue(session.isCommandEditCurrent(captured))
+                assertEquals(ACCEPTED, session.submitInput(captured, listOf(TerminalTextReplacementEvent(0, 0, " --short"))))
+                runCurrent()
+                assertEquals("tatus --short", connector.writtenBytes.toString(Charsets.UTF_8))
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["bytes", "input", "resize", "prompt", "close"])
+    fun `follow up cannot survive intervening input geometry metadata or shutdown`(change: String) =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            val metadata = TerminalShellIntegrationState()
+            session(connector, model, TerminalShellIntegrationFactory.host(metadata, model)).use { session ->
+                session.start(10, 3)
+                val original = checkNotNull(session.captureCommandEdit())
+                assertEquals(ACCEPTED, session.submitInput(original, listOf(TerminalTextReplacementEvent(0, 0, "tatus"))))
+                val next = async { session.awaitCommandEditAfterInput(original, "git status") }
+                runCurrent()
+                assertFalse(next.isCompleted)
+                when (change) {
+                    "bytes" -> session.submitBytes("x".toByteArray())
+                    "input" -> session.submitInput(TerminalKeyEvent.text("x"))
+                    "resize" -> session.resize(11, 3)
+                    "prompt" -> metadata.recordPromptStart(1)
+                    "close" -> session.close()
+                }
+                // Deliberately conflate departure and matching text: the receipt must still reject it.
+                model.value = snapshot().copy(commandText = "git status", cursorOffset = 10)
+                runCurrent()
+                assertNull(next.await())
+            }
+        }
+
+    @Test
+    fun `follow up requires a nonempty successful conditional admission`() =
+        runTest {
+            val connector = MockConnector()
+            val model = TerminalShellCommandLineState(snapshot())
+            session(connector, model).use { session ->
+                session.start(10, 3)
+                val original = checkNotNull(session.captureCommandEdit())
+                assertNull(session.awaitCommandEditAfterInput(original, "git s"))
+                assertEquals(ACCEPTED, session.submitInput(original, emptyList()))
+                assertNull(session.awaitCommandEditAfterInput(original, "git s"))
+            }
+        }
+
     @Test
     fun `provisional command text cannot admit an edit without native confirmation`() =
         runTest {

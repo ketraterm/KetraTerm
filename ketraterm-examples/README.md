@@ -43,6 +43,7 @@ The popup and inline results may differ deliberately.
 | Ctrl+Shift+Space | Request inline manually, including when automatic inline is off. |
 | Up / Down | Deliberately select a popup item and hide inline text. |
 | Tab / Right | Accept visible inline text while the popup is passive. |
+| Ctrl+Right | Accept the next word of visible inline text while the popup is passive. |
 | Tab / Enter | Insert a deliberately selected popup item. |
 | Enter without a deliberate popup selection | Execute the current command, preserving the shell's own handling. |
 | Escape | Dismiss the popup first, then inline. |
@@ -56,6 +57,20 @@ Try typing more before the simulated reply arrives, or selecting a popup item
 during that delay. A late reply cannot edit newer input or take over popup
 navigation. Close the window to cancel view-owned requests and asynchronously
 close the workspace and its process.
+
+To try next-word acceptance, type `echo ext` and wait for the ghost text. Press
+Ctrl+Right to reach `echo external`, then again for `echo external inline`, then
+`echo external inline suggestion`. Each step waits for the shell's echo before
+showing the remainder. Enter executes only the text already accepted; Tab or
+Right accepts the entire remaining suggestion. With no visible inline text,
+Ctrl+Right reaches the shell for its usual word navigation.
+
+This example opts into the binding using `setInlineShellSuggestionKeymap` and
+`SwingShellSuggestionAction.ACCEPT_NEXT_WORD` in
+[`SuggestionExampleWindow`](src/main/kotlin/io/github/ketraterm/examples/suggestions/SuggestionExampleWindow.kt).
+Other inline keys fall back to `SwingShellSuggestionKeymap.INLINE_STANDARD`.
+See the [inline contract](../ketraterm-ui-swing/README.md#inline-suffix-rendering)
+for word boundaries, Unicode handling, and echo validation.
 
 ## Replacing the local simulation
 

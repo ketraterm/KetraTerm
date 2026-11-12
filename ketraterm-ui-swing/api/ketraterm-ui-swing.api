@@ -259,6 +259,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;)V
 	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun acceptInlineShellSuggestion ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAcceptanceResult;
+	public final fun acceptInlineShellSuggestionNextWord ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAcceptanceResult;
 	public fun addNotify ()V
 	public final fun addSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun addShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
@@ -1042,6 +1043,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionA
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction : java/lang/Enum {
 	public static final field ACCEPT Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
+	public static final field ACCEPT_NEXT_WORD Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field ACCEPT_SELECTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field DISMISS Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
 	public static final field SELECT_FIRST Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionAction;
@@ -1133,6 +1135,7 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionF
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind : java/lang/Enum {
 	public static final field ACCEPTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static final field DISMISSED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
+	public static final field PARTIALLY_ACCEPTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static final field REJECTED Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackKind;

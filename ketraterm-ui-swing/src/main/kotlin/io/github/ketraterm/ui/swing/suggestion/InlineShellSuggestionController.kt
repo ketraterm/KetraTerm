@@ -39,10 +39,12 @@ internal class InlineShellSuggestionController(
     private var source: SwingInlineShellSuggestionProvider? = null
     private var sourceJob: Job? = null
     private var observation: Job? = null
+    private var continuation: Job? = null
     private var sourceRevision = 0L
     val revision get() = sourceRevision
     private var selectedPopup: String? = null
     private var feedbackForPublication: ((SwingShellSuggestionFeedbackHandler) -> Unit)? = null
+    private var currentFeedback: SwingShellSuggestionFeedbackHandler? = null
     var coexistence = SwingInlineShellSuggestionCoexistence.INDEPENDENT
         set(value) {
             field = value
@@ -53,11 +55,13 @@ internal class InlineShellSuggestionController(
     var isAutomatic: Boolean = false
         private set
 
-    fun isRequestCurrent(): Boolean = active?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
+    fun isRequestCurrent(): Boolean =
+        continuation?.isActive == true || active?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
 
     fun begin(
         feedback: SwingShellSuggestionFeedbackHandler,
         automatic: Boolean = false,
+        confirmed: TerminalCommandEditContext? = null,
     ): SwingShellSuggestionInteraction? {
         if (automatic && !isAutomatic && isRequestCurrent()) return null
         val revision = sourceRevision + 1
@@ -65,7 +69,7 @@ internal class InlineShellSuggestionController(
         if (sourceRevision != revision || active != null) return null
         val bound = session() ?: return null
         if (!eligible()) return null
-        val expected = bound.captureCommandEdit() ?: return null
+        val expected = confirmed ?: bound.captureCommandEdit() ?: return null
         val line = expected.commandLine
         if (line.requiresShellConfirmation || line.cursorOffset != line.commandText.length) {
             expected.cancel()
@@ -74,17 +78,25 @@ internal class InlineShellSuggestionController(
         val request = SwingShellSuggestionRequest(line.commandText, line.cursorOffset)
         val handler = SwingShellSuggestionEditTarget.captureSessionEdit(bound, request, expected) ?: return null
         var sourceFeedback = SwingShellSuggestionFeedbackHandler.NONE
+        val combinedFeedback =
+            if (confirmed != null) {
+                feedback
+            } else {
+                SwingShellSuggestionFeedbackHandler { event ->
+                    val observer = sourceFeedback
+                    io.github.ketraterm.ui.swing.cleanupSwingResources(
+                        { feedback.onSuggestionFeedback(event) },
+                        { observer.onSuggestionFeedback(event) },
+                    )
+                }
+            }
         val interaction =
             SwingShellSuggestionInteraction(
                 request,
                 handler,
-            ) { event ->
-                val observer = sourceFeedback
-                io.github.ketraterm.ui.swing.cleanupSwingResources(
-                    { feedback.onSuggestionFeedback(event) },
-                    { observer.onSuggestionFeedback(event) },
-                )
-            }
+                combinedFeedback,
+            )
+        currentFeedback = combinedFeedback
         feedbackForPublication = { sourceFeedback = it }
         interaction.sessionEditContext = expected
         interaction.contextIsCurrent = { session() === bound && eligible() && bound.isCommandEditCurrent(expected) }
@@ -104,6 +116,7 @@ internal class InlineShellSuggestionController(
                     sourceJob = null
                     observation = null
                     feedbackForPublication = null
+                    currentFeedback = null
                     hide()
                 }
             }
@@ -229,6 +242,71 @@ internal class InlineShellSuggestionController(
         return interaction.tryAccept(publication, publication.selectedIndex)
     }
 
+    fun acceptNextWord(): SwingShellSuggestionAcceptanceResult {
+        val interaction = active ?: return SwingShellSuggestionAcceptanceResult.UNAVAILABLE
+        if (!visible()) return SwingShellSuggestionAcceptanceResult.UNAVAILABLE
+        val publication = interaction.snapshot
+        val candidate = publication.selectedSuggestion ?: return SwingShellSuggestionAcceptanceResult.UNAVAILABLE
+        val command =
+            candidate.commandTextAfterReplacement(interaction.request)
+                ?: return SwingShellSuggestionAcceptanceResult.INVALID_EDIT
+        val prefix = interaction.request.commandText
+        if (!command.startsWith(prefix) || command.length == prefix.length) return SwingShellSuggestionAcceptanceResult.INVALID_EDIT
+        val end = nextInlineWordEnd(command, prefix.length)
+        val acceptedCommand = command.substring(0, end)
+        val edit =
+            candidate.copy(
+                replacementText = command.substring(prefix.length, end),
+                replacementStartOffset = prefix.length,
+                replacementEndOffset = prefix.length,
+            )
+        if (end == command.length) return interaction.tryAccept(publication, publication.selectedIndex, edit, partial = false)
+        val expected = checkNotNull(interaction.sessionEditContext)
+        val bound = session() ?: return SwingShellSuggestionAcceptanceResult.UNAVAILABLE
+        val feedback = checkNotNull(currentFeedback)
+        val revision = sourceRevision
+        val result = interaction.tryAccept(publication, publication.selectedIndex, edit, partial = true)
+        // Acceptance callbacks may replace either the session or the request.
+        if (result == SwingShellSuggestionAcceptanceResult.ACCEPTED &&
+            sourceRevision == revision &&
+            active == null &&
+            session() === bound &&
+            eligible()
+        ) {
+            val waiting =
+                scope.launch(start = CoroutineStart.LAZY) {
+                    try {
+                        val next = bound.awaitCommandEditAfterInput(expected, acceptedCommand) ?: return@launch
+                        if (sourceRevision != revision || session() !== bound || !eligible()) {
+                            next.cancel()
+                            return@launch
+                        }
+                        continuation = null
+                        val resumed = begin(feedback, confirmed = next)
+                        if (resumed == null) {
+                            next.cancel()
+                        } else {
+                            resumed.publish(
+                                listOf(
+                                    candidate.copy(
+                                        replacementText = command.substring(acceptedCommand.length),
+                                        replacementStartOffset = acceptedCommand.length,
+                                        replacementEndOffset = acceptedCommand.length,
+                                    ),
+                                ),
+                                selectedIndex = 0,
+                            )
+                        }
+                    } finally {
+                        if (sourceRevision == revision) continuation = null
+                    }
+                }
+            continuation = waiting
+            waiting.start()
+        }
+        return result
+    }
+
     fun dismiss(): Boolean {
         val interaction = active ?: return false
         return visible() && interaction.dismiss(interaction.snapshot)
@@ -250,6 +328,10 @@ internal class InlineShellSuggestionController(
                 dismiss()
                 true
             }
+            SwingShellSuggestionAction.ACCEPT_NEXT_WORD -> {
+                acceptNextWord()
+                true
+            }
             else -> false
         }
     }
@@ -264,7 +346,10 @@ internal class InlineShellSuggestionController(
         isAutomatic = false
         source = null
         feedbackForPublication = null
+        currentFeedback = null
         sourceRevision++
+        continuation?.cancel()
+        continuation = null
         sourceJob?.cancel()
         sourceJob = null
         observation?.cancel()

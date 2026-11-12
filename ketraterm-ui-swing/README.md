@@ -500,10 +500,48 @@ same guarded operations for host actions. A failed acceptance never falls throug
 to accepting the other surface or sending that key to the shell. Each mapped gesture
 stays bound to its original publication; reentrant keymaps cannot redirect it to a new result.
 
+For long suggestions, hosts can opt into `acceptInlineShellSuggestionNextWord()` or
+map `SwingShellSuggestionAction.ACCEPT_NEXT_WORD` in the inline keymap. It is
+**unbound by default**. For example, to add Ctrl+Right while retaining the defaults:
+
+```kotlin
+view.setInlineShellSuggestionKeymap { event ->
+    if (event.keyCode == java.awt.event.KeyEvent.VK_RIGHT &&
+        event.modifiersEx == java.awt.event.InputEvent.CTRL_DOWN_MASK
+    ) {
+        SwingShellSuggestionAction.ACCEPT_NEXT_WORD
+    } else {
+        SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(event)
+    }
+}
+```
+
+The popup ignores `ACCEPT_NEXT_WORD`, so a shared custom keymap can expose it on
+both surfaces without intercepting inline acceptance.
+
+Each step includes leading whitespace and the next non-whitespace run. This is a
+text operation with the same rules in every shell; it does not parse shell syntax.
+Paths stay together and spaces split quoted arguments too. Examples:
+
+| Current command | Suggestion | After one step |
+| --- | --- | --- |
+| `git s` | `git status --short` | `git status` |
+| `git status` | `git status  --short` | `git status  --short` |
+| `cd ` | `cd src/main/ test/` | `cd src/main/` |
+| `echo ` | `echo "hello world"` | `echo "hello` |
+
+Grapheme clusters remain intact. Acceptance never executes input. The remainder
+is hidden until the shell reports the accepted text and end cursor, with the writer
+idle. Intervening input, resize, shell metadata changes, clearing, or a newer request
+discard it. A shell that never acknowledges the prefix cannot restore the remainder.
+The saved candidate and its source feedback are retained; no provider rerun is needed.
+`PARTIALLY_ACCEPTED` feedback describes only the admitted prefix; the completion-learning
+adapter ignores it. Finishing the candidate emits ordinary `ACCEPTED` feedback.
+
 Managed rendering accepts only append-only outcomes. Clipping limits displayed
-cells; acceptance inserts the entire suggestion. Clearing managed work cancels
+cells; whole-suggestion acceptance inserts the entire suggestion. Clearing managed work cancels
 its owned edit context; a token passed to the rendering-only overload remains
-caller-owned. The standalone app's opt-in history source is documented in the
+caller-owned. The standalone app's opt-in completion source is documented in the
 [completion catalog](../docs/features/completion.md#inline-suffix-presentation).
 
 ## How to Extend: Custom Host Services

@@ -54,6 +54,9 @@ public enum class SwingShellSuggestionAction {
 
     /** Explicitly dismisses the selected suggestion. */
     DISMISS,
+
+    /** Accepts the next whitespace-delimited chunk of visible inline text. Unbound by default; inline only. */
+    ACCEPT_NEXT_WORD,
 }
 
 /**
