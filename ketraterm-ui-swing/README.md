@@ -392,7 +392,11 @@ Successful rendering-only presentation also retires pending automatic inline
 requests for the current command. For
 provider collection and guarded whole-suggestion acceptance, install an independent
 inline provider on the EDT. Optional automatic requests reuse the popup scheduler's
-eligibility, invalidation, and dismissal logic, with independent timing:
+eligibility, invalidation, and dismissal logic, with independent timing.
+
+The [runnable consumer example](../ketraterm-examples/README.md) combines normal
+local popup completion with an independent delayed inline provider and bounded
+command/output context, using public APIs throughout.
 
 ```kotlin
 import io.github.ketraterm.ui.swing.api.SwingTerminal
