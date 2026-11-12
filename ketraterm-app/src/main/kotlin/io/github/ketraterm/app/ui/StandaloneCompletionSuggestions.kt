@@ -36,11 +36,12 @@ internal class StandaloneCompletionSuggestions(
     AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + workerDispatcher)
     private var current: Request? = null
+    private var inlineRequest: Request? = null
     private var closed = false
 
     val inlineProvider =
         SwingInlineShellSuggestionProvider { request ->
-            val shared = openShared(request, inline = true)
+            val shared = openShared(request, inline = true).also { inlineRequest = it }
             SwingShellSuggestionSource(shared.results().map { it.take(1) }) { feedback ->
                 try {
                     // When inline was the only candidate, its duplicate left no visible popup to
@@ -58,7 +59,7 @@ internal class StandaloneCompletionSuggestions(
         val shared = openShared(request, inline = false)
         val suggestions =
             flow {
-                var omitted: SwingShellSuggestion? = null
+                var omitFirst = false
                 var browsing = false
                 emitAll(
                     shared
@@ -69,13 +70,13 @@ internal class StandaloneCompletionSuggestions(
                                 withContext(uiDispatcher) {
                                     // Down hides inline text. Keep the omitted row out for this browsing session
                                     // so that disappearance cannot shift the user's next navigation target.
-                                    if (omitted != null && visible == null && terminal.currentShellSuggestionState().selectedIndex >= 0) {
+                                    if (omitFirst && visible == null && terminal.currentShellSuggestionState().selectedIndex >= 0) {
                                         browsing = true
                                     }
                                     if (!browsing) {
-                                        omitted = visible?.selectedSuggestion?.takeIf { it === ranked.firstOrNull() }
+                                        omitFirst = visible != null && inlineRequest === shared
                                     }
-                                    ranked.filterNot { it === omitted }
+                                    if (omitFirst) ranked.drop(1) else ranked
                                 }
                             }
                         }.distinctUntilChanged(),
@@ -126,6 +127,7 @@ internal class StandaloneCompletionSuggestions(
         closed = true
         current?.expected?.cancel()
         current = null
+        inlineRequest = null
         scope.cancel()
     }
 

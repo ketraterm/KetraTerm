@@ -40,6 +40,31 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class InlineShellSuggestionTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `spaces alone do not establish visible inline text even after clipping`(clipped: Boolean) =
+        runTest {
+            val snapshot = if (clipped) TerminalShellCommandLineSnapshot("abcde", 5, 5, 2) else null
+            fixture(prefix = if (clipped) "abcde" else "cmd", snapshot = snapshot) { session, input, expected ->
+                if (clipped) input.feed("\u001b[3;1Habcde")
+                val live = cache(session)
+                val preview = assertNotNull(session.captureCommandSuffixPreview(expected, if (clipped) " next" else " "))
+                val (baseline, _) = paint(live)
+                val (withPreview, _) = paint(live, preview)
+                assertContentEquals(pixels(baseline), pixels(withPreview))
+                assertFalse(InlineShellSuggestion(session, expected, preview, null).reconcile(live))
+            }
+        }
+
+    @Test
+    fun `leading spaces remain eligible when followed by visible text`() =
+        runTest {
+            fixture { session, _, expected ->
+                val preview = assertNotNull(session.captureCommandSuffixPreview(expected, " next"))
+                assertTrue(InlineShellSuggestion(session, expected, preview, null).reconcile(cache(session)))
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["x", "e\u0301", "界", "❤️", "🚀", "xאב", "xسل"])
     fun `block cursor redraws the first ghost glyph using ordinary cursor foreground`(suffix: String) =
         runTest {

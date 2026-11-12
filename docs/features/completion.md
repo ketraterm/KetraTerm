@@ -292,7 +292,7 @@ command specifications, paths, shell completions, and learned candidates. It
 keeps the original replacement range and learning feedback. A result that does
 not strictly extend the current command is popup-only; inline never substitutes
 a lower-ranked candidate. Empty prefixes produce no inline suggestion.
-The popup omits that candidate only after its inline preview becomes visible.
+The popup drops the first row of the shared result only after its inline preview becomes visible.
 Down selects the first alternative and hides inline; the omitted candidate stays
 out during that browsing session so the list does not shift under navigation.
 If inline cannot render, the full ranking remains in the popup. Disabling inline

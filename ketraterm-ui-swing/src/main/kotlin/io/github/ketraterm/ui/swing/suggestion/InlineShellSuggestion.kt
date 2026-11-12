@@ -40,7 +40,8 @@ internal class InlineShellSuggestion(
         val modes = session.modeSnapshot
         if (modes.treatAmbiguousAsWide != ambiguousAsWide) return false
         if (!modes.isAutoWrap || modes.isOriginMode || modes.isLeftRightMarginMode || !live.hasFullScreenMargins) return false
-        if (expected.isCancelled || session.isClosed ||
+        if (expected.isCancelled ||
+            session.isClosed ||
             live.activeBuffer != TerminalRenderBufferKind.PRIMARY ||
             live.scrollbackOffset != 0 ||
             live.columns != cells.columns ||
@@ -86,7 +87,8 @@ internal class InlineShellSuggestion(
                     for (changed in row until cells.rows) cells.lineGenerations[changed]++
                     return visible
                 }
-                visible = true
+                // Retained padding alone must not claim inline acceptance keys.
+                if (!blank(cells, row, column)) visible = true
             }
         }
         return visible

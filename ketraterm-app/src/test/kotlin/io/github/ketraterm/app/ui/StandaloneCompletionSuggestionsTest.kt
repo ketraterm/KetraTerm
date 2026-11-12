@@ -181,14 +181,13 @@ class StandaloneCompletionSuggestionsTest {
         }
 
     @Test
-    fun `separate rankings omit the matching edit even with a different range and position`() =
+    fun `a popup from different request options keeps its complete ranking`() =
         withFixture { f ->
             f.results = flowOf(f.ranked.value)
             f.enable()
             f.advance()
-            val alternative = f.ranked.value[1]
-            val duplicate = SwingShellSuggestion("tatus", 5, 5, "another source", "COMMAND")
-            f.results = flowOf(listOf(alternative, duplicate))
+            val refreshed = f.ranked.value.reversed()
+            f.results = flowOf(refreshed)
             val popup =
                 assertNotNull(
                     f.terminal.beginShellSuggestionInteraction(
@@ -200,28 +199,23 @@ class StandaloneCompletionSuggestionsTest {
             f.terminal.requestShellSuggestions(popup, f.completions)
             f.dispatcher.scheduler.runCurrent()
             assertEquals(2, f.collected)
+            assertEquals(refreshed, popup.snapshot.suggestions)
             assertNotNull(f.terminal.inlineShellSuggestionPresentation.value)
-            assertEquals(listOf(alternative), popup.snapshot.suggestions)
-            assertTrue(f.press(KeyEvent.VK_DOWN).isConsumed)
-            f.dispatcher.scheduler.runCurrent()
-            assertEquals(listOf(alternative), popup.snapshot.suggestions)
-            assertSame(alternative, popup.snapshot.selectedSuggestion)
-            assertTrue(f.press(KeyEvent.VK_TAB).isConsumed)
-            f.dispatcher.scheduler.runCurrent()
-            assertEquals("\u007fstash", f.connector.writtenBytes.toString(Charsets.UTF_8))
         }
 
     @Test
-    fun `shell owned suffix keeps popup candidates when no host inline is visible`() =
+    fun `invisible inline spaces preserve popup candidates and shell Tab`() =
         withFixture { f ->
-            f.connector.feedFromHost("\u001b[3mtatus\u001b[0m\u001b[5D".toByteArray())
-            f.line.value = assertNotNull(f.line.value).copy(requiresShellConfirmation = true)
-            f.dispatcher.scheduler.runCurrent()
+            f.ranked.value = listOf(SwingShellSuggestion(" ", 5, 5, "spec", "COMMAND"))
             val popup = f.popup()
             f.enable()
             f.advance()
             assertNull(f.terminal.inlineShellSuggestionPresentation.value)
             assertEquals(f.ranked.value, popup.snapshot.suggestions)
+            assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
+            f.press(KeyEvent.VK_TAB)
+            f.dispatcher.scheduler.runCurrent()
+            assertEquals("\t", f.connector.writtenBytes.toString(Charsets.UTF_8))
         }
 
     @Test
