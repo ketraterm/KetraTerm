@@ -443,14 +443,14 @@ import kotlinx.coroutines.flow.flow
 @OptIn(ExperimentalShellSuggestionsApi::class)
 fun requestInline(
     view: SwingTerminal,
-    generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,
+    generateSuffix: suspend (SwingShellSuggestionRequest) -> String?,
 ): SwingShellSuggestionInteraction? {
     val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
     view.requestInlineShellSuggestions(interaction, SwingInlineShellSuggestionProvider { context ->
         SwingShellSuggestionSource(flow {
             val suffix = generateSuffix(context) ?: return@flow
             if (suffix.isNotEmpty()) {
-                val offset = context.commandLine.cursorOffset
+                val offset = context.cursorOffset
                 emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
             }
         })
@@ -469,12 +469,13 @@ produced the accepted or dismissed publication. Custom publication uses
 If a valid result arrives before its copied render frame is ready, frame publication
 retries presentation using the original edit context and provider result.
 
-Popup and inline providers are independent by default. Their results may differ;
-popup updates neither cancel nor restart inline work. Deliberate popup browsing
+Popup and inline providers are independent. Their results may differ; inline
+results never insert, reorder, or select popup entries, and popup updates neither
+cancel nor restart inline work. Deliberate popup browsing
 hides inline presentation, including late arrivals, while retaining its valid
-request. `setInlineShellSuggestionCoexistence(EXTEND_POPUP_SELECTION)` explicitly
-opts into compatible results: the provider receives `selectedPopupCommandText`
-and is reopened when that context changes. Detached popup owners control their
+request. Dismissing the popup can reveal the retained inline result without another
+provider request. Inline providers receive the command-line request directly;
+popup selection is not part of their context. Detached popup owners control their
 presentation and key routing themselves.
 
 The inline standard keymap accepts the whole visible suggestion with Tab or Right

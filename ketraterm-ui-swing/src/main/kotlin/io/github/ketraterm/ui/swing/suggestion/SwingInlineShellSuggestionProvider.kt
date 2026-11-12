@@ -15,33 +15,13 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
-/** Context captured on the EDT before inline source collection starts. */
-@ExperimentalShellSuggestionsApi
-public data class SwingInlineShellSuggestionRequest(
-    /** Original command text and UTF-16 cursor, sharing the interaction's editing authority. */
-    val commandLine: SwingShellSuggestionRequest,
-    /** Resulting command of the selected visible popup item, or null when none is selected. */
-    val selectedPopupCommandText: String?,
-)
-
 /**
  * Host-owned inline source. [open] captures resources and feedback on the EDT; keep it cheap.
- * The returned cold source is collected off the EDT. Providers are independent by default.
- * Opting into EXTEND_POPUP_SELECTION reopens the source when popup context changes.
+ * The returned cold source is collected off the EDT. Popup and inline providers are independent.
  * Closing an interaction cancels its source.
  */
 @ExperimentalShellSuggestionsApi
 public fun interface SwingInlineShellSuggestionProvider {
     /** Returns request-owned work; the provider itself remains host-owned. */
-    public fun open(request: SwingInlineShellSuggestionRequest): SwingShellSuggestionSource
-}
-
-/** Determines which independently produced inline results may accompany a popup selection. */
-@ExperimentalShellSuggestionsApi
-public enum class SwingInlineShellSuggestionCoexistence {
-    /** Show inline only when its resulting command extends the selected popup command. */
-    EXTEND_POPUP_SELECTION,
-
-    /** Default: permit unrelated results together while the popup is passive; browsing hides inline text. */
-    INDEPENDENT,
+    public fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource
 }

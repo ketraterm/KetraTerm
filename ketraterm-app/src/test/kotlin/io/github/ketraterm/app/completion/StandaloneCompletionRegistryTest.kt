@@ -142,7 +142,7 @@ class StandaloneCompletionRegistryTest {
             assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
             val inline =
                 withContext(Dispatchers.Swing) {
-                    InlineCompletionSuggestions(provider).open(SwingInlineShellSuggestionRequest(request("git s"), null))
+                    InlineCompletionSuggestions(provider).open(request("git s"))
                 }
             assertEquals(listOf(learnedSuggestion), inline.suggestions.last())
         }
@@ -175,7 +175,7 @@ class StandaloneCompletionRegistryTest {
                 assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "learned" })
                 val inline =
                     withContext(Dispatchers.Swing) {
-                        InlineCompletionSuggestions(provider).open(SwingInlineShellSuggestionRequest(request("cd "), null))
+                        InlineCompletionSuggestions(provider).open(request("cd "))
                     }
                 assertEquals(listOf(suggestions.first()), inline.suggestions.last())
                 registry.closeAndFlush()

@@ -179,11 +179,6 @@ public class SwingTerminal
                 present = { expected, suffix -> presentInlineShellSuggestionRendering(expected, suffix, null) },
                 hide = { clearInlineShellSuggestionRendering() },
                 visible = { inlineShellSuggestion != null },
-                popupCommand = {
-                    activeSuggestionInteraction?.takeIf { it.isActive && shellSuggestionController?.state()?.visible == true }?.let {
-                        it.snapshot.selectedSuggestion?.commandTextAfterReplacement(it.request)
-                    }
-                },
                 popupOwnsInput = {
                     shellSuggestionController?.isBrowsing == true ||
                         activeSuggestionInteraction?.let { it.isActive && it.hasExplicitSelection } == true ||
@@ -564,7 +559,7 @@ public class SwingTerminal
                             val handled = popup.handleAction(popupAction, popupPublication)
                             if (popupAction == SwingShellSuggestionAction.DISMISS) {
                                 popupCompletionCommand = null
-                                inlineRequests.popupChanged()
+                                inlineRequests.refreshPresentation()
                             }
                             return handled
                         }
@@ -1583,13 +1578,6 @@ public class SwingTerminal
         public fun setShellSuggestionKeymap(keymap: SwingShellSuggestionKeymap) {
             check(SwingUtilities.isEventDispatchThread()) { "popup keymap must run on the EDT" }
             suggestionKeymap = keymap
-        }
-
-        /** Sets optional compatibility with popup content; defaults to independent providers. */
-        @ExperimentalShellSuggestionsApi
-        public fun setInlineShellSuggestionCoexistence(policy: SwingInlineShellSuggestionCoexistence) {
-            check(SwingUtilities.isEventDispatchThread()) { "inline policy must run on the EDT" }
-            inlineRequests.coexistence = policy
         }
 
         override fun paintComponent(graphics: Graphics) {
@@ -2636,7 +2624,7 @@ public class SwingTerminal
                                     } else {
                                         popupCompletionCommand = null
                                     }
-                                    inlineRequests.popupChanged()
+                                    inlineRequests.refreshPresentation()
                                 }
                             }
                         }
@@ -2911,7 +2899,7 @@ public class SwingTerminal
                 popupCompletionCommand = null
                 cleanupSwingResources(
                     { cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden") },
-                    inlineRequests::popupChanged,
+                    inlineRequests::refreshPresentation,
                 )
             }
         }
@@ -3201,7 +3189,7 @@ public class SwingTerminal
                     override fun revalidate() = this@SwingTerminal.revalidate()
 
                     override fun repaint() {
-                        inlineRequests.popupChanged()
+                        inlineRequests.refreshPresentation()
                         this@SwingTerminal.repaint()
                     }
 
@@ -3278,7 +3266,7 @@ public class SwingTerminal
                                 if (bound.activeShellCommandLine()?.commandText == command) expected = bound.captureCommandEdit()
                             } else if (!bound.isCommandEditCurrent(current)) {
                                 popupCompletionCommand = null
-                                inlineRequests.popupChanged()
+                                inlineRequests.refreshPresentation()
                             }
                         }
                     } finally {

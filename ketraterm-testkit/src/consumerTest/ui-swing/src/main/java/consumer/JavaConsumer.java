@@ -76,8 +76,6 @@ public final class JavaConsumer {
         if (interaction != null && interaction.getHasExplicitSelection()) throw new AssertionError("New requests are passive");
         view.setShellSuggestionKeymap(io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.STANDARD);
         if (interaction != null) view.requestInlineShellSuggestions(interaction, provider);
-        view.setInlineShellSuggestionCoexistence(
-            io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionCoexistence.INDEPENDENT);
         view.setInlineShellSuggestionKeymap(
             io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap.INLINE_STANDARD);
         view.acceptInlineShellSuggestion();

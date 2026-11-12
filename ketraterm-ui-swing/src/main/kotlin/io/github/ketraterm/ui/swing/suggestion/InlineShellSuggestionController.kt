@@ -31,25 +31,17 @@ internal class InlineShellSuggestionController(
     private val present: (TerminalCommandEditContext, String) -> Boolean,
     private val hide: () -> Unit,
     private val visible: () -> Boolean,
-    private val popupCommand: () -> String?,
     private val popupOwnsInput: () -> Boolean,
     private val failure: (SwingShellSuggestionInteraction, Exception) -> Unit,
 ) {
     private var active: SwingShellSuggestionInteraction? = null
-    private var source: SwingInlineShellSuggestionProvider? = null
     private var sourceJob: Job? = null
     private var observation: Job? = null
     private var continuation: Job? = null
     private var sourceRevision = 0L
     val revision get() = sourceRevision
-    private var selectedPopup: String? = null
     private var feedbackForPublication: ((SwingShellSuggestionFeedbackHandler) -> Unit)? = null
     private var currentFeedback: SwingShellSuggestionFeedbackHandler? = null
-    var coexistence = SwingInlineShellSuggestionCoexistence.INDEPENDENT
-        set(value) {
-            field = value
-            popupChanged()
-        }
     var keymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.INLINE_STANDARD
     val publication get() = active?.takeIf { it.isActive }?.snapshot
     var isAutomatic: Boolean = false
@@ -102,15 +94,13 @@ internal class InlineShellSuggestionController(
         interaction.contextIsCurrent = { session() === bound && eligible() && bound.isCommandEditCurrent(expected) }
         active = interaction
         isAutomatic = automatic
-        selectedPopup = if (coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION) popupCommand() else null
         interaction.addChangeListener {
             if (active === interaction) {
                 if (interaction.isActive) {
-                    render()
+                    refreshPresentation()
                 } else {
                     active = null
                     isAutomatic = false
-                    source = null
                     sourceJob?.cancel()
                     observation?.cancel()
                     sourceJob = null
@@ -137,14 +127,6 @@ internal class InlineShellSuggestionController(
         provider: SwingInlineShellSuggestionProvider,
     ) {
         if (active !== interaction || !interaction.validateContext()) return
-        source = provider
-        collectSource(interaction, provider)
-    }
-
-    private fun collectSource(
-        interaction: SwingShellSuggestionInteraction,
-        provider: SwingInlineShellSuggestionProvider,
-    ) {
         val revision = ++sourceRevision
         sourceJob?.cancel()
         // Each refreshed source captures feedback against its own publication. The original
@@ -154,7 +136,7 @@ internal class InlineShellSuggestionController(
         if (active !== interaction || sourceRevision != revision) return
         val opened =
             try {
-                provider.open(SwingInlineShellSuggestionRequest(interaction.request, selectedPopup))
+                provider.open(interaction.request)
             } catch (cancelled: CancellationException) {
                 if (active === interaction && sourceRevision == revision) close()
                 throw cancelled
@@ -196,21 +178,12 @@ internal class InlineShellSuggestionController(
         failure(interaction, error)
     }
 
-    fun popupChanged() {
-        val next = if (coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION) popupCommand() else null
-        val changed = next != selectedPopup
-        selectedPopup = next
-        val interaction = active ?: return
-        val provider = source
-        if (changed && provider != null && interaction.validateContext()) collectSource(interaction, provider) else render()
-    }
-
     /** A valid result may have arrived before the copied frame caught up to its edit context. */
     fun frameChanged() {
-        if (!visible()) render()
+        if (!visible()) refreshPresentation()
     }
 
-    private fun render() {
+    fun refreshPresentation() {
         val interaction = active ?: return
         if (!interaction.validateContext()) return
         if (popupOwnsInput()) {
@@ -221,13 +194,9 @@ internal class InlineShellSuggestionController(
         val suggestion = current.selectedSuggestion
         val result = suggestion?.commandTextAfterReplacement(interaction.request)
         val prefix = interaction.request.commandText
-        val popup = selectedPopup
         if (result == null ||
             !result.startsWith(prefix) ||
-            result.length == prefix.length ||
-            coexistence == SwingInlineShellSuggestionCoexistence.EXTEND_POPUP_SELECTION &&
-            popup != null &&
-            !result.startsWith(popup)
+            result.length == prefix.length
         ) {
             hide()
             return
@@ -344,7 +313,6 @@ internal class InlineShellSuggestionController(
         val previous = active
         active = null
         isAutomatic = false
-        source = null
         feedbackForPublication = null
         currentFeedback = null
         sourceRevision++

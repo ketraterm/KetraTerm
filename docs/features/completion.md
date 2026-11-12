@@ -274,8 +274,8 @@ Library consumers can opt into experimental append-only ghost-text rendering
 through `SwingTerminal.presentInlineShellSuggestion`. It uses the ordinary terminal
 text painter, clips wrapped previews to free visible cells, and requires current
 command-edit authority. Independent inline providers share the guarded interaction
-contract with popup providers, with separate cancellation, configurable keymaps,
-and a default compatibility rule for simultaneous presentation. Hosts can also bind
+contract with popup providers, with separate cancellation and configurable keymaps.
+Both surfaces can appear together while the popup is passive. Hosts can also bind
 next-word inline acceptance; it is unbound by default and retains the remaining
 text only after a guarded shell echo. Both surfaces
 support optional automatic scheduling with independent debounce delays, or explicit

@@ -47,7 +47,6 @@ import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
@@ -131,7 +130,7 @@ fun requestConfiguredInline(view: SwingTerminal): SwingShellSuggestionInteractio
 
 fun requestInline(
     view: SwingTerminal,
-    generateSuffix: suspend (SwingInlineShellSuggestionRequest) -> String?,
+    generateSuffix: suspend (SwingShellSuggestionRequest) -> String?,
 ): SwingShellSuggestionInteraction? {
     val interaction = view.beginInlineShellSuggestionInteraction() ?: return null
     check(!interaction.hasExplicitSelection)
@@ -143,7 +142,7 @@ fun requestInline(
                 flow {
                     val suffix = generateSuffix(context) ?: return@flow
                     if (suffix.isNotEmpty()) {
-                        val offset = context.commandLine.cursorOffset
+                        val offset = context.cursorOffset
                         emit(listOf(SwingShellSuggestion(suffix, offset, offset, "AI", "COMMAND")))
                     }
                 },

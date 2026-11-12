@@ -25,7 +25,6 @@ import io.github.ketraterm.session.*
 import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.suggestion.ExperimentalShellSuggestionsApi
-import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.workspace.TerminalProfileKind
 import kotlinx.coroutines.*
@@ -149,7 +148,7 @@ class ExternalInlineSuggestionsTest {
                         calls++
                         simulateCompletion(context)
                     }, dispatcher)
-                val source = provider.open(SwingInlineShellSuggestionRequest(request, null))
+                val source = provider.open(request)
                 assertEquals(0, calls)
                 val results = mutableListOf<String>()
                 val work = launch { source.suggestions.collect { results += it.single().replacementText } }
@@ -189,7 +188,7 @@ class ExternalInlineSuggestionsTest {
                 var publications = 0
                 val work =
                     launch {
-                        provider.open(SwingInlineShellSuggestionRequest(request, null)).suggestions.collect { publications++ }
+                        provider.open(request).suggestions.collect { publications++ }
                     }
                 runCurrent()
                 assertTrue(entered.isCompleted)
@@ -211,14 +210,14 @@ class ExternalInlineSuggestionsTest {
                     val provider = ExternalInlineSuggestions(f.session, { response }, dispatcher)
                     assertTrue(
                         provider
-                            .open(SwingInlineShellSuggestionRequest(request, null))
+                            .open(request)
                             .suggestions
                             .toList()
                             .isEmpty(),
                     )
                 }
                 val failing = ExternalInlineSuggestions(f.session, { throw IOException("Example service unavailable") }, dispatcher)
-                assertFailsWith<IOException> { failing.open(SwingInlineShellSuggestionRequest(request, null)).suggestions.toList() }
+                assertFailsWith<IOException> { failing.open(request).suggestions.toList() }
             }
         }
 

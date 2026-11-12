@@ -23,8 +23,8 @@ import kotlinx.coroutines.flow.map
 internal class InlineCompletionSuggestions(
     private val provider: SwingShellSuggestionProvider,
 ) : SwingInlineShellSuggestionProvider {
-    override fun open(request: SwingInlineShellSuggestionRequest): SwingShellSuggestionSource {
-        val source = provider.open(request.commandLine)
+    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+        val source = provider.open(request)
         // Keep the original candidate and feedback owner; the view checks append-only eligibility.
         return SwingShellSuggestionSource(source.suggestions.map { it.take(1) }, source.feedbackHandler)
     }

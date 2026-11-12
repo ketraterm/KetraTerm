@@ -44,7 +44,7 @@ class InlineCompletionSuggestionsTest {
     fun `inline uses the first ranked completion without popup or pane history and preserves feedback`() =
         withFixture { f ->
             val top = f.ranked.value.first()
-            val source = f.inlineProvider.open(SwingInlineShellSuggestionRequest(f.request, null))
+            val source = f.inlineProvider.open(f.request)
             assertSame(f.feedbackHandler, source.feedbackHandler)
             f.enable()
             f.dispatcher.scheduler.runCurrent()

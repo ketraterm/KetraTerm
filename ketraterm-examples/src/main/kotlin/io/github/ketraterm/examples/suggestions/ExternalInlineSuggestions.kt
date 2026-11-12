@@ -37,16 +37,16 @@ internal class ExternalInlineSuggestions(
     private val contextDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val shellKind: TerminalProfileKind = TerminalProfileKind.DEFAULT,
 ) : SwingInlineShellSuggestionProvider {
-    override fun open(request: SwingInlineShellSuggestionRequest): SwingShellSuggestionSource =
+    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
         SwingShellSuggestionSource(
             flow {
                 val context =
-                    withContext(contextDispatcher) { readSuggestionContext(session, request.commandLine, shellKind) }
+                    withContext(contextDispatcher) { readSuggestionContext(session, request, shellKind) }
                         ?: return@flow
                 val command = generate(context) ?: return@flow
                 // Bound external responses before publishing. Do not interpret output as executable instructions.
                 if (command.length <= 4_096 && command.none(Char::isISOControl)) {
-                    emit(listOf(SwingShellSuggestion(command, 0, request.commandLine.commandText.length, "external-example", "COMMAND")))
+                    emit(listOf(SwingShellSuggestion(command, 0, request.commandText.length, "external-example", "COMMAND")))
                 }
             },
         )

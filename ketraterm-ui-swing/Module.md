@@ -26,7 +26,7 @@ and revision checks; they never access Swing state directly.
 
 `InlineShellSuggestion` checks copied live cells for collisions and clips its
 detached suffix cache. `InlineShellSuggestionController` independently owns managed
-inline interactions, provider collection, popup-selection context, feedback, and
+inline interactions, provider collection, feedback, and
 guarded key actions. It reuses `SwingShellSuggestionInteraction` and the session
 edit target; the rendering-only API still borrows a caller-owned token.
 Popup and inline automation use separate `SwingShellSuggestionScheduler` instances
