@@ -85,6 +85,11 @@ for [native suggestions](completion.md#sources-by-host). The handler
 reads the live editing buffer and calls `TabExpansion2` without submitting or
 replacing the command. Each prompt announces a fresh completion epoch.
 
+Fish hooks also install read-only
+[editor-buffer confirmation](../reference/protocol.md#private-fish-editor-buffer-confirmation)
+when its prerequisites are available. This lets popup suggestions coexist with
+fish's native autosuggestions; fish's own Tab completion remains unchanged.
+
 Direct interactive Bash launches load the user's startup files before installing
 prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible prompt.
 An explicit `--norc` launch keeps startup files disabled and receives only the

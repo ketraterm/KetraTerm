@@ -197,7 +197,7 @@ Permissions and decoded-size limits are checked again before execution.
 
 ## Query allowlists
 
-The optional PowerShell completion exchange below is host-initiated semantic
+The optional shell completion exchange below is host-initiated semantic
 input. Receiving its OSC metadata never sends a terminal reply, executes command
 text, or requests completion by itself; it adds no terminal-response allowlist entry.
 
@@ -546,6 +546,27 @@ discovery. Callers can cancel earlier. Native completers run in the shell and ma
 continue after host cancellation. See the session's
 [query lifecycle and conditional editing contract](../../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits)
 for shared queries, wire-slot retirement, and validation before suggestion acceptance.
+
+## Private fish editor-buffer confirmation
+
+The workspace's fish hook reuses the
+[private completion envelope](#private-powershell-completion-metadata) and announces
+`Ready;epoch;BufferState` after the prompt's input marker. It requires `base64`
+and unclaimed private F12 request bindings in every installed editing mode.
+Conflicting bindings are preserved and prevent readiness. Each prompt announcement
+retires earlier editing authority, as with PowerShell.
+
+Both `F12,b` and `F12,e` read `commandline --current-buffer` and `commandline --cursor`
+without accepting an autosuggestion, running completion scripts, or repainting the
+prompt. Replies contain the actual editable text, UTF-16 cursor offsets, an empty
+application name and zero candidates. Fish code-point offsets are converted to
+UTF-16; displayed predictions are excluded by fish's buffer API.
+
+Active pagers, multiline or control-containing buffers, and buffers over 4096
+UTF-16 code units return the correlated `Failed` response. The session still
+requires an exact match with the captured text and cursor: a real editable suffix
+cannot confirm a screen-derived prefix. This hook does not provide native fish
+candidate discovery or the `PrefixReset` capability.
 
 ## Private Bash command inventory
 
