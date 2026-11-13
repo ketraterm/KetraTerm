@@ -290,12 +290,12 @@ class ShellAwareCompletionEngineTest {
                                 request(line).copy(shellCapabilities = shell, workingDirectoryUri = "file:///home/user"),
                             ).last()
                     val outcomes = results.map { line.replaceRange(it.replacementStartOffset, it.replacementEndOffset, it.replacementText) }
-                    // Repeated use promotes Documents; one old nested visit stays below a live sibling.
+                    // Repeated use promotes Documents; one old nested visit does not qualify for replay.
                     val expected =
                         if (prefix == "Doc") {
-                            listOf("cd Documents/", "cd Documents/projects/")
+                            listOf("cd Documents/")
                         } else {
-                            listOf("cd Documents/", "cd Downloads/", "cd Documents/projects/")
+                            listOf("cd Documents/", "cd Downloads/")
                         }
                     assertEquals(expected, outcomes)
                     assertEquals("path", results.first().source)
@@ -767,7 +767,7 @@ class ShellAwareCompletionEngineTest {
     fun `ready learned arguments publish while native fallback is pending without suppressing it`() =
         runTest {
             val learning = TerminalCompletionLearningStore()
-            learning.recordCommandResult("git switch feature-old", true, null, null, 10)
+            repeat(2) { learning.recordCommandResult("git switch feature-old", true, null, null, 10) }
             val host = CompletableDeferred<List<TerminalCompletionCandidate>>()
             val native = CompletableDeferred<List<TerminalCompletionCandidate>>()
             var queries = 0
@@ -803,7 +803,7 @@ class ShellAwareCompletionEngineTest {
     fun `learned arguments remain available when native fallback has no matches`() =
         runTest {
             val learning = TerminalCompletionLearningStore()
-            learning.recordCommandResult("git switch feature-old", true, null, null, 10)
+            repeat(2) { learning.recordCommandResult("git switch feature-old", true, null, null, 10) }
             var queries = 0
             val engine =
                 MergedCompletionEngine(

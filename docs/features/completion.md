@@ -33,7 +33,9 @@ Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Library hosts enable and configure their own provider and presentation.
 
-History suggestions are selective: command names use ordinary discovery, and
+History command and path suggestions require two successful executions of the
+same command in the same profile and working directory. Observed options can
+qualify after one success. Command names use ordinary discovery, and
 full-command replay requires a nonempty argument prefix. Running or accepting a
 command does not make its full history entry appear after an empty argument.
 Whole-command replays have a small row budget; learned ranking continues to

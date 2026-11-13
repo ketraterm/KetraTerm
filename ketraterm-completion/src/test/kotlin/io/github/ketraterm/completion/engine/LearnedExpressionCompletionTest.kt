@@ -158,7 +158,7 @@ class LearnedExpressionCompletionTest {
     ): TerminalCompletionEngine {
         val store = TerminalCompletionLearningStore()
         for ((index, command) in recorded.withIndex()) {
-            store.recordCommandResult(command, true, null, null, index + 1L)
+            repeat(2) { store.recordCommandResult(command, true, null, null, index + 1L) }
         }
         return TerminalCompletionEngines.fromSources(emptyList(), commandSpecs, store)
     }
