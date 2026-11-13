@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.util.zip.CRC32
+import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
 import kotlin.test.*
 
@@ -125,12 +126,10 @@ class GraphicsDecoderTest {
         val row = bytes(18, 86, 154, 19, 86, 154, 18, 87, 154, 18, 86, 155)
         val input = png(8, 2, row, width = 4, transparency = shorts(0x0112, 0x8056, 0xff9a))
         assertPixels(success(pngCommand, input), 0x0012569a, 0xff13569a.toInt(), 0xff12579a.toInt(), 0xff12569b.toInt())
-        // The compacted stream remains valid, including the rewritten tRNS CRC.
-        assertPixels(success(pngCommand, input), 0x0012569a, 0xff13569a.toInt(), 0xff12579a.toInt(), 0xff12569b.toInt())
     }
 
     @Test
-    fun `PNG key normalization rejects corruption of unused bits before rewriting the CRC`() {
+    fun `PNG transparency rejects corrupted unused key bits before normalization`() {
         val transparency = chunk("tRNS", shorts(0xff80)).also { it[8] = (it[8].toInt() xor 1).toByte() }
         val input = container(header(colorType = 0), transparency, chunk("IDAT", zlib(bytes(0, 128))), chunk("IEND"))
         failure(pngCommand, input, TerminalGraphicsResult.INVALID)
@@ -258,7 +257,6 @@ class GraphicsDecoderTest {
                 container(data, validHeader, end),
                 container(validHeader, validHeader, data, end),
                 container(validHeader, chunk("ABCD"), data, end),
-                container(validHeader, chunk("abca"), data, end),
                 container(validHeader, chunk("t3Xt"), data, end),
                 container(validHeader, end),
                 container(validHeader, data, chunk("IEND", bytes(0))),
@@ -279,6 +277,24 @@ class GraphicsDecoderTest {
         failure(pngCommand, container(header(width = 8193), data, end), TerminalGraphicsResult.TOO_LARGE)
         failure(pngCommand, container(header(width = 8192, height = 1025), data, end), TerminalGraphicsResult.TOO_LARGE)
         failure(pngCommand, container(header(width = -1), data, end), TerminalGraphicsResult.TOO_LARGE)
+    }
+
+    @Test
+    fun `PNG ignores unknown ancillary chunks including reserved names but rejects unknown critical chunks`() {
+        val header = header()
+        val data = imageData()
+        val end = chunk("IEND")
+        for (name in listOf("abca", "tEXt", "idat")) {
+            val ancillary = chunk(name, bytes(1, 2, 3))
+            assertPixels(success(pngCommand, container(header, ancillary, data, end)), 0x04010203)
+            assertPixels(success(pngCommand, container(header, data, ancillary, end)), 0x04010203)
+            failure(pngCommand, container(header, data, ancillary, data, end), TerminalGraphicsResult.INVALID)
+            val corrupt = ancillary.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+            failure(pngCommand, container(header, corrupt, data, end), TerminalGraphicsResult.INVALID)
+        }
+        for (name in listOf("ABcD", "IdAT")) {
+            failure(pngCommand, container(header, chunk(name), data, end), TerminalGraphicsResult.INVALID)
+        }
     }
 
     @Test
@@ -316,6 +332,7 @@ class GraphicsDecoderTest {
         val image = zlib(bytes(0, 1, 2, 3, 4))
         val invalidPayloads =
             listOf(
+                byteArrayOf(),
                 image.copyOf(image.size - 1),
                 image + byteArrayOf(0),
                 image + image,
@@ -329,6 +346,20 @@ class GraphicsDecoderTest {
             val png = container(header(), chunk("IDAT", input), chunk("IEND"))
             assertEquals(TerminalGraphicsResult.INVALID, decoder.decode(pngCommand, png, png.size).status, "case $index")
         }
+    }
+
+    @Test
+    fun `PNG rejects zlib preset dictionaries and a subsequent valid decode succeeds`() {
+        val deflater = Deflater()
+        val compressed = ByteArrayOutputStream()
+        try {
+            deflater.setDictionary(bytes(1, 2, 3, 4))
+            DeflaterOutputStream(compressed, deflater).use { it.write(bytes(0, 1, 2, 3, 4)) }
+        } finally {
+            deflater.end()
+        }
+        failure(pngCommand, container(header(), chunk("IDAT", compressed.toByteArray()), chunk("IEND")), TerminalGraphicsResult.INVALID)
+        assertPixels(success(pngCommand, png(8, 6, bytes(1, 2, 3, 4))), 0x04010203)
     }
 
     @Test
@@ -350,7 +381,7 @@ class GraphicsDecoderTest {
     }
 
     @Test
-    fun `PNG compacts metadata and thousands of IDAT chunks before invoking ImageIO`() {
+    fun `PNG compacts metadata and thousands of IDAT chunks before scanline decoding`() {
         val metadata = chunk("zTXt", bytes(65, 0, 0) + zlib(ByteArray(1024 * 1024)))
         val stream = ByteArrayOutputStream()
         stream.write(signature)
@@ -361,21 +392,29 @@ class GraphicsDecoderTest {
         for (byte in data) stream.write(chunk("IDAT", byteArrayOf(byte)))
         stream.write(chunk("IEND"))
         val input = stream.toByteArray()
-        assertPixels(success(pngCommand, input), 0x04010203)
-        var offset = 8
-        val names = ArrayList<String>()
-        while (true) {
-            val name = input.copyOfRange(offset + 4, offset + 8).decodeToString()
-            names.add(name)
-            val size =
-                java.nio.ByteBuffer
-                    .wrap(input, offset, 4)
-                    .int
-            if (name == "IEND") break
-            offset += size + 12
+        val image = success(pngCommand, input)
+        input.fill(0)
+        assertPixels(image, 0x04010203)
+    }
+
+    @Test
+    fun `PNG accepts maximum pixel count and row width at sixteen bit RGBA depth`() {
+        val compressed = ByteArrayOutputStream()
+        DeflaterOutputStream(compressed).use { output ->
+            val row = ByteArray(8192 * 8 + 1)
+            repeat(1024) { output.write(row) }
         }
-        assertEquals(listOf("IHDR", "IDAT", "IEND"), names)
-        assertEquals(data.size + 57, offset + 12)
+        val input =
+            container(
+                header(width = 8192, height = 1024, depth = 16),
+                chunk("IDAT", compressed.toByteArray()),
+                chunk("IEND"),
+            )
+        val image = success(pngCommand, input)
+        assertEquals(8192, image.width)
+        assertEquals(1024, image.height)
+        val actual = pixels(image)
+        assertTrue(actual.all { it == 0 }, "All zero RGBA samples retain zero alpha and color")
     }
 
     private fun success(

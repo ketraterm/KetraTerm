@@ -19,7 +19,6 @@ import io.github.ketraterm.protocol.TerminalGraphicsCommand
 import io.github.ketraterm.protocol.TerminalGraphicsLimits
 import io.github.ketraterm.protocol.TerminalGraphicsResult
 import io.github.ketraterm.render.api.TerminalRenderImage
-import java.io.IOException
 import java.util.zip.DataFormatException
 import java.util.zip.Inflater
 
@@ -32,7 +31,7 @@ internal class GraphicsDecodeResult(
 /**
  * Synchronous, bounded image decoding outside session mutation locks. The caller
  * exclusively owns [decode]'s staging array until it returns: PNG compaction may
- * overwrite it. No staging bytes, AWT object, or codec state escape a decode.
+ * overwrite it. No staging bytes or codec state escape a decode.
  */
 internal class GraphicsDecoder {
     fun decode(
@@ -88,8 +87,6 @@ internal class GraphicsDecoder {
         } catch (failure: GraphicsDecodeException) {
             GraphicsDecodeResult(failure.status)
         } catch (_: DataFormatException) {
-            GraphicsDecodeResult(TerminalGraphicsResult.INVALID)
-        } catch (_: IOException) {
             GraphicsDecodeResult(TerminalGraphicsResult.INVALID)
         }
     }

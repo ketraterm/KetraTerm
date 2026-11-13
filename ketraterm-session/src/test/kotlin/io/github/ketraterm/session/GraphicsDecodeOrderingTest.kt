@@ -39,7 +39,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.swing.SwingUtilities
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -273,12 +272,10 @@ class GraphicsDecodeOrderingTest {
                 var expectedFailure: Throwable? = if (scenario == "close-failure") failure else null
                 if (scenario == "capacity") {
                     withContext(Dispatchers.IO) {
-                        SwingUtilities.invokeAndWait {
-                            assertEquals(
-                                TerminalInputAdmission.CAPACITY_EXCEEDED,
-                                session.submitBytes(ByteArray(OutboundWriter.MAX_QUEUED_BYTES + 1)),
-                            )
-                        }
+                        assertEquals(
+                            TerminalInputAdmission.CAPACITY_EXCEEDED,
+                            session.submitBytes(ByteArray(OutboundWriter.MAX_QUEUED_BYTES + 1)),
+                        )
                     }
                     expectedFailure = assertIs<OutboundCapacityException>(session.failure)
                 } else {

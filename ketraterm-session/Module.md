@@ -12,7 +12,8 @@ connector owns inbound threads and ordered byte delivery. Session workers use
 caller-supplied, non-owned dispatchers.
 
 `graphics/GraphicsDecoder` validates raw/zlib payloads; `PngDecoder` validates,
-compacts and decodes PNG using the JDK reader. They return immutable render images.
+compacts and decodes PNG with JDK zlib and two reusable scanline buffers. They
+return immutable ARGB render images without desktop or frontend dependencies.
 The session retains ingress admission across parser yields and commits the decoded
 image through `HostCommandAdapter` before consuming the remaining bytes.
 

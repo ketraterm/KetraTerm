@@ -33,6 +33,11 @@ Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-on
 resolution. A host replacing dependencies with a platform runtime must verify
 that runtime separately.
 
+The headless entry point and its complete runtime dependency closure operate
+without `java.desktop` or frontend SDKs, including PNG decoding. Frontends consume
+neutral render data and own their graphics resources. Publication checks verify
+this boundary using both Gradle metadata and POM-only resolution.
+
 ## Evolution rules
 
 - Preserve JVM signatures, Kotlin metadata, defaults, and documented semantics.

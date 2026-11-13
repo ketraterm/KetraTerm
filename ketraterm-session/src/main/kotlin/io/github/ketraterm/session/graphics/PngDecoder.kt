@@ -17,16 +17,10 @@ package io.github.ketraterm.session.graphics
 
 import io.github.ketraterm.protocol.TerminalGraphicsResult
 import io.github.ketraterm.render.api.TerminalRenderImage
-import java.awt.image.BufferedImage
-import java.io.ByteArrayInputStream
 import java.util.zip.CRC32
 import java.util.zip.Inflater
-import javax.imageio.ImageReader
-import javax.imageio.spi.IIORegistry
-import javax.imageio.spi.ImageReaderSpi
-import javax.imageio.stream.MemoryCacheImageInputStream
 
-/** Validates and strips unneeded PNG chunks before invoking the JDK's bounded raster decoder. */
+/** Validates PNG containers and decodes scanlines directly into immutable ARGB pixels. */
 internal object PngDecoder {
     private const val IHDR = 0x49484452
     private const val PLTE = 0x504c5445
@@ -34,26 +28,20 @@ internal object PngDecoder {
     private const val IDAT = 0x49444154
     private const val IEND = 0x49454e44
     private val signature = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
-    private val provider: ImageReaderSpi by lazy { findProvider() }
+
+    // Adam7 passes followed by the single noninterlaced pass.
+    private val xStarts = intArrayOf(0, 4, 0, 2, 0, 1, 0, 0)
+    private val yStarts = intArrayOf(0, 0, 4, 0, 2, 0, 1, 0)
+    private val xSteps = intArrayOf(8, 8, 4, 4, 2, 2, 1, 1)
+    private val ySteps = intArrayOf(8, 8, 8, 4, 4, 2, 2, 1)
 
     fun decode(
         bytes: ByteArray,
         length: Int,
     ): TerminalRenderImage {
-        val png = validate(bytes, length)
-        val compactedLength = compact(bytes, length, png)
-        validateImageStream(bytes, png)
-        val reader = provider.createReaderInstance()
-        try {
-            MemoryCacheImageInputStream(ByteArrayInputStream(bytes, 0, compactedLength)).use { input ->
-                reader.setInput(input, true, true)
-                // Keep native samples: an 8-bit destination changes 16-bit tRNS matching.
-                val image = reader.read(0, reader.defaultReadParam)
-                return normalize(image, png)
-            }
-        } finally {
-            reader.dispose()
-        }
+        val header = validate(bytes, length)
+        val dataLength = compactImageData(bytes, length)
+        return decodeImageStream(bytes, dataLength, header)
     }
 
     private fun validate(
@@ -81,7 +69,6 @@ internal object PngDecoder {
                 val letter = bytes[nameIndex++].toInt() and 255
                 if (letter !in 65..90 && letter !in 97..122) invalid()
             }
-            if (bytes[index + 6].toInt() and 32 != 0) invalid()
             crc.reset()
             crc.update(bytes, index + 4, size + 4)
             if (crc.value.toInt() != intAt(bytes, index + 8 + size)) invalid()
@@ -174,6 +161,9 @@ internal object PngDecoder {
             }
             2 -> {
                 if (length != 6) invalid()
+                header.transparentRed = shortAt(bytes, offset) and maxSample
+                header.transparentGreen = shortAt(bytes, offset + 2) and maxSample
+                header.transparentBlue = shortAt(bytes, offset + 4) and maxSample
             }
             3 -> {
                 if (length == 0 || length > header.palette.size) invalid()
@@ -187,70 +177,31 @@ internal object PngDecoder {
         }
     }
 
-    /** All source chunks have already passed bounds/CRC/order checks. Writes never overtake reads. */
-    private fun compact(
+    /** All chunks are validated first. Copy only IDAT bytes; writes never overtake unread data. */
+    private fun compactImageData(
         bytes: ByteArray,
         length: Int,
-        header: PngHeader,
     ): Int {
-        val crc = CRC32()
         var read = 8
-        var write = 8
-        var imageData = -1
-        var imageDataLength = 0
+        var write = 0
         while (read < length) {
             val size = intAt(bytes, read)
-            val type = intAt(bytes, read + 4)
-            if (type == IDAT) {
-                if (imageData < 0) {
-                    imageData = write
-                    writeInt(bytes, write + 4, IDAT)
-                    write += 8
-                }
+            if (intAt(bytes, read + 4) == IDAT) {
                 bytes.copyInto(bytes, write, read + 8, read + 8 + size)
                 write += size
-                imageDataLength += size
-            } else {
-                if (imageData >= 0 && type == IEND) {
-                    writeInt(bytes, imageData, imageDataLength)
-                    crc.reset()
-                    crc.update(bytes, imageData + 4, imageDataLength + 4)
-                    writeInt(bytes, write, crc.value.toInt())
-                    write += 4
-                }
-                if (type == IHDR || type == PLTE || type == TRNS || type == IEND) {
-                    bytes.copyInto(bytes, write, read, read + size + 12)
-                    if (type == TRNS && header.colorType != 3 && header.depth < 16) {
-                        // PNG requires ignoring unused key bits. Normalize before
-                        // ImageIO compares samples, after validating the original CRC.
-                        val maxSample = (1 shl header.depth) - 1
-                        var sample = write + 8
-                        while (sample < write + 8 + size) {
-                            val value = shortAt(bytes, sample) and maxSample
-                            bytes[sample] = 0
-                            bytes[sample + 1] = value.toByte()
-                            sample += 2
-                        }
-                        crc.reset()
-                        crc.update(bytes, write + 4, size + 4)
-                        writeInt(bytes, write + 8 + size, crc.value.toInt())
-                    }
-                    write += size + 12
-                }
             }
             read += size + 12
         }
         return write
     }
 
-    /** ImageIO may stop after the requested rows; verify the zlib trailer and full scanline size independently. */
-    private fun validateImageStream(
+    /** Two scanline buffers are reused across passes; no native-depth image is retained. */
+    private fun decodeImageStream(
         bytes: ByteArray,
+        length: Int,
         header: PngHeader,
-    ) {
-        var offset = 8
-        while (intAt(bytes, offset + 4) != IDAT) offset += intAt(bytes, offset) + 12
-        val length = intAt(bytes, offset)
+    ): TerminalRenderImage {
+        if (length == 0) invalid()
         val channels =
             when (header.colorType) {
                 0, 3 -> 1
@@ -259,116 +210,143 @@ internal object PngDecoder {
                 else -> 4
             }
         val bitsPerPixel = channels * header.depth
-        var expected = 0L
-        if (header.interlace == 0) {
-            expected = (((header.width.toLong() * bitsPerPixel + 7) / 8) + 1) * header.height
-        } else {
-            var pass = 0
-            while (pass < 7) {
-                val xStart =
-                    when (pass) {
-                        1 -> 4
-                        3 -> 2
-                        5 -> 1
-                        else -> 0
-                    }
-                val yStart =
-                    when (pass) {
-                        2 -> 4
-                        4 -> 2
-                        6 -> 1
-                        else -> 0
-                    }
-                val xStep =
-                    when (pass) {
-                        0, 1 -> 8
-                        2, 3 -> 4
-                        4, 5 -> 2
-                        else -> 1
-                    }
-                val yStep =
-                    when (pass) {
-                        0, 1, 2 -> 8
-                        3, 4 -> 4
-                        else -> 2
-                    }
-                val width = (header.width - xStart + xStep - 1) / xStep
-                val height = (header.height - yStart + yStep - 1) / yStep
-                if (width > 0 && height > 0) expected += ((width.toLong() * bitsPerPixel + 7) / 8 + 1) * height
-                pass++
-            }
-        }
-        val scratch = ByteArray(8192)
+        val bytesPerPixel = (bitsPerPixel + 7) / 8
+        val rowCapacity = (header.width * bitsPerPixel + 7) / 8 + 1
+        var row = ByteArray(rowCapacity)
+        var previous = ByteArray(rowCapacity)
+        val pixels = IntArray(header.width * header.height)
         val inflater = Inflater()
         try {
-            inflater.setInput(bytes, offset + 8, length)
-            var expanded = 0L
-            while (!inflater.finished()) {
-                val count = inflater.inflate(scratch)
-                expanded += count
-                if (expanded > expected || count == 0 && !inflater.finished()) invalid()
+            inflater.setInput(bytes, 0, length)
+            val firstPass = if (header.interlace == 0) 7 else 0
+            val endPass = if (header.interlace == 0) 8 else 7
+            for (pass in firstPass until endPass) {
+                val width = (header.width - xStarts[pass] + xSteps[pass] - 1) / xSteps[pass]
+                if (width <= 0 || yStarts[pass] >= header.height) continue
+                val rowLength = (width * bitsPerPixel + 7) / 8 + 1
+                previous.fill(0, 0, rowLength)
+                var y = yStarts[pass]
+                while (y < header.height) {
+                    var used = 0
+                    while (used < rowLength) {
+                        val count = inflater.inflate(row, used, rowLength - used)
+                        if (count == 0) invalid()
+                        used += count
+                    }
+                    unfilter(row, previous, rowLength, bytesPerPixel)
+                    var x = xStarts[pass]
+                    var sample = 0
+                    while (x < header.width) {
+                        pixels[y * header.width + x] = pixel(row, sample, header)
+                        sample += channels
+                        x += xSteps[pass]
+                    }
+                    val swap = previous
+                    previous = row
+                    row = swap
+                    y += ySteps[pass]
+                }
             }
-            if (expanded != expected || inflater.remaining != 0) invalid()
+            // Rows can end before zlib's checksum. Accept no extra expanded byte,
+            // concatenated stream, or trailing compressed suffix.
+            if (inflater.inflate(row, 0, 1) != 0 || !inflater.finished() || inflater.remaining != 0) invalid()
         } finally {
             inflater.end()
         }
-    }
-
-    private fun normalize(
-        image: BufferedImage,
-        header: PngHeader,
-    ): TerminalRenderImage {
-        if (image.width != header.width || image.height != header.height) invalid()
-        val raster = image.raster
-        // Grayscale tRNS can expand sub-byte samples to an 8-bit gray/alpha raster.
-        val sampleDepth = raster.sampleModel.getSampleSize(0)
-        // JDK PNG compares gray tRNS after expanding sub-byte samples, against the
-        // unexpanded key. Compare in the actual raster's sample range ourselves.
-        val transparentGray =
-            if (header.transparentGray < 0) {
-                -1
-            } else {
-                (header.transparentGray.toLong() * ((1 shl sampleDepth) - 1) / ((1 shl header.depth) - 1)).toInt()
-            }
-        val pixels = IntArray(header.width * header.height)
-        var target = 0
-        var y = 0
-        while (y < header.height) {
-            var x = 0
-            while (x < header.width) {
-                val first = raster.getSample(x, y, 0)
-                pixels[target++] =
-                    when (header.colorType) {
-                        3 -> {
-                            if (first >= header.palette.size) invalid()
-                            header.palette[first]
-                        }
-                        0, 4 -> {
-                            val gray = sample8(first, sampleDepth)
-                            val alpha =
-                                if (header.colorType == 4) {
-                                    sample8(raster.getSample(x, y, 1), sampleDepth)
-                                } else if (first == transparentGray) {
-                                    0
-                                } else {
-                                    255
-                                }
-                            (alpha shl 24) or (gray shl 16) or (gray shl 8) or gray
-                        }
-                        else -> {
-                            val green = raster.getSample(x, y, 1)
-                            val blue = raster.getSample(x, y, 2)
-                            val alpha = if (raster.numBands == 4) sample8(raster.getSample(x, y, 3), sampleDepth) else 255
-                            (alpha shl 24) or (sample8(first, sampleDepth) shl 16) or (sample8(green, sampleDepth) shl 8) or
-                                sample8(blue, sampleDepth)
-                        }
-                    }
-                x++
-            }
-            y++
-        }
         return DecodedGraphicsImage(header.width, header.height, pixels)
     }
+
+    private fun unfilter(
+        row: ByteArray,
+        previous: ByteArray,
+        length: Int,
+        stride: Int,
+    ) {
+        val filter = row[0].toInt() and 255
+        if (filter > 4) invalid()
+        if (filter == 0) return
+        var index = 1
+        while (index < length) {
+            val left = if (index > stride) row[index - stride].toInt() and 255 else 0
+            val up = previous[index].toInt() and 255
+            val upperLeft = if (index > stride) previous[index - stride].toInt() and 255 else 0
+            val prediction =
+                when (filter) {
+                    1 -> left
+                    2 -> up
+                    3 -> (left + up) / 2
+                    else -> paeth(left, up, upperLeft)
+                }
+            row[index] = (row[index].toInt() + prediction).toByte()
+            index++
+        }
+    }
+
+    private fun paeth(
+        left: Int,
+        up: Int,
+        upperLeft: Int,
+    ): Int {
+        val prediction = left + up - upperLeft
+        val leftDistance = kotlin.math.abs(prediction - left)
+        val upDistance = kotlin.math.abs(prediction - up)
+        val cornerDistance = kotlin.math.abs(prediction - upperLeft)
+        return when {
+            leftDistance <= upDistance && leftDistance <= cornerDistance -> left
+            upDistance <= cornerDistance -> up
+            else -> upperLeft
+        }
+    }
+
+    private fun pixel(
+        row: ByteArray,
+        sample: Int,
+        header: PngHeader,
+    ): Int {
+        val first = sample(row, sample, header.depth)
+        return when (header.colorType) {
+            3 -> {
+                if (first >= header.palette.size) invalid()
+                header.palette[first]
+            }
+            0, 4 -> {
+                val gray = sample8(first, header.depth)
+                val alpha =
+                    when {
+                        header.colorType == 4 -> sample8(sample(row, sample + 1, header.depth), header.depth)
+                        first == header.transparentGray -> 0
+                        else -> 255
+                    }
+                (alpha shl 24) or (gray shl 16) or (gray shl 8) or gray
+            }
+            else -> {
+                val green = sample(row, sample + 1, header.depth)
+                val blue = sample(row, sample + 2, header.depth)
+                val alpha =
+                    when {
+                        header.colorType == 6 -> sample8(sample(row, sample + 3, header.depth), header.depth)
+                        first == header.transparentRed && green == header.transparentGreen && blue == header.transparentBlue -> 0
+                        else -> 255
+                    }
+                (alpha shl 24) or (sample8(first, header.depth) shl 16) or
+                    (sample8(green, header.depth) shl 8) or sample8(blue, header.depth)
+            }
+        }
+    }
+
+    private fun sample(
+        row: ByteArray,
+        index: Int,
+        depth: Int,
+    ): Int =
+        when (depth) {
+            16 -> shortAt(row, 1 + index * 2)
+            8 -> row[1 + index].toInt() and 255
+            else -> {
+                val bit = index * depth
+                (row[1 + bit / 8].toInt() ushr (8 - depth - bit % 8)) and ((1 shl depth) - 1)
+            }
+        }
 
     private fun sample8(
         value: Int,
@@ -379,16 +357,6 @@ internal object PngDecoder {
             8 -> value
             else -> value * 255 / ((1 shl depth) - 1)
         }
-
-    private fun findProvider(): ImageReaderSpi {
-        val providers = IIORegistry.getDefaultInstance().getServiceProviders(ImageReaderSpi::class.java, false)
-        while (providers.hasNext()) {
-            val candidate = providers.next()
-            if (candidate.javaClass.module != ImageReader::class.java.module) continue
-            if (candidate.formatNames.any { it.equals("png", ignoreCase = true) }) return candidate
-        }
-        throw IllegalStateException("The JDK PNG reader is unavailable")
-    }
 
     private fun shortAt(
         bytes: ByteArray,
@@ -402,17 +370,6 @@ internal object PngDecoder {
         ((bytes[offset].toInt() and 255) shl 24) or ((bytes[offset + 1].toInt() and 255) shl 16) or
             ((bytes[offset + 2].toInt() and 255) shl 8) or (bytes[offset + 3].toInt() and 255)
 
-    private fun writeInt(
-        bytes: ByteArray,
-        offset: Int,
-        value: Int,
-    ) {
-        bytes[offset] = (value ushr 24).toByte()
-        bytes[offset + 1] = (value ushr 16).toByte()
-        bytes[offset + 2] = (value ushr 8).toByte()
-        bytes[offset + 3] = value.toByte()
-    }
-
     private fun invalid(): Nothing = throw GraphicsDecodeException(TerminalGraphicsResult.INVALID)
 
     private class PngHeader(
@@ -424,5 +381,8 @@ internal object PngDecoder {
     ) {
         var palette = IntArray(0)
         var transparentGray = -1
+        var transparentRed = -1
+        var transparentGreen = -1
+        var transparentBlue = -1
     }
 }

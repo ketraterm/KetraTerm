@@ -55,7 +55,12 @@ private class KotlinLine : TerminalLine {
     override fun getCodepoint(col: Int) = if (col == 0) 'K'.code else 0
 }
 
-fun main() {
+fun main(args: Array<String>) {
+    if (args.contentEquals(arrayOf("--verify-headless-dependencies"))) {
+        verifyHeadlessDependencies()
+        return
+    }
+    verifyHeadlessSession()
     JavaConsumer.verify()
     val sink = KotlinSink(JavaConsumer.Sink())
     val parser = TerminalParsers.create(sink)

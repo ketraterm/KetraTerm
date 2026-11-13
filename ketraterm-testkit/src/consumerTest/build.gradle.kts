@@ -133,6 +133,9 @@ subprojects {
             dependsOn("classes")
             classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
             mainClass.set("consumer.KotlinConsumerKt")
+            if (project.name == "host-spi") {
+                jvmArgs("--limit-modules=java.base,java.logging,java.management,java.instrument,jdk.unsupported")
+            }
             if (project.name in setOf("ui-swing", "ui-swing-host")) systemProperty("java.awt.headless", "true")
             javaLauncher.set(
                 project.extensions.getByType<JavaToolchainService>().launcherFor {
@@ -141,6 +144,22 @@ subprojects {
             )
         }
     tasks.named("check") { dependsOn(smoke) }
+    if (name == "host-spi") {
+        val verifyHeadlessDependencies =
+            tasks.register<JavaExec>("verifyHeadlessDependencies") {
+                dependsOn("classes")
+                classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
+                mainClass.set("consumer.KotlinConsumerKt")
+                args("--verify-headless-dependencies")
+                jvmArgs("--add-modules=jdk.jdeps")
+                javaLauncher.set(
+                    project.extensions.getByType<JavaToolchainService>().launcherFor {
+                        languageVersion.set(JavaLanguageVersion.of(25))
+                    },
+                )
+            }
+        tasks.named("check") { dependsOn(verifyHeadlessDependencies) }
+    }
 
     // Resolution has no dependency on classes: an upgrade must never recompile its old client.
     tasks.register("prepareCompiledClientRuntime") {
@@ -254,7 +273,7 @@ val verifyPublicationBoundary =
                         check(module.module !in productArtifacts) { "$consumer pulled product artifact $module" }
                         check(module.version == version) { "$consumer mixed library versions: expected $version, got $module" }
                     }
-                    if (consumer == "parser" || consumer == "core") {
+                    if (consumer in setOf("parser", "core", "host-spi")) {
                         check(
                             !module.module.startsWith("ketraterm-ui-") &&
                                 module.module != "ketraterm-pty" &&

@@ -23,7 +23,7 @@ Optional modules can be selected independently through the [BOM](../../ketraterm
 | Host shortcuts | Configurable shortcut maps, action dispatch, and key-press interception for Swing hosts. |
 | Configuration | Immutable settings with Kotlin update callbacks and Java builders. |
 | Localization | Resource-bundle overrides for terminal chrome and completion descriptions. |
-| Distribution | Dependency-only headless/Swing entry points, version alignment, API documentation, and isolated-consumer verification. |
+| Distribution | Dependency-only headless/Swing entry points, version alignment, API documentation, and isolated-consumer verification. The [headless runtime](../../ketraterm-headless/README.md) includes PNG decoding and has no desktop/frontend dependency. |
 
 ## View customization
 
