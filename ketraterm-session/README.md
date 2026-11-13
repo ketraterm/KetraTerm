@@ -237,6 +237,11 @@ fun createHostSession(
 ```
 
 Use a distinct projection per session and publish metadata in output order.
+The host factory refreshes `TerminalShellIntegrationState` line ordering after
+output and resize. Custom producers using this model with render line IDs must
+call `updateLineOrder(context)` from `outputProcessed`, under session mutation
+serialization. Stable identities are not row numbers; unavailable anchors after
+row rearrangement produce unknown ranges.
 `commandDurationMillis(recordId)` reports monotonic elapsed time for explicitly
 completed commands, independently of metadata wall-clock timestamps. Capture it
 in a command-finished listener before later bounded eviction. Custom shell views

@@ -550,6 +550,7 @@ public final class io/github/ketraterm/session/TerminalShellIntegrationState : i
 	public final fun recordCurrentWorkingDirectory (Ljava/lang/String;)V
 	public final fun recordPromptEnd (J)V
 	public final fun recordPromptStart (J)V
+	public final fun updateLineOrder (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;)V
 }
 
 public abstract interface class io/github/ketraterm/session/TerminalShellIntegrationView {

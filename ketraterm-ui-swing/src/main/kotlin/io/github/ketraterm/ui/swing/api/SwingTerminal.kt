@@ -1692,6 +1692,7 @@ public class SwingTerminal
                     inlineSuggestionScheduler?.stop()
                     bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                     mouseController.resetInput()
+                    inputController.resetInput()
                     this.session = session
                     acceptedSessionSettings = null
                     chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
@@ -1814,6 +1815,7 @@ public class SwingTerminal
                         job?.cancel(CancellationException("Terminal session unbound"))
                     },
                     mouseController::resetInput,
+                    inputController::resetInput,
                     { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
                     {
                         session = null

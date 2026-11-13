@@ -15,9 +15,88 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.core.TerminalBuffers
 import kotlin.test.*
 
 class TerminalShellIntegrationStateTest {
+    @Test
+    fun `late host prompt publication uses the retained predecessor across an identity gap`() {
+        val terminal = TerminalBuffers.create(12, 8)
+        terminal.positionCursor(0, 2)
+        terminal.deleteLines(1)
+        val state = TerminalShellIntegrationState()
+        state.updateLineOrder(terminal)
+        val ids = LongArray(3)
+        terminal.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+        assertTrue(ids[2] > ids[1] + 1)
+        state.recordCommandStart(ids[1], includeLine = true)
+        state.recordCommandFinished(ids[2], exitCode = 0)
+        val record = state.latestCommandRecordId()
+        state.recordPromptStart(ids[2])
+
+        val range = LongArray(3)
+        assertTrue(state.copyCommandOutputRange(record, range))
+        assertContentEquals(longArrayOf(ids[1], ids[1], 1), range)
+    }
+
+    @Test
+    fun `reordered identities use spatial order for output prompt clipping and decorations`() {
+        val terminal = TerminalBuffers.create(12, 8)
+        val state = TerminalShellIntegrationState()
+        state.updateLineOrder(terminal)
+        terminal.positionCursor(0, 2)
+        terminal.insertLines(1)
+        val ids = LongArray(8)
+        terminal.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+        assertTrue(ids[2] > ids[3])
+        state.recordPromptStart(ids[0])
+        state.recordPromptEnd(ids[0])
+        state.recordCommandStart(ids[1], includeLine = true)
+        state.recordCommandFinished(ids[3], exitCode = 1)
+        val record = state.latestCommandRecordId()
+        state.recordPromptStart(ids[3])
+        state.updateLineOrder(terminal)
+
+        val range = LongArray(3)
+        assertTrue(state.copyCommandOutputRange(record, range))
+        assertContentEquals(longArrayOf(ids[1], ids[2], 1), range)
+        assertTrue(state.copyCommandBlockRange(record, range))
+        assertEquals(ids[0], range[0])
+        assertEquals(ids[2], range[1])
+        assertEquals(record, state.commandOutputRecordIdAtLine(ids[2]))
+        assertEquals(0, state.commandOutputRecordIdAtLine(ids[3]))
+        assertEquals(record, state.previousCommandRecordIdBeforeLine(ids[3]))
+        val owners = IntArray(8)
+        val rails = BooleanArray(8)
+        state.copyViewport(ids, 8, BooleanArray(8), BooleanArray(8), BooleanArray(8), owners, IntArray(8), rails)
+        assertContentEquals(intArrayOf(record, record, record), owners.copyOfRange(0, 3))
+        assertTrue(owners[3] > 0 && owners[3] != record)
+        assertContentEquals(IntArray(4), owners.copyOfRange(4, 8))
+        assertContentEquals(booleanArrayOf(false, true, true, false, false, false, false, false), rails)
+    }
+
+    @Test
+    fun `losing an anchor after reordering makes command ranges unknown`() {
+        val terminal = TerminalBuffers.create(12, 8)
+        val state = TerminalShellIntegrationState()
+        terminal.positionCursor(0, 2)
+        terminal.insertLines(1)
+        val ids = LongArray(8)
+        terminal.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+        state.recordCommandStart(ids[1], includeLine = true)
+        state.recordCommandFinished(ids[2], exitCode = 0)
+        state.updateLineOrder(terminal)
+        val record = state.latestCommandRecordId()
+        assertTrue(state.copyCommandOutputRange(record, LongArray(3)))
+        terminal.positionCursor(0, 1)
+        terminal.deleteLines(1)
+        state.updateLineOrder(terminal)
+
+        assertFalse(state.copyCommandOutputRange(record, LongArray(3)))
+        assertFalse(state.copyCommandBlockRange(record, LongArray(2)))
+        assertEquals(0, state.commandOutputRecordIdAtLine(ids[2]))
+    }
+
     @Test
     fun `record projection rejects an overflowing destination slice without changing arrays`() {
         val state = TerminalShellIntegrationState()

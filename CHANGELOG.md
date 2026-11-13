@@ -12,6 +12,11 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Headless runtime
 
+- Clip DEC rectangle coordinates after overflow-safe origin rebasing, keeping
+  editing operations and checksum queries on the same geometry policy.
+- Kitty text-mode keys emit text only on press and repeat; release reports remain
+  available for enhanced keys and report-all mode.
+
 - Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
   a single extreme count from triggering billions of synchronous grid mutations.
 
@@ -57,9 +62,16 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 - Added `TerminalSession.commandOutputText` for bounded headless extraction of a completed command’s
   retained output tail. Results preserve graphemes and logical line breaks, distinguishing caller
-  truncation from missing history. Custom producers can implement the optional contract.
+  truncation from missing history. Command ranges follow retained row order through insertion
+  and reflow; ambiguous anchors remain unknown. Custom producers can implement the optional contract.
+
+- POSIX path completion preserves quoted and escaped tildes as literal directories
+  in both filesystem lookup and inserted text, while bare `~/` continues to expand home.
 
 ### Rendering and interaction
+
+- Swing tracks repeat and release for extended function and system keys, and clears
+  pending keyboard state on focus loss and session binding changes.
 
 - Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking
   whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while

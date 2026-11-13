@@ -15,12 +15,16 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -206,7 +210,17 @@ public class TerminalShellIntegrationState(
     }
 
     private val lock = Any()
+    private var explicitLineOrder = false
+    private var orderedLineIds = LongArray(0)
+    private var sortedLineIds = LongArray(0)
+    private var linePositions = IntArray(0)
+    private var orderedLineCount = 0
+    private var observedStructure = Long.MIN_VALUE
+    private var observedHistoryLayout = Long.MIN_VALUE
+    private var observedVisibleStart = Long.MIN_VALUE
+    private var observedMetadataRevision = Long.MIN_VALUE
     private val promptStartLineIds = LongArray(capacity) { NO_LINE_ID }
+    private val promptPrecedingLineIds = LongArray(capacity) { NO_LINE_ID }
     private val promptEndLineIds = LongArray(capacity) { NO_LINE_ID }
     private val commandStartLineIds = LongArray(capacity) { NO_LINE_ID }
     private val commandEndLineIds = LongArray(capacity) { NO_LINE_ID }
@@ -234,6 +248,156 @@ public class TerminalShellIntegrationState(
     private val directoryListeners = CopyOnWriteArrayList<Listener<String>>()
 
     public override val revision: StateFlow<Long> = mutableRevision.asStateFlow()
+
+    /**
+     * Refreshes primary-buffer spatial ordering after output or resize.
+     *
+     * Producers using terminal render identities must call this before publishing ranges
+     * for consumers. The whole call must share the reader's terminal mutation boundary;
+     * frames are borrowed only within their callbacks. Acquire that boundary before this
+     * model's storage lock. Session-backed producers call it from [TerminalShellIntegration.outputProcessed].
+     * Adjacent wrapped rows may share an identity. Missing anchors after rearrangement
+     * make ranges unknown. Models that omit this call must use consecutive line positions as IDs.
+     *
+     * @param reader primary-buffer frame reader serialized with producer publications.
+     */
+    public fun updateLineOrder(reader: TerminalRenderFrameReader) {
+        var capture = false
+        var scanStart = 0L
+        reader.readRenderFrame { frame ->
+            if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) return@readRenderFrame
+            synchronized(lock) {
+                var previous = 0L
+                var rearranged = false
+                for (row in 0 until frame.rows) {
+                    val id = frame.lineId(row)
+                    if (id <= 0 || id < previous) rearranged = true
+                    previous = id
+                }
+                val visibleStart = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+                val layoutChanged = observedHistoryLayout != frame.historyContentGeneration
+                val historyAdvanced = observedVisibleStart != visibleStart
+                if (!explicitLineOrder &&
+                    !rearranged &&
+                    (observedStructure != frame.structureGeneration || observedMetadataRevision != metadataRevision)
+                ) {
+                    capturePromptPredecessors(frame)
+                }
+                capture = layoutChanged ||
+                    historyAdvanced ||
+                    ((explicitLineOrder || rearranged) && observedStructure != frame.structureGeneration)
+                // Rows scrolled out during this batch can hide an insertion from the live viewport.
+                if (!explicitLineOrder && !layoutChanged && !rearranged) {
+                    scanStart = (observedVisibleStart - 1).coerceAtLeast(0)
+                }
+                observedHistoryLayout = frame.historyContentGeneration
+                observedStructure = frame.structureGeneration
+                observedVisibleStart = visibleStart
+                observedMetadataRevision = metadataRevision
+            }
+        }
+        if (!capture) return
+        var requiresFullOrder: Boolean
+        do {
+            requiresFullOrder = false
+            reader.readRenderFrameForAbsoluteRange(scanStart, Long.MAX_VALUE) { frame ->
+                if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) return@readRenderFrameForAbsoluteRange
+                synchronized(lock) {
+                    var monotonic = true
+                    var previous = 0L
+                    for (row in 0 until frame.rows) {
+                        val id = frame.lineId(row)
+                        if (id <= 0 || id < previous) monotonic = false
+                        previous = id
+                    }
+                    if (!explicitLineOrder && monotonic) {
+                        capturePromptPredecessors(frame)
+                        return@synchronized
+                    }
+                    if (scanStart != 0L) {
+                        requiresFullOrder = true
+                        return@synchronized
+                    }
+                    explicitLineOrder = true
+                    if (orderedLineIds.size < frame.rows) {
+                        orderedLineIds = LongArray(frame.rows)
+                        sortedLineIds = LongArray(frame.rows)
+                        linePositions = IntArray(frame.rows)
+                    }
+                    orderedLineCount = 0
+                    for (row in 0 until frame.rows) {
+                        val id = frame.lineId(row)
+                        if (id <= 0) {
+                            orderedLineCount = 0
+                            return@synchronized
+                        }
+                        // Reflow can spread one logical identity over adjacent physical rows.
+                        if (orderedLineCount > 0 && orderedLineIds[orderedLineCount - 1] == id) continue
+                        orderedLineIds[orderedLineCount] = id
+                        sortedLineIds[orderedLineCount] = id
+                        orderedLineCount++
+                    }
+                    Arrays.sort(sortedLineIds, 0, orderedLineCount)
+                    for (row in 0 until orderedLineCount) {
+                        if (row > 0 && sortedLineIds[row] == sortedLineIds[row - 1]) {
+                            orderedLineCount = 0
+                            return@synchronized
+                        }
+                    }
+                    for (row in 0 until orderedLineCount) {
+                        linePositions[Arrays.binarySearch(sortedLineIds, 0, orderedLineCount, orderedLineIds[row])] = row
+                    }
+                }
+            }
+            scanStart = 0L
+        } while (requiresFullOrder)
+    }
+
+    /** Records real neighbours even when increasing identities have gaps after deletion. */
+    private fun capturePromptPredecessors(frame: TerminalRenderFrame) {
+        if (orderedLineIds.size < frame.rows) {
+            orderedLineIds = LongArray(frame.rows)
+            sortedLineIds = LongArray(frame.rows)
+            linePositions = IntArray(frame.rows)
+        }
+        orderedLineCount = frame.rows
+        for (row in 0 until frame.rows) orderedLineIds[row] = frame.lineId(row)
+        // Host metadata can arrive after outputProcessed; keep identities, never borrowed frames.
+        for (index in 0 until count) {
+            val prompt = promptStartLineIds[index]
+            if (prompt == NO_LINE_ID) continue
+            val preceding = precedingRetainedLineId(prompt)
+            if (preceding != NO_LINE_ID) promptPrecedingLineIds[index] = preceding
+        }
+    }
+
+    private fun precedingRetainedLineId(lineId: Long): Long {
+        var first = 0
+        var last = orderedLineCount
+        while (first < last) {
+            val middle = first + (last - first) / 2
+            if (orderedLineIds[middle] < lineId) first = middle + 1 else last = middle
+        }
+        return if (first in 1 until orderedLineCount && orderedLineIds[first] == lineId) orderedLineIds[first - 1] else NO_LINE_ID
+    }
+
+    private fun linePosition(id: Long): Long {
+        if (id == NO_LINE_ID) return -1
+        if (!explicitLineOrder) return id
+        val index = Arrays.binarySearch(sortedLineIds, 0, orderedLineCount, id)
+        return if (index < 0) -1 else linePositions[index].toLong()
+    }
+
+    private fun lineBetween(
+        id: Long,
+        start: Long,
+        end: Long,
+    ): Boolean {
+        val first = linePosition(start)
+        val last = linePosition(end)
+        val position = linePosition(id)
+        return first in 0..last && position in first..last
+    }
 
     public override fun addCommandFinishedListener(listener: (TerminalShellIntegrationCommandMetadata) -> Unit): AutoCloseable =
         addListener(commandFinishedListeners, listener)
@@ -289,6 +453,7 @@ public class TerminalShellIntegrationState(
                 activeCommandIndex = NO_INDEX
                 val index = appendCommandLocked()
                 promptStartLineIds[index] = lineId
+                if (!explicitLineOrder) promptPrecedingLineIds[index] = precedingRetainedLineId(lineId)
                 lifecycles[index] = TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY
                 activePromptIndex = index
                 ++metadataRevision
@@ -541,9 +706,9 @@ public class TerminalShellIntegrationState(
 
             val start = commandStartLineIds[index]
             val end = commandEndLineIds[index]
-            if (start == NO_LINE_ID || end == NO_LINE_ID || start > end) return false
+            if (start == NO_LINE_ID || end == NO_LINE_ID || linePosition(start) < 0 || linePosition(start) > linePosition(end)) return false
             val lastOutputLine = lastCommandLineBeforeNextPromptLocked(index, start, end)
-            if (lastOutputLine < start) return false
+            if (linePosition(lastOutputLine) < linePosition(start)) return false
             if (!isCommandStartInclusive(index) && lastOutputLine == start) return false
 
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.START_LINE_ID_INDEX] = start
@@ -575,7 +740,7 @@ public class TerminalShellIntegrationState(
 
             val blockStart = promptStartLineIds[index].takeIf { it != NO_LINE_ID } ?: commandStart
             val blockEnd =
-                if (commandStart <= commandEnd) {
+                if (linePosition(commandStart) >= 0 && linePosition(commandStart) <= linePosition(commandEnd)) {
                     lastCommandLineBeforeNextPromptLocked(index, commandStart, commandEnd)
                 } else {
                     // A reversed finish is empty only when the next prompt occupies the
@@ -585,7 +750,7 @@ public class TerminalShellIntegrationState(
                     if (nextPrompt == count || promptStartLineIds[nextPrompt] != commandStart) return false
                     commandEnd
                 }
-            if (blockEnd < blockStart) return false
+            if (linePosition(blockStart) < 0 || linePosition(blockEnd) < linePosition(blockStart)) return false
 
             destination[destinationOffset + TerminalShellIntegrationCommandBlockRange.START_LINE_ID_INDEX] = blockStart
             destination[destinationOffset + TerminalShellIntegrationCommandBlockRange.END_LINE_ID_INDEX] = blockEnd
@@ -637,7 +802,12 @@ public class TerminalShellIntegrationState(
             val owner = commandIndexAtLineLocked(lineId)
             var index = if (owner == NO_INDEX) count - 1 else owner - 1
             while (index >= 0) {
-                if (isCommandRecordLocked(index) && commandStartLineIds[index] < lineId) return recordIds[index]
+                if (isCommandRecordLocked(index) &&
+                    linePosition(commandStartLineIds[index]) >= 0 &&
+                    linePosition(commandStartLineIds[index]) < linePosition(lineId)
+                ) {
+                    return recordIds[index]
+                }
                 index--
             }
             return TerminalShellIntegrationCommandRecord.NONE
@@ -650,7 +820,12 @@ public class TerminalShellIntegrationState(
             val owner = commandIndexAtLineLocked(lineId)
             var index = if (owner == NO_INDEX) 0 else owner + 1
             while (index < count) {
-                if (isCommandRecordLocked(index) && commandStartLineIds[index] > lineId) return recordIds[index]
+                if (isCommandRecordLocked(index) &&
+                    linePosition(lineId) >= 0 &&
+                    linePosition(commandStartLineIds[index]) > linePosition(lineId)
+                ) {
+                    return recordIds[index]
+                }
                 index++
             }
             return TerminalShellIntegrationCommandRecord.NONE
@@ -814,6 +989,9 @@ public class TerminalShellIntegrationState(
                 val index = activePromptIndex
                 if (index == NO_INDEX || anchors[index] == lineId) return
                 anchors[index] = lineId
+                if (anchors === promptStartLineIds) {
+                    promptPrecedingLineIds[index] = if (explicitLineOrder) NO_LINE_ID else precedingRetainedLineId(lineId)
+                }
                 ++metadataRevision
             }
         publishRevision(changedRevision)
@@ -890,6 +1068,7 @@ public class TerminalShellIntegrationState(
         val index = count
         count++
         promptStartLineIds[index] = NO_LINE_ID
+        promptPrecedingLineIds[index] = NO_LINE_ID
         promptEndLineIds[index] = NO_LINE_ID
         commandStartLineIds[index] = NO_LINE_ID
         commandEndLineIds[index] = NO_LINE_ID
@@ -918,6 +1097,7 @@ public class TerminalShellIntegrationState(
         commandPromptBytes -= commandPrompts[0]?.storageBytes ?: 0
         commandPrompts.copyInto(commandPrompts, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptStartLineIds.copyInto(promptStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
+        promptPrecedingLineIds.copyInto(promptPrecedingLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptEndLineIds.copyInto(promptEndLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandStartLineIds.copyInto(commandStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandEndLineIds.copyInto(commandEndLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
@@ -980,15 +1160,15 @@ public class TerminalShellIntegrationState(
             var index = count - 1
             while (index >= 0) {
                 val start = commandStartLineIds[index]
-                if (start != NO_LINE_ID && lineId >= start) {
+                if (start != NO_LINE_ID && linePosition(start) >= 0 && linePosition(lineId) >= linePosition(start)) {
                     val end = commandEndLineIds[index]
                     val ownsOutput =
                         if (end != NO_LINE_ID) {
-                            lineId <= end && isLineInCommandOutputRange(index, lineId, start, end)
+                            isLineInCommandOutputRange(index, lineId, start, end)
                         } else {
                             index == activeCommandIndex &&
                                 lifecycles[index] == TerminalShellIntegrationCommandLifecycle.RUNNING &&
-                                (lineId > start || isCommandStartInclusive(index))
+                                (lineId != start || isCommandStartInclusive(index))
                         }
                     if (ownsOutput) return recordIds[index]
                 }
@@ -1017,9 +1197,9 @@ public class TerminalShellIntegrationState(
         if (promptStart != NO_LINE_ID) {
             val promptEnd = promptEndLineIds[index]
             if (promptEnd != NO_LINE_ID) {
-                val first = minOf(promptStart, promptEnd)
-                val last = maxOf(promptStart, promptEnd)
-                if (lineId in first..last) return true
+                val first = if (linePosition(promptStart) <= linePosition(promptEnd)) promptStart else promptEnd
+                val last = if (first == promptStart) promptEnd else promptStart
+                if (lineBetween(lineId, first, last)) return true
             } else if (lineId == promptStart) {
                 return true
             }
@@ -1177,9 +1357,9 @@ public class TerminalShellIntegrationState(
         start: Long,
         end: Long,
     ): Boolean {
-        if (start > end) return false
+        if (linePosition(start) < 0 || linePosition(start) > linePosition(end)) return false
         val lastOutputLine = lastCommandLineBeforeNextPromptLocked(index, start, end)
-        return lineId in start..lastOutputLine && (isCommandStartInclusive(index) || lineId != start)
+        return lineBetween(lineId, start, lastOutputLine) && (isCommandStartInclusive(index) || lineId != start)
     }
 
     /** A subsequent prompt bounds both output and block selection; the command's own prompt does not. */
@@ -1188,16 +1368,25 @@ public class TerminalShellIntegrationState(
         start: Long,
         end: Long,
     ): Long {
-        var lastBlockLine = end
+        val startPosition = linePosition(start)
+        var lastBlockPosition = linePosition(end)
+        if (startPosition < 0 || lastBlockPosition < 0) return NO_LINE_ID
         var i = 0
         while (i < count) {
             val promptStart = promptStartLineIds[i]
-            if (i != commandIndex && promptStart >= start && promptStart <= lastBlockLine) {
-                lastBlockLine = promptStart - 1L
+            val promptPosition = linePosition(promptStart)
+            if (i != commandIndex && promptPosition >= startPosition && promptPosition <= lastBlockPosition) {
+                lastBlockPosition =
+                    if (!explicitLineOrder && promptPrecedingLineIds[i] != NO_LINE_ID) {
+                        linePosition(promptPrecedingLineIds[i])
+                    } else {
+                        promptPosition - 1L
+                    }
             }
             i++
         }
-        return lastBlockLine
+        if (lastBlockPosition < 0) return NO_LINE_ID
+        return if (explicitLineOrder) orderedLineIds[lastBlockPosition.toInt()] else lastBlockPosition
     }
 
     private fun isCommandStartInclusive(index: Int): Boolean = flags[index] and FLAG_COMMAND_START_INCLUSIVE != 0
@@ -1217,6 +1406,12 @@ public class TerminalShellIntegrationState(
         }
 
     private fun clearLocked() {
+        explicitLineOrder = false
+        orderedLineCount = 0
+        observedStructure = Long.MIN_VALUE
+        observedHistoryLayout = Long.MIN_VALUE
+        observedVisibleStart = Long.MIN_VALUE
+        observedMetadataRevision = Long.MIN_VALUE
         var index = 0
         while (index < count) {
             commandTexts[index] = null
@@ -1228,6 +1423,31 @@ public class TerminalShellIntegrationState(
         count = 0
         activePromptIndex = NO_INDEX
         activeCommandIndex = NO_INDEX
+    }
+
+    private fun projectLineRange(
+        lineIds: LongArray,
+        rowCount: Int,
+        commandRecordIds: IntArray,
+        commandLifecycleStates: IntArray,
+        destinationOffset: Int,
+        startLineId: Long,
+        endLineId: Long,
+        commandRecordId: Int,
+        lifecycle: Int,
+    ) {
+        val first = if (linePosition(startLineId) <= linePosition(endLineId)) startLineId else endLineId
+        val last = if (first == startLineId) endLineId else startLineId
+        var row = 0
+        while (row < rowCount) {
+            val lineId = lineIds[row]
+            if (lineBetween(lineId, first, last)) {
+                val destinationIndex = destinationOffset + row
+                commandRecordIds[destinationIndex] = commandRecordId
+                commandLifecycleStates[destinationIndex] = lifecycle
+            }
+            row++
+        }
     }
 
     private companion object {
@@ -1323,31 +1543,6 @@ public class TerminalShellIntegrationState(
                     commandRecordIds[destinationIndex] = commandRecordId
                     commandLifecycleStates[destinationIndex] = lifecycle
                     return
-                }
-                row++
-            }
-        }
-
-        private fun projectLineRange(
-            lineIds: LongArray,
-            rowCount: Int,
-            commandRecordIds: IntArray,
-            commandLifecycleStates: IntArray,
-            destinationOffset: Int,
-            startLineId: Long,
-            endLineId: Long,
-            commandRecordId: Int,
-            lifecycle: Int,
-        ) {
-            val first = minOf(startLineId, endLineId)
-            val last = maxOf(startLineId, endLineId)
-            var row = 0
-            while (row < rowCount) {
-                val lineId = lineIds[row]
-                if (lineId in first..last) {
-                    val destinationIndex = destinationOffset + row
-                    commandRecordIds[destinationIndex] = commandRecordId
-                    commandLifecycleStates[destinationIndex] = lifecycle
                 }
                 row++
             }

@@ -147,6 +147,8 @@ private class OscShellIntegrationSession(
     }
 
     override fun outputProcessed() {
+        // Keep prompt-only observation cold until a command needs spatial ranges.
+        if (state.latestCommandRecordId() != TerminalShellIntegrationCommandRecord.NONE) state.updateLineOrder(context)
         shellCompletion.outputProcessed()
         if (readinessPromptStarted) context.readRenderFrame(readinessFrameConsumer)
         val tracker = observationTracker

@@ -27,6 +27,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
@@ -55,6 +56,44 @@ import javax.swing.SwingUtilities
 class SwingTerminalCommandNavigationTest {
     private val mutationDispatcher = StandardTestDispatcher()
     private val components = ArrayList<SwingTerminal>()
+
+    @Test
+    fun `real inserted output selects spatial rows and excludes the following prompt`() {
+        lateinit var inbound: TerminalConnectorListener
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun start(listener: TerminalConnectorListener) {
+                    inbound = listener
+                }
+            }
+        TerminalSession
+            .create(
+                TerminalBuffers.create(12, 8),
+                connector,
+                shellIntegration = OscShellIntegration,
+                workerDispatcher = mutationDispatcher,
+                ioDispatcher = mutationDispatcher,
+                cleanupDispatcher = mutationDispatcher,
+            ).use { session ->
+                session.start(12, 8)
+                val bytes =
+                    (
+                        "\u001b]133;A\u0007$ \u001b]133;B\u0007run\r\n\u001b[L\u001b]133;C\u0007" +
+                            "one\r\ninserted\r\n\u001b]133;D;1\u0007\u001b]133;A\u0007$ \u001b]133;B\u0007"
+                    ).encodeToByteArray()
+                inbound.onBytes(bytes, 0, bytes.size)
+                SwingUtilities.invokeAndWait {
+                    val component = createComponent(settingsProvider = { SwingSettings.create { it.padding = SwingPadding(0, 0, 0, 0) } })
+                    component.size = component.preferredGridSize(12, 8)
+                    component.bind(session)
+                    mutationDispatcher.scheduler.runCurrent()
+                    val id = session.shellIntegrationState.latestCommandRecordId()
+                    assertEquals("one\ninserted", component.commandOutputText(id))
+                    assertTrue(component.selectCommandOutput(id))
+                    assertEquals(CellSelection(0, 1, 12, 2), component.currentSelection())
+                }
+            }
+    }
 
     @AfterEach
     fun disposeComponents() {

@@ -24,6 +24,26 @@ import kotlin.test.*
 
 class PathCompletionSourceTest {
     @Test
+    fun `home expansion preserves quoted escaped and mixed literal tilde paths`() =
+        runBlocking {
+            for ((line, directory, replacement) in listOf(
+                Triple("cd ~/D", "~/", "~/Documents/"),
+                Triple("cd '~'/D", "./~/", "'~/Documents/'"),
+                Triple("cd \\~/D", "./~/", "\\~/Documents/"),
+                Triple("cd '~/D", "./~/", "'~/Documents/'"),
+                Triple("cd \"~/D", "./~/", "\"~/Documents/\""),
+                Triple("cd ~\"/D\"", "./~/", "\\~/Documents/"),
+            )) {
+                val source =
+                    PathCompletionSource({ listing ->
+                        assertEquals(directory, listing.directoryPrefix, line)
+                        listOf(TerminalFileEntry("Documents", true))
+                    })
+                assertEquals(replacement, source.complete(request(line, "file:///project")).single().replacementText, line)
+            }
+        }
+
+    @Test
     fun `POSIX quoting preserves literal backslashes through listing matching and insertion`() =
         runBlocking {
             val source =

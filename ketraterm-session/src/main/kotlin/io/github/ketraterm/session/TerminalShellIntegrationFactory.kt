@@ -65,12 +65,16 @@ public fun interface TerminalShellIntegrationFactory {
             promptReady: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow(),
         ): TerminalShellIntegrationFactory {
             val resetKeys = copyCommandLinePrefixResetKeys(prefixResetKeys)
-            return TerminalShellIntegrationFactory {
+            return TerminalShellIntegrationFactory { context ->
                 object : TerminalShellIntegration {
                     override val state = state
                     override val promptReady = promptReady
                     override val commandLineChanges = commandLine.changes
                     override val commandLinePrefixResetKeys = resetKeys
+
+                    override fun outputProcessed() {
+                        (state as? TerminalShellIntegrationState)?.updateLineOrder(context)
+                    }
 
                     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = commandLine.value
 
@@ -111,10 +115,13 @@ public fun interface TerminalShellIntegrationFactory {
                 ).asStateFlow(),
             promptReady: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow(),
         ): TerminalShellIntegrationFactory =
-            TerminalShellIntegrationFactory {
+            TerminalShellIntegrationFactory { context ->
                 object : TerminalShellIntegration {
                     override val state = state
                     override val promptReady = promptReady
+
+                    override fun outputProcessed() = state.updateLineOrder(context)
+
                     private var nextRevision = 0L
                     override val commandLineChanges =
                         flow {

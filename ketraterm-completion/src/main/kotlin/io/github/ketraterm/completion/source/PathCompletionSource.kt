@@ -53,21 +53,23 @@ internal class PathCompletionSource(
         val pathParts = splitPathPrefix(normalizedPrefix) ?: return emptyList()
         val directoryPortion = pathParts.directoryPrefix
         val filePrefix = pathParts.entryNamePrefix
+        val rawStart = context.replacementStartOffset
+        val posixHome = request.shellCapabilities.syntax == TerminalShellSyntax.POSIX && directoryPortion.startsWith("~/")
+        val expandHome =
+            posixHome &&
+                request.commandLine.getOrNull(rawStart) == '~' &&
+                (request.cursorOffset == rawStart + 1 || request.commandLine.getOrNull(rawStart + 1) == '/')
+        val lookupDirectory = if (posixHome && !expandHome) "./$directoryPortion" else directoryPortion
         val entries =
             fileSystemProvider.listDirectory(
                 TerminalDirectoryListingRequest(
                     workingDirectoryUri = workingDir,
-                    directoryPrefix = directoryPortion,
+                    directoryPrefix = lookupDirectory,
                     entryNamePrefix = filePrefix,
                 ),
             )
 
         val pathSeparator = request.shellCapabilities.pathSeparator(prefix)
-        val expandHome =
-            directoryPortion.startsWith("~/") &&
-                pathSeparator == '/' &&
-                context.activeTokenQuote == '\u0000' &&
-                request.shellCapabilities.quoting == TerminalShellQuotingPolicy.POSIX
         // Only the request's home prefix is shell syntax; provider names remain literal.
         val literalDirectoryPortion = if (expandHome) directoryPortion.substring(2) else directoryPortion
         val candidates = BoundedCompletionCandidateCollector(limit)

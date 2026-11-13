@@ -428,6 +428,13 @@ stable line IDs before later bytes, and refresh live-grid editing anchors after
 geometry changes. Thread-safe model storage alone does not order notifications
 from concurrent producers. Use distinct projections per session.
 
+`outputProcessed` runs under mutation serialization after parser batches and
+resizes. Producers backed by `TerminalShellIntegrationState` and render identities
+refresh spatial ranges there with `updateLineOrder(context)`; the host factory does
+this automatically. The model acquires its storage lock only after entering the
+terminal boundary. Wrapped rows can share an identity, and numeric IDs do not
+establish row order. Missing or ambiguous anchors after rearrangement stay unknown.
+
 Metadata `revision` is conflated invalidation state. Command-finished listeners
 deliver completed records synchronously outside the model lock. Directory
 listeners report future changed URIs without replay and suppress equal URIs;

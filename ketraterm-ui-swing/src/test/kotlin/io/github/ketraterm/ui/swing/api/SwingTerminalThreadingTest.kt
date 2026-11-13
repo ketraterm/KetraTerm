@@ -63,6 +63,60 @@ import kotlin.concurrent.thread
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
+    @Test
+    fun `focus loss unbind and rebind discard incomplete keyboard input`() {
+        val events = ArrayList<TerminalKeyEvent>()
+        val session =
+            TerminalSession.create(
+                TerminalBuffers.create(10, 3),
+                NoOpConnector,
+                inputEncoderFactory =
+                    TerminalInputEncoderFactory { _, _, _ ->
+                        object : TerminalInputEncoder by NoOpInputEncoder {
+                            override fun encodeKey(event: TerminalKeyEvent) {
+                                events += event
+                            }
+                        }
+                    },
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
+            )
+        session.use {
+            session.start()
+            edtCall {
+                val component = controlledTerminal()
+                try {
+                    component.bind(session)
+
+                    fun press() {
+                        val event =
+                            java.awt.event.KeyEvent(
+                                component,
+                                java.awt.event.KeyEvent.KEY_PRESSED,
+                                0L,
+                                0,
+                                java.awt.event.KeyEvent.VK_UP,
+                                java.awt.event.KeyEvent.CHAR_UNDEFINED,
+                            )
+                        component.keyListeners.forEach { it.keyPressed(event) }
+                    }
+                    press()
+                    component.focusListeners.forEach { it.focusLost(FocusEvent(component, FocusEvent.FOCUS_LOST)) }
+                    press()
+                    component.unbind()
+                    component.bind(session)
+                    press()
+                    component.bind(session)
+                    press()
+                    assertEquals(List(4) { io.github.ketraterm.input.event.TerminalKeyEventType.PRESS }, events.map { it.type })
+                } finally {
+                    component.dispose()
+                }
+            }
+        }
+    }
+
     private val dispatcher = StandardTestDispatcher()
     private val uiDispatches = AtomicInteger()
 

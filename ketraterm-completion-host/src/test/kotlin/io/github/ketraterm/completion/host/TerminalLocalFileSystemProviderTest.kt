@@ -15,17 +15,61 @@
  */
 package io.github.ketraterm.completion.host
 
-import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
-import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.api.*
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
+import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.test.*
 
 class TerminalLocalFileSystemProviderTest {
+    @TempDir
+    lateinit var directory: Path
+
+    @Test
+    fun `POSIX quoted tilde completion reads the literal directory while bare tilde reads home`() {
+        val home = Files.createDirectory(directory.resolve("home"))
+        val project = Files.createDirectory(directory.resolve("project"))
+        Files.createDirectory(home.resolve("HomeDocuments"))
+        Files.createDirectory(Files.createDirectory(project.resolve("~")).resolve("LiteralDocuments"))
+        runTest {
+            val provider =
+                TerminalLocalFileSystemProvider(
+                    resolver = TerminalCompletionPathResolver(homeDirectory = home),
+                    scanner =
+                        TerminalBoundedDirectoryScanner(
+                            ioDispatcher = StandardTestDispatcher(testScheduler),
+                            scanBudgetNanos = Long.MAX_VALUE,
+                        ),
+                )
+            val source = TerminalCompletionSources.path(provider)
+            for ((line, expected) in listOf(
+                "cd ~/" to "~/HomeDocuments/",
+                "cd '~/" to "'~/LiteralDocuments/'",
+                "cd \"~/" to "\"~/LiteralDocuments/\"",
+                "cd \\~/" to "\\~/LiteralDocuments/",
+                "cd '~'/" to "'~/LiteralDocuments/'",
+            )) {
+                val request =
+                    TerminalCompletionRequest(
+                        line,
+                        line.length,
+                        workingDirectoryUri = project.toUri().toString(),
+                        shellCapabilities = TerminalShellCapabilities.POSIX,
+                    )
+                val candidate = source.complete(request, TerminalCompletionContext.resolve(request), 10).single()
+                assertEquals(expected, candidate.replacementText, line)
+                assertEquals(3, candidate.replacementStartOffset, line)
+                assertEquals(line.length, candidate.replacementEndOffset, line)
+            }
+        }
+    }
+
     @Test
     fun `local URI resolution preserves local paths and rejects non-path components`() {
         val directory = Path.of("local directory").toAbsolutePath().normalize()

@@ -27,6 +27,83 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class SwingKeyMapperTest {
+    @Test
+    fun `mapped symbolic keys preserve physical lifecycle at every supported location`() {
+        val codes =
+            buildList {
+                addAll(KeyEvent.VK_F1..KeyEvent.VK_F12)
+                addAll(KeyEvent.VK_F13..KeyEvent.VK_F24)
+                addAll(KeyEvent.VK_NUMPAD0..KeyEvent.VK_NUMPAD9)
+                addAll(
+                    listOf(
+                        KeyEvent.VK_UP,
+                        KeyEvent.VK_DOWN,
+                        KeyEvent.VK_LEFT,
+                        KeyEvent.VK_RIGHT,
+                        KeyEvent.VK_HOME,
+                        KeyEvent.VK_END,
+                        KeyEvent.VK_PAGE_UP,
+                        KeyEvent.VK_PAGE_DOWN,
+                        KeyEvent.VK_INSERT,
+                        KeyEvent.VK_DELETE,
+                        KeyEvent.VK_BACK_SPACE,
+                        KeyEvent.VK_ENTER,
+                        KeyEvent.VK_TAB,
+                        KeyEvent.VK_ESCAPE,
+                        KeyEvent.VK_CAPS_LOCK,
+                        KeyEvent.VK_SCROLL_LOCK,
+                        KeyEvent.VK_NUM_LOCK,
+                        KeyEvent.VK_PRINTSCREEN,
+                        KeyEvent.VK_PAUSE,
+                        KeyEvent.VK_CONTEXT_MENU,
+                        KeyEvent.VK_SHIFT,
+                        KeyEvent.VK_CONTROL,
+                        KeyEvent.VK_ALT,
+                        KeyEvent.VK_META,
+                        KeyEvent.VK_WINDOWS,
+                        KeyEvent.VK_DECIMAL,
+                        KeyEvent.VK_DIVIDE,
+                        KeyEvent.VK_MULTIPLY,
+                        KeyEvent.VK_SUBTRACT,
+                        KeyEvent.VK_ADD,
+                    )
+                )
+            }
+        for (code in codes) {
+            for (location in KeyEvent.KEY_LOCATION_UNKNOWN..KeyEvent.KEY_LOCATION_NUMPAD) {
+                val label = "key=$code location=$location"
+                val press = mapper.keyPressed(pressed(code, keyLocation = location))
+                assertEquals(TerminalKeyEventType.PRESS, press?.type, label)
+                assertEquals(TerminalKeyEventType.REPEAT, mapper.keyPressed(pressed(code, keyLocation = location))?.type, label)
+                val release = mapper.keyReleased(released(code, keyLocation = location))
+                assertEquals(TerminalKeyEventType.RELEASE, release?.type, label)
+                assertEquals(press?.key, release?.key, label)
+                assertNull(mapper.keyReleased(released(code, keyLocation = location)), label)
+            }
+        }
+        assertEquals(
+            TerminalKeyEventType.PRESS,
+            mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))?.type,
+        )
+        assertEquals(
+            TerminalKeyEventType.PRESS,
+            mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))?.type,
+        )
+    }
+
+    @Test
+    fun `reset discards held keys surrogate halves and keypad suppression`() {
+        mapper.keyPressed(pressed(KeyEvent.VK_UP))
+        mapper.keyTyped(typed('\uD83D'))
+        mapper.resetInput()
+        assertNull(mapper.keyReleased(released(KeyEvent.VK_UP)))
+        assertNull(mapper.keyTyped(typed('\uDE00')))
+        assertEquals(TerminalKeyEventType.PRESS, mapper.keyPressed(pressed(KeyEvent.VK_UP))?.type)
+        mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD7))
+        mapper.resetInput()
+        assertEquals('7'.code, mapper.keyTyped(typed('7'))?.codepoint)
+    }
+
     private val source = Canvas()
     private val mapper = SwingKeyMapper(numLockState = { false })
 

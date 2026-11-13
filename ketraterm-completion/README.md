@@ -64,6 +64,10 @@ Path separators are captured separately from quoting: set
 Git Bash that accept Windows paths. Native POSIX capabilities preserve literal
 backslashes in filenames.
 
+POSIX path completion expands a bare `~/` prefix using the provider's configured
+home directory. Quoted or escaped tildes remain literal paths relative to the
+working directory, including in the inserted replacement.
+
 ## Customize the engine
 
 Pass `commandSpecs` to `TerminalCompletionEngines.fromSources` to replace the

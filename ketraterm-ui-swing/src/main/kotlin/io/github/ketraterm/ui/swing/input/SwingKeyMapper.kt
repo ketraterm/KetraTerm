@@ -44,7 +44,15 @@ internal class SwingKeyMapper(
     private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
     private var suppressNextKeypadTyped: Boolean = false
     private var numLockQueryAvailable: Boolean = true
-    private val pressedPhysicalKeys = BooleanArray((KeyEvent.KEY_LAST + 1) * KEY_LOCATION_COUNT)
+    private val pressedPhysicalKeys = BooleanArray(TerminalKey.entries.size * KEY_LOCATION_COUNT)
+
+    /** Discards keyboard state when physical release events may have been lost. */
+    fun resetInput() {
+        pressedPhysicalKeys.fill(false)
+        pendingHighSurrogate = NO_PENDING_SURROGATE
+        pendingHighSurrogateModifiers = TerminalModifiers.NONE
+        suppressNextKeypadTyped = false
+    }
 
     /**
      * Converts a `KEY_PRESSED` event to terminal input when the event should
@@ -59,7 +67,7 @@ internal class SwingKeyMapper(
         val key = terminalKey(event)
         if (key != null) {
             suppressNextKeypadTyped = isPrintableKeypadKey(key)
-            return TerminalKeyEvent.key(key, keypadModifiers(key, modifiers), pressedType(event))
+            return TerminalKeyEvent.key(key, keypadModifiers(key, modifiers), pressedType(event, key))
         }
 
         suppressNextKeypadTyped = false
@@ -83,7 +91,7 @@ internal class SwingKeyMapper(
      */
     fun keyReleased(event: KeyEvent): TerminalKeyEvent? {
         val key = terminalKey(event) ?: return null
-        if (!releasePhysicalKey(event)) return null
+        if (!releasePhysicalKey(event, key)) return null
         return TerminalKeyEvent.key(key, keypadModifiers(key, modifiers(event)), TerminalKeyEventType.RELEASE)
     }
 
@@ -316,8 +324,11 @@ internal class SwingKeyMapper(
         }
     }
 
-    private fun pressedType(event: KeyEvent): TerminalKeyEventType {
-        val index = physicalKeyIndex(event)
+    private fun pressedType(
+        event: KeyEvent,
+        key: TerminalKey,
+    ): TerminalKeyEventType {
+        val index = physicalKeyIndex(event, key)
         if (index == NO_PHYSICAL_KEY_INDEX) return TerminalKeyEventType.PRESS
         if (pressedPhysicalKeys[index]) return TerminalKeyEventType.REPEAT
 
@@ -325,21 +336,26 @@ internal class SwingKeyMapper(
         return TerminalKeyEventType.PRESS
     }
 
-    private fun releasePhysicalKey(event: KeyEvent): Boolean {
-        val index = physicalKeyIndex(event)
+    private fun releasePhysicalKey(
+        event: KeyEvent,
+        key: TerminalKey,
+    ): Boolean {
+        val index = physicalKeyIndex(event, key)
         if (index == NO_PHYSICAL_KEY_INDEX || !pressedPhysicalKeys[index]) return false
 
         pressedPhysicalKeys[index] = false
         return true
     }
 
-    private fun physicalKeyIndex(event: KeyEvent): Int {
-        val keyCode = event.keyCode
+    private fun physicalKeyIndex(
+        event: KeyEvent,
+        key: TerminalKey,
+    ): Int {
         val keyLocation = event.keyLocation
-        if (keyCode !in 0..KeyEvent.KEY_LAST || keyLocation !in 0 until KEY_LOCATION_COUNT) {
+        if (keyLocation !in 0 until KEY_LOCATION_COUNT) {
             return NO_PHYSICAL_KEY_INDEX
         }
-        return keyCode * KEY_LOCATION_COUNT + keyLocation
+        return key.ordinal * KEY_LOCATION_COUNT + keyLocation
     }
 
     private companion object {

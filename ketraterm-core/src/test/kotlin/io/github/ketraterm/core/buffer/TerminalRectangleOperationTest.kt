@@ -27,6 +27,22 @@ import org.junit.jupiter.params.provider.CsvSource
 
 class TerminalRectangleOperationTest {
     @Test
+    fun `maximum rectangle coordinates clip after origin rebasing without overflow`() {
+        val buffer = TerminalBuffers.create(10, 8)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setScrollRegion(3, 7)
+        buffer.setOriginMode(true)
+        buffer.fillRectangle('X'.code, Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals('X'.code, buffer.getCodepointAt(7, 6))
+        assertEquals(0, buffer.getCodepointAt(2, 2))
+        buffer.eraseRectangle(Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE, false)
+        assertEquals(0, buffer.getCodepointAt(7, 6))
+        buffer.fillRectangle('Y'.code, Int.MAX_VALUE, 1, 1, 1)
+        assertEquals("", buffer.getAllAsString().trim())
+    }
+
+    @Test
     fun `DECFRA fills an inclusive rectangle without moving cursor`() {
         val buffer = TerminalBuffers.create(width = 6, height = 4)
         buffer.positionCursor(col = 5, row = 3)

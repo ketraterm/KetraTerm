@@ -1320,6 +1320,7 @@ public class TerminalSession private constructor(
                         }
                     val (scrollbackOffset, historySize) = anchor
                     coreResizeCompleted = true
+                    runtime.shellIntegration?.outputProcessed()
                     var resizedViewport: TerminalViewportResizeResult? = null
                     renderReader.readRenderFrame { frame ->
                         resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)

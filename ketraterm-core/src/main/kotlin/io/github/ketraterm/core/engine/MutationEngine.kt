@@ -20,6 +20,7 @@ import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.core.util.withResolvedRectangle
 import io.github.ketraterm.protocol.DecRectangleAttribute
 import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 
@@ -1286,7 +1287,7 @@ internal class MutationEngine(
         right: Int,
         selective: Boolean,
     ) = structuralMutation {
-        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+        state.withResolvedRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
             for (row in topRow..bottomRow) {
                 if (selective) {
                     selectiveEraseRange(row, leftCol, rightCol + 1)
@@ -1313,7 +1314,7 @@ internal class MutationEngine(
     ) = structuralMutation {
         if (codepoint !in 0..0x10FFFF || codepoint in 0xD800..0xDFFF) return@structuralMutation
 
-        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+        state.withResolvedRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
             for (row in topRow..bottomRow) {
                 val line = getLine(row)
                 for (col in leftCol..rightCol) {
@@ -1345,7 +1346,7 @@ internal class MutationEngine(
     ) = structuralMutation {
         if (sourcePage !in 0..1 || destinationPage !in 0..1) return@structuralMutation
 
-        withRectangle(sourceTop, sourceLeft, sourceBottom, sourceRight) { topRow, leftCol, bottomRow, rightCol ->
+        state.withResolvedRectangle(sourceTop, sourceLeft, sourceBottom, sourceRight) { topRow, leftCol, bottomRow, rightCol ->
             val originRows = state.modes.isOriginMode
             val originColumns = originRows && state.modes.isLeftRightMarginMode
             val rowBase = if (originRows) state.scrollTop else 0
@@ -1354,13 +1355,13 @@ internal class MutationEngine(
             val colLimit = if (originColumns) rightMargin else width - 1
             val destinationRow = rowBase + if (destinationTop <= 0) 0 else destinationTop - 1
             val destinationCol = colBase + if (destinationLeft <= 0) 0 else destinationLeft - 1
-            if (destinationRow !in rowBase..rowLimit || destinationCol !in colBase..colLimit) return@withRectangle
+            if (destinationRow !in rowBase..rowLimit || destinationCol !in colBase..colLimit) return@withResolvedRectangle
 
             val sourceRows = bottomRow - topRow + 1
             val sourceColumns = rightCol - leftCol + 1
             val copyRows = minOf(sourceRows, rowLimit - destinationRow + 1)
             val copyColumns = minOf(sourceColumns, colLimit - destinationCol + 1)
-            if (copyRows <= 0 || copyColumns <= 0) return@withRectangle
+            if (copyRows <= 0 || copyColumns <= 0) return@withResolvedRectangle
 
             snapshotRectangle(topRow, leftCol, copyRows, copyColumns)
 
@@ -1475,7 +1476,7 @@ internal class MutationEngine(
         right: Int,
         block: (row: Int, from: Int, to: Int, materializeBlanks: Boolean) -> Unit,
     ) {
-        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+        state.withResolvedRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
             if (state.isAttributeChangeExtentRectangle) {
                 for (row in topRow..bottomRow) {
                     block(row, leftCol, rightCol, true)
@@ -1636,35 +1637,6 @@ internal class MutationEngine(
         var nextSize = rectangleClusterData.size.coerceAtLeast(16)
         while (nextSize < required) nextSize *= 2
         rectangleClusterData = rectangleClusterData.copyOf(nextSize)
-    }
-
-    private inline fun withRectangle(
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-        block: (topRow: Int, leftCol: Int, bottomRow: Int, rightCol: Int) -> Unit,
-    ) {
-        val originRows = state.modes.isOriginMode
-        val originColumns = originRows && state.modes.isLeftRightMarginMode
-        val rowBase = if (originRows) state.scrollTop else 0
-        val rowLimit = if (originRows) state.scrollBottom else height - 1
-        val colBase = if (originColumns) leftMargin else 0
-        val colLimit = if (originColumns) rightMargin else width - 1
-
-        val requestedTop = rowBase + if (top <= 0) 0 else top - 1
-        val requestedLeft = colBase + if (left <= 0) 0 else left - 1
-        val requestedBottom = rowBase + if (bottom <= 0) rowLimit - rowBase else bottom - 1
-        val requestedRight = colBase + if (right <= 0) colLimit - colBase else right - 1
-        if (requestedTop > requestedBottom || requestedLeft > requestedRight) return
-
-        val topRow = requestedTop.coerceIn(rowBase, rowLimit)
-        val leftCol = requestedLeft.coerceIn(colBase, colLimit)
-        val bottomRow = requestedBottom.coerceIn(rowBase, rowLimit)
-        val rightCol = requestedRight.coerceIn(colBase, colLimit)
-        if (topRow > bottomRow || leftCol > rightCol) return
-
-        block(topRow, leftCol, bottomRow, rightCol)
     }
 
     /** Clears scrollback (ED 3), retaining visible rows and allocated storage for reuse. */

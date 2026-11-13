@@ -32,6 +32,106 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandOutputTextTest {
     @Test
+    fun `same line prompt after deletion clips to the actual predecessor without missing history`() =
+        runTest {
+            fixture(columns = 30, rows = 8) { session, connector ->
+                connector.feedFromHost(
+                    (PROMPT + "run\r\n" + START + "one\r\n\u001b[Moverwritten" + FINISH + "\u001b[1G" + PROMPT).encodeToByteArray(),
+                )
+                val id = session.shellIntegrationState.latestCommandRecordId()
+                assertEquals(TerminalCommandOutputText("one", false, false), session.commandOutputText(id))
+                session.readRenderFrame { frame ->
+                    val range = LongArray(3)
+                    assertTrue(session.shellIntegrationState.copyCommandOutputRange(id, range))
+                    assertEquals(frame.lineId(1), range[1])
+                }
+            }
+        }
+
+    @Test
+    fun `reflow retains inserted output with shared logical line identities`() =
+        runTest {
+            fixture(columns = 20, rows = 12) { session, connector ->
+                connector.feedFromHost(
+                    (PROMPT + "run\r\n" + START + "one\r\n\u001b[L0123456789abcdef\r\n" + FINISH + PROMPT).encodeToByteArray(),
+                )
+                val id = session.shellIntegrationState.latestCommandRecordId()
+                val expected = TerminalCommandOutputText("one\n0123456789abcdef", false, false)
+                assertEquals(expected, session.commandOutputText(id))
+                session.resizeViewport(7, 12)
+                assertEquals(expected, session.commandOutputText(id))
+                session.resizeViewport(20, 12)
+                assertEquals(expected, session.commandOutputText(id))
+            }
+        }
+
+    @Test
+    fun `insertion scrolled into history in one batch preserves output across chunking`() =
+        runTest {
+            val output = "one\r\n\u001b[Linserted\r\n" + (1..8).joinToString("\r\n") { "tail$it" }
+            val bytes = (PROMPT + "run\r\n" + START + output + "\r\n" + FINISH + PROMPT).encodeToByteArray()
+            for (split in 0..bytes.size) {
+                fixture(rows = 5) { session, connector ->
+                    // Establish the normal-order fast path before the rearranging batch.
+                    command(session, connector, "warmup")
+                    connector.feedFromHost(bytes.copyOfRange(0, split))
+                    connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+                    val id = session.shellIntegrationState.latestCommandRecordId()
+                    assertEquals(
+                        TerminalCommandOutputText("one\ninserted\n" + (1..8).joinToString("\n") { "tail$it" }, false, false),
+                        session.commandOutputText(id),
+                        "split=$split",
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun `deleted reordered anchors produce unknown output instead of an unrelated row`() =
+        runTest {
+            fixture(rows = 8) { session, connector ->
+                connector.feedFromHost((PROMPT + "run\r\n" + START + "one\r\n\u001b[Linserted\r\n" + FINISH + PROMPT).encodeToByteArray())
+                val id = session.shellIntegrationState.latestCommandRecordId()
+                assertEquals("one\ninserted", session.commandOutputText(id)?.text)
+                connector.feedFromHost("\u001b[2;1H\u001b[M".encodeToByteArray())
+                assertNull(session.commandOutputText(id))
+            }
+        }
+
+    @Test
+    fun `inserted lines are selected by retained order at every byte split`() =
+        runTest {
+            for (body in listOf(
+                START + "one\r\n\u001B[Linserted\r\n",
+                "\u001B[L" + START + "one\r\ninserted\r\n",
+            )) {
+                val bytes = (PROMPT + "run\r\n" + body + FINISH + PROMPT).encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    fixture(rows = 8) { session, connector ->
+                        connector.feedFromHost(bytes.copyOfRange(0, split))
+                        connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+                        val state = session.shellIntegrationState
+                        val id = state.latestCommandRecordId()
+                        assertEquals(
+                            TerminalCommandOutputText("one\ninserted", false, false),
+                            session.commandOutputText(id),
+                            "split=$split",
+                        )
+                        session.readRenderFrame { frame ->
+                            assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(1)))
+                            assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(2)))
+                            assertEquals(0, state.commandOutputRecordIdAtLine(frame.lineId(3)))
+                            val range = LongArray(3)
+                            assertTrue(state.copyCommandOutputRange(id, range))
+                            assertEquals(frame.lineId(1), range[0])
+                            assertEquals(frame.lineId(2), range[1])
+                        }
+                    }
+                }
+            }
+        }
+
+    @Test
     fun `a final grapheme exceeding the character budget is omitted whole`() =
         runTest {
             fixture { session, connector ->

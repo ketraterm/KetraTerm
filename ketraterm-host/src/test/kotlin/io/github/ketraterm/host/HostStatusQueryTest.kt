@@ -27,6 +27,28 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostStatusQueryTest {
     @ParameterizedTest
+    @ValueSource(strings = ["2147483646", "2147483647", "99999999999999999999999999999"])
+    fun `rectangle fill and checksum share overflow safe origin clipping at every byte split`(coordinate: String) {
+        val bytes =
+            (
+                "\u001B[3;7r\u001B[?69h\u001B[3;8s\u001B[?6h" +
+                    "\u001B[88;$coordinate;$coordinate;$coordinate;$coordinate\$x" +
+                    "\u001B[17;1;$coordinate;$coordinate;$coordinate;$coordinate*y"
+            ).encodeToByteArray()
+        assertAllByteSplits(bytes) { split ->
+            val terminal = TerminalBuffers.create(10, 8)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+            assertEquals('X'.code, terminal.getCodepointAt(7, 6), "split=$split")
+            assertEquals(0, terminal.getCodepointAt(2, 2))
+            val response = ByteArray(64)
+            val count = terminal.readResponseBytes(response)
+            assertEquals("\u001BP17!~FFA8\u001B\\", response.decodeToString(0, count), "split=$split")
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `origin relative cursor reports follow resets and response denial`(deny: Boolean) {
         val bytes =

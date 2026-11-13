@@ -54,6 +54,68 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
+    fun `both host factories refresh row order before the first semantic command publication`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            for (versioned in listOf(false, true)) {
+                val state = TerminalShellIntegrationState()
+                val factory =
+                    if (versioned) {
+                        TerminalShellIntegrationFactory.host(state, TerminalShellCommandLineState())
+                    } else {
+                        TerminalShellIntegrationFactory.host(state)
+                    }
+                val connector = MockConnector()
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(12, 8),
+                        connector,
+                        shellIntegration = factory,
+                        workerDispatcher = dispatcher,
+                        ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
+                    ).use { session ->
+                        session.start(12, 8)
+                        connector.feedFromHost("\u001b[2;1H\u001b[Lone\r\ntwo".ascii())
+                        val ids = LongArray(3)
+                        session.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+                        assertTrue(ids[1] > ids[2])
+                        state.recordCommandStart(ids[1], includeLine = true)
+                        state.recordCommandFinished(ids[2], exitCode = 0)
+                        val id = state.latestCommandRecordId()
+                        val range = LongArray(3)
+                        assertTrue(state.copyCommandOutputRange(id, range))
+                        assertArrayEquals(longArrayOf(ids[1], ids[2], 1), range)
+                        session.resizeViewport(12, 9)
+                        assertTrue(state.copyCommandOutputRange(id, range))
+                        assertArrayEquals(longArrayOf(ids[1], ids[2], 1), range)
+                    }
+            }
+        }
+
+    @Test
+    fun `wire Kitty event type negotiation does not duplicate text on release`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    session.start()
+                    connector.feedFromHost("\u001B[>2u".ascii())
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code, type = TerminalKeyEventType.RELEASE))
+                    runCurrent()
+                    assertEquals("a", connector.writtenBytes.asciiText())
+                }
+        }
+
+    @Test
     fun `oversized REP admits bounded work then processes output and completes cleanup`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)

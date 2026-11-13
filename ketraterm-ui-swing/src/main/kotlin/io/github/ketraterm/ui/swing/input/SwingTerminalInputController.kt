@@ -45,6 +45,11 @@ internal class SwingTerminalInputController(
     private val keyMapper = SwingKeyMapper()
     private val claimedKeyLifecycle = ClaimedSwingKeyLifecycle()
 
+    fun resetInput() {
+        keyMapper.resetInput()
+        claimedKeyLifecycle.clear()
+    }
+
     val keyListener =
         object : KeyAdapter() {
             override fun keyPressed(event: KeyEvent) {
@@ -146,7 +151,7 @@ internal class SwingTerminalInputController(
             }
 
             override fun focusLost(event: FocusEvent) {
-                claimedKeyLifecycle.clear()
+                resetInput()
                 host.setTerminalFocused(false)
                 host.session?.encodeFocus(TerminalFocusEvent(focused = false))
                 host.repaintCursorState()

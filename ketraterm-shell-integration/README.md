@@ -94,6 +94,9 @@ The producer resolves the recorded primary-buffer range under session
 serialization and copies only a bounded tail. The result reports caller
 truncation separately from missing history; it never reads alternate-screen text
 as primary command output.
+Ranges follow retained row order through line insertion and reflow. When a
+rearranged range loses an anchor, output is unknown rather than inferred from
+numeric line identities.
 
 ## Readiness and trust
 

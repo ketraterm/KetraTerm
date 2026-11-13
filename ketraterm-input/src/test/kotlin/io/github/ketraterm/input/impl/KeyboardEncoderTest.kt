@@ -33,6 +33,24 @@ import org.junit.jupiter.api.Test
 
 class KeyboardEncoderTest {
     @Test
+    fun `Kitty plain text has no release bytes unless all keys are reported`() {
+        for (flags in listOf(2, 3)) {
+            for (modifiers in listOf(0, TerminalModifiers.SHIFT, TerminalModifiers.CAPS_LOCK, TerminalModifiers.NUM_LOCK)) {
+                val modes = kittyKeyboardBits(flags)
+                assertBytes(bytes(), TerminalKeyEvent.codepoint('a'.code, modifiers, type = TerminalKeyEventType.RELEASE), modes)
+                assertBytes(bytes(0x61), TerminalKeyEvent.codepoint('a'.code, modifiers, type = TerminalKeyEventType.PRESS), modes)
+                assertBytes(bytes(0x61), TerminalKeyEvent.codepoint('a'.code, modifiers, type = TerminalKeyEventType.REPEAT), modes)
+            }
+        }
+        assertBytes(esc("[97;1:3u"), TerminalKeyEvent.codepoint('a'.code, type = TerminalKeyEventType.RELEASE), kittyKeyboardBits(10))
+        assertBytes(
+            esc("[97;5:3u"),
+            TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.CTRL, type = TerminalKeyEventType.RELEASE),
+            kittyKeyboardBits(2),
+        )
+    }
+
+    @Test
     fun `text only press and repeat emit complete UTF8 while release emits nothing`() {
         val text = "a\u00e9\u4e2de\u0301\uD83D\uDE00"
         val expected = bytes(0x61, 0xc3, 0xa9, 0xe4, 0xb8, 0xad, 0x65, 0xcc, 0x81, 0xf0, 0x9f, 0x98, 0x80)

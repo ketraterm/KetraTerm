@@ -170,12 +170,13 @@ internal class TerminalCommandInteractionController(
     private fun absoluteRowForLineId(
         cache: TerminalRenderCache,
         lineId: Long,
+        last: Boolean = false,
     ): Long {
         val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
-        var row = 0
-        while (row < cache.rows) {
+        var row = if (last) cache.rows - 1 else 0
+        while (row in 0 until cache.rows) {
             if (cache.lineIds[row] == lineId) return firstAbsoluteRow + row
-            row++
+            row += if (last) -1 else 1
         }
         return NO_COMMAND_ABSOLUTE_ROW
     }
@@ -186,6 +187,13 @@ internal class TerminalCommandInteractionController(
         endLineId: Long,
         includeStart: Boolean,
     ): Long {
+        val start = absoluteRowForLineId(cache, startLineId, last = !includeStart)
+        val end = absoluteRowForLineId(cache, endLineId, last = true)
+        if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
+            val first = start + if (includeStart) 0 else 1
+            return if (first <= end) first else NO_COMMAND_ABSOLUTE_ROW
+        }
+        if (!hasMonotonicLineIds(cache)) return NO_COMMAND_ABSOLUTE_ROW
         val firstLineId = minOf(startLineId, endLineId)
         val lastLineId = maxOf(startLineId, endLineId)
         val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
@@ -205,6 +213,12 @@ internal class TerminalCommandInteractionController(
         startLineId: Long,
         endLineId: Long,
     ): Long {
+        val start = absoluteRowForLineId(cache, startLineId)
+        val end = absoluteRowForLineId(cache, endLineId, last = true)
+        if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
+            return if (start <= end) start else NO_COMMAND_ABSOLUTE_ROW
+        }
+        if (!hasMonotonicLineIds(cache)) return NO_COMMAND_ABSOLUTE_ROW
         val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
         var row = 0
         while (row < cache.rows) {
@@ -220,6 +234,12 @@ internal class TerminalCommandInteractionController(
         startLineId: Long,
         endLineId: Long,
     ): Long {
+        val start = absoluteRowForLineId(cache, startLineId)
+        val end = absoluteRowForLineId(cache, endLineId, last = true)
+        if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
+            return if (start <= end) end else NO_COMMAND_ABSOLUTE_ROW
+        }
+        if (!hasMonotonicLineIds(cache)) return NO_COMMAND_ABSOLUTE_ROW
         val firstLineId = minOf(startLineId, endLineId)
         val lastLineId = maxOf(startLineId, endLineId)
         val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
@@ -230,6 +250,16 @@ internal class TerminalCommandInteractionController(
             row--
         }
         return NO_COMMAND_ABSOLUTE_ROW
+    }
+
+    private fun hasMonotonicLineIds(cache: TerminalRenderCache): Boolean {
+        var previous = 0L
+        for (row in 0 until cache.rows) {
+            val id = cache.lineIds[row]
+            if (id <= 0 || id < previous) return false
+            previous = id
+        }
+        return true
     }
 
     private companion object {
