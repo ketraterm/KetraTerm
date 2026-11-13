@@ -1588,7 +1588,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assumeTrue(fish != null, "fish is not installed")
         val hook = checkNotNull(javaClass.getResourceAsStream("fish-completion.fish")).use { it.readBytes().toString(Charsets.UTF_8) }
         val script =
-            "fish_default_key_bindings\n$hook\n" +
+            "bind --preset --mode default a self-insert\n$hook\n" +
                 """
                 __ketraterm_fish_completion_ready
                 set -l occupied (printf '\e[24~$suffix')
@@ -1691,11 +1691,11 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     session.submitInput(edited, listOf(TerminalTextReplacementEvent(0, 0, "-done"))),
                 )
                 session.awaitLine(replacement, "accepting after the confirmed Unicode prefix")
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("tail")))
+                session.awaitLine(replacement + "tail", "pasting real editable text")
                 assertEquals(
                     TerminalInputAdmission.ACCEPTED,
-                    session.submitInput(
-                        listOf(TerminalPasteEvent("tail")) + List(4) { TerminalKeyEvent.key(TerminalKey.LEFT) },
-                    ),
+                    session.submitInput(List(4) { TerminalKeyEvent.key(TerminalKey.LEFT) }),
                 )
                 val midLine = session.awaitLine(replacement, "cursor before real editable text")
                 assertTrue(midLine.commandLine.requiresShellConfirmation)
