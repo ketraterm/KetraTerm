@@ -33,7 +33,9 @@ Standalone users can also set `smart_suggestions_enabled`
 in the [TOML configuration](../../ketraterm-app/docs/profile-config-toml.md).
 Library hosts enable and configure their own provider and presentation.
 
-History suggestions are selective: command names use ordinary discovery, and
+History command and path suggestions require two successful executions of the
+same command in the same profile and working directory. Observed options can
+qualify after one success. Command names use ordinary discovery, and
 full-command replay requires a nonempty argument prefix. Running or accepting a
 command does not make its full history entry appear after an empty argument.
 Whole-command replays have a small row budget; learned ranking continues to
@@ -49,11 +51,14 @@ Terminal suggestions require an editable command context, normally supplied by
 Unsupported shells do not gain command tracking merely by enabling completion.
 Custom hosts can supply their own context and editing authority.
 
-Fish's inline autosuggestions and some redraws of wrapped input can make the
-editable context unavailable because there is no Fish editor-buffer confirmation
-bridge. `set -g fish_autosuggestion_enabled 0` removes the inline-prediction
-conflict. Suggestions still require an unambiguous prompt-to-cursor context;
-KetraTerm does not guess how cursor-positioned rows form an editable command.
+Fish popup suggestions confirm the typed buffer with the shell, so native inline
+autosuggestions can remain enabled. The
+[fish buffer hook](../reference/protocol.md#private-fish-editor-buffer-confirmation)
+requires `base64` and available private key bindings. Without that hook, visible
+text after the cursor makes the editing context unavailable. Suggestions still
+require an unambiguous prompt-to-cursor context; some wrapped-input redraws can
+remain unavailable. Real editable text after the cursor is never treated as a
+prediction. KetraTerm's inline preview does not paint over fish's native prediction.
 
 ## Using suggestions
 
@@ -249,7 +254,7 @@ not an exhaustive schema for every version of these tools.
 | Paths | Directory traversal, including for file-valued arguments, shell-aware escaping, literal POSIX backslashes, Windows separators, and hidden entries when explicitly requested. |
 | Ranking | Merged sources, deterministic ordering, contextual priority, and bounded learning boosts. |
 | Progressive results | Sources can update results asynchronously; obsolete requests are cancelled. |
-| Presentation | Compact matched-text rows, keyboard/pointer navigation, description-only hover tooltips, full row context for accessibility, and custom UI support. |
+| Presentation | Compact matched-text rows, keyboard/pointer navigation, full-path and description hover tooltips, full row context for accessibility, and custom UI support. |
 | Acceptance | A stale editing context is rejected before replacement is admitted. |
 
 ## Library customization
@@ -286,13 +291,14 @@ and automatic requests never replace a valid manual interaction. See the
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
 The standalone application offers opt-in **Inline suggestions** on its
 **Suggestions** settings page, off by default. Inline uses the popup's completion
-provider and shares one evaluation for matching command context and options. It
+provider with one request, one debounce and one UI publication. It
 previews the first result from each ranked snapshot, including
 command specifications, paths, shell completions, and learned candidates. It
 keeps the original replacement range and learning feedback. A result that does
 not strictly extend the current command is popup-only; inline never substitutes
 a lower-ranked candidate. Empty prefixes produce no inline suggestion.
-The popup drops the first row of the shared result only after its inline preview becomes visible.
+Each ranking is tried inline first; the popup receives the remaining rows in the
+same UI update. A lone result that renders inline never flashes in a popup.
 Down selects the first alternative and hides inline; the omitted candidate stays
 out during that browsing session so the list does not shift under navigation.
 If inline cannot render, the full ranking remains in the popup. Disabling inline
@@ -300,9 +306,9 @@ restores the candidate in a passive popup. Library hosts can still provide unrel
 popup and inline sources.
 
 Requests start after a 75 ms pause in command-edit activity. Popup and inline
-presentations retain independent lifetimes and switches; closing one keeps shared
-work alive for the other. Tab or Right accepts
-visible inline text while the popup is passive. Deliberate popup browsing hides
+retain separate switches. Closing the shared request cancels source work; an
+already visible, still-valid inline result remains available. Right Arrow accepts
+visible inline text while the popup is passive; Tab invokes shell completion. Deliberate popup browsing hides
 inline text, including late results; Tab or Enter then inserts the selected popup
 item. A popup acceptance keeps inline hidden while the accepted command remains
 unchanged. Fresh child suggestions require deliberate navigation before host

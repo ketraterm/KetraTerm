@@ -54,7 +54,7 @@ internal class TerminalPane private constructor(
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
     private var fontSizeAdjustment = 0
-    private var completionSuggestions: StandaloneCompletionSuggestions? = null
+    private var completionSuggestions: SwingShellSuggestionProvider? = null
 
     init {
         setCompletionProvider(completionProvider)
@@ -89,7 +89,7 @@ internal class TerminalPane private constructor(
 
     fun reloadSettings() {
         terminal.reloadSettings()
-        terminal.setShellSuggestionProvider(completionSuggestions.takeIf { settings.config.popupSuggestionsEnabled })
+        terminal.setSharedShellSuggestionProvider(completionSuggestions, settings.config.popupSuggestionsEnabled)
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
         exitBanner.refreshColors()
@@ -109,15 +109,8 @@ internal class TerminalPane private constructor(
 
     fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
         if (closed.get()) return
-        val previous = completionSuggestions
-        val shared = provider?.let { StandaloneCompletionSuggestions(it, tab.session, terminal) }
-        completionSuggestions = shared
-        try {
-            terminal.setShellSuggestionProvider(shared.takeIf { settings.config.popupSuggestionsEnabled })
-            terminal.setInlineShellSuggestionProvider(shared?.inlineProvider)
-        } finally {
-            previous?.close()
-        }
+        completionSuggestions = provider
+        terminal.setSharedShellSuggestionProvider(provider, settings.config.popupSuggestionsEnabled)
     }
 
     override fun suggestionsEnabled(): Boolean =
@@ -187,7 +180,6 @@ internal class TerminalPane private constructor(
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcut?.dispose() }
         failure = captureCleanupFailure(failure, terminal::dispose)
-        failure = captureCleanupFailure(failure) { completionSuggestions?.close() }
         completionSuggestions = null
         failure?.let { throw it }
     }

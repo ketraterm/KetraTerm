@@ -27,12 +27,51 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LearnedHistoryCompletionEngineTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["cd projects/company/app/src", "cat file.txt --verbose"])
+    fun `history replay requires two successes even after failures acceptance and persistence`(command: String) =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            repeat(2) {
+                store.recordCommandResult(command, false, null, null, 10)
+                store.recordSuggestionFeedback(command, TerminalCompletionFeedbackKind.ACCEPTED, null, null, 20)
+            }
+            val engine = engine(store)
+            val typed = if (command.startsWith("cd ")) "cd " else "cat fi"
+            for (successes in 0..2) {
+                if (successes > 0) store.recordCommandResult(command, true, null, null, 30L + successes)
+                val restored = TerminalCompletionLearningStore().apply { mergeSnapshot(store.snapshot()) }
+                for (current in listOf(engine, engine(restored))) {
+                    val history = current.complete(request(typed)).filter { it.source == "learned" }
+                    assertEquals(
+                        if (successes >= 2) listOf(command.substringAfter(' ')) else emptyList(),
+                        history.map { it.replacementText },
+                        "$command after $successes successful runs",
+                    )
+                }
+            }
+        }
+
+    @Test
+    fun `observed options qualify after one success each without promoting command replay`() =
+        runBlocking {
+            val store = TerminalCompletionLearningStore()
+            for (option in listOf("-a", "-b", "-c")) {
+                store.recordCommandResult("abc $option", true, null, null, 10)
+            }
+            store.recordCommandResult("abc -d", false, null, null, 20)
+            val candidates = engine(store, commandSpecs = emptyList()).complete(request("abc -"))
+
+            assertEquals(setOf("-a", "-b", "-c"), candidates.map { it.replacementText }.toSet())
+            assertTrue(candidates.all { it.source == "observed" && it.kind == TerminalCompletionCandidateKind.OPTION })
+        }
+
     @Test
     fun `history supplements completion without listing every successful command`() =
         runBlocking {
             val store = TerminalCompletionLearningStore()
             repeat(12) { index ->
-                store.recordCommandResult("cat file$index.txt --verbose", true, null, null, index + 1L)
+                repeat(2) { store.recordCommandResult("cat file$index.txt --verbose", true, null, null, index + 1L) }
             }
             val engine = engine(store)
             assertTrue(engine.complete(request("ca")).none { it.source == "learned" })
@@ -48,14 +87,14 @@ class LearnedHistoryCompletionEngineTest {
         }
 
     @Test
-    fun `accepted and persisted one-off history requires a nonempty argument prefix`() =
+    fun `accepted and persisted repeated history requires a nonempty argument prefix`() =
         runBlocking {
             val store = TerminalCompletionLearningStore()
             val command = "cat utf8-extended.txt -Encoding UTF8"
             store.recordSuggestionFeedback(command, TerminalCompletionFeedbackKind.ACCEPTED, null, "file:///repo", 10)
-            store.recordCommandResult(command, true, null, "file:///repo", 20)
+            repeat(2) { store.recordCommandResult(command, true, null, "file:///repo", 20) }
             assertEquals(
-                1,
+                2,
                 store
                     .snapshot()
                     .rankingStats
@@ -108,8 +147,10 @@ class LearnedHistoryCompletionEngineTest {
             val store = TerminalCompletionLearningStore()
             val files = listOf("file-a.txt", "file-b.txt", "file-c.txt", "file-d.txt")
             for (file in files) {
-                store.recordCommandResult("cat $file", true, null, "file:///repo", 10)
-                store.recordCommandResult("cat $file --verbose", true, null, "file:///repo", 10)
+                repeat(2) {
+                    store.recordCommandResult("cat $file", true, null, "file:///repo", 10)
+                    store.recordCommandResult("cat $file --verbose", true, null, "file:///repo", 10)
+                }
             }
             val provider = TerminalFileSystemProvider { files.map { TerminalFileEntry(it, isDirectory = false) } }
             val candidates =
@@ -183,9 +224,11 @@ class LearnedHistoryCompletionEngineTest {
     fun `completed argument identity ignores quote style but preserves decoded case and whitespace`() =
         runBlocking {
             val store = TerminalCompletionLearningStore()
-            store.recordCommandResult("tool 'Repo Path' --upper", true, null, null, 10)
-            store.recordCommandResult("tool 'repo path' --lower", true, null, null, 20)
-            store.recordCommandResult("tool 'Repo Path ' --spaced", true, null, null, 30)
+            repeat(2) {
+                store.recordCommandResult("tool 'Repo Path' --upper", true, null, null, 10)
+                store.recordCommandResult("tool 'repo path' --lower", true, null, null, 20)
+                store.recordCommandResult("tool 'Repo Path ' --spaced", true, null, null, 30)
+            }
             val engine = engine(store, commandSpecs = listOf(TerminalCommandSpec("tool")))
             val cases =
                 mapOf(
@@ -216,7 +259,7 @@ class LearnedHistoryCompletionEngineTest {
                 )
             for ((recorded, typed, offsets) in cases) {
                 val store = TerminalCompletionLearningStore()
-                store.recordCommandResult(recorded, true, null, null, 10)
+                repeat(2) { store.recordCommandResult(recorded, true, null, null, 10) }
                 val candidate =
                     engine(store)
                         .complete(request(typed, shellCapabilities = TerminalShellCapabilities.POSIX))
@@ -233,7 +276,7 @@ class LearnedHistoryCompletionEngineTest {
     fun `saved attached path values highlight relative to their projected label`() =
         runBlocking {
             val store = TerminalCompletionLearningStore()
-            store.recordCommandResult("tool --path=IdeaProjects/KetraTerm/", true, null, null, 10)
+            repeat(2) { store.recordCommandResult("tool --path=IdeaProjects/KetraTerm/", true, null, null, 10) }
             val spec =
                 TerminalCommandSpec(
                     name = "tool",
@@ -258,8 +301,10 @@ class LearnedHistoryCompletionEngineTest {
     fun `learned history active prefixes match case-insensitively while preserving recorded case`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
-            learningStore.recordCommandResult("cat Foo", true, null, null, 10)
-            learningStore.recordCommandResult("cat foo", true, null, null, 20)
+            repeat(2) {
+                learningStore.recordCommandResult("cat Foo", true, null, null, 10)
+                learningStore.recordCommandResult("cat foo", true, null, null, 20)
+            }
 
             val candidates =
                 engine(
@@ -278,12 +323,14 @@ class LearnedHistoryCompletionEngineTest {
         runBlocking {
             val recordedDirectory = "file:///C:/Users/gagik"
             val learningStore = TerminalCompletionLearningStore()
-            learningStore.recordCommandResult("cd IdeaProjects/JvTerm/", true, null, recordedDirectory, 10)
-            learningStore.recordCommandResult("cd /usr/bin", true, null, recordedDirectory, 20)
-            learningStore.recordCommandResult("cd ..", true, null, recordedDirectory, 30)
-            learningStore.recordCommandResult("cat relative/file.txt", true, null, recordedDirectory, 40)
-            learningStore.recordCommandResult("cd -- /opt/tools", true, null, recordedDirectory, 50)
-            learningStore.recordCommandResult("cd -- sibling", true, null, recordedDirectory, 60)
+            repeat(2) {
+                learningStore.recordCommandResult("cd IdeaProjects/JvTerm/", true, null, recordedDirectory, 10)
+                learningStore.recordCommandResult("cd /usr/bin", true, null, recordedDirectory, 20)
+                learningStore.recordCommandResult("cd ..", true, null, recordedDirectory, 30)
+                learningStore.recordCommandResult("cat relative/file.txt", true, null, recordedDirectory, 40)
+                learningStore.recordCommandResult("cd -- /opt/tools", true, null, recordedDirectory, 50)
+                learningStore.recordCommandResult("cd -- sibling", true, null, recordedDirectory, 60)
+            }
             val engine = engine(learningStore)
 
             val otherDirectoryCandidates =
@@ -319,7 +366,7 @@ class LearnedHistoryCompletionEngineTest {
     fun `learned completion at the cursor preserves following command text`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
-            learningStore.recordCommandResult("git switch main", true, null, null, 10)
+            repeat(2) { learningStore.recordCommandResult("git switch main", true, null, null, 10) }
             val commandLine = "git switch ma --detach"
 
             val candidate =
@@ -357,12 +404,12 @@ class LearnedHistoryCompletionEngineTest {
                                 listOf(
                                     commandLearning(
                                         commandLine = "tool a-old",
-                                        successCount = 1,
+                                        successCount = 2,
                                         lastUsedEpochMillis = now - 31L * 24L * 60L * 60L * 1_000L,
                                     ),
                                     commandLearning(
                                         commandLine = "tool z-new",
-                                        successCount = 1,
+                                        successCount = 2,
                                         lastUsedEpochMillis = now - 60L * 1_000L,
                                     ),
                                 ),
@@ -387,9 +434,7 @@ class LearnedHistoryCompletionEngineTest {
             val learningStore = TerminalCompletionLearningStore(replayFilter = { replayEnabled })
             val request = request("./gradlew ")
             val coldCandidate = engine(learningStore).complete(request).single { it.replacementText == "test" }
-            repeat(3) { index ->
-                learningStore.recordCommandResult("./gradlew test", true, null, null, 1_000L + index)
-            }
+            learningStore.recordCommandResult("./gradlew test", true, null, null, 1_000L)
 
             val learnedCandidate = engine(learningStore).complete(request).single { it.replacementText == "test" }
 
@@ -422,8 +467,10 @@ class LearnedHistoryCompletionEngineTest {
     fun `learned-only outcomes keep fallback presentation and remain distinct from specification results`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
-            learningStore.recordCommandResult("unknown-cli deploy", true, null, null, 10)
-            learningStore.recordCommandResult("./gradlew build --scan", true, null, null, 20)
+            repeat(2) {
+                learningStore.recordCommandResult("unknown-cli deploy", true, null, null, 10)
+                learningStore.recordCommandResult("./gradlew build --scan", true, null, null, 20)
+            }
 
             val unknownCandidate =
                 engine(

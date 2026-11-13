@@ -71,8 +71,8 @@ See [completion availability](../docs/features/completion.md) for shell requirem
 
 Inline suggestions are opt-in on the same page. They preview the top ranked
 completion from the popup's source pipeline, including paths, command
-specifications, shell results, and learning. Matching popup and inline requests
-share one evaluation. While that candidate appears inline, the popup starts with
+specifications, shell results, and learning. Inline and popup use one request and
+debounce, and update together. While that candidate appears inline, the popup starts with
 the alternatives, so one Down selects the next completion. Inline also works with popups disabled.
 See the [inline contract](../docs/features/completion.md#inline-suffix-presentation)
 for append-only eligibility, dismissal, and shell-prediction behavior.

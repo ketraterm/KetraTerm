@@ -115,6 +115,6 @@ class LearnedHistoryCandidateIndexTest {
             commandLine = commandLine,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
-            successCount = 1,
+            successCount = 2,
         )
 }

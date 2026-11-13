@@ -585,6 +585,7 @@ internal object TerminalShellIntegrationBootstrap {
         ${TerminalShellEnvironmentBootstrap.fish}
         if not set -q __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED
             set -g __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED 1
+            ${checkNotNull(javaClass.getResourceAsStream("fish-completion.fish")).use { it.readBytes().toString(Charsets.UTF_8) }}
             set -g __ketraterm_fish_native_markers 0
             if status test-feature mark-prompt
                 set -g __ketraterm_fish_native_markers 1
@@ -640,6 +641,7 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_original_fish_prompt
                 __ketraterm_osc7
                 __ketraterm_osc133 B
+                __ketraterm_fish_completion_ready
             end
         end
         """.trimIndent()

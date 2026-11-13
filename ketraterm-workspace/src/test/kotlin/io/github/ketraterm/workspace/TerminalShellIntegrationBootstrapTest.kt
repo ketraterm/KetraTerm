@@ -323,6 +323,8 @@ class TerminalShellIntegrationBootstrapTest {
 
         assertEquals(listOf("/usr/bin/fish", "-l", "--init-command"), integrated.command.dropLast(1))
         assertTrue(integrated.command.last().contains("__ketraterm_fish_preexec"))
+        assertTrue(integrated.command.last().contains("__ketraterm_fish_completion_ready"))
+        assertTrue(integrated.command.last().contains(";BufferState"))
         assertTrue(integrated.command.last().contains("]133;"))
         assertTrue(integrated.command.last().contains("__ketraterm_osc7"))
         assertTrue(integrated.command.last().contains("string escape --style=url"))

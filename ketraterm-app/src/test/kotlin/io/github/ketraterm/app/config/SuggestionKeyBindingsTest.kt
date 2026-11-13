@@ -34,7 +34,7 @@ class SuggestionKeyBindingsTest {
         val bindings = SuggestionKeyBindings()
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, bindings.popupAction(key(KeyEvent.VK_TAB)))
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, bindings.popupAction(key(KeyEvent.VK_ENTER)))
-        assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, bindings.inlineAction(key(KeyEvent.VK_TAB)))
+        assertNull(bindings.inlineAction(key(KeyEvent.VK_TAB)))
         assertEquals(SwingShellSuggestionAction.ACCEPT_SELECTED, bindings.inlineAction(key(KeyEvent.VK_RIGHT)))
         assertNull(bindings.inlineAction(key(KeyEvent.VK_ENTER)))
         assertTrue(bindings.triggers(key(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)))
@@ -78,7 +78,7 @@ class SuggestionKeyBindingsTest {
                 suggestionKeyBindings =
                     SuggestionKeyBindings(
                         popupAccept = setOf(stroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK)),
-                        inlineAccept = setOf(stroke(KeyEvent.VK_RIGHT)),
+                        inlineAccept = setOf(stroke(KeyEvent.VK_TAB), stroke(KeyEvent.VK_RIGHT)),
                         trigger = setOf(stroke(KeyEvent.VK_SPACE, InputEvent.ALT_DOWN_MASK)),
                     ),
             )

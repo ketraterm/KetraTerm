@@ -324,7 +324,15 @@ private class CompletionRenderer(
         val separators = if (suggestion.backslashPathSeparator) charArrayOf('/', '\\') else charArrayOf('/')
         val nameEnd = primary.trimEnd(*separators).length
         val nameStart = primary.lastIndexOfAny(separators, nameEnd - 1) + 1
-        val pathNameStart = nameStart.takeIf { suggestion.kind == "PATH" && it > 0 && nameEnd > it }
+        val isPath = suggestion.kind == "PATH"
+        val pathNameStart =
+            nameStart.takeIf {
+                isPath &&
+                    it > 0 &&
+                    nameEnd > it &&
+                    primary.none { character -> character.isWhitespace() || character in "'\"`~%*?[]{}()$" } &&
+                    primary.split(*separators).none { component -> component == "." || component == ".." }
+            }
         val role = roles[suggestion.accentRole.ordinal]
         val accessibleDescription =
             if (detail.isEmpty()) {
@@ -336,10 +344,11 @@ private class CompletionRenderer(
             primary = primary,
             matches = matches,
             hint = hint,
+            isPath = isPath,
             pathNameStart = pathNameStart,
             tooltip =
                 when {
-                    pathNameStart != null ->
+                    isPath ->
                         "<html>" + escapeHtml(primary) +
                             (if (detail.isEmpty()) "" else "<br>" + escapeHtml(detail)) + "</html>"
                     detail.isNotEmpty() -> "<html>" + escapeHtml(detail) + "</html>"
@@ -449,6 +458,7 @@ private class CompletionRow(
     private val primary: String,
     private val matches: SwingShellSuggestionMatchRanges,
     private val hint: String,
+    private val isPath: Boolean,
     private val pathNameStart: Int?,
     val tooltip: String?,
     val accessibleName: String,
@@ -483,12 +493,16 @@ private class CompletionRow(
         val matchBackground = if (selected) style.selectionMatchBackground else style.matchBackground
         val hintColor = if (selected) style.selectionArgumentHintForeground else style.argumentHintForeground
         val parentColor = if (selected) style.selectionForeground else style.secondaryForeground
-        if (labelHtml.isEmpty() || (pathNameStart != null && (layoutWidth != width || layoutFont != metrics.font))) {
+        if (labelHtml.isEmpty() || (isPath && (layoutWidth != width || layoutFont != metrics.font))) {
             labelHtml =
                 buildString {
                     append("<html>")
                     if (pathNameStart == null) {
-                        appendMatched(primary, matches, 0, primary.length)
+                        if (isPath) {
+                            appendElided(primary, matches, 0, primary.length, width, metrics)
+                        } else {
+                            appendMatched(primary, matches, 0, primary.length)
+                        }
                     } else {
                         val parentEnd =
                             when (pathNameStart) {

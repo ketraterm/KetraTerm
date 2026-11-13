@@ -129,7 +129,7 @@ completion as ghost text. This is off by default and works even when popups are
 disabled. Both surfaces use the same completion sources and ranking. If the top
 result would rewrite existing text, it remains popup-only; inline does not skip
 to another result.
-Tab or Right accepts a visible suffix while the popup is passive. Up/Down select
+Right Arrow accepts a visible suffix while the popup is passive; Tab invokes shell completion. Up/Down select
 popup items and hide inline text; Tab or Enter then inserts that choice without
 execution. Fresh child suggestions remain passive for Tab and Enter: Tab invokes
 shell completion and Enter executes the directory already entered. Escape dismisses the popup first, then inline text. See the

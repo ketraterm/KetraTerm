@@ -42,24 +42,24 @@ class TerminalCompletionLocalizationTest {
     }
 
     @Test
-    fun `catalog message keys cover the bundle and preserve canonical completion behavior`() =
-        runBlocking {
-            val keys = LinkedHashSet<String>()
-            val localized =
-                TerminalCommandSpecs.defaults { key, _ ->
-                    assertTrue(keys.add(key), "Duplicate catalog key: $key")
-                    "locale:$key"
-                }
-            val bundle = ResourceBundle.getBundle("io.github.ketraterm.completion.model.CommandSpecMessages", Locale.ROOT)
-            assertEquals(bundle.keySet(), keys)
-            assertEquals(TerminalCommandSpecs.defaults(), TerminalCommandSpecs.defaults(Locale.ROOT))
-            val partialBundle = PropertyResourceBundle(StringReader("spec.git.description=Contrôle de version"))
-            val partial = TerminalCommandSpecs.defaults(partialBundle)
-            assertEquals("Contrôle de version", partial.single { it.name == "git" }.description)
-            assertEquals("change directory", partial.single { it.name == "cd" }.description)
+    fun `catalog message keys cover the bundle and preserve canonical completion behavior`() {
+        val keys = LinkedHashSet<String>()
+        val localized =
+            TerminalCommandSpecs.defaults { key, _ ->
+                assertTrue(keys.add(key), "Duplicate catalog key: $key")
+                "locale:$key"
+            }
+        val bundle = ResourceBundle.getBundle("io.github.ketraterm.completion.model.CommandSpecMessages", Locale.ROOT)
+        assertEquals(bundle.keySet(), keys)
+        assertEquals(TerminalCommandSpecs.defaults(), TerminalCommandSpecs.defaults(Locale.ROOT))
+        val partialBundle = PropertyResourceBundle(StringReader("spec.git.description=Contrôle de version"))
+        val partial = TerminalCommandSpecs.defaults(partialBundle)
+        assertEquals("Contrôle de version", partial.single { it.name == "git" }.description)
+        assertEquals("change directory", partial.single { it.name == "cd" }.description)
 
-            val englishEngine = TerminalCompletionEngines.fromSources(emptyList())
-            val localizedEngine = TerminalCompletionEngines.fromSources(emptyList(), localized)
+        val englishEngine = TerminalCompletionEngines.fromSources(emptyList())
+        val localizedEngine = TerminalCompletionEngines.fromSources(emptyList(), localized)
+        runBlocking {
             for (command in listOf("g", "git st", "git status --s", "kubectl get p", "gradle --console=")) {
                 val request = request(command)
                 val english = englishEngine.completions(request).last()
@@ -68,44 +68,45 @@ class TerminalCompletionLocalizationTest {
                 assertEquals(english.map { it.copy(detail = "") }, translated.map { it.copy(detail = "") }, command)
                 assertTrue(translated.all { it.detail.startsWith("locale:") }, command)
             }
-            val englishKubectl = TerminalCommandSpecs.defaults().single { it.name == "kubectl" }
-            val localizedKubectl = localized.single { it.name == "kubectl" }
-            assertEquals(
-                "resource",
-                englishKubectl.subcommands
-                    .single { it.name == "get" }
-                    .positionalArguments
-                    .single()
-                    .name,
-            )
-            assertEquals(
-                "locale:spec.kubectl.get.argument.resource.name",
-                localizedKubectl.subcommands
-                    .single { it.name == "get" }
-                    .positionalArguments
-                    .single()
-                    .name,
-            )
         }
+        val englishKubectl = TerminalCommandSpecs.defaults().single { it.name == "kubectl" }
+        val localizedKubectl = localized.single { it.name == "kubectl" }
+        assertEquals(
+            "resource",
+            englishKubectl.subcommands
+                .single { it.name == "get" }
+                .positionalArguments
+                .single()
+                .name,
+        )
+        assertEquals(
+            "locale:spec.kubectl.get.argument.resource.name",
+            localizedKubectl.subcommands
+                .single { it.name == "get" }
+                .positionalArguments
+                .single()
+                .name,
+        )
+    }
 
     @Test
-    fun `localized source descriptions preserve replacements source identity and scores`() =
-        runBlocking {
-            val messages =
-                TerminalCompletionMessages.forLocale(
-                    Locale.FRANCE,
-                    PropertyResourceBundle(
-                        StringReader(
-                            """
-                            completion.directory=répertoire
-                            completion.file=fichier
-                            completion.projectDirectory=répertoire du projet
-                            completion.projectFile=fichier du projet
-                            completion.gradleTask=Tâche {0} de Gradle
-                            """.trimIndent(),
-                        ),
+    fun `localized source descriptions preserve replacements source identity and scores`() {
+        val messages =
+            TerminalCompletionMessages.forLocale(
+                Locale.FRANCE,
+                PropertyResourceBundle(
+                    StringReader(
+                        """
+                        completion.directory=répertoire
+                        completion.file=fichier
+                        completion.projectDirectory=répertoire du projet
+                        completion.projectFile=fichier du projet
+                        completion.gradleTask=Tâche {0} de Gradle
+                        """.trimIndent(),
                     ),
-                )
+                ),
+            )
+        runBlocking {
             val fileSystem =
                 TerminalFileSystemProvider {
                     listOf(TerminalFileEntry("new.txt", false), TerminalFileEntry("notes", true))
@@ -144,12 +145,13 @@ class TerminalCompletionLocalizationTest {
                 mapOf(":app:run" to "Tâche :app:run de Gradle", ":app:runIde" to "Description du modèle"),
             )
         }
+    }
 
     @Test
     fun `learning descriptions are cached at engine creation without changing ranking`() =
         runBlocking {
             val learning = TerminalCompletionLearningStore()
-            learning.recordCommandResult("unknown-tool status --verbose", true, null, "file:///repo", 1)
+            repeat(2) { learning.recordCommandResult("unknown-tool status --verbose", true, null, "file:///repo", 1) }
             val lookupCounts = HashMap<String, Int>()
             val messages =
                 TerminalCompletionMessages { key, _ ->

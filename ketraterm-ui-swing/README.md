@@ -313,8 +313,10 @@ Custom views retain control of their own styling. Providers supply label-relativ
 fragments without repeating the match. Providers can supply display-only `argumentHint`
 text beside the label; hints never become part of the accepted command.
 
-Nested `PATH` rows show the name first and parent context in `secondaryForeground`
-(`selectionForeground` on selection). Long paths shorten to the available width;
+Simple nested `PATH` rows show the name first and parent context in `secondaryForeground`
+(`selectionForeground` on selection). Paths containing `.` or `..` components,
+whitespace, quotes, or shell-expression markers retain their original order.
+Both layouts shorten long paths to the available width;
 hover and accessibility retain the full path, and acceptance inserts the original
 replacement. Visible match fragments keep their supplied highlights.
 Custom providers set `backslashPathSeparator = false` when `PATH` labels contain
@@ -350,6 +352,16 @@ collection. Lifecycle changes invalidate obsolete results and edits.
 for view-owned diagnostics.
 
 ### Inline suffix rendering
+
+For one source shared by the built-in popup and inline preview, install it with
+`setSharedShellSuggestionProvider(provider, popupEnabled = true)`. This mode uses
+one request and the popup debounce setting. Each result is tried inline first;
+only a successfully displayed preview is omitted from the popup. A lone inline
+result therefore never opens a popup before its preview. The inline switch and
+popup automatic setting remain effective, and `popupEnabled = false` supports
+inline-only presentation. The shared request honors the command-name setting.
+Popup browsing keeps its rows stable and suppresses inline updates. Independent
+providers remain available through the APIs below.
 
 The experimental inline API paints caller-supplied ghost text through the same
 text renderer as ordinary terminal cells. Capture edit authority before starting
@@ -485,9 +497,9 @@ provider availability. Updates are conflated and do not report acceptance;
 rendering-only previews have no managed publication. Observation does not change
 popup content or keyboard routing.
 
-The inline standard keymap accepts the whole visible suggestion with Tab or Right
-at the command's end while the popup is passive. Without visible inline text,
-Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+The inline standard keymap accepts the whole visible suggestion with Right Arrow
+at the command's end while the popup is passive. Tab reaches the shell until a
+popup item is deliberately selected. Keyboard navigation
 deliberately selects a popup item and hides inline text; Tab or Enter then inserts
 that choice without executing it. Enter otherwise reaches the shell. Provider
 preselection and hover never enable Tab or Enter acceptance. A refresh preserves an

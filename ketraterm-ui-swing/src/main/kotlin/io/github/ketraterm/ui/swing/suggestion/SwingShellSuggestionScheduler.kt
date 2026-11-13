@@ -197,6 +197,8 @@ internal class SwingShellSuggestionScheduler(
         lastRequest = snapshot
     }
 
+    fun isDismissed(commandText: String): Boolean = dismissedCommandText == commandText
+
     fun onFocusGained() {
         checkEdt()
         scheduleRefresh()

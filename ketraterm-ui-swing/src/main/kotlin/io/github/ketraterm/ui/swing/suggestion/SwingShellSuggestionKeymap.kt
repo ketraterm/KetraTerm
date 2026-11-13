@@ -77,7 +77,7 @@ public fun interface SwingShellSuggestionKeymap {
     public fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
 
     public companion object {
-        /** Inline defaults: unmodified Tab or Right accepts the whole visible suffix, Escape dismisses. */
+        /** Inline defaults: unmodified Right accepts the whole visible suffix, Escape dismisses. */
         @JvmField
         public val INLINE_STANDARD: SwingShellSuggestionKeymap =
             SwingShellSuggestionKeymap { event ->
@@ -85,7 +85,7 @@ public fun interface SwingShellSuggestionKeymap {
                     null
                 } else {
                     when (event.keyCode) {
-                        KeyEvent.VK_TAB, KeyEvent.VK_RIGHT -> SwingShellSuggestionAction.ACCEPT_SELECTED
+                        KeyEvent.VK_RIGHT -> SwingShellSuggestionAction.ACCEPT_SELECTED
                         KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                         else -> null
                     }

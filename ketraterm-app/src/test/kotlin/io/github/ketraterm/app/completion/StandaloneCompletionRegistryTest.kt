@@ -129,6 +129,7 @@ class StandaloneCompletionRegistryTest {
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
+                count = 2,
             )
 
             val suggestions = provider.suggestions(request("git s")).last()
@@ -159,6 +160,7 @@ class StandaloneCompletionRegistryTest {
                     commandLine = "cd remembered",
                     profileId = "pwsh",
                     workingDirectoryUri = directory.toUri().toString(),
+                    count = 2,
                 )
 
                 val suggestions = provider.suggestions(request("cd ")).last()
@@ -243,13 +245,15 @@ class StandaloneCompletionRegistryTest {
     fun `persistent stats supply learned fallback without a standalone stats source`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
-            persistentStats.recordCommandResult(
-                commandLine = "git show --stat",
-                successful = true,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                usedAtEpochMillis = 1_000,
-            )
+            repeat(2) {
+                persistentStats.recordCommandResult(
+                    commandLine = "git show --stat",
+                    successful = true,
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
+                    usedAtEpochMillis = 1_000,
+                )
+            }
             val registry = registry(learningStore = persistentStats)
             val provider =
                 registry.openProvider(
@@ -260,6 +264,7 @@ class StandaloneCompletionRegistryTest {
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
+                count = 2,
             )
 
             val request = request("git s")
@@ -387,6 +392,7 @@ class StandaloneCompletionRegistryTest {
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
+                count = 2,
             )
             registry.recordSuccess(
                 commandLine = "git status",
@@ -530,11 +536,13 @@ class StandaloneCompletionRegistryTest {
                 commandLine = "git checkout feature-a",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo-a",
+                count = 2,
             )
             registry.recordSuccess(
                 commandLine = "git checkout feature-b",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo-b",
+                count = 2,
             )
 
             // When in repo-a
@@ -556,8 +564,8 @@ class StandaloneCompletionRegistryTest {
             val bashProvider = registry.openProvider(profileId = "bash")
             val zshProvider = registry.openProvider(profileId = "zsh")
 
-            registry.recordSuccess("build --release", profileId = "bash", workingDirectoryUri = null)
-            registry.recordSuccess("build --debug", profileId = "zsh", workingDirectoryUri = null)
+            registry.recordSuccess("build --release", profileId = "bash", workingDirectoryUri = null, count = 2)
+            registry.recordSuccess("build --debug", profileId = "zsh", workingDirectoryUri = null, count = 2)
 
             assertTrue(bashProvider.suggestions(request("build")).last().isEmpty())
             assertTrue(zshProvider.suggestions(request("build")).last().isEmpty())
@@ -608,14 +616,17 @@ class StandaloneCompletionRegistryTest {
         commandLine: String,
         profileId: String?,
         workingDirectoryUri: String?,
+        count: Int = 1,
     ) {
-        recordFinishedCommand(
-            commandLine = commandLine,
-            successful = true,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
-            usedAtEpochMillis = ++eventTime,
-        )
+        repeat(count) {
+            recordFinishedCommand(
+                commandLine = commandLine,
+                successful = true,
+                profileId = profileId,
+                workingDirectoryUri = workingDirectoryUri,
+                usedAtEpochMillis = ++eventTime,
+            )
+        }
     }
 
     private fun TerminalCompletionLearningStore.recordFeedback(

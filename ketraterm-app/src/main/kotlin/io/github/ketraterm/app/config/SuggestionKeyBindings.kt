@@ -26,7 +26,7 @@ import javax.swing.KeyStroke
 @OptIn(ExperimentalShellSuggestionsApi::class)
 internal data class SuggestionKeyBindings(
     val popupAccept: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)),
-    val inlineAccept: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0)),
+    val inlineAccept: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0)),
     val trigger: Set<KeyStroke> = setOf(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)),
 ) {
     init {

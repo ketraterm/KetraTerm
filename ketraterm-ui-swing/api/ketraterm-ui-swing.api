@@ -363,6 +363,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun setSearchRegex (Z)V
 	public final fun setSearchWholeWord (Z)V
 	public final fun setSelection (Lio/github/ketraterm/ui/swing/api/TerminalSelectionRange;)Z
+	public final fun setSharedShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
+	public final fun setSharedShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Z)V
+	public static synthetic fun setSharedShellSuggestionProvider$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;ZILjava/lang/Object;)V
 	public final fun setShellSuggestionFailureHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;)V
 	public final fun setShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
 	public final fun setShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V

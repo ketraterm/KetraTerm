@@ -1581,6 +1581,128 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
 
+    @ParameterizedTest(name = "Fish user binding for F12{0}")
+    @ValueSource(strings = ["", "q"])
+    fun `fish buffer bridge preserves user bindings and stops advertising after a conflict`(suffix: String) {
+        val fish = installedExecutable("fish", "fish.exe")
+        assumeTrue(fish != null, "fish is not installed")
+        val hook = checkNotNull(javaClass.getResourceAsStream("fish-completion.fish")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            "bind --preset --mode default a self-insert\n$hook\n" +
+                """
+                __ketraterm_fish_completion_ready
+                set -l occupied (printf '\e[24~$suffix')
+                bind --user --mode default "${'$'}occupied" 'printf ketra-user-binding'
+                __ketraterm_fish_completion_ready
+                bind --user --mode default "${'$'}occupied"
+                """.trimIndent()
+        val result = runProcess(listOf(requireNotNull(fish), "--no-config"), standardInput = script)
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertEquals(1, Regex("KetraTermCompletion;3;Ready;").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("printf ketra-user-binding"), "The user's binding must survive bridge installation")
+    }
+
+    @ParameterizedTest(name = "Fish native prediction with {0}")
+    @ValueSource(strings = ["fish_default_key_bindings", "fish_vi_key_bindings"])
+    fun `fish confirms native predictions without accepting them and rejects real editor suffixes`(
+        keyBindings: String,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            val fish = installedExecutable("fish", "fish.exe")
+            assumeTrue(fish != null, "fish is not installed")
+            val setup =
+                "$keyBindings; set -g fish_greeting; set -g fish_history ketra_bridge_test; " +
+                    "set -g fish_autosuggestion_enabled 1; " +
+                    "function fish_prompt; printf 'ketra> '; end; function fish_right_prompt; end"
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace
+                        .openTab(
+                            TerminalProfile(
+                                "fish",
+                                "Fish",
+                                listOf(requireNotNull(fish), "--no-config", "-C", setup, "-i"),
+                                environment = mapOf("XDG_DATA_HOME" to directory.toString()),
+                                workingDirectory = directory,
+                            ),
+                            TerminalWorkspaceOpenOptions.create { it.columns = 160 },
+                        ).session
+                session.awaitLine("")
+                withTimeout(15.seconds) { session.renderGeneration.first { session.shellCompletionAvailable } }
+                assertTrue(session.confirmCommandEdit(session.awaitLine("")), "An empty fish buffer must confirm without adding whitespace")
+                val prefix = "echo ketra\uD83D\uDE00-native-"
+                val historyCommand = prefix + "prediction"
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(listOf(TerminalPasteEvent(historyCommand), TerminalKeyEvent.key(TerminalKey.ENTER))),
+                )
+                withTimeout(15.seconds) {
+                    session.shellIntegrationState.revision.first {
+                        val state = session.shellIntegrationState
+                        val command = state.commandMetadata(state.latestCommandRecordId())
+                        command?.commandText == historyCommand && command.exitCode == 0
+                    }
+                }
+                withTimeout(15.seconds) { session.commandEditChanges.first { session.shellCompletionAvailable } }
+                session.awaitLine("", "after seeding native history")
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(prefix.codePoints().toArray().map { TerminalKeyEvent.codepoint(it) }),
+                )
+                withTimeout(15.seconds) {
+                    session.renderGeneration.first {
+                        var predicted = false
+                        session.readRenderFrame { frame ->
+                            val codeWords = IntArray(frame.columns)
+                            frame.copyTextLine(frame.cursor.row, codeWords, flags = IntArray(frame.columns))
+                            val suffix =
+                                buildString {
+                                    for (column in frame.cursor.column until frame.columns) append(codeWords[column].toChar())
+                                }
+                            predicted = suffix.startsWith("prediction")
+                        }
+                        predicted
+                    }
+                }
+                val predictedEdit = session.awaitLine(prefix, "painted native prediction")
+                assertTrue(predictedEdit.commandLine.requiresShellConfirmation)
+                assertEquals(
+                    TerminalInputAdmission.STALE_CONTEXT,
+                    session.submitInput(predictedEdit, listOf(TerminalTextReplacementEvent(0, 0, "unconfirmed"))),
+                )
+                assertTrue(session.confirmCommandEdit(predictedEdit), "Fish must confirm only the typed prefix, excluding its prediction")
+                val confirmed = assertNotNull(session.requestShellCompletions(predictedEdit))
+                assertEquals(prefix, confirmed.commandLine)
+                assertEquals(prefix.length, confirmed.cursorOffset, "Fish code-point offsets must be converted to UTF-16")
+                assertTrue(confirmed.candidates.isEmpty(), "Buffer confirmation must not invoke native candidate discovery")
+
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalKeyEvent.codepoint('x'.code)))
+                val edited = session.awaitLine(prefix + "x", "typing after confirmation")
+                assertFalse(session.confirmCommandEdit(predictedEdit), "Typing revokes the original editing authority")
+                assertEquals(
+                    TerminalInputAdmission.STALE_CONTEXT,
+                    session.submitInput(predictedEdit, listOf(TerminalTextReplacementEvent(0, 0, "obsolete"))),
+                )
+                val replacement = prefix + "x-done"
+                assertTrue(session.confirmCommandEdit(edited))
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(edited, listOf(TerminalTextReplacementEvent(0, 0, "-done"))),
+                )
+                session.awaitLine(replacement, "accepting after the confirmed Unicode prefix")
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("tail")))
+                session.awaitLine(replacement + "tail", "pasting real editable text")
+                assertEquals(
+                    TerminalInputAdmission.ACCEPTED,
+                    session.submitInput(List(4) { TerminalKeyEvent.key(TerminalKey.LEFT) }),
+                )
+                val midLine = session.awaitLine(replacement, "cursor before real editable text")
+                assertTrue(midLine.commandLine.requiresShellConfirmation)
+                assertFalse(session.confirmCommandEdit(midLine), "Real text after the cursor must not be accepted as prediction decoration")
+            }
+        }
+
     @ParameterizedTest(name = "Fish initial command boundary with {0}-column prompt")
     @ValueSource(ints = [12, 19, 20, 21, 40])
     fun `fish initial prompt at the right margin leaves an empty command line`(promptWidth: Int): Unit =

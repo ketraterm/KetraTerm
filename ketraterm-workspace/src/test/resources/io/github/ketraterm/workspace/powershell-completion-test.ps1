@@ -1,4 +1,7 @@
 # Replace only the line-editor boundary; use the real PowerShell completion engine.
+# Keep discovery independent of tools and modules installed on the developer or CI host.
+$env:PATH = $PSHOME
+$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
 Add-Type @'
 namespace Microsoft.PowerShell {
     public class PSConsoleReadLine {

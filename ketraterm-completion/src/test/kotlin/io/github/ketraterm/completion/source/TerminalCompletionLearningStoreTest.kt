@@ -63,16 +63,18 @@ class TerminalCompletionLearningStoreTest {
     }
 
     @Test
-    fun `successful command result supplies token-local learned history evidence`() =
+    fun `repeated successful command results supply token-local learned history evidence`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
-            source.recordCommandResult(
-                commandLine = "tool status",
-                successful = true,
-                profileId = "pwsh",
-                workingDirectoryUri = "file:///repo",
-                usedAtEpochMillis = 1_000,
-            )
+            repeat(2) {
+                source.recordCommandResult(
+                    commandLine = "tool status",
+                    successful = true,
+                    profileId = "pwsh",
+                    workingDirectoryUri = "file:///repo",
+                    usedAtEpochMillis = 1_000,
+                )
+            }
 
             val candidates =
                 learnedHistory(source).complete(request("tool s", profileId = "pwsh", workingDirectoryUri = "file:///repo"))
@@ -248,20 +250,22 @@ class TerminalCompletionLearningStoreTest {
     fun `accepted feedback boosts candidate above dismissed candidate`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
-            source.recordCommandResult(
-                "tool status",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 100,
-            )
-            source.recordCommandResult(
-                "tool switch main",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 100,
-            )
+            repeat(2) {
+                source.recordCommandResult(
+                    "tool status",
+                    successful = true,
+                    profileId = null,
+                    workingDirectoryUri = null,
+                    usedAtEpochMillis = 100,
+                )
+                source.recordCommandResult(
+                    "tool switch main",
+                    successful = true,
+                    profileId = null,
+                    workingDirectoryUri = null,
+                    usedAtEpochMillis = 100,
+                )
+            }
 
             repeat(4) {
                 source.recordSuggestionFeedback(
@@ -323,20 +327,22 @@ class TerminalCompletionLearningStoreTest {
     fun `learned history requires exact canonical profile and directory context`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
-            source.recordCommandResult(
-                "tool scoped",
-                successful = true,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                usedAtEpochMillis = 100,
-            )
-            source.recordCommandResult(
-                "tool unknown",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 100,
-            )
+            repeat(2) {
+                source.recordCommandResult(
+                    "tool scoped",
+                    successful = true,
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
+                    usedAtEpochMillis = 100,
+                )
+                source.recordCommandResult(
+                    "tool unknown",
+                    successful = true,
+                    profileId = null,
+                    workingDirectoryUri = null,
+                    usedAtEpochMillis = 100,
+                )
+            }
 
             assertEquals(
                 listOf("scoped"),

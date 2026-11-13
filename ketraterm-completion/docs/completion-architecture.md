@@ -297,6 +297,10 @@ every successful execution at every prefix.
 
 - At command-name positions, history does not append command tails. Ordinary
   command discovery remains eligible and retains learned ranking evidence.
+- History command and path candidates require two successful executions of the
+  same command in the same profile and working directory. Failures and explicit
+  acceptance do not count toward this threshold. Recording, ranking evidence,
+  and observed-token inference remain available after the first success.
 - Full-command replay requires a nonempty argument prefix. An empty argument
   requests values, rather than an entire previously executed command tail.
   Single-word learned values remain eligible as ordinary argument completions.

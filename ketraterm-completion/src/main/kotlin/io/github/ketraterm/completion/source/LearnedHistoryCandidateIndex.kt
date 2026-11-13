@@ -23,7 +23,7 @@ import io.github.ketraterm.completion.model.TerminalCommandReplay
 import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import java.util.*
 
-/** Immutable exact-host-context and command-prefix index for positive learned command rows. */
+/** Immutable exact-host-context and command-prefix index for repeatedly successful commands. */
 internal class LearnedHistoryCandidateIndex private constructor(
     private val buckets: Map<HistoryBucketKey, List<IndexedLearnedCommand>>,
 ) {
@@ -64,7 +64,7 @@ internal class LearnedHistoryCandidateIndex private constructor(
             for (snapshotRank in rows.indices) {
                 val parsedRow = rows[snapshotRank]
                 val stats = parsedRow.stats
-                if (!stats.hasSuccessfulExecution()) continue
+                if (stats.successCount < 2) continue
                 val line = parsedRow.lineContext
                 val learningContext = CompletionLearningContextKey.of(stats.profileId, stats.workingDirectoryUri)
                 val tokens = line.tokens.map { it.identity }
@@ -109,5 +109,3 @@ internal data class IndexedLearnedCommand(
     val normalizedActiveToken: String,
     val snapshotRank: Int,
 )
-
-private fun TerminalCompletionRankingStats.hasSuccessfulExecution(): Boolean = successCount > 0
