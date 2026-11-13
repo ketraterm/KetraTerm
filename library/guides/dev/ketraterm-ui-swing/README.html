@@ -189,7 +189,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -294,8 +294,10 @@ Custom views retain control of their own styling. Providers supply label-relativ
 <code>matchedRanges</code>, including disjoint fuzzy matches; the default view colors those
 fragments without repeating the match. Providers can supply display-only <code>argumentHint</code>
 text beside the label; hints never become part of the accepted command.</p>
-<p>Nested <code>PATH</code> rows show the name first and parent context in <code>secondaryForeground</code>
-(<code>selectionForeground</code> on selection). Long paths shorten to the available width;
+<p>Simple nested <code>PATH</code> rows show the name first and parent context in <code>secondaryForeground</code>
+(<code>selectionForeground</code> on selection). Paths containing <code>.</code> or <code>..</code> components,
+whitespace, quotes, or shell-expression markers retain their original order.
+Both layouts shorten long paths to the available width;
 hover and accessibility retain the full path, and acceptance inserts the original
 replacement. Visible match fragments keep their supplied highlights.
 Custom providers set <code>backslashPathSeparator = false</code> when <code>PATH</code> labels contain
@@ -340,6 +342,15 @@ collection. Lifecycle changes invalidate obsolete results and edits.</p>
 <code>copyCellBounds</code> to anchor a host popup and <code>setShellSuggestionFailureHandler</code>
 for view-owned diagnostics.</p>
 <h3 id="inline-suffix-rendering">Inline suffix rendering</h3>
+<p>For one source shared by the built-in popup and inline preview, install it with
+<code>setSharedShellSuggestionProvider(provider, popupEnabled = true)</code>. This mode uses
+one request and the popup debounce setting. Each result is tried inline first;
+only a successfully displayed preview is omitted from the popup. A lone inline
+result therefore never opens a popup before its preview. The inline switch and
+popup automatic setting remain effective, and <code>popupEnabled = false</code> supports
+inline-only presentation. The shared request honors the command-name setting.
+Popup browsing keeps its rows stable and suppresses inline updates. Independent
+providers remain available through the APIs below.</p>
 <p>The experimental inline API paints caller-supplied ghost text through the same
 text renderer as ordinary terminal cells. Capture edit authority before starting
 asynchronous work, then present the result on the EDT:</p>
@@ -457,9 +468,9 @@ It reflects rendering eligibility, including collision checks, rather than just
 provider availability. Updates are conflated and do not report acceptance;
 rendering-only previews have no managed publication. Observation does not change
 popup content or keyboard routing.</p>
-<p>The inline standard keymap accepts the whole visible suggestion with Tab or Right
-at the command&#39;s end while the popup is passive. Without visible inline text,
-Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+<p>The inline standard keymap accepts the whole visible suggestion with Right Arrow
+at the command&#39;s end while the popup is passive. Tab reaches the shell until a
+popup item is deliberately selected. Keyboard navigation
 deliberately selects a popup item and hides inline text; Tab or Enter then inserts
 that choice without executing it. Enter otherwise reaches the shell. Provider
 preselection and hover never enable Tab or Enter acceptance. A refresh preserves an
@@ -629,7 +640,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -123,8 +123,10 @@ parameter. Hosts record authoritative command results and explicit suggestion
 feedback. The store performs no I/O; persistence consumes its immutable
 <code>snapshot()</code> and hydrates through <code>mergeSnapshot()</code> once per distinct aggregate
 event set.</p>
-<p>Replay preserves supported shell-expression spelling and selectively supplements
-live completion with useful past commands. See the
+<p>History command and path candidates require two successful executions in the
+same context. Observed options can qualify after one success. Replay preserves
+supported shell-expression spelling and selectively supplements live completion
+with useful past commands. See the
 <a href="docs/completion-architecture.html#history-suggestion-policy">history suggestion policy</a>
 for prefix and row-budget rules. Commands whose syntax cannot be replayed
 safely are omitted; the rules are described in the learning contract below.</p>
@@ -148,7 +150,7 @@ unchanged; descriptions supplied by shells or custom providers remain provider-o
 <li><a href="../docs/terminal-feature-map.html">Supported behavior</a> and
 <a href="../docs/terminal-feature-gap-map.html">deferred work</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/040cce87bc04144cce5838ed18c48fe11b7fec61/ketraterm-completion/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-completion/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
