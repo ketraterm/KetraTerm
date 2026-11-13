@@ -32,7 +32,8 @@ drains terminal responses, and observes one selected shell producer. The
 connector owns inbound threads and ordered byte delivery. Session workers use
 caller-supplied, non-owned dispatchers.</p>
 <p><code>graphics/GraphicsDecoder</code> validates raw/zlib payloads; <code>PngDecoder</code> validates,
-compacts and decodes PNG using the JDK reader. They return immutable render images.
+compacts and decodes PNG with JDK zlib and two reusable scanline buffers. They
+return immutable ARGB render images without desktop or frontend dependencies.
 The session retains ingress admission across parser yields and commits the decoded
 image through <code>HostCommandAdapter</code> before consuming the remaining bytes.</p>
 <p><code>OutboundWriter</code> manages transactional byte admission, bounded bulk/reply
@@ -89,7 +90,7 @@ guidance.</li>
 <p>Run <code>./gradlew :ketraterm-session:test</code> from the repository root. This includes
 <code>defaultDispatcherTest</code> in a separate JVM with one ordinary I/O worker, so cleanup
 independence is checked against actual defaults without changing other tests&#39; schedulers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

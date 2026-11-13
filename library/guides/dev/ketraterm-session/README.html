@@ -30,6 +30,10 @@ bounded writer. It has no dependency on Swing or a PTY implementation.</p>
 <p>For local processes, use the <a href="../ketraterm-pty/README.html">PTY module</a>. For an
 existing transport, supply a <a href="../ketraterm-transport-api/README.html"><code>TerminalConnector</code></a>
 as shown below. See the <a href="../README.html">root README</a> for dependency selection.</p>
+<p>The session and its runtime dependencies are independent of AWT, Swing,
+<code>java.desktop</code>, and frontend SDKs. PNG decoding is available in headless use;
+render consumers receive immutable ARGB pixels and own conversion to their
+frontend&#39;s graphics types. See the <a href="../docs/development/kitty-graphics-contract.html#decoder-boundary-and-ordering">graphics contract</a>.</p>
 <h2 id="usage">Usage</h2>
 <p>This example runs an already-created connector until closure. <code>copyFrame</code> copies
 the borrowed frame into storage owned by the renderer; it must return promptly
@@ -272,7 +276,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

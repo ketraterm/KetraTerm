@@ -74,6 +74,10 @@ Kotlin 2.4.20, JVM target 25, and JVM default-method compatibility bridges.
 Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-only
 resolution. A host replacing dependencies with a platform runtime must verify
 that runtime separately.</p>
+<p>The headless entry point and its complete runtime dependency closure operate
+without <code>java.desktop</code> or frontend SDKs, including PNG decoding. Frontends consume
+neutral render data and own their graphics resources. Publication checks verify
+this boundary using both Gradle metadata and POM-only resolution.</p>
 <h2 id="evolution-rules">Evolution rules</h2>
 <ul>
 <li>Preserve JVM signatures, Kotlin metadata, defaults, and documented semantics.</li>
@@ -111,7 +115,7 @@ consumer fixtures compile and run independent Java/Kotlin clients; retained
 binaries test upgrades without recompilation. Deliberate linkage-failure controls
 check that the upgrade harness detects missing symbols.</p>
 <p><code>./gradlew publicationChecks</code> runs the library publication gates against a local
-repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
+repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
 explains individual checks and baseline refreshes. A deliberate development
 baseline refresh must record the break and migration; it cannot be presented as
 proof of compatibility with the earlier API or retained clients.</p>
@@ -146,7 +150,7 @@ fallback defaults.</p>
 new interfaces, with fixture sources, jar hashes, compiler/toolchain details,
 and staged dependency hashes in their provenance. Review sources, artifacts,
 provenance, and ABI snapshots together, then run the source-consumer and retained
-client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
+client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
 The refreshed baseline verifies subsequent upgrades of those recompiled clients;
 it does not establish binary compatibility with the pre-feature baseline or
 any earlier 0.x release.</p>
@@ -236,7 +240,7 @@ release history remains in the <a href="../../CHANGELOG.html">changelog</a>.</p>
 </tbody></table></div>
 <p>See <a href="configuration.html">configuration</a>, <a href="../../ketraterm-session/README.html#custom-assembly">session assembly</a>,
 and <a href="../../ketraterm-ui-swing/README.html">Swing APIs</a> for current usage.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -22,10 +22,10 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Kitty graphics implementation contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#command-and-transfer-semantics">Command and transfer semantics</a><a class="depth-2" href="#placement-and-screen-ownership">Placement and screen ownership</a><a class="depth-2" href="#image-lifetime-and-render-publication">Image lifetime and render publication</a><a class="depth-2" href="#resource-limits">Resource limits</a><a class="depth-2" href="#decoder-boundary-and-ordering">Decoder boundary and ordering</a><a class="depth-3" href="#edt-admission-and-lifecycle">EDT admission and lifecycle</a><a class="depth-2" href="#verification-gates">Verification gates</a></nav></details><div class="article-content"><div class="prose"><h1 id="kitty-graphics-implementation-contract">Kitty graphics implementation contract</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Kitty graphics implementation contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#command-and-transfer-semantics">Command and transfer semantics</a><a class="depth-2" href="#placement-and-screen-ownership">Placement and screen ownership</a><a class="depth-2" href="#image-lifetime-and-render-publication">Image lifetime and render publication</a><a class="depth-2" href="#resource-limits">Resource limits</a><a class="depth-2" href="#decoder-boundary-and-ordering">Decoder boundary and ordering</a><a class="depth-3" href="#codec-qualification">Codec qualification</a><a class="depth-3" href="#session-ordering">Session ordering</a><a class="depth-3" href="#edt-admission-and-lifecycle">EDT admission and lifecycle</a><a class="depth-2" href="#verification-gates">Verification gates</a></nav></details><div class="article-content"><div class="prose"><h1 id="kitty-graphics-implementation-contract">Kitty graphics implementation contract</h1>
 <p>This document defines graphics protocol, resource and lifecycle invariants. The <a href="../terminal-feature-gap-map.html#optional-protocol-work">gap map</a>
 owns delivery scope and support status. Sender provenance, exact input bytes and
-regeneration instructions live with the <a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/tools/kitty-graphics/README.md">fixture corpus</a>.</p>
+regeneration instructions live with the <a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/tools/kitty-graphics/README.md">fixture corpus</a>.</p>
 <p>The reference is Kitty revision
 <a href="https://github.com/kovidgoyal/kitty/tree/1c5a4829ae4dd472017f592b1424381d5ece7575"><code>1c5a4829ae4dd472017f592b1424381d5ece7575</code></a>.
 The pinned <a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/docs/graphics-protocol.rst">specification</a>
@@ -293,8 +293,8 @@ pinned implementation above. An 8-column wrapped line widened to 16 columns
 moves a following prompt up one row while retaining the image&#39;s cell anchor;
 narrowing restores the text and typing remains beside the prompt. Repeated
 height shrinking and growth after history eviction verify the corresponding
-anchor shifts. Permanent <a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-core/src/test/kotlin/io/github/ketraterm/core/graphics/GraphicsResizeTest.kt">core regressions</a>
-cover these cases and inactive-primary history; <a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/ketraterm-ui-swing/src/test/kotlin/io/github/ketraterm/ui/swing/render/GraphicsRenderingTest.kt">Swing regressions</a>
+anchor shifts. Permanent <a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-core/src/test/kotlin/io/github/ketraterm/core/graphics/GraphicsResizeTest.kt">core regressions</a>
+cover these cases and inactive-primary history; <a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/ketraterm-ui-swing/src/test/kotlin/io/github/ketraterm/ui/swing/render/GraphicsRenderingTest.kt">Swing regressions</a>
 check painted clipping, reveal and raster reuse. These checks do not change
 KetraTerm&#39;s general text reflow policy or verify native ConPTY cursor tracking.</p>
 <h2 id="image-lifetime-and-render-publication">Image lifetime and render publication</h2>
@@ -377,7 +377,7 @@ reserve maximum capacities for terminals that never receive images.</p>
 </tr>
 <tr>
 <td>Active transfer/decode</td>
-<td>One operation; 225 MiB admission allowance for bounded staging/native/canonical data and estimated codec headroom; see qualification below</td>
+<td>One operation; less than 99 MiB of live owned byte/pixel arrays, plus JVM/native overhead; see accounting below</td>
 </tr>
 <tr>
 <td>Each render snapshot</td>
@@ -390,8 +390,13 @@ reserve maximum capacities for terminals that never receive images.</p>
 </tbody></table></div>
 <p>The image-size limit admits a 3840x2160 RGBA image. Enforce dimensions before
 decoder raster allocation, and byte/count limits before growth or publication.
-Account PNG&#39;s possible 16-bit native samples: at this pixel bound the native
-RGBA raster can occupy 64 MiB before its 32 MiB normalized result exists.</p>
+The decoder retains only the final 32 MiB ARGB array and two scanline buffers,
+even for 16-bit Adam7 images. Each row buffer is at most 65,537 bytes
+(8,192 pixels × four channels × two bytes, plus the filter byte). A transfer
+wrapped in zlib can additionally retain the 33 MiB transfer staging array and
+33 MiB expanded PNG array. Their combined payload, including the palette and
+small inflate scratch, stays below 99 MiB. This bounds live owned arrays;
+borrowed connector bytes, native zlib state, object headers, and GC lag are additional.</p>
 <p>Evict unplaced images first, then least-recently-used images and their dependent
 placements, using a monotonic operation counter rather than wall time. Validate
 a new image completely before evicting for its commit. Fail if one image can
@@ -399,51 +404,59 @@ never fit, or placement admission cannot satisfy its bound. Replacement must
 reserve transient capacity without destroying the previous image on failure.</p>
 <p>With three publisher caches and one EDT cache, independent old versions can
 retain more memory than the core quota. A conservative built-in payload envelope
-is <code>64 + 3*64 + 64 + 64 + 64 + 225 = 673 MiB</code>: core, published snapshots, EDT snapshot,
+is <code>64 + 3*64 + 64 + 64 + 64 + 99 = 547 MiB</code>: core, published snapshots, EDT snapshot,
 Swing rasters, their retained source resources, and active decode. This is a conservative live payload estimate,
 not a per-session reservation or total-process-memory promise. Primitive metadata,
 JVM object overhead, GC lag and platform graphics surfaces are additional; measure
 them separately. Reusing unchanged resources normally avoids this multiplier.
-ImageIO provides no allocator-budget API: the 225 MiB allowance is not an enforced
-cap on opaque codec allocations. Owned byte/pixel/count limits are hard bounds;
-adversarial heap profiling must validate codec headroom before PNG support ships.
-Do not advertise a total memory ceiling based on this estimate.</p>
+Owned byte/pixel/count limits are enforced before allocation or growth. Profile
+native zlib and JVM overhead separately; the payload accounting is not a total
+process memory ceiling.</p>
 <h2 id="decoder-boundary-and-ordering">Decoder boundary and ordering</h2>
-<p>Use one internal PNG decoder in <code>ketraterm-session</code>, separate from coordination.
-Use the JDK&#39;s PNG <code>ImageReaderSpi</code> from module <code>java.desktop</code>, selected through
-public APIs, with a per-operation reader. No new codec dependency or module is
-required. ImageIO provider initialization may run trusted classpath providers;
-do not describe this as a plugin-free discovery mechanism. Select the JDK PNG
-provider explicitly rather than decoding arbitrary detected formats.</p>
-<p>Use <code>MemoryCacheImageInputStream</code> over a <code>ByteArrayInputStream</code> restricted to the
-compacted prefix. These standard JDK streams replace custom read/seek bookkeeping;
-no file cache, global ImageIO settings or internal JDK exports are needed. First validate signature, IHDR, chunk
-lengths/order, CRCs, known critical chunks and final IEND; reject truncated/trailing
-streams. Then compact the exclusively owned staging array in place to
-<code>IHDR</code>/<code>PLTE</code>/<code>tRNS</code>/<code>IDAT</code>/<code>IEND</code>, merging consecutive IDAT payloads and recomputing
-their combined length/CRC. Enforce format-defined palette/transparency lengths.
-The reader receives this bounded logical length. Its memory cache may retain up
-to another 33 MiB of payload, included in the active-decode allowance above.
-This prevents compressed metadata and tiny-chunk object floods; <code>ignoreMetadata=true</code>
-alone does not. The stream byte limit bounds the validation pass.
-Validate remaining codec headroom with hostile-input tests and profiling. Close
-the input and dispose the reader on every exit. ImageIO does not validate all
-PNG CRCs itself.</p>
-<p>Verify the merged IDAT&#39;s complete single zlib stream and exact filtered scanline
-byte count, including Adam7 passes, before ImageIO. The bounded second inflate
-prevents a reader that stops after its requested rows from accepting a truncated
-trailer or extra compressed data; it uses fixed scratch rather than another raster.</p>
-<p>Read the native raster: forcing an 8-bit destination loses some 16-bit <code>tRNS</code>
-transparency in the JDK PNG reader. Sub-byte grayscale <code>tRNS</code> also requires comparing
-the transparent key in the native raster&#39;s expanded sample range. Mask unused key
-bits for depths below 16 before decoding, after validating the original chunk CRC.
-Normalize samples explicitly: replicate grayscale channels, resolve palette entries and alpha, scale
-sub-byte samples, and take the high byte of 16-bit samples. Initially treat samples
-as sRGB and ignore embedded profiles/gamma metadata: this is a KetraTerm fidelity
-limitation, not Kitty parity,
-and is tracked in the gap map. Do not use generic <code>BufferedImage.getRGB</code> for grayscale;
-its color-space conversion changes sample values. Only immutable normalized
-pixels cross into core/render contracts; AWT objects stay inside the decoder/UI.</p>
+<p>One internal PNG decoder in <code>ketraterm-session</code> owns container validation and
+scanline decoding. The entire headless runtime is independent of <code>java.desktop</code>
+and frontend SDKs. Decoding needs only JDK zlib and primitive arrays; frontend
+modules convert the immutable ARGB resource into their own painting types.</p>
+<p>Validate signature, IHDR dimensions and format, chunk lengths/order, CRCs, known
+critical chunks, palette/transparency cardinality, and final IEND before allocating
+pixels. Reject truncated or trailing containers. Unknown ancillary chunks are
+ignored after bounds and CRC validation, including names with the reserved bit set;
+unknown critical chunks are rejected. After validation, concatenate only the IDAT
+payload bytes at the start of the exclusively owned staging array. Container headers
+and metadata have already been consumed; no replacement PNG or CRCs are constructed.
+Ignored metadata is never decompressed or represented by per-chunk objects; the
+transfer byte limit bounds the validation pass.</p>
+<p>Inflate the single IDAT zlib stream once, row by row. Reconstruct the five PNG
+filters using two reusable scanline arrays; reset the prior row at each Adam7
+pass and skip empty passes. Unpack samples directly into their final ARGB positions.
+Consume the zlib checksum after the final row and reject missing, excess,
+concatenated, or trailing compressed data. Release the inflater on every exit.</p>
+<p>Compare transparency keys at the full source sample depth, masking unused key
+bits only after CRC validation. Replicate grayscale channels, resolve palette
+entries and alpha, scale sub-byte samples, and take the high byte of 16-bit samples.
+Pixels retain unassociated alpha, including color samples under zero alpha.
+Initially treat samples as sRGB and ignore embedded profiles/gamma; color
+management remains tracked in the gap map.</p>
+<h3 id="codec-qualification">Codec qualification</h3>
+<p>The published <code>ar.com.hjg:pngj:2.1.0</code> artifact was inspected before implementation.
+Although its core reader can operate without AWT, its packaged <code>pixels</code> helpers
+reference <code>BufferedImage</code>; whole-artifact <code>jdeps</code> analysis reports <code>java.desktop</code>.
+It fails this library&#39;s dependency boundary. Keeping the existing bounded
+container validation and implementing the focused scanline reconstruction avoids
+a repackaged fork or another codec&#39;s metadata/raster model. The algorithms follow
+the <a href="https://www.w3.org/TR/png-3/">PNG filter and interlace specification</a>.</p>
+<p>Qualification covers all supported color/depth combinations, all five filters,
+interlaced and noninterlaced narrow/odd images, full-depth transparency, malformed
+streams, mixed row filters, nonzero packed padding, and deterministic mutation
+recovery. Pinned PNGSuite fixtures carry independently recorded pixel hashes;
+producer streams separately verify exact pixels and byte-stream ordering.
+Allocation profiling compares the same workloads and boundaries; measurements
+do not replace the owned-array bounds.</p>
+<p>Published headless consumers resolve through both Gradle and POM metadata. Their
+checks inspect all resolved runtime JARs with <code>jdeps</code>, then exercise text, input,
+PNG, malformed-image recovery, replies, retention and closure in a JVM where
+<code>java.desktop</code> is unavailable. No frontend or codec setup is required.</p>
+<h3 id="session-ordering">Session ordering</h3>
 <p>The parser must stop immediately after a graphics command needing decode and
 report the consumed byte count. The session keeps the remaining borrowed input
 on the same ingress call. A narrow mutation-admission gate serializes that input
@@ -564,7 +577,7 @@ allocations are permitted and measured separately, including alpha scaling,
 clip changes and fractional translation. Passing frame-copy measurements alone
 does not establish allocation-free painting. Review any new public API and ABI
 snapshots, then run the affected module, published-consumer and formatting checks.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a8c8168426ed87e7f2fe2fab0e8edeb7a9c55f5d/docs/development/kitty-graphics-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/docs/development/kitty-graphics-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
