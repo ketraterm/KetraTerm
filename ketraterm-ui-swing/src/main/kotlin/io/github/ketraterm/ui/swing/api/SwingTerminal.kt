@@ -372,15 +372,12 @@ public class SwingTerminal
                 object : TerminalCommandInteractionHost {
                     override val session: TerminalSession? get() = this@SwingTerminal.session
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val searchCache: TerminalRenderCache get() = this@SwingTerminal.searchCache
 
                     override fun cellAt(
                         x: Int,
                         y: Int,
                         cache: TerminalRenderCache,
                     ): Long = this@SwingTerminal.cellAt(x, y, cache)
-
-                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
 
                     override fun commandNavigationAnchorRow(): Int = this@SwingTerminal.commandNavigationAnchorRow()
 
@@ -2027,6 +2024,8 @@ public class SwingTerminal
          * clipboard, scrolling, focusing, or sending input. Eviction may clip selection;
          * invalidated layouts or buffer changes clear it. Resulting selection changes
          * notify listeners outside the frame lease. The returned string may be retained.
+         * Returns null if content or layout changes during copying; text from different
+         * revisions is never combined.
          *
          * @throws IllegalStateException outside the EDT.
          */

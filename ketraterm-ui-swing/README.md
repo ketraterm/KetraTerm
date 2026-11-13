@@ -201,8 +201,10 @@ for completion and lifetime details.
 clipboard access. It includes offscreen and closed-session content, joins soft
 wraps for linear selections, and preserves block-selection row breaks. It reads
 current content rather than frozen selection text. `null` means unavailable;
-an empty string can represent selected blanks removed by trimming. Clipboard
-copy uses the same extraction. Use `createSelectionRange`, `setSelection`, and
+an empty string can represent selected blanks removed by trimming. Extraction
+returns `null` if content or layout changes during copying, rather than mixing
+revisions. Clipboard copy uses the same extraction. Use `createSelectionRange`,
+`setSelection`, and
 `clearSelection` for host-controlled ranges; see the
 [selection contract](docs/swing-repaint-optimization.md#2-selection-drag-matrix--text-extraction).
 
