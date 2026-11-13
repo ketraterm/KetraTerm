@@ -50,10 +50,25 @@ internal class InlineShellSuggestionController(
     fun isRequestCurrent(): Boolean =
         continuation?.isActive == true || active?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
 
+    fun publishShared(
+        request: SwingShellSuggestionRequest,
+        suggestion: SwingShellSuggestion,
+        feedback: SwingShellSuggestionFeedbackHandler,
+    ): Boolean {
+        val interaction =
+            active?.takeIf { it.request == request && it.validateContext() }
+                ?: begin(SwingShellSuggestionFeedbackHandler.NONE, automatic = true, sharedRequest = request)
+                ?: return false
+        feedbackForPublication?.invoke(feedback)
+        interaction.publish(listOf(suggestion), selectedIndex = 0)
+        return visible()
+    }
+
     fun begin(
         feedback: SwingShellSuggestionFeedbackHandler,
         automatic: Boolean = false,
         confirmed: TerminalCommandEditContext? = null,
+        sharedRequest: SwingShellSuggestionRequest? = null,
     ): SwingShellSuggestionInteraction? {
         if (automatic && !isAutomatic && isRequestCurrent()) return null
         val revision = sourceRevision + 1
@@ -67,7 +82,7 @@ internal class InlineShellSuggestionController(
             expected.cancel()
             return null
         }
-        val request = SwingShellSuggestionRequest(line.commandText, line.cursorOffset)
+        val request = sharedRequest ?: SwingShellSuggestionRequest(line.commandText, line.cursorOffset)
         val handler = SwingShellSuggestionEditTarget.captureSessionEdit(bound, request, expected) ?: return null
         var sourceFeedback = SwingShellSuggestionFeedbackHandler.NONE
         val combinedFeedback =

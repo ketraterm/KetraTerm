@@ -32,11 +32,84 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
 import java.util.concurrent.FutureTask
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.test.*
 
 @OptIn(ExperimentalShellSuggestionsApi::class, ExperimentalCoroutinesApi::class)
-class StandaloneCompletionSuggestionsTest {
+class SharedCompletionSuggestionsTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a lone candidate never flashes in the popup and progressive results publish only alternatives`(finite: Boolean) =
+        withFixture { f ->
+            val candidates = f.ranked.value
+            f.ranked.value = candidates.take(1)
+            if (finite) f.results = flowOf(f.ranked.value)
+            f.popupAutomatic = true
+            f.enable()
+            f.advance()
+            assertTrue(f.popupPublications.isEmpty())
+            assertFalse(f.terminal.currentShellSuggestionState().visible)
+            assertSame(
+                candidates.first(),
+                f.terminal.inlineShellSuggestionPresentation.value
+                    ?.selectedSuggestion,
+            )
+            if (!finite) {
+                f.ranked.value = candidates
+                f.dispatcher.scheduler.runCurrent()
+                assertEquals(candidates.drop(1), f.popupPublications.last())
+                f.ranked.value = candidates.take(1)
+                f.dispatcher.scheduler.runCurrent()
+                assertFalse(f.terminal.currentShellSuggestionState().visible)
+            }
+            assertTrue(f.popupPublications.none { candidates.first() in it })
+            assertEquals(1, f.collected)
+            assertEquals(1, f.opened.size)
+            assertTrue(f.feedback.isEmpty())
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["disabled", "rewrite", "spaces", "shell-text"])
+    fun `single result remains in popup when inline is disabled or cannot actually render`(reason: String) =
+        withFixture { f ->
+            f.ranked.value =
+                listOf(
+                    when (reason) {
+                        "rewrite" -> SwingShellSuggestion("show", 0, 5, "shell", "COMMAND")
+                        "spaces" -> SwingShellSuggestion(" ", 5, 5, "shell", "ARGUMENT")
+                        else -> f.ranked.value.first()
+                    },
+                )
+            if (reason == "shell-text") f.connector.feedFromHost("hell\u001b[4D".toByteArray())
+            f.popupAutomatic = true
+            f.enabled = reason != "disabled"
+            f.terminal.reloadSettings()
+            f.advance()
+            assertNull(f.terminal.inlineShellSuggestionPresentation.value)
+            assertEquals(f.ranked.value, f.popupPublications.last())
+            assertEquals(1, f.collected)
+        }
+
+    @Test
+    fun `inline dismissal allows an explicit popup without reviving the same inline result`() =
+        withFixture { f ->
+            f.ranked.value = f.ranked.value.take(1)
+            f.popupAutomatic = true
+            f.enable()
+            f.advance()
+            assertTrue(f.press(KeyEvent.VK_ESCAPE).isConsumed)
+            f.dispatcher.scheduler.runCurrent()
+            assertNull(f.terminal.inlineShellSuggestionPresentation.value)
+            val popup = f.popup()
+            f.dispatcher.scheduler.runCurrent()
+            assertEquals(f.ranked.value, popup.snapshot.suggestions)
+            assertTrue(f.terminal.currentShellSuggestionState().visible)
+            assertNull(f.terminal.inlineShellSuggestionPresentation.value)
+            assertEquals(1, f.feedback.size)
+            assertTrue(f.connector.writtenBytes.isEmpty())
+        }
+
     @Test
     fun `source failure retires both consumers and an explicit retry opens fresh work`() =
         withFixture { f ->
@@ -58,10 +131,10 @@ class StandaloneCompletionSuggestionsTest {
             f.dispatcher.scheduler.runCurrent()
             assertFalse(popup.isActive)
             assertNull(f.terminal.inlineShellSuggestionPresentation.value)
-            assertEquals(2, failures.size)
+            assertEquals(1, failures.size)
             failures.forEach { assertEquals("source failed", it.message) }
             f.results = flowOf(f.ranked.value)
-            val retry = assertNotNull(f.terminal.requestActiveInlineShellSuggestions())
+            val retry = f.popup()
             f.dispatcher.scheduler.runCurrent()
             assertTrue(retry.isActive)
             assertEquals(2, f.collected)
@@ -70,17 +143,17 @@ class StandaloneCompletionSuggestionsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `independent automatic deadlines share one source once both surfaces are eligible`(inlineFirst: Boolean) =
+    fun `both surfaces use the common debounce regardless of independent inline delay`(inlineFirst: Boolean) =
         withFixture { f ->
             f.popupAutomatic = true
-            f.popupDelay = if (inlineFirst) 150 else 75
-            f.inlineDelay = if (inlineFirst) 75 else 150
-            f.terminal.setShellSuggestionProvider(f.completions)
+            f.popupDelay = 75
+            f.inlineDelay = if (inlineFirst) 0 else 150
+            f.terminal.setSharedShellSuggestionProvider(f.completions)
             f.enable()
             f.advance()
             assertEquals(1, f.opened.size)
-            assertEquals(inlineFirst, f.terminal.inlineShellSuggestionPresentation.value != null)
-            assertEquals(!inlineFirst, f.terminal.currentShellSuggestionState().visible)
+            assertNotNull(f.terminal.inlineShellSuggestionPresentation.value)
+            assertTrue(f.terminal.currentShellSuggestionState().visible)
             f.advance()
             assertEquals(1, f.collected)
             assertEquals(1, f.opened.size)
@@ -114,6 +187,8 @@ class StandaloneCompletionSuggestionsTest {
             }
             f.dispatcher.scheduler.runCurrent()
             f.enable()
+            f.terminal.refreshShellSuggestions()
+            f.popup()
             f.advance()
             assertEquals(2, f.collected)
             assertEquals(2, f.opened.size)
@@ -132,13 +207,11 @@ class StandaloneCompletionSuggestionsTest {
             assertEquals(1, f.collected)
         }
 
-    @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `both arrival orders share one finite evaluation and Down selects the first alternative`(inlineFirst: Boolean) =
+    @Test
+    fun `one finite evaluation publishes both surfaces and Down selects the first alternative`() =
         withFixture { f ->
             f.results = flowOf(f.ranked.value)
             f.enable()
-            if (inlineFirst) f.advance()
             val popup = f.popup()
             f.advance()
             assertEquals(listOf(f.request), f.opened)
@@ -181,7 +254,7 @@ class StandaloneCompletionSuggestionsTest {
         }
 
     @Test
-    fun `a popup from different request options keeps its complete ranking`() =
+    fun `explicit request options replace the entire shared ranking`() =
         withFixture { f ->
             f.results = flowOf(f.ranked.value)
             f.enable()
@@ -199,7 +272,12 @@ class StandaloneCompletionSuggestionsTest {
             f.terminal.requestShellSuggestions(popup, f.completions)
             f.dispatcher.scheduler.runCurrent()
             assertEquals(2, f.collected)
-            assertEquals(refreshed, popup.snapshot.suggestions)
+            assertEquals(refreshed.drop(1), popup.snapshot.suggestions)
+            assertSame(
+                refreshed.first(),
+                f.terminal.inlineShellSuggestionPresentation.value
+                    ?.selectedSuggestion,
+            )
             assertNotNull(f.terminal.inlineShellSuggestionPresentation.value)
         }
 
@@ -237,20 +315,18 @@ class StandaloneCompletionSuggestionsTest {
             assertTrue(f.connector.writtenBytes.isEmpty())
         }
 
-    @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `closing one presentation keeps shared work until the other closes`(closeInlineFirst: Boolean) =
+    @Test
+    fun `closing the shared request cancels its source and leaves its valid inline result`() =
         withFixture { f ->
             f.popup()
             f.enable()
             f.advance()
             assertEquals(1, f.collected)
-            if (closeInlineFirst) f.terminal.clearInlineShellSuggestion() else f.terminal.hideShellSuggestions()
-            f.dispatcher.scheduler.runCurrent()
-            assertEquals(0, f.finished)
-            if (closeInlineFirst) f.terminal.hideShellSuggestions() else f.terminal.clearInlineShellSuggestion()
+            f.terminal.hideShellSuggestions()
             f.dispatcher.scheduler.runCurrent()
             assertEquals(1, f.finished)
+            assertNotNull(f.terminal.inlineShellSuggestionPresentation.value)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, f.terminal.acceptInlineShellSuggestion())
         }
 
     @Test
@@ -298,7 +374,7 @@ class StandaloneCompletionSuggestionsTest {
             f.dispatcher.scheduler.runCurrent()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             f.advance()
-            assertFalse(f.terminal.hasShellSuggestionProvider)
+            assertFalse(f.terminal.currentShellSuggestionState().visible)
             assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, f.terminal.acceptInlineShellSuggestion())
             f.dispatcher.scheduler.runCurrent()
             assertEquals("\u007fstatus", f.connector.writtenBytes.toString(Charsets.UTF_8))
@@ -309,17 +385,40 @@ class StandaloneCompletionSuggestionsTest {
         }
 
     @Test
+    fun `refreshing the same command routes inline acceptance to the latest source`() =
+        withFixture { f ->
+            f.enable()
+            f.advance()
+            assertEquals(1, f.opened.size)
+            f.popup()
+            f.dispatcher.scheduler.runCurrent()
+            assertEquals(2, f.opened.size)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, f.terminal.acceptInlineShellSuggestion())
+            assertEquals(listOf(1), f.feedbackSources)
+            assertEquals(SwingShellSuggestionFeedbackKind.ACCEPTED, f.feedback.single().kind)
+        }
+
+    @Test
     fun `progressive ranking updates replace inline and empty results clear it`() =
         withFixture { f ->
             f.enable()
             f.advance()
-            val interaction = assertNotNull(f.terminal.requestActiveInlineShellSuggestions())
+
             f.advance()
-            assertEquals(listOf(f.ranked.value.first()), interaction.snapshot.suggestions)
+            assertEquals(
+                listOf(f.ranked.value.first()),
+                f.terminal.inlineShellSuggestionPresentation.value
+                    ?.suggestions,
+            )
             val next = SwingShellSuggestion("stash", 4, 5, "learned", "COMMAND")
             f.ranked.value = listOf(next, f.ranked.value.first())
             f.advance()
-            assertEquals(listOf(next), interaction.snapshot.suggestions)
+            assertEquals(
+                listOf(next),
+                f.terminal.inlineShellSuggestionPresentation.value
+                    ?.suggestions,
+            )
             f.ranked.value = emptyList()
             f.advance()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
@@ -344,7 +443,7 @@ class StandaloneCompletionSuggestionsTest {
             val popup = f.popup()
             f.dispatcher.scheduler.runCurrent()
             assertEquals(f.ranked.value, popup.snapshot.suggestions)
-            assertEquals(1, f.collected)
+            assertEquals(2, f.collected)
             assertTrue(f.connector.writtenBytes.isEmpty())
         }
 
@@ -361,7 +460,7 @@ class StandaloneCompletionSuggestionsTest {
             f.advance()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             f.enable()
-            f.terminal.setInlineShellSuggestionProvider(null)
+            f.terminal.setSharedShellSuggestionProvider(null)
             f.advance()
             assertEquals(SwingShellSuggestionAcceptanceResult.UNAVAILABLE, f.terminal.acceptInlineShellSuggestion())
             assertFalse(f.session.isClosed)
@@ -429,9 +528,9 @@ class StandaloneCompletionSuggestionsTest {
             if (choosePopup) popup.select(popup.snapshot, 1)
             release.complete(Unit)
             f.advance()
-            assertTrue(f.press(KeyEvent.VK_TAB).isConsumed)
+            f.press(KeyEvent.VK_TAB)
             f.dispatcher.scheduler.runCurrent()
-            assertEquals("\u007f" + if (choosePopup) "stash" else "status", f.connector.writtenBytes.toString(Charsets.UTF_8))
+            assertEquals(if (choosePopup) "\u007fstash" else "\t", f.connector.writtenBytes.toString(Charsets.UTF_8))
         }
 
     @Test
@@ -516,13 +615,14 @@ class StandaloneCompletionSuggestionsTest {
             )
         var results: Flow<List<SwingShellSuggestion>> = ranked
         val feedback = mutableListOf<SwingShellSuggestionFeedback>()
-        val feedbackHandler = SwingShellSuggestionFeedbackHandler { feedback += it }
+        val feedbackSources = mutableListOf<Int>()
         val provider =
             object : SwingShellSuggestionProvider {
                 override fun suggestions(request: SwingShellSuggestionRequest) = results
 
                 override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
                     opened += request
+                    val sourceIndex = opened.lastIndex
                     val captured = results
                     return SwingShellSuggestionSource(
                         flow {
@@ -533,7 +633,10 @@ class StandaloneCompletionSuggestionsTest {
                                 finished++
                             }
                         },
-                        feedbackHandler,
+                        SwingShellSuggestionFeedbackHandler {
+                            feedback += it
+                            feedbackSources += sourceIndex
+                        },
                     )
                 }
             }
@@ -545,6 +648,7 @@ class StandaloneCompletionSuggestionsTest {
         var popupAutomatic = false
         var popupDelay = 75
         var inlineDelay = 75
+        val popupPublications = mutableListOf<List<SwingShellSuggestion>>()
         val terminal =
             SuggestionTestTerminal.create(
                 {
@@ -559,12 +663,21 @@ class StandaloneCompletionSuggestionsTest {
                 SwingHostServices.create {
                     it.uiDispatcher = TerminalUiDispatcher { task -> task.run() }
                     it.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
+                    it.shellSuggestionViewFactory =
+                        SwingShellSuggestionViewFactory {
+                            object : SwingShellSuggestionView {
+                                override val component = JPanel()
+
+                                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                                    if (snapshot.visibleSuggestions.isNotEmpty()) popupPublications += snapshot.visibleSuggestions.toList()
+                                }
+                            }
+                        }
                 },
                 dispatcher,
             )
 
-        val completions = StandaloneCompletionSuggestions(provider, session, terminal, dispatcher, dispatcher)
-        val inlineProvider get() = completions.inlineProvider
+        val completions = provider
 
         init {
             session.start(30, 4)
@@ -574,7 +687,7 @@ class StandaloneCompletionSuggestionsTest {
             focus()
             dispatcher.scheduler.runCurrent()
             history.recordCurrentWorkingDirectory("file:///project")
-            terminal.setInlineShellSuggestionProvider(inlineProvider)
+            terminal.setSharedShellSuggestionProvider(completions)
         }
 
         fun focus() = terminal.focusListeners.forEach { it.focusGained(FocusEvent(terminal, FocusEvent.FOCUS_GAINED)) }
@@ -609,7 +722,7 @@ class StandaloneCompletionSuggestionsTest {
 
         override fun close() {
             terminal.dispose()
-            completions.close()
+
             session.close()
             dispatcher.scheduler.runCurrent()
         }

@@ -351,6 +351,16 @@ for view-owned diagnostics.
 
 ### Inline suffix rendering
 
+For one source shared by the built-in popup and inline preview, install it with
+`setSharedShellSuggestionProvider(provider, popupEnabled = true)`. This mode uses
+one request and the popup debounce setting. Each result is tried inline first;
+only a successfully displayed preview is omitted from the popup. A lone inline
+result therefore never opens a popup before its preview. The inline switch and
+popup automatic setting remain effective, and `popupEnabled = false` supports
+inline-only presentation. The shared request honors the command-name setting.
+Popup browsing keeps its rows stable and suppresses inline updates. Independent
+providers remain available through the APIs below.
+
 The experimental inline API paints caller-supplied ghost text through the same
 text renderer as ordinary terminal cells. Capture edit authority before starting
 asynchronous work, then present the result on the EDT:

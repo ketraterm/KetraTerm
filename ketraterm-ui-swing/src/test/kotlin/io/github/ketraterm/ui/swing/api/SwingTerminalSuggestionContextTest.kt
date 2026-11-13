@@ -667,6 +667,33 @@ class SwingTerminalSuggestionContextTest {
             assertEquals("\u007f".repeat(6) + "git status", writes.toString("UTF-8"))
         }
 
+    @Test
+    fun `shared publication presents inline from the current frame before the copied frame catches up`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.settings = fixture.settings.copy { it.inlineShellSuggestionsEnabled = true }
+            view.reloadSettings()
+            var opened = 0
+            val provider =
+                SwingShellSuggestionProvider { request ->
+                    opened++
+                    flowOf(listOf(SwingShellSuggestion("git status", 0, request.cursorOffset, "spec", "COMMAND")))
+                }
+            view.setSharedShellSuggestionProvider(provider)
+            fixture.feedHost("\r\u001b[2K    git st")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git st", 6, 10, 0)
+            dispatcher.scheduler.runCurrent()
+            view.requestActiveShellSuggestions()
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(1, opened)
+            assertNotNull(view.inlineShellSuggestionPresentation.value)
+            assertFalse(view.currentShellSuggestionState().visible)
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u007f".repeat(6) + "git status", writes.toString("UTF-8"))
+        }
+
     @ParameterizedTest
     @ValueSource(strings = ["close", "supersede", "input", "unbind"])
     fun `frame arrival cannot revive obsolete inline work`(end: String) =

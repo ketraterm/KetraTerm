@@ -289,13 +289,14 @@ and automatic requests never replace a valid manual interaction. See the
 for eligibility, Unicode handling, collisions, provider context and caller ownership.
 The standalone application offers opt-in **Inline suggestions** on its
 **Suggestions** settings page, off by default. Inline uses the popup's completion
-provider and shares one evaluation for matching command context and options. It
+provider with one request, one debounce and one UI publication. It
 previews the first result from each ranked snapshot, including
 command specifications, paths, shell completions, and learned candidates. It
 keeps the original replacement range and learning feedback. A result that does
 not strictly extend the current command is popup-only; inline never substitutes
 a lower-ranked candidate. Empty prefixes produce no inline suggestion.
-The popup drops the first row of the shared result only after its inline preview becomes visible.
+Each ranking is tried inline first; the popup receives the remaining rows in the
+same UI update. A lone result that renders inline never flashes in a popup.
 Down selects the first alternative and hides inline; the omitted candidate stays
 out during that browsing session so the list does not shift under navigation.
 If inline cannot render, the full ranking remains in the popup. Disabling inline
@@ -303,8 +304,8 @@ restores the candidate in a passive popup. Library hosts can still provide unrel
 popup and inline sources.
 
 Requests start after a 75 ms pause in command-edit activity. Popup and inline
-presentations retain independent lifetimes and switches; closing one keeps shared
-work alive for the other. Tab or Right accepts
+retain separate switches. Closing the shared request cancels source work; an
+already visible, still-valid inline result remains available. Tab or Right accepts
 visible inline text while the popup is passive. Deliberate popup browsing hides
 inline text, including late results; Tab or Enter then inserts the selected popup
 item. A popup acceptance keeps inline hidden while the accepted command remains
