@@ -313,8 +313,10 @@ Custom views retain control of their own styling. Providers supply label-relativ
 fragments without repeating the match. Providers can supply display-only `argumentHint`
 text beside the label; hints never become part of the accepted command.
 
-Nested `PATH` rows show the name first and parent context in `secondaryForeground`
-(`selectionForeground` on selection). Long paths shorten to the available width;
+Simple nested `PATH` rows show the name first and parent context in `secondaryForeground`
+(`selectionForeground` on selection). Paths containing `.` or `..` components,
+whitespace, quotes, or shell-expression markers retain their original order.
+Both layouts shorten long paths to the available width;
 hover and accessibility retain the full path, and acceptance inserts the original
 replacement. Visible match fragments keep their supplied highlights.
 Custom providers set `backslashPathSeparator = false` when `PATH` labels contain

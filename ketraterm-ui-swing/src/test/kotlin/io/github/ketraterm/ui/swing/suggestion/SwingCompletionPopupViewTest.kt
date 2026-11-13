@@ -38,7 +38,7 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @ParameterizedTest
-    @ValueSource(strings = ["foo\\bar.txt", "dir\\name/foo\\bar.txt", "parent/foo\\"])
+    @ValueSource(strings = ["foo\\bar.txt", "dir\\name/foo\\bar.txt", "parent/foo\\", "parent/foo\\.."])
     fun `POSIX path presentation preserves literal backslashes in names and parents`(path: String) =
         onEdt {
             val nameStart = path.lastIndexOf('/') + 1
@@ -60,7 +60,7 @@ class SwingCompletionPopupViewTest {
 
                 assertEquals(name + if (parent.isEmpty()) "" else "  $parent", text)
                 assertTrue(row.text.contains(">foo</b>"))
-                assertEquals(if (parent.isEmpty()) null else "<html>$path</html>", row.toolTipText)
+                assertEquals("<html>$path</html>", row.toolTipText)
                 assertEquals(path, row.accessibleContext.accessibleName)
                 assertEquals(path, candidate.replacementText)
             } finally {
@@ -69,8 +69,8 @@ class SwingCompletionPopupViewTest {
         }
 
     @ParameterizedTest
-    @CsvSource("/file.txt, /", "C:\\file.txt, C:\\", "../file.txt, ..")
-    fun `root and navigation context survives name first presentation`(
+    @CsvSource("/file.txt, /", "C:\\file.txt, C:\\")
+    fun `root context survives name first presentation`(
         path: String,
         parent: String,
     ) = onEdt {
@@ -86,6 +86,78 @@ class SwingCompletionPopupViewTest {
             view.close()
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            ".", "..", "../..", "../../", "./src/", "../src/", "projects/../build/",
+            "..\\..\\", ".\\src\\", "projects\\..\\build\\",
+            "'My Projects/app/'", "\"projects/app/\"", "\$HOME/projects/app/", "~/projects/app/",
+            "%USERPROFILE%/projects/app/", "projects/`name/app/", "projects/*/app/", "projects/?/app/",
+            "projects/[ab]/app/", "projects/{one,two}/app/", "projects/$(pwd)/app/",
+            "projects/app/ --verbose", "C:\\Users\\My Projects\\app\\", "/", "C:\\",
+        ],
+    )
+    fun `navigation and ambiguous path labels keep their original order and highlights`(path: String) =
+        onEdt {
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(path, intArrayOf(0, 1)),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(1000, 40)
+                val row = view.renderedLabel(candidate)
+                val text =
+                    row.text
+                        .replace(Regex("<[^>]+>"), "")
+                        .replace("&quot;", "\"")
+                        .replace("&nbsp;", " ")
+
+                assertEquals(path, text)
+                assertTrue(row.text.contains("<b "))
+                assertFalse(row.text.contains("<span"))
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertNotNull(row.toolTipText)
+                assertEquals(path, candidate.replacementText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `long navigation paths shorten in order and retain full tooltip and accessibility text`() =
+        onEdt {
+            val path = "../" + "directory/".repeat(20) + "target/"
+            val start = path.indexOf("target")
+            val candidate =
+                suggestion(path).copy(
+                    kind = "PATH",
+                    matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(path, intArrayOf(start, start + 6)),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(300, 40)
+                val row = view.renderedLabel(candidate)
+
+                assertTrue(row.text.startsWith("<html>../"))
+                assertTrue(row.text.contains('\u2026'))
+                assertTrue(row.text.contains(">target</b>"))
+                assertFalse(row.text.contains("<span"))
+                assertEquals("<html>$path</html>", row.toolTipText)
+                assertEquals(path, row.accessibleContext.accessibleName)
+                assertEquals(path, candidate.replacementText)
+
+                val narrow = row.text
+                view.list.setSize(600, 40)
+                assertTrue(view.renderedLabel(candidate).text.length > narrow.length)
+            } finally {
+                view.close()
+            }
+        }
 
     @Test
     fun `path shortening preserves deep matching graphemes and escapes full path tooltips`() =
