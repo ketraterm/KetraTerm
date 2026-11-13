@@ -43,6 +43,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Security and notifications
 
+- Install the companion CLI in a private temporary directory instead of trusting
+  a predictable shared temporary path.
 - Pastes containing line breaks or control characters show an escaped preview for review,
   with Cancel selected by default.
 - Invalid clipboard or title permissions deny access and identify the affected setting.

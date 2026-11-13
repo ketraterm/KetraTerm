@@ -87,7 +87,8 @@ ketra config
 
 `config` opens the active configuration file using the platform helper's editor
 selection. WSL and Ubuntu launcher profiles do not receive the native helper or
-native configuration paths.
+native configuration paths. Helpers are installed in a private, randomly named
+temporary directory with owner-only access and are removed on normal JVM exit.
 
 <a id="maintainer-entry-points"></a>
 

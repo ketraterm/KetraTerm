@@ -29,15 +29,70 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.FileTime
-import java.nio.file.attribute.PosixFileAttributeView
-import java.nio.file.attribute.PosixFilePermissions
+import java.nio.file.attribute.*
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class KetraTermCliTest {
     @TempDir
     lateinit var directory: Path
+
+    @Test
+    fun `default helpers use distinct private directories and reuse them within an owner`() {
+        val first = KetraTermCli(directory.resolve("config.toml"))
+        val second = KetraTermCli(directory.resolve("config.toml"))
+        val firstProfile = first.prepare(profile(), emptyMap())
+        val firstDirectory = Path.of(firstProfile.environment.getValue("PATH"))
+        val secondDirectory = Path.of(second.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+        try {
+            assertNotEquals(firstDirectory, secondDirectory)
+            assertEquals(firstProfile, first.prepare(profile(), emptyMap()))
+            for (helper in listOf(firstDirectory, secondDirectory)) {
+                assertTrue(Files.isRegularFile(helper.resolve("ketra")))
+                assertTrue(Files.isRegularFile(helper.resolve("ketra.bat")))
+                val posix = Files.getFileAttributeView(helper, PosixFileAttributeView::class.java)
+                if (posix != null) {
+                    assertEquals(PosixFilePermissions.fromString("rwx------"), posix.readAttributes().permissions())
+                } else {
+                    val acl = assertNotNull(Files.getFileAttributeView(helper, AclFileAttributeView::class.java))
+                    assertEquals(
+                        setOf(Files.getOwner(helper)),
+                        acl.acl
+                            .filter { it.type() == AclEntryType.ALLOW }
+                            .map { it.principal() }
+                            .toSet(),
+                    )
+                }
+            }
+        } finally {
+            for (helper in listOf(firstDirectory, secondDirectory)) {
+                Files.deleteIfExists(helper.resolve("ketra"))
+                Files.deleteIfExists(helper.resolve("ketra.bat"))
+                Files.deleteIfExists(helper)
+            }
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `installation replaces a helper symlink without modifying its target`() {
+        val helper = directory.resolve("helpers")
+        val cli = KetraTermCli(directory.resolve("config.toml"), helper)
+        cli.prepare(profile(), emptyMap())
+        val script = helper.resolve("ketra")
+        val content = Files.readString(script)
+        val victim = Files.writeString(directory.resolve("unrelated-file"), content)
+        Files.setPosixFilePermissions(victim, PosixFilePermissions.fromString("rw-------"))
+        Files.delete(script)
+        Files.createSymbolicLink(script, victim)
+
+        cli.prepare(profile(), emptyMap())
+
+        assertFalse(Files.isSymbolicLink(script))
+        assertEquals(content, Files.readString(script))
+        assertEquals(content, Files.readString(victim))
+        assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(victim))
+    }
 
     @Test
     fun `preparation supplies product metadata and preserves the launch contract`() {
