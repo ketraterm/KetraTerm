@@ -26,7 +26,7 @@ class SwingShellSuggestionKeymapTest {
     private val source = Canvas()
 
     @Test
-    fun `next word has no default binding and whole inline acceptance remains unchanged`() {
+    fun `next word has no default binding and whole inline acceptance uses only Right`() {
         for (modifiers in listOf(
             0,
             InputEvent.CTRL_DOWN_MASK,
@@ -46,14 +46,17 @@ class SwingShellSuggestionKeymapTest {
                 )
             }
         }
-        for (key in listOf(KeyEvent.VK_TAB, KeyEvent.VK_RIGHT)) {
-            assertEquals(
-                SwingShellSuggestionAction.ACCEPT_SELECTED,
-                SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(
-                    KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED),
-                ),
-            )
-        }
+        assertEquals(
+            SwingShellSuggestionAction.ACCEPT_SELECTED,
+            SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(
+                KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED),
+            ),
+        )
+        assertNull(
+            SwingShellSuggestionKeymap.INLINE_STANDARD.actionFor(
+                KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_TAB, KeyEvent.CHAR_UNDEFINED),
+            ),
+        )
     }
 
     @Test

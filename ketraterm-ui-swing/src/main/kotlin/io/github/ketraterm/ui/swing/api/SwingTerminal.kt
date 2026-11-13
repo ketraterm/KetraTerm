@@ -1585,7 +1585,7 @@ public class SwingTerminal
         }
 
         /**
-         * Replaces inline Tab/Right/Escape defaults. Inline acceptance wins while the popup is
+         * Replaces inline Right/Escape defaults. Inline acceptance wins while the popup is
          * passive; deliberate popup browsing hides inline text and owns its acceptance keys.
          */
         @ExperimentalShellSuggestionsApi

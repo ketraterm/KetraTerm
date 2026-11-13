@@ -88,7 +88,7 @@ All keys below belong to `[behavior]`. Boolean values are `true` or `false`.
 | `popup_suggestions_enabled` | `true` | Enable the popup surface, including explicit requests; independent of inline previews. |
 | `popup_accept_keys` | `"TAB"` | Insert a deliberately selected popup item; passive popups leave the key to inline suggestions or the shell. |
 | `popup_selected_accept_keys` | `"ENTER"` | Insert only a deliberately selected popup item, without execution. |
-| `inline_accept_keys` | `"TAB, RIGHT"` | Insert the whole visible inline suggestion while the popup is passive. |
+| `inline_accept_keys` | `"RIGHT"` | Insert the whole visible inline suggestion while the popup is passive. |
 | `suggestions_trigger_keys` | `"ctrl SPACE"` | Explicitly open the popup and select its first available item. |
 | `inline_suggestions_enabled` | `false` | Preview the top ranked completion as an append-only inline suffix, when the master switch is enabled. Independent of popup presentation; see [inline previews](../../docs/features/completion.md#inline-suffix-presentation). |
 | `shell_suggestion_automatic_mode` | `"always"` | `"always"` or `"parameters_only"`. The latter suppresses executable-name popups; subcommands, options, arguments, and explicit completion remain available. |

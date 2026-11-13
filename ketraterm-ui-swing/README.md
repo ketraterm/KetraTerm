@@ -495,9 +495,9 @@ provider availability. Updates are conflated and do not report acceptance;
 rendering-only previews have no managed publication. Observation does not change
 popup content or keyboard routing.
 
-The inline standard keymap accepts the whole visible suggestion with Tab or Right
-at the command's end while the popup is passive. Without visible inline text,
-Tab reaches the shell until a popup item is deliberately selected. Keyboard navigation
+The inline standard keymap accepts the whole visible suggestion with Right Arrow
+at the command's end while the popup is passive. Tab reaches the shell until a
+popup item is deliberately selected. Keyboard navigation
 deliberately selects a popup item and hides inline text; Tab or Enter then inserts
 that choice without executing it. Enter otherwise reaches the shell. Provider
 preselection and hover never enable Tab or Enter acceptance. A refresh preserves an

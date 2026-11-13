@@ -1010,32 +1010,34 @@ class SwingTerminalSuggestionContextTest {
         }
 
     @ParameterizedTest
-    @ValueSource(booleans = [true, false])
-    fun `Tab accepts visible inline text with or without a popup`(dismissPopupFirst: Boolean) =
-        withInlineFixture { fixture, dispatcher, writes ->
-            val view = fixture.terminal
-            val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
-            inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
-            val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
-            popup.publish(listOf(inlineCandidate("git status")), selectedIndex = if (dismissPopupFirst) 0 else -1)
-            view.presentShellSuggestions(popup)
+    @CsvSource("true, true", "true, false", "false, true", "false, false")
+    fun `default inline acceptance uses Right and leaves Tab to the shell`(
+        dismissPopupFirst: Boolean,
+        acceptInline: Boolean,
+    ) = withInlineFixture { fixture, dispatcher, writes ->
+        val view = fixture.terminal
+        val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
+        inline.publish(listOf(inlineCandidate("git status --short")), selectedIndex = 0)
+        val popup = assertNotNull(view.beginActiveShellSuggestionInteraction())
+        popup.publish(listOf(inlineCandidate("git status")), selectedIndex = if (dismissPopupFirst) 0 else -1)
+        view.presentShellSuggestions(popup)
 
-            fun press(key: Int) {
-                val event = KeyEvent(view, KeyEvent.KEY_PRESSED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
-                view.keyListeners.forEach { it.keyPressed(event) }
-                assertTrue(event.isConsumed)
-                val released = KeyEvent(view, KeyEvent.KEY_RELEASED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
-                view.keyListeners.forEach { it.keyReleased(released) }
-            }
-            if (dismissPopupFirst) {
-                press(KeyEvent.VK_ESCAPE)
-                assertEquals(SwingShellSuggestionCloseReason.DISMISSED, popup.closeReason)
-                assertTrue(inline.isActive)
-            }
-            press(KeyEvent.VK_TAB)
-            dispatcher.scheduler.runCurrent()
-            assertEquals("\u007f".repeat(5) + "git status --short", writes.toString("UTF-8"))
+        fun press(key: Int) {
+            val event = KeyEvent(view, KeyEvent.KEY_PRESSED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
+            view.keyListeners.forEach { it.keyPressed(event) }
+            assertTrue(event.isConsumed)
+            val released = KeyEvent(view, KeyEvent.KEY_RELEASED, 0L, 0, key, KeyEvent.CHAR_UNDEFINED)
+            view.keyListeners.forEach { it.keyReleased(released) }
         }
+        if (dismissPopupFirst) {
+            press(KeyEvent.VK_ESCAPE)
+            assertEquals(SwingShellSuggestionCloseReason.DISMISSED, popup.closeReason)
+            assertTrue(inline.isActive)
+        }
+        press(if (acceptInline) KeyEvent.VK_RIGHT else KeyEvent.VK_TAB)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(if (acceptInline) "\u007f".repeat(5) + "git status --short" else "\t", writes.toString("UTF-8"))
+    }
 
     @Test
     fun `stale inline Tab does not select a popup item or forward Tab`() =
@@ -1247,8 +1249,8 @@ class SwingTerminalSuggestionContextTest {
         assertTrue(fixture.press(keyCode).isConsumed)
         dispatcher.scheduler.runCurrent()
         assertNotEquals(SwingShellSuggestionCloseReason.ACCEPTED, popup.closeReason)
-        if (key == "ENTER") {
-            assertEquals("\r", writes.toString("UTF-8"))
+        if (key != "RIGHT") {
+            assertEquals(if (key == "TAB") "\t" else "\r", writes.toString("UTF-8"))
             assertTrue(feedback.isEmpty())
         } else {
             assertEquals("\u007f".repeat(5) + "git stash --all", writes.toString("UTF-8"))

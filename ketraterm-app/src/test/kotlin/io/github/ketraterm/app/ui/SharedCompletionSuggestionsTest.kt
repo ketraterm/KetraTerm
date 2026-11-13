@@ -541,7 +541,7 @@ class SharedCompletionSuggestionsTest {
             f.ranked.value = listOf(parent)
             f.enable()
             f.advance()
-            assertTrue(f.press(KeyEvent.VK_TAB).isConsumed)
+            assertTrue(f.press(KeyEvent.VK_RIGHT).isConsumed)
             f.dispatcher.scheduler.runCurrent()
             assertEquals("\u007fxyz/", f.connector.writtenBytes.toString(Charsets.UTF_8))
             f.setLine("cd xyz/")

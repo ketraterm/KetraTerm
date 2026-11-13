@@ -305,8 +305,8 @@ popup and inline sources.
 
 Requests start after a 75 ms pause in command-edit activity. Popup and inline
 retain separate switches. Closing the shared request cancels source work; an
-already visible, still-valid inline result remains available. Tab or Right accepts
-visible inline text while the popup is passive. Deliberate popup browsing hides
+already visible, still-valid inline result remains available. Right Arrow accepts
+visible inline text while the popup is passive; Tab invokes shell completion. Deliberate popup browsing hides
 inline text, including late results; Tab or Enter then inserts the selected popup
 item. A popup acceptance keeps inline hidden while the accepted command remains
 unchanged. Fresh child suggestions require deliberate navigation before host
