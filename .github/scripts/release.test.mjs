@@ -32,6 +32,10 @@ import {
 
 const pending =
   "# Changelog\n\n## [Unreleased]\n\n### Fixes\n\n- Fixed [rendering](docs/render.md).\n\n## [0.3.0] - 2026-09-23\n\n- Old change.\n";
+const pendingWithNavigation = pending.replace(
+  "# Changelog\n",
+  "# Changelog\n\nReleased versions: [0.3.0](#030---2026-09-23)\n",
+);
 
 test("repository changelogs satisfy the release preparation contract", () => {
   const version = readFileSync(new URL("../../VERSION", import.meta.url), "utf8").trim();
@@ -128,8 +132,44 @@ test("rejects ambiguous changelogs instead of losing changes", () => {
     assert.throws(() => finalizeChangelog(text, "0.4.0", "2026-10-31"));
 });
 
+test("finalization refreshes release navigation and preserves notes and retry dates", () => {
+  const result = finalizeChangelog(
+    pendingWithNavigation.replaceAll("\n", "\r\n"), "0.4.0", "2026-10-31",
+  );
+  assert.equal(result, pendingWithNavigation
+    .replace("## [Unreleased]", "## [0.4.0] - 2026-10-31")
+    .replace("Released versions:", "Released versions: [0.4.0](#040---2026-10-31) ·"));
+  assert.equal(finalizeChangelog(result, "0.4.0", "2026-11-01"), result);
+  assert.equal(finalizeChangelog(
+    result.replace("## [0.4.0]", "## [Unreleased]\n\n## [0.4.0]"),
+    "0.4.0", "2026-11-01",
+  ), result);
+  const stale = result.replace("[0.4.0](#040---2026-10-31) · ", "");
+  assert.equal(finalizeChangelog(stale, "0.4.0", "2026-11-01"), result);
+});
+
+test("navigation includes prereleases, replaces stale wrapped links, and excludes Unreleased", () => {
+  const source = pendingWithNavigation.replace(
+    "[0.3.0](#030---2026-09-23)",
+    "[0.4.0-rc01](#wrong) ·\n[0.3.0](#wrong) · [Unreleased](#unreleased)",
+  );
+  const result = finalizeChangelog(source, "0.4.0-rc01", "2026-10-31");
+  assert.equal(result, pendingWithNavigation
+    .replace("## [Unreleased]", "## [0.4.0-rc01] - 2026-10-31")
+    .replace("Released versions:", "Released versions: [0.4.0-rc01](#040-rc01---2026-10-31) ·"));
+  const next = finalizeChangelog(
+    result.replace("## [0.4.0-rc01]", "## [Unreleased]\n\n- Stable release.\n\n## [0.4.0-rc01]"),
+    "0.4.0", "2026-11-01",
+  );
+  const navigation = next.match(/^Released versions:.*(?:\n[^\n]+)*/m)[0];
+  assert.equal(navigation.replaceAll("\n", " "),
+    "Released versions: [0.4.0](#040---2026-11-01) · [0.4.0-rc01](#040-rc01---2026-10-31) · [0.3.0](#030---2026-09-23)");
+  assert.ok(navigation.split("\n").every(line => line.length <= 100));
+  assert.equal(finalizeChangelog(next, "0.4.0", "2026-11-02"), next);
+});
+
 test("release notes combine only this version and resolve links against each changelog", () => {
-  const text = finalizeChangelog(pending, "0.4.0", "2026-10-31");
+  const text = finalizeChangelog(pendingWithNavigation, "0.4.0", "2026-10-31");
   const notes = releaseNotes(
     changelogs.map(([file, title]) => [file, title, text]),
     "0.4.0",
@@ -145,6 +185,7 @@ test("release notes combine only this version and resolve links against each cha
     ),
   );
   assert.ok(!notes.includes("Old change"));
+  assert.ok(!notes.includes("Released versions:"));
 });
 
 test("prepare command supports first release and resumes the immutable tag after interruption", (t) => {
@@ -160,7 +201,7 @@ test("prepare command supports first release and resumes the immutable tag after
   for (const [file] of changelogs) {
     if (file.includes("/"))
       mkdirSync(join(root, file.split("/")[0]), { recursive: true });
-    writeFileSync(join(root, file), pending);
+    writeFileSync(join(root, file), pendingWithNavigation);
   }
   git("add", ".");
   git("commit", "-m", "Initial");
@@ -180,8 +221,8 @@ test("prepare command supports first release and resumes the immutable tag after
     });
   writeFileSync(join(root, changelogs.at(-1)[0]), "# Missing release section\n");
   assert.throws(run);
-  assert.equal(readFileSync(join(root, "CHANGELOG.md"), "utf8"), pending);
-  writeFileSync(join(root, changelogs.at(-1)[0]), pending);
+  assert.equal(readFileSync(join(root, "CHANGELOG.md"), "utf8"), pendingWithNavigation);
+  writeFileSync(join(root, changelogs.at(-1)[0]), pendingWithNavigation);
   run();
   assert.match(readFileSync(output, "utf8"), /needed=true/);
   assert.ok(readFileSync(output, "utf8").includes(`source_revision=${sourceCommit}`));
@@ -197,11 +238,15 @@ test("prepare command supports first release and resumes the immutable tag after
   assert.ok(readFileSync(output, "utf8").includes(`revision=${sourceCommit}`));
   assert.match(readFileSync(output, "utf8"), /existing_tag=false/);
   assert.equal(git("tag", "--list", "v0.4.0"), "");
-  for (const [file] of changelogs)
+  for (const [file] of changelogs) {
+    const finalized = readFileSync(join(root, file), "utf8");
     assert.match(
-      readFileSync(join(root, file), "utf8"),
+      finalized,
       /## \[0.4.0\] - \d{4}-\d{2}-\d{2}/,
     );
+    const date = finalized.match(/## \[0.4.0\] - (\d{4}-\d{2}-\d{2})/)[1];
+    assert.ok(finalized.includes(`Released versions: [0.4.0](#040---${date}) · [0.3.0](#030---2026-09-23)`));
+  }
   git("add", ...changelogs.map(([file]) => file));
   git("commit", "-m", "Release v0.4.0");
   git("tag", "v0.4.0");
@@ -226,8 +271,12 @@ test("prepare command supports first release and resumes the immutable tag after
 test("source reuse excludes only deterministic release changelog edits", () => {
   const before = pending.trim();
   const after = finalizeChangelog(before, "0.4.0", "2026-11-01");
+  const navigationBefore = pendingWithNavigation.trim();
+  const navigationAfter = finalizeChangelog(navigationBefore, "0.4.0", "2026-11-01");
   for (const [files, parentText, releaseText, expected] of [
     ["CHANGELOG.md", before, after, "parent"],
+    ["CHANGELOG.md", navigationBefore, navigationAfter, "parent"],
+    ["CHANGELOG.md", navigationBefore, navigationAfter.replace("#040---2026-11-01", "#wrong"), "head"],
     ["CHANGELOG.md\nVERSION", before, after, "head"],
     ["CHANGELOG.md", before, after.replace("Fixed", "Changed"), "head"],
     ["CHANGELOG.md", "# No release headings", after, "head"],

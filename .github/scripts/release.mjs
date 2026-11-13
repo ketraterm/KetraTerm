@@ -67,6 +67,25 @@ export function shouldRelease(version, releases) {
   return !published.some((release) => release.tag_name === `v${version}`);
 }
 
+function updateChangelogNavigation(text) {
+  return text.replace(/^Released versions:.*(?:\n[^\n]+)*/m, () => {
+    const links = [...text.matchAll(/^## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})$/gm)]
+      .map(([, version, date]) => `[${version}](#${version.replaceAll(".", "")}---${date})`);
+    const lines = [];
+    let line = "Released versions:";
+    for (const [index, link] of links.entries()) {
+      const item = link + (index < links.length - 1 ? " ·" : "");
+      if (line.length + 1 + item.length > 100) {
+        lines.push(line);
+        line = item;
+      } else {
+        line += ` ${item}`;
+      }
+    }
+    return [...lines, line].join("\n");
+  });
+}
+
 export function finalizeChangelog(source, version, date) {
   const text = source.replace(/\r\n/g, "\n");
   const headings = [...text.matchAll(/^## \[([^\]]+)\].*$/gm)];
@@ -95,13 +114,14 @@ export function finalizeChangelog(source, version, date) {
     ) {
       throw new Error(`Missing release date for ${version}.`);
     }
-    return pending.length
+    const finalized = pending.length
       ? text.slice(0, pending[0].index) + text.slice(existing[0].index)
       : text;
+    return updateChangelogNavigation(finalized);
   }
   if (pending.length !== 1 || pending[0] !== headings[0])
     throw new Error("Expected a leading Unreleased changelog section.");
-  return (
+  return updateChangelogNavigation(
     text.slice(0, pending[0].index) +
     pending[0][0].replace("[Unreleased]", `[${version}] - ${date}`) +
     text.slice(pending[0].index + pending[0][0].length)

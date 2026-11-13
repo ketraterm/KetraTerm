@@ -1,128 +1,210 @@
 # KetraTerm Standalone Changelog
 
+Release notes for the KetraTerm desktop application.
+For emulator APIs and embedding changes, see the [library changelog](../CHANGELOG.md).
+
+Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
+[0.3.0](#030---2026-09-23) · [0.2.2](#022---2026-09-11) · [0.2.1](#021---2026-07-14) ·
+[0.2.0](#020---2026-07-13) · [0.1.3](#013---2026-07-08) · [0.1.2](#012---2026-07-03) ·
+[0.1.1](#011---2026-07-02) · [0.1.0](#010---2026-06-30)
+
 ## [Unreleased]
 
-- Added opt-in inline previews of the top ranked completion. Popup and inline use one request, debounce and ranked publication, preserving source feedback. Each result is tried inline before popup rows are published, so a lone inline result never flashes a popup. The popup omits the visibly previewed candidate, so one Down selects the first alternative; browsing keeps the list stable. Only append-only results appear inline, including with popups disabled. Right Arrow accepts visible inline text by default until deliberate popup browsing takes over; Tab/Enter insert a deliberate popup choice without executing it. Without visible inline text, passive popups and refreshed child results preserve shell Tab/Enter behavior. A dedicated Suggestions settings page controls inline previews, popup mode, learning, and shortcuts recorded as removable key chips. Inline is off by default; saved history-inline preferences migrate automatically.
-- PowerShell automatic suggestions confirm inline-prediction input without waiting for native candidate discovery.
-- Added temporary per-pane font zoom/reset, Windows Ctrl+Shift+C/V clipboard aliases, and window-scoped tab/pane shortcuts. History paging keeps one row of context; Shift+Home/End jumps to oldest history/live output.
-- Double- and triple-click dragging extends selection by whole words or rows. Word selection preserves complete wide characters and keeps adjacent paths out of whitespace/delimiter selections.
-- New configurations start at 100 × 28 cells with 10,000 scrollback lines; the initial window fits the monitor's usable area before shell output starts. Linux and other non-Windows/macOS platforms select an installed font from the shared curated monospace list, with `Monospaced` as the fallback. Font size remains 16 points and the default cursor remains a block blinking every 600 ms. Saved preferences remain effective.
-- Added review of explicit pastes containing line breaks or control characters, with an escaped preview and Cancel selected by default.
-- Coalesced bell bursts and limited audible, visual, and desktop-attention feedback to one delivery every 500 ms per window.
-- Ctrl+Space now passes through to the running application when shell completion cannot start.
-- Invalid explicit clipboard and title permissions now deny access and report the affected key. Malformed or unreadable configuration recovery also denies these permissions.
-- Failed sessions retain their final output with an exit-status banner and Close button. Transport failures and unknown exit statuses are retained too; successful exits still close normally.
-- Fresh Windows configurations prefer discovered modern PowerShell (`pwsh.exe`), falling back to Windows PowerShell. Saved shell choices remain effective.
+### Suggestions
+
+- Added opt-in inline completion previews, including when suggestion popups are disabled.
+  Existing history-inline preferences migrate automatically.
+- Popups show alternatives to the inline preview without briefly duplicating it.
+- Right Arrow accepts an inline preview. After browsing the popup, Tab or Enter inserts the
+  selected suggestion without executing it; passive popups preserve shell Tab/Enter behavior.
+- Added a Suggestions settings page for inline previews, popup mode, learning, and customizable
+  shortcuts. Press keys to record a shortcut; click its chip to remove it.
+- PowerShell suggestions stay responsive while native inline predictions are visible.
+- Ctrl+Space passes through to the running application when shell completion cannot start.
+
+### Keyboard, selection, and navigation
+
+- Added temporary font zoom and reset for each pane, Windows Ctrl+Shift+C/V clipboard shortcuts,
+  and window-scoped tab and pane shortcuts.
+- History paging keeps one row of context. Shift+Home/End jumps to oldest history or live output.
+- Double- and triple-click dragging selects whole words or rows. Word selection preserves wide
+  characters and keeps neighboring paths out of whitespace selections.
+
+### Startup and session recovery
+
+- New configurations use 100 × 28 cells and 10,000 scrollback lines. The initial window fits the
+  available desktop; saved preferences remain effective.
+- Linux and other non-Windows/macOS platforms choose an installed monospace font, with
+  `Monospaced` as the fallback.
+- Fresh Windows configurations prefer modern PowerShell when installed, with Windows PowerShell
+  as fallback. Saved shell choices remain effective.
+- Failed sessions retain their output with an exit-status banner and Close button, including
+  transport failures and unknown exit statuses. Successful exits close normally.
+
+### Security and notifications
+
+- Pastes containing line breaks or control characters show an escaped preview for review,
+  with Cancel selected by default.
+- Invalid clipboard or title permissions deny access and identify the affected setting.
+  Configuration recovery also denies these permissions.
+- Bell feedback is limited to once every 500 ms per window.
 
 ## [0.5.0] - 2026-11-09
 
-- Expanded experimental suggestions, enabled by default, with live PowerShell completion, Bash/zsh command discovery, bundled command specifications, local paths, and Git references. PowerShell suggestions remain usable across inline-prediction redraws while changed input invalidates acceptance. The popup highlights matches and shows argument hints. Settings control automatic popups and Enter acceptance; saved learning is opt-in and can be reset. See the [completion guide](../docs/features/completion.md) for shell requirements and limitations.
-- Improved shell icon readability on light and dark backgrounds, balanced logo proportions, and replaced the Command Prompt drive lettering with a clean terminal glyph.
-- Added sticky command headers, enabled by default with an independent setting. The overlay repeats the full original prompt/input row with normal terminal typography, colors and cell spacing while its output is at the viewport top. Clicking reveals the command; scrolling, grid dimensions and PTY sizing remain unchanged.
-- Typing and accepted paste return to live input immediately. Scroll on output now defaults to off so incoming output preserves the reader's position; saved preferences remain effective.
+### Suggestions
+
+- Expanded experimental suggestions with PowerShell completions, Bash/zsh command discovery,
+  command specifications, local paths, and Git references. Suggestions are enabled by default;
+  saved learning is opt-in. See [shell requirements](../docs/features/completion.md).
+- Added match highlighting, argument hints, and settings for automatic popups and Enter acceptance.
+  PowerShell prediction redraws preserve suggestions; changed input invalidates acceptance.
+
+### Appearance and navigation
+
+- Improved shell icon contrast and proportions, including a clearer Command Prompt icon.
+- Added sticky command headers, enabled by default. Click a header to return to its command;
+  disable the overlay independently in settings.
+- Typing and pasting return immediately to live input. Scroll on output now defaults to off;
+  saved preferences remain effective.
 
 ## [0.4.0] - 2026-10-31
 
-- Compatible applications can show colored percentage rings or spinning arcs in place of shell icons (OSC 9;4), with unchanged tab names and window/taskbar status where supported. Progress clears after five minutes without updates and works independently of title permission, with no progress setting.
-- Added opt-in desktop alerts when long-running commands finish in an unfocused terminal, with a configurable minimum duration (10 seconds by default).
-- Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.
-- Terminal applications can change the mouse pointer shape (OSC 22).
-- Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.
-- Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.
-- Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.
-- Search now starts at the viewport and wraps through history. Frequent queries show `1,000+` instead of collecting every result; next/previous navigation still reaches matches throughout retained history, and visible matches remain highlighted.
-- Fixed a thin orange highlight remaining after changing a selected search result into a query with no matches.
-- Added explanatory search tooltips, shortcut hints, and keyboard focus indicators. Use Alt+C for match case, Alt+W for whole words, Alt+R for regex, Enter/Shift+Enter for next/previous match, and Escape to close search; Tab and Space navigate and toggle controls.
-- Fixed window geometry refresh throwing after prompt-style changes or window moves and resizes.
-- Added a Prompt style setting with Gutter, Divider, and None choices, applied to open terminals and saved across restarts.
-- Reserved prompt gutters before the first prompt for shells with configured integration, while shells without prompt support use the full available width.
-- Centered full-screen terminal apps consistently across shell profiles, including spare pixels around the existing grid.
-- Improved responsiveness when displaying large text output, including logs, CJK text, and emoji.
-- Search controls follow the selected theme.
-- Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.
-- Discarded stale suggestions to protect newer input. Closing the terminal or disabling suggestions closes completion popups.
-- Improved window-state reporting while terminal output is active.
-- Kept cursors visible when terminals lose focus, with thin outlines for blocks and steady bars or underlines. Cursor thickness stays consistent across split panes.
-- Improved link highlighting and activation across wrapped lines, scrolling and output updates, with hand cursors only when links can be activated.
-- Improved cursor-position reporting in terminal apps using margins.
-- Fixed terminal apps failing to query the current cursor shape and blinking style.
-- Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.
-- Fixed terminal windows failing to grow near screen edges; resizing now keeps the window within the available desktop.
-- Fixed terminal column switching when shell window resizing is disabled or the window layout cannot resize.
-- Improved responsiveness and reliability when pasting large text into busy terminals.
-- Compatible terminal apps can now read clipboard text with your permission. Keyboard-accessible dialogs let you approve once, deny, or block reads for that terminal. New settings ask before reading; saved permissions are preserved.
-- Improved keyboard compatibility with terminal apps that configure and query modifier handling.
-- Improved compatibility with terminal apps that query active terminal settings and supported features. Input settings can be changed safely during large pastes.
-- Simplified clipboard and title permissions so they apply consistently throughout a terminal, including SSH sessions. Clipboard choices are now Deny, Ask, and Allow, with writes allowed by default. Previous separate local/remote settings reset to the new defaults.
-- Improved protection when pasting copied terminal sequences and simplified paste handling settings.
-- Improved compatibility with combined text formatting commands and prevented oversized terminal commands from changing formatting or terminal settings unexpectedly.
+### Terminal features
+
+- Compatible applications can show progress rings in shell icons and window/taskbar status where
+  supported. Progress works independently of titles and clears after five minutes without updates.
+- Added Kitty image previews for RGB/RGBA and PNG, including compression, cropping, and scaling.
+- Compatible applications can change the mouse pointer shape.
+
+### Search
+
+- Added whole-word and regular-expression search, with feedback for invalid patterns.
+- Search stays responsive in large histories, updates results during scanning, and starts at the
+  viewport. Queries with many matches show `1,000+`; navigation still reaches all retained matches.
+- Search controls fit narrow panes, follow the theme, and show shortcut hints and keyboard focus.
+  Alt+C/W/R toggles case, whole words, and regex; Enter/Shift+Enter navigates; Escape closes search.
+- Fixed highlight remnants after changing a selected match to a query with no results.
+
+### Appearance and layout
+
+- Added Gutter, Divider, and None prompt styles. Integrated shells reserve their gutter at startup.
+- Centered full-screen terminal applications consistently across shell profiles.
+- Unfocused terminals keep visible cursors: outlined blocks or steady bars and underlines.
+- Improved link highlighting across wrapped lines, scrolling, and output updates.
+- Fixed layout errors after prompt-style changes, window moves, and resizing near desktop edges.
+
+### Suggestions and notifications
+
+- Stale suggestions no longer affect newer input. Closing a terminal or disabling suggestions
+  closes its popup.
+- Added opt-in alerts for long-running commands that finish in an unfocused terminal,
+  with a configurable duration threshold of 10 seconds by default.
+
+### Security and permissions
+
+- Compatible applications can read clipboard text with consent. Dialogs offer one-time approval,
+  denial, or blocking for the terminal; new settings ask before reading.
+- Clipboard and title permissions now apply throughout a session, including SSH. Clipboard choices
+  are Deny, Ask, and Allow; writes default to Allow. Previous local/remote settings reset to defaults.
+- Improved paste protection and simplified paste settings.
+- Unsupported status queries can no longer inject supplied text or control characters into input.
+
+### Compatibility and reliability
+
+- Improved cursor-position, cursor-style, modifier-key, and terminal-capability query compatibility.
+- Fixed column switching when window resizing is disabled or the layout cannot resize.
+- Improved large-paste reliability and prevented premature writes during terminal startup.
+  Input settings can change safely during a paste.
+- Improved combined text formatting and rejected oversized commands safely.
+- Improved responsiveness during large output and window-state reporting while output is active.
 
 ## [0.3.0] - 2026-09-23
 
-- Fixed scrolling in split terminal layouts disturbing neighboring content.
-- Fixed slow trackpad movements being ignored in full-screen terminal apps when mouse mode is off.
-- Terminal apps can now copy larger selections to the clipboard, up to 1 MiB, while respecting clipboard permissions.
-- Fixed cursor shape and blinking not returning after leaving full-screen terminal apps such as Neovim.
-- Tabs can now show the running application's name when it does not supply a title. Custom names keep priority, and automatic process titles can be turned off in settings.
-- Improved cursor positioning compatibility with terminal apps that save and restore the cursor.
-- Improved compatibility with apps that switch terminal width, while respecting resize settings and protecting split layouts.
-- Fixed cursor and scroll-position jumps when resizing terminals with a full history.
-- Fixed terminal links opening the wrong destination after a reset.
-- Compatible terminal apps can now match the terminal's light or dark theme.
-- Added a startup command setting for new terminal tabs and splits.
-- Fixed missing spaces and line breaks when copying or exporting terminal text, including after resizing.
-- Improved compatibility with custom shell startup files and commands.
-- Improved link underlines and kept hover highlights consistent across wrapped lines and output updates.
+### Shells and startup
+
+- Tabs can show the running application's name when no title is supplied. Custom names take
+  priority, and automatic process titles can be disabled.
+- Added startup commands for new tabs and splits, with improved custom shell startup compatibility.
+
+### Scrolling, selection, and links
+
+- Fixed scrolling in split layouts disturbing neighboring content and slow trackpad gestures
+  being ignored in full-screen applications when mouse mode is off.
+- Fixed cursor and scroll-position jumps when resizing with a full history.
+- Fixed missing spaces and line breaks when copying or exporting text after resizing.
+- Fixed links opening the wrong destination after reset and improved wrapped-link highlighting.
+- Compatible applications can copy up to 1 MiB to the clipboard, subject to permissions.
+
+### Terminal compatibility
+
+- Fixed cursor shape and blinking after leaving full-screen applications such as Neovim.
+- Improved cursor save/restore and terminal-width switching while respecting resize settings
+  and protecting split layouts.
+- Compatible applications can detect the terminal's light or dark theme.
 
 ## [0.2.2] - 2026-09-11
 
-- Fixed alignment of Hebrew, Arabic, and mixed-direction text with cell backgrounds, the cursor, selection and search highlights, and mouse targets.
-- Fixed Arabic letter forms changing under the block cursor and missing text in very long lines that require contextual shaping.
-- Fixed Arabic text containing joiners unexpectedly switching fonts, particularly on macOS.
-- Preserved native emoji rendering and solid block graphics on lines containing right-to-left text.
-- Fixed concealed text and emoji becoming visible under the block cursor or when hovering over links. Prevented neighboring characters from spilling into concealed cells.
-- Fixed rectangular selections widening across mixed-direction lines or when part of the selection scrolls out of view.
-- Fixed a terminal view retaining the previous session's text or search results when switching to a new session.
-- Fixed blinking text and the cursor remaining hidden after unrelated output updates.
-- Fixed inverted colors in scrollback failing to update when reverse-video mode changes or resets.
-- Fixed gaps during smooth scrolling while new content is loading, scroll-position jumps during resizing, and stale scroll animations after screen switches.
+### Unicode and text rendering
+
+- Aligned Hebrew, Arabic, and mixed-direction text with backgrounds, cursors, selections,
+  search highlights, and mouse targets.
+- Fixed Arabic shaping under block cursors, missing text in long shaped lines, and unexpected
+  font changes around joiners, particularly on macOS.
+- Preserved native emoji and solid block graphics on lines containing right-to-left text.
+
+### Selection and display fixes
+
+- Concealed text stays hidden under cursors and link highlights; neighboring glyphs stay clipped.
+- Fixed rectangular selections widening across mixed-direction or partially hidden rows.
+- Switching sessions clears the previous session's text and search results.
+- Fixed blinking text, cursor visibility, and reverse-video updates in scrollback.
+- Fixed smooth-scroll gaps and jumps during loading, resizing, and screen switches.
 
 ## [0.2.1] - 2026-07-14
 
-- Fixed holding Backspace or Delete deleting only one character.
-- Improved compatibility for Ctrl-number shortcuts, modified keys, extended function keys, and applications that configure Backspace behavior.
-- Reported terminal capabilities more accurately to shells and terminal applications.
-- Improved compatibility with full-screen terminal applications that verify rectangular screen regions.
+### Input and compatibility
+
+- Fixed held Backspace and Delete keys deleting only one character.
+- Improved Ctrl-number shortcuts, modified keys, extended function keys, and Backspace behavior.
+- Improved capability reporting and compatibility with applications that verify screen regions.
 
 ## [0.2.0] - 2026-07-13
 
-- Fixed multiline paste.
-- Fixed terminal selection copying that could intermittently copy the wrong text or leave the previous clipboard contents unchanged.
+### Clipboard and selection
+
+- Fixed multiline paste and intermittent copies of incorrect or stale text.
 - Improved copying of scrollback selections, wrapped lines, and trailing empty cells.
-- Fixed scrollback behavior in terminal apps (including TUIs like codex logs) so historical output is scrollable again.
-- Fixed prompt gutter clicks selecting the wrong text under certain circumstances.
+- Fixed prompt gutter clicks selecting the wrong text.
+
+### Scrolling
+
+- Restored historical output scrolling in terminal applications using scroll regions.
 
 ## [0.1.3] - 2026-07-08
 
-- Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.
-- Added a compact floating search bar with result navigation and match-case control.
-- Added a terminal context menu that respects TUI mouse tracking.
-- Improved macOS shortcut behavior with standard Cmd+C, Cmd+V, and Cmd+F bindings.
+### Search and shortcuts
+
+- Added a floating search bar with result navigation and case-sensitive matching.
+- Improved copy, paste, search, and scrolling shortcuts, including standard macOS Cmd bindings.
+- Added a context menu that respects terminal mouse tracking.
 
 ## [0.1.2] - 2026-07-03
 
-- Added terminal process close confirmation.
-- Added a "Scroll on output" setting to keep the viewport in place or follow new output.
-- Fixed selection copying to support text spanning the entire terminal scrollback history.
-- Fixed first-run TUI wrapping corruption.
+### Settings and fixes
+
+- Added process close confirmation and a Scroll on output setting.
+- Fixed copying selections across the entire scrollback history and first-run TUI wrapping.
 
 ## [0.1.1] - 2026-07-02
 
-- Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.
+### Input fixes
+
+- Fixed AltGr input and grid corruption on AZERTY keyboards for Windows/Linux.
 
 ## [0.1.0] - 2026-06-30
 
-- First public KetraTerm standalone desktop application release.
-- Added a native desktop window with multiple terminal tabs, custom titles, and tab-management shortcuts.
-- Added local terminal sessions for zsh, bash, sh, PowerShell, and cmd.exe.
-- Added configurable typography, default colors, palettes, and scrollback capacity.
+### Initial release
+
+- First public standalone desktop release, with tabs, custom titles, and tab shortcuts.
+- Added local sessions for zsh, bash, sh, PowerShell, and cmd.exe.
+- Added configurable typography, colors, palettes, and scrollback capacity.

@@ -24,7 +24,8 @@ The workflow:
    [CI validation set](testing.md#ci) on the pinned source commit, including
    native/desktop suites and three-platform consumers. A failure creates no new tag;
    fix the source and rerun with the same `VERSION`.
-5. Finalizes the changelogs from that validated commit, commits them to `master`,
+5. Finalizes the changelogs from that validated commit, refreshes their released-version
+   navigation links, commits them to `master`,
    and creates `v{version}` in one atomic push. If `master` advances during
    verification, the push fails; rerun against the updated branch. Existing tags
    are never moved, and retries continue to validate and publish their pinned contents.
@@ -43,6 +44,24 @@ JVM tests, consumers, and artifact metadata). Remote publishing depends on the
 narrower `publicationArtifactChecks`: source validation is the release workflow's
 responsibility, while release-mode consumer and artifact checks run in the same
 Gradle invocation as publication. No ordinary JVM tests are repeated just to upload.
+
+## Writing changelog entries
+
+Keep library and embedding changes in the [library changelog](../../CHANGELOG.md),
+and desktop user changes in the [application changelog](../../ketraterm-app/CHANGELOG.md).
+When a change affects both audiences, describe its impact for each.
+
+- Add completed changes under `## [Unreleased]`, grouped by area using `###` headings.
+  Reuse relevant sections and omit empty ones. Put breaking changes and required migrations first.
+- Write one consumer-visible change per bullet. Lead with what users or embedders can now do,
+  what changed, or what was fixed; include defaults, opt-ins, and limits when they affect adoption.
+- Keep app entries to one or two short sentences about visible behavior. Put API names,
+  protocol details, and implementation contracts in library notes or linked guides.
+- Consolidate work on an unreleased feature into its final behavior. Keep implementation steps,
+  validation logs, and planned work out of release notes. Link detailed contracts and migrations.
+- Preserve released changes, version headings, and dates when editing presentation or wording.
+  The release workflow finalizes the Unreleased heading and date and rebuilds the existing
+  `Released versions:` navigation from dated release headings, including prereleases.
 
 ## Release bot setup
 
