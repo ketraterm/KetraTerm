@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#release-bot-setup">Release bot setup</a><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Releasing KetraTerm</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#writing-changelog-entries">Writing changelog entries</a><a class="depth-2" href="#release-bot-setup">Release bot setup</a><a class="depth-2" href="#prereleases">Prereleases</a><a class="depth-2" href="#interrupted-releases">Interrupted releases</a></nav></details><div class="article-content"><div class="prose"><h1 id="releasing-ketraterm">Releasing KetraTerm</h1>
 <p><code>VERSION</code> on <code>master</code> is the release version for libraries and the standalone app.
 Set it to the desired version and merge the change before releasing. No manual
 tag or version input is needed. The
@@ -46,7 +46,8 @@ changelog finalization. Without matching evidence, runs the full
 <a href="testing.html#ci">CI validation set</a> on the pinned source commit, including
 native/desktop suites and three-platform consumers. A failure creates no new tag;
 fix the source and rerun with the same <code>VERSION</code>.</li>
-<li>Finalizes the changelogs from that validated commit, commits them to <code>master</code>,
+<li>Finalizes the changelogs from that validated commit, refreshes their released-version
+navigation links, commits them to <code>master</code>,
 and creates <code>v{version}</code> in one atomic push. If <code>master</code> advances during
 verification, the push fails; rerun against the updated branch. Existing tags
 are never moved, and retries continue to validate and publish their pinned contents.</li>
@@ -65,6 +66,23 @@ JVM tests, consumers, and artifact metadata). Remote publishing depends on the
 narrower <code>publicationArtifactChecks</code>: source validation is the release workflow&#39;s
 responsibility, while release-mode consumer and artifact checks run in the same
 Gradle invocation as publication. No ordinary JVM tests are repeated just to upload.</p>
+<h2 id="writing-changelog-entries">Writing changelog entries</h2>
+<p>Keep library and embedding changes in the <a href="../../CHANGELOG.html">library changelog</a>,
+and desktop user changes in the <a href="https://ketraterm.github.io/KetraTerm/changelog.html">application changelog</a>.
+When a change affects both audiences, describe its impact for each.</p>
+<ul>
+<li>Add completed changes under <code>## [Unreleased]</code>, grouped by area using <code>###</code> headings.
+Reuse relevant sections and omit empty ones. Put breaking changes and required migrations first.</li>
+<li>Write one consumer-visible change per bullet. Lead with what users or embedders can now do,
+what changed, or what was fixed; include defaults, opt-ins, and limits when they affect adoption.</li>
+<li>Keep app entries to one or two short sentences about visible behavior. Put API names,
+protocol details, and implementation contracts in library notes or linked guides.</li>
+<li>Consolidate work on an unreleased feature into its final behavior. Keep implementation steps,
+validation logs, and planned work out of release notes. Link detailed contracts and migrations.</li>
+<li>Preserve released changes, version headings, and dates when editing presentation or wording.
+The release workflow finalizes the Unreleased heading and date and rebuilds the existing
+<code>Released versions:</code> navigation from dated release headings, including prereleases.</li>
+</ul>
 <h2 id="release-bot-setup">Release bot setup</h2>
 <p>The release commit and tag are pushed as a dedicated GitHub App. Create and
 install the app on this repository with <strong>Contents: Read and write</strong>, then add
@@ -109,7 +127,7 @@ Tags containing unfinalized changelogs are rejected.</p>
 <p>Run the release automation tests locally with:</p>
 <pre><code class="language-shell">node --test .github/scripts/release.test.mjs
 </code></pre>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5b02336dd12ef08f3f413bf882df6512fa5beda8/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/docs/development/releases.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
