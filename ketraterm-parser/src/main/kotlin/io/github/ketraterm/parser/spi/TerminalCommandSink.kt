@@ -84,7 +84,8 @@ public interface TerminalCommandSink {
     /**
      * Writes [count] copies of the preceding graphic's retained grapheme (REP).
      * Each copy uses the current pen and ordinary printable placement semantics.
-     * [length] is in `1..32`, and [count] is positive. The used prefix of [codepoints]
+     * [length] is in `1..32`, and the parser bounds [count] to `1..65535` per command
+     * to limit synchronous output amplification. The used prefix of [codepoints]
      * is borrowed only for this synchronous call, including single-codepoint graphemes.
      */
     public fun writeRepeatedCluster(

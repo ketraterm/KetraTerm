@@ -12,6 +12,9 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Headless runtime
 
+- Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
+  a single extreme count from triggering billions of synchronous grid mutations.
+
 - The complete headless pipeline, including PNG graphics decoding, now runs without AWT or
   `java.desktop`. PNG output uses immutable ARGB pixels; Gradle and Maven consumer checks enforce
   desktop independence.

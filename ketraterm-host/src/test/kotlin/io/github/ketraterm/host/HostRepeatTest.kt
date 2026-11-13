@@ -18,10 +18,69 @@ package io.github.ketraterm.host
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.parser.spi.TerminalCommandSink
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class HostRepeatTest {
+    @Test
+    fun `maximum wire REP matches bounded ordinary writes across placement modes`() {
+        val setups = listOf("", "\u001B[?7l", "\u001B[4h", "\u001B[?69h\u001B[2;7s\u001B[2;3r", "\u001B[?1049h")
+        for (graphic in listOf("A", "界", "e\u0301", "👩‍💻", "e" + "\u0301".repeat(31))) {
+            val codepoints = graphic.codePoints().toArray()
+            for (setup in setups) {
+                val actual = TerminalBuffers.create(9, 4, maxHistory = 3)
+                val expected = TerminalBuffers.create(9, 4, maxHistory = 3)
+                val adapter = HostCommandAdapter(actual)
+                val parser =
+                    TerminalParsers.create(
+                        object : TerminalCommandSink by adapter {
+                            override fun writeRepeatedCluster(
+                                codepoints: IntArray,
+                                length: Int,
+                                count: Int,
+                            ) {
+                                // Fail before grid mutation if admission regresses; never run billions of writes in a test.
+                                check(count in 1..65_535) { "unbounded REP reached the host: $count" }
+                                adapter.writeRepeatedCluster(codepoints, length, count)
+                            }
+                        },
+                    )
+                val referenceParser = TerminalParsers.create(HostCommandAdapter(expected))
+                val prefix = ("outside\r" + setup + "\u001B[31m" + graphic).encodeToByteArray()
+                parser.accept(prefix)
+                referenceParser.accept(prefix)
+                parser.accept("\u001B[2147483647b\u001B[2bZ".encodeToByteArray())
+                repeat(65_535) { expected.writeCluster(codepoints, codepoints.size) }
+                referenceParser.accept("\u001B[2bZ".encodeToByteArray())
+                val context = "graphic=$graphic setup=$setup"
+                assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+                assertEquals(expected.cursorCol, actual.cursorCol, context)
+                assertEquals(expected.cursorRow, actual.cursorRow, context)
+                assertEquals(expected.historySize, actual.historySize, context)
+                expected.readRenderFrame { expectedFrame ->
+                    actual.readRenderFrame { actualFrame ->
+                        assertEquals(expectedFrame.discardedCount, actualFrame.discardedCount, context)
+                        assertEquals(expectedFrame.cursorPendingWrap, actualFrame.cursorPendingWrap, context)
+                        for (row in 0 until 4) {
+                            assertEquals(expectedFrame.lineWrapped(row), actualFrame.lineWrapped(row), context)
+                            for (col in 0 until 9) {
+                                assertEquals(expected.getCodepointAt(col, row), actual.getCodepointAt(col, row), context)
+                                assertEquals(expected.getAttrAt(col, row), actual.getAttrAt(col, row), context)
+                            }
+                        }
+                    }
+                }
+                if (setup == "\u001B[?1049h") {
+                    parser.accept("\u001B[?1049l".encodeToByteArray())
+                    referenceParser.accept("\u001B[?1049l".encodeToByteArray())
+                    assertEquals("outside", actual.getLineAsString(0))
+                    assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+                }
+            }
+        }
+    }
+
     @Test
     fun `REP preserves ASCII wide and complete Unicode graphics at every byte split`() {
         for ((graphic, width) in listOf(

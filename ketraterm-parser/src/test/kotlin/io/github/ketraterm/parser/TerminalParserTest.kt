@@ -54,7 +54,28 @@ class TerminalParserTest {
         )
         sink.events.clear()
         parser.accept("e\u0301\u001B[2147483647b".encodeToByteArray())
-        assertEquals(listOf("writeCluster:2:101:769", "writeRepeatedCluster:2147483647:2:101:769"), sink.events)
+        assertEquals(listOf("writeCluster:2:101:769", "writeRepeatedCluster:65535:2:101:769"), sink.events)
+    }
+
+    @Test
+    fun `REP bounds sink work at every byte split and resets its budget for each command`() {
+        for (count in listOf("65534", "65535", "65536", "2147483647")) {
+            val expectedCount = minOf(count.toInt(), 65_535)
+            val bytes = "👩‍💻\u001B[${count}b\u001B[2bZ".encodeToByteArray()
+            for (split in 0..bytes.size) {
+                val sink = RecordingTerminalCommandSink()
+                val parser = TerminalParsers.create(sink)
+                parser.accept(bytes, 0, split)
+                parser.accept(bytes, split, bytes.size - split)
+                parser.endOfInput()
+                assertEquals(
+                    listOf("writeRepeatedCluster:$expectedCount:3:128105:8205:128187", "writeRepeatedCluster:2:3:128105:8205:128187"),
+                    sink.events.filter { it.startsWith("writeRepeatedCluster:") },
+                    "count=$count split=$split",
+                )
+                assertEquals("writeCodepoint:90", sink.events.last())
+            }
+        }
     }
 
     @Test

@@ -55,6 +55,7 @@ public interface TerminalWriter {
      * The used prefix of [codepoints] is consumed synchronously and is not retained.
      * Non-positive counts leave the buffer unchanged after validating the grapheme.
      * Work is proportional to the generated output; no count-sized buffer is created.
+     * Direct callers control this work; the parser's wire REP limit is applied before sink dispatch.
      *
      * @param codepoints Unicode scalars forming one grapheme.
      * @param length Used prefix length, in `1..32` and at most the size of [codepoints].

@@ -43,9 +43,13 @@ parser reset, RIS, and DECSTR clear it.
 
 Copies use the current pen and width policy, insert mode, margins, autowrap,
 and scrolling, as ordinary printable writes do. REP does not copy the original
-cell's attributes or read text back from the grid. Counts through `Int.MAX_VALUE`
-are accepted; work is proportional to generated output without a count-sized
-temporary buffer. Numeric overflow, extra fields, colon subparameters, private
+cell's attributes or read text back from the grid. Valid counts above 65,535 are
+capped to 65,535 additional copies per command before any sink is called. This
+resource limit bounds synchronous output amplification, including wide and
+clustered graphics. Each subsequent REP has its own limit; the source graphic
+is preserved. The direct core `writeRepeatedCluster` API remains caller-controlled
+and does not apply this wire-input limit. No count-sized temporary buffer is
+created. Numeric overflow, extra fields, colon subparameters, private
 markers, and intermediates reject REP. The shared [CSI limits](#csi-parameters)
 and cancellation rules apply.
 

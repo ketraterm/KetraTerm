@@ -91,6 +91,8 @@ they are not release commitments.
 
 ## Accepted limitations
 
+- REP output amplification is bounded per command. Counts above the supported
+  limit are capped before sink dispatch; see the [REP contract](reference/protocol.md#repeat-character).
 - Terminal grids require at least two columns so wide occupants remain intact.
   Creation and resize reject smaller widths; pixel-based viewport layout clamps to two columns.
 - Grapheme processing is always enabled (mode 2027 reports permanently set).
