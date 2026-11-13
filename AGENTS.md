@@ -52,6 +52,8 @@ Keep ownership strict:
 - Transport never parses protocols. PTY owns local process/connector lifecycle
   and its convenience session factory, but never encodes input or mutates core.
 - Session is the synchronization and outbound-write boundary.
+- The headless runtime dependency closure must remain independent of `java.desktop`
+  and frontend SDKs. Decode images into neutral pixels; frontends own painting resources.
 - Swing UI sends intent through `TerminalSession`; it contains no PTY or
   IntelliJ-specific behavior.
 - Render API/cache never choose fonts, paint Swing, or expose parser/core

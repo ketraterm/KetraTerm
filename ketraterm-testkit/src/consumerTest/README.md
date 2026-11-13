@@ -24,7 +24,7 @@ in-memory pty4j process implementation.
 
 ## Source-consumer verification
 
-Eleven fixture projects reach the 15 supported JVM libraries and the headless and
+The fixture projects reach the supported JVM libraries and the headless and
 Swing dependency entry points through one declared KetraTerm dependency per
 project. The fixture must not repair a missing export by declaring additional
 library dependencies. Kotlin and Java callers compile and run in four combinations:
@@ -51,7 +51,10 @@ Verification covers:
 - Swing construction and binding on the EDT, detector discovery and refresh,
   provider cancellation on unbind, and host ownership of session/transport.
 - PNG decoding through the published session, placement copying, and immutable
-  image retention after deletion, without adding codec dependencies.
+  image retention after deletion, without adding codec dependencies. The headless
+  consumer also checks malformed-image recovery and exact replies with
+  `java.desktop` unavailable. `verifyHeadlessDependencies` inspects every resolved
+  runtime JAR with JDK `jdeps` and rejects desktop references or unresolved classes.
 - Product source labels and search presentation through Kotlin and Java APIs;
   provider and suggestion configuration across construction and unbinding.
 - Exported pty4j types, constructor defaults, resize forwarding, and connector

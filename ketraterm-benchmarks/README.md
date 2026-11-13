@@ -37,6 +37,12 @@ parameter; inspect the benchmark's source for available values. An invocation ma
 process a whole input buffer or batch, so an operation is not necessarily one
 byte, cell, or key.
 
+`TerminalGraphicsDecodeBenchmark.consume` measures synchronous session ingress
+with `text`, `png8`, and `png16Adam7` workloads. The PNG workloads use quiet,
+chunked queries; setup verifies a successful decode before measurement. The
+16-bit Adam7 case is a 3840×2160 RGBA image. Payload generation happens in setup;
+the GC profiler measures the session path without an encoder in the timed method.
+
 The full warmed suite is available through:
 
 ```text

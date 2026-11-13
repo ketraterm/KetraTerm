@@ -275,14 +275,19 @@ reserve maximum capacities for terminals that never receive images.
 | Image dimensions | Each edge at most 8192; at most 8,388,608 pixels / 32 MiB canonical ARGB |
 | Retained images | 64 MiB canonical pixels and 256 image records across both screens |
 | Placements | 65,536 records across both screens, including history; enough for Yazi's per-cell path |
-| Active transfer/decode | One operation; 225 MiB admission allowance for bounded staging/native/canonical data and estimated codec headroom; see qualification below |
+| Active transfer/decode | One operation; less than 99 MiB of live owned byte/pixel arrays, plus JVM/native overhead; see accounting below |
 | Each render snapshot | At most 64 MiB unique referenced pixels and the placement count above |
 | Swing raster cache | 64 MiB raster pixels and at most 256 resources per bound view, plus at most 64 MiB referenced canonical pixels; retain offscreen entries until admission needs capacity |
 
 The image-size limit admits a 3840x2160 RGBA image. Enforce dimensions before
 decoder raster allocation, and byte/count limits before growth or publication.
-Account PNG's possible 16-bit native samples: at this pixel bound the native
-RGBA raster can occupy 64 MiB before its 32 MiB normalized result exists.
+The decoder retains only the final 32 MiB ARGB array and two scanline buffers,
+even for 16-bit Adam7 images. Each row buffer is at most 65,537 bytes
+(8,192 pixels × four channels × two bytes, plus the filter byte). A transfer
+wrapped in zlib can additionally retain the 33 MiB transfer staging array and
+33 MiB expanded PNG array. Their combined payload, including the palette and
+small inflate scratch, stays below 99 MiB. This bounds live owned arrays;
+borrowed connector bytes, native zlib state, object headers, and GC lag are additional.
 
 Evict unplaced images first, then least-recently-used images and their dependent
 placements, using a monotonic operation counter rather than wall time. Validate
@@ -292,56 +297,69 @@ reserve transient capacity without destroying the previous image on failure.
 
 With three publisher caches and one EDT cache, independent old versions can
 retain more memory than the core quota. A conservative built-in payload envelope
-is `64 + 3*64 + 64 + 64 + 64 + 225 = 673 MiB`: core, published snapshots, EDT snapshot,
+is `64 + 3*64 + 64 + 64 + 64 + 99 = 547 MiB`: core, published snapshots, EDT snapshot,
 Swing rasters, their retained source resources, and active decode. This is a conservative live payload estimate,
 not a per-session reservation or total-process-memory promise. Primitive metadata,
 JVM object overhead, GC lag and platform graphics surfaces are additional; measure
 them separately. Reusing unchanged resources normally avoids this multiplier.
-ImageIO provides no allocator-budget API: the 225 MiB allowance is not an enforced
-cap on opaque codec allocations. Owned byte/pixel/count limits are hard bounds;
-adversarial heap profiling must validate codec headroom before PNG support ships.
-Do not advertise a total memory ceiling based on this estimate.
+Owned byte/pixel/count limits are enforced before allocation or growth. Profile
+native zlib and JVM overhead separately; the payload accounting is not a total
+process memory ceiling.
 
 ## Decoder boundary and ordering
 
-Use one internal PNG decoder in `ketraterm-session`, separate from coordination.
-Use the JDK's PNG `ImageReaderSpi` from module `java.desktop`, selected through
-public APIs, with a per-operation reader. No new codec dependency or module is
-required. ImageIO provider initialization may run trusted classpath providers;
-do not describe this as a plugin-free discovery mechanism. Select the JDK PNG
-provider explicitly rather than decoding arbitrary detected formats.
+One internal PNG decoder in `ketraterm-session` owns container validation and
+scanline decoding. The entire headless runtime is independent of `java.desktop`
+and frontend SDKs. Decoding needs only JDK zlib and primitive arrays; frontend
+modules convert the immutable ARGB resource into their own painting types.
 
-Use `MemoryCacheImageInputStream` over a `ByteArrayInputStream` restricted to the
-compacted prefix. These standard JDK streams replace custom read/seek bookkeeping;
-no file cache, global ImageIO settings or internal JDK exports are needed. First validate signature, IHDR, chunk
-lengths/order, CRCs, known critical chunks and final IEND; reject truncated/trailing
-streams. Then compact the exclusively owned staging array in place to
-`IHDR`/`PLTE`/`tRNS`/`IDAT`/`IEND`, merging consecutive IDAT payloads and recomputing
-their combined length/CRC. Enforce format-defined palette/transparency lengths.
-The reader receives this bounded logical length. Its memory cache may retain up
-to another 33 MiB of payload, included in the active-decode allowance above.
-This prevents compressed metadata and tiny-chunk object floods; `ignoreMetadata=true`
-alone does not. The stream byte limit bounds the validation pass.
-Validate remaining codec headroom with hostile-input tests and profiling. Close
-the input and dispose the reader on every exit. ImageIO does not validate all
-PNG CRCs itself.
+Validate signature, IHDR dimensions and format, chunk lengths/order, CRCs, known
+critical chunks, palette/transparency cardinality, and final IEND before allocating
+pixels. Reject truncated or trailing containers. Unknown ancillary chunks are
+ignored after bounds and CRC validation, including names with the reserved bit set;
+unknown critical chunks are rejected. After validation, concatenate only the IDAT
+payload bytes at the start of the exclusively owned staging array. Container headers
+and metadata have already been consumed; no replacement PNG or CRCs are constructed.
+Ignored metadata is never decompressed or represented by per-chunk objects; the
+transfer byte limit bounds the validation pass.
 
-Verify the merged IDAT's complete single zlib stream and exact filtered scanline
-byte count, including Adam7 passes, before ImageIO. The bounded second inflate
-prevents a reader that stops after its requested rows from accepting a truncated
-trailer or extra compressed data; it uses fixed scratch rather than another raster.
+Inflate the single IDAT zlib stream once, row by row. Reconstruct the five PNG
+filters using two reusable scanline arrays; reset the prior row at each Adam7
+pass and skip empty passes. Unpack samples directly into their final ARGB positions.
+Consume the zlib checksum after the final row and reject missing, excess,
+concatenated, or trailing compressed data. Release the inflater on every exit.
 
-Read the native raster: forcing an 8-bit destination loses some 16-bit `tRNS`
-transparency in the JDK PNG reader. Sub-byte grayscale `tRNS` also requires comparing
-the transparent key in the native raster's expanded sample range. Mask unused key
-bits for depths below 16 before decoding, after validating the original chunk CRC.
-Normalize samples explicitly: replicate grayscale channels, resolve palette entries and alpha, scale
-sub-byte samples, and take the high byte of 16-bit samples. Initially treat samples
-as sRGB and ignore embedded profiles/gamma metadata: this is a KetraTerm fidelity
-limitation, not Kitty parity,
-and is tracked in the gap map. Do not use generic `BufferedImage.getRGB` for grayscale;
-its color-space conversion changes sample values. Only immutable normalized
-pixels cross into core/render contracts; AWT objects stay inside the decoder/UI.
+Compare transparency keys at the full source sample depth, masking unused key
+bits only after CRC validation. Replicate grayscale channels, resolve palette
+entries and alpha, scale sub-byte samples, and take the high byte of 16-bit samples.
+Pixels retain unassociated alpha, including color samples under zero alpha.
+Initially treat samples as sRGB and ignore embedded profiles/gamma; color
+management remains tracked in the gap map.
+
+### Codec qualification
+
+The published `ar.com.hjg:pngj:2.1.0` artifact was inspected before implementation.
+Although its core reader can operate without AWT, its packaged `pixels` helpers
+reference `BufferedImage`; whole-artifact `jdeps` analysis reports `java.desktop`.
+It fails this library's dependency boundary. Keeping the existing bounded
+container validation and implementing the focused scanline reconstruction avoids
+a repackaged fork or another codec's metadata/raster model. The algorithms follow
+the [PNG filter and interlace specification](https://www.w3.org/TR/png-3/).
+
+Qualification covers all supported color/depth combinations, all five filters,
+interlaced and noninterlaced narrow/odd images, full-depth transparency, malformed
+streams, mixed row filters, nonzero packed padding, and deterministic mutation
+recovery. Pinned PNGSuite fixtures carry independently recorded pixel hashes;
+producer streams separately verify exact pixels and byte-stream ordering.
+Allocation profiling compares the same workloads and boundaries; measurements
+do not replace the owned-array bounds.
+
+Published headless consumers resolve through both Gradle and POM metadata. Their
+checks inspect all resolved runtime JARs with `jdeps`, then exercise text, input,
+PNG, malformed-image recovery, replies, retention and closure in a JVM where
+`java.desktop` is unavailable. No frontend or codec setup is required.
+
+### Session ordering
 
 The parser must stop immediately after a graphics command needing decode and
 report the consumed byte count. The session keeps the remaining borrowed input

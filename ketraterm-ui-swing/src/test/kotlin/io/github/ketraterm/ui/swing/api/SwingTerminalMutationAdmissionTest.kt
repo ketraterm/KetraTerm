@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -291,6 +292,25 @@ class SwingTerminalMutationAdmissionTest {
         } finally {
             gate.release()
             edt { view.dispose() }
+            session.close()
+        }
+    }
+
+    @Test
+    fun `outbound overflow on the EDT returns before session mutation admission is released`() {
+        val session = session()
+        val gate = holdAdmission(session)
+        // The documented ordinary outbound queue is bounded at 8 MiB.
+        val oversized = ByteArray(8 * 1024 * 1024 + 1)
+        try {
+            edt {
+                assertEquals(TerminalInputAdmission.CAPACITY_EXCEEDED, session.submitBytes(oversized))
+                assertTrue(session.isClosed)
+            }
+            // This EDT marker must complete while the ingress admission gate is held.
+            assertTrue(edt { SwingUtilities.isEventDispatchThread() })
+        } finally {
+            gate.release()
             session.close()
         }
     }

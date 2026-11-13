@@ -3,6 +3,9 @@
 `ketraterm-headless` is the dependency entry point for a terminal host that
 supplies its own transport and presentation. It brings in the terminal pipeline
 and `TerminalSession` through dependency metadata; it contains no runtime code.
+The complete pipeline, including PNG graphics decoding, works without AWT, Swing,
+`java.desktop`, or a frontend. Render resources expose immutable ARGB pixels for
+hosts that supply presentation.
 
 The libraries require Java 25. See [library compatibility](../docs/library/compatibility.md)
 for compiler and runtime requirements.

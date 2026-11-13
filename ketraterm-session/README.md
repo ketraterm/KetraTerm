@@ -9,6 +9,11 @@ For local processes, use the [PTY module](../ketraterm-pty/README.md). For an
 existing transport, supply a [`TerminalConnector`](../ketraterm-transport-api/README.md)
 as shown below. See the [root README](../README.md) for dependency selection.
 
+The session and its runtime dependencies are independent of AWT, Swing,
+`java.desktop`, and frontend SDKs. PNG decoding is available in headless use;
+render consumers receive immutable ARGB pixels and own conversion to their
+frontend's graphics types. See the [graphics contract](../docs/development/kitty-graphics-contract.md#decoder-boundary-and-ordering).
+
 ## Usage
 
 This example runs an already-created connector until closure. `copyFrame` copies
