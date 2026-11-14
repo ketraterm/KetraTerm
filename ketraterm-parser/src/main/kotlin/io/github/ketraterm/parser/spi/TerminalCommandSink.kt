@@ -20,7 +20,7 @@ import io.github.ketraterm.protocol.*
 /**
  * Parser-facing terminal command sink.
  *
- * This is the narrow semantic handoff boundary from :terminal-parser to :terminal-core.
+ * This is the narrow semantic handoff boundary from :ketraterm-parser to :ketraterm-core.
  *
  * Rules:
  * - The parser emits terminal operations.
@@ -664,7 +664,8 @@ public interface TerminalCommandSink {
      * host own durable state and unsupported-mode policy.
      *
      * @param flags Kitty keyboard progressive-enhancement flags.
-     * @param applicationMode The application mode parameter (0 = replace, 1 = push, 2 = pop).
+     * @param applicationMode Flag application (1 = replace, 2 = set, 3 = clear), as defined by
+     * [io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode]. Stack push/pop are separate commands.
      */
     public fun applyKittyKeyboardFlags(
         flags: Int,

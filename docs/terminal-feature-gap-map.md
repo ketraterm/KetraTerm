@@ -78,6 +78,7 @@ they are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
+| `TODO(parser)` | Unicode GB9c Indic conjunct segmentation using `Indic_Conjunct_Break` properties. Current [grapheme coverage](../ketraterm-parser/docs/grapheme-segmentation.md#2-grapheme-segmentation-unicode-uax-29) does not include this rule. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
 | `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |
 | `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |

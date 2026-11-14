@@ -34,9 +34,9 @@ import java.nio.file.Path
  *
  * @property command nonempty executable name followed by arguments passed to the PTY
  * child process. Arguments after the executable may be empty strings.
- * @property environment environment variables for the child process. `TERM` and
- * `COLORTERM` default to the shared terminal capability identity when the
- * caller does not provide them.
+ * @property environment complete child environment, copied without adding missing variables.
+ * A new builder starts with [defaultEnvironment], which copies the current process
+ * environment and sets the shared `TERM` and `COLORTERM` capability identity.
  * @property workingDirectory initial process working directory, or `null` to let
  * PTY4J use its platform default.
  * @property columns initial terminal width in cells.

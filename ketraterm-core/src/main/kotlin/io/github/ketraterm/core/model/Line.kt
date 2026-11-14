@@ -660,7 +660,7 @@ internal class Line(
 }
 
 /**
- * A read-only, zero-allocation sentinel returned by [io.github.ketraterm.buffer.TerminalBufferApi.getLine]
+ * A read-only, zero-allocation sentinel returned by [io.github.ketraterm.core.api.TerminalReader.getLine]
  * when the requested row is out of bounds. Avoids null checks in the renderer.
  */
 internal object VoidLine : TerminalLine {

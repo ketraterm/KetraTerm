@@ -88,8 +88,13 @@ jobs:
           else
             echo "RELEASE=false" >> "$GITHUB_ENV"
           fi
-      - run: ./gradlew :dokkaGenerate --no-daemon
+      - name: Generate and check development API links
         if: env.RELEASE != 'true'
+        shell: bash
+        run: |
+          mkdir -p build
+          ./gradlew :dokkaGenerate --no-daemon --rerun-tasks --console=plain 2>&1 | tee build/dokka-generation.log
+          node .github/scripts/dokka-links.mjs build/dokka-generation.log
 
       - uses: actions/configure-pages@v5
         id: pages

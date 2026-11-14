@@ -20,7 +20,7 @@ package io.github.ketraterm.core.api
  *
  * Sessions drain this interface after parser/core mutations and forward the
  * bytes to the active connector. Implementations must synchronously copy bytes
- * into [dst] before returning.
+ * into caller-provided storage before returning.
  */
 public interface TerminalHostResponseReader {
     /**

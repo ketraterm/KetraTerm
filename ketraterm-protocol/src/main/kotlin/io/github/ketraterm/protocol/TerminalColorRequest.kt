@@ -111,16 +111,37 @@ public class TerminalColorRequest(
     }
 
     public companion object {
+        /** Unrecognized target; its original key remains available for failure replies. */
         public const val UNKNOWN: Int = -1
+
+        /** Default text foreground role; indexed palette targets occupy `0..255`. */
         public const val FOREGROUND: Int = 256
+
+        /** Default text background role. */
         public const val BACKGROUND: Int = 257
+
+        /** Selected text foreground role. */
         public const val SELECTION_FOREGROUND: Int = 258
+
+        /** Selected text background role. */
         public const val SELECTION_BACKGROUND: Int = 259
+
+        /** Cursor fill role. */
         public const val CURSOR: Int = 260
+
+        /** Text beneath the cursor role. */
         public const val CURSOR_TEXT: Int = 261
+
+        /** Assign the operation's packed ARGB color to its target. */
         public const val SET: Int = 0
+
+        /** Restore the target's host theme default. */
         public const val RESET: Int = 1
+
+        /** Request automatic color selection for a role that supports it. */
         public const val DYNAMIC: Int = 2
+
+        /** Request the target's current color without changing it. */
         public const val QUERY: Int = 3
     }
 }

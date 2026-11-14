@@ -59,7 +59,7 @@ data class TerminalDifferentialResult(
  * Compares only semantics exposed by both KetraTerm and the public xterm.js API.
  *
  * This deliberately excludes cursor shape/visibility, discarded-history
- * counters, hyperlinks, icon title, and KetraTerm-specific modes. It also
+ * counters, hyperlinks, icon title, and KetraTerm-specific modes.
  * Missing oracle state is never guessed or replaced with a default. Underline
  * styles are reduced to enabled/disabled because xterm.js exposes only that
  * public distinction through its buffer-cell API.

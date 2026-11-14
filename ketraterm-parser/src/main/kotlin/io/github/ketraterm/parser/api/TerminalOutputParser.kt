@@ -61,6 +61,7 @@ public interface TerminalOutputParser {
      *
      * Flushes pending printable text, replacing an incomplete printable UTF-8
      * sequence. Unfinished OSC/DCS commands are discarded without metadata or query dispatch.
+     * Call [reset] before reusing this parser for another stream.
      */
     public fun endOfInput()
 

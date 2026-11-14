@@ -30,8 +30,8 @@ fixed legacy sequences are shared with the input encoder through protocol vocabu
 `TerminalState` holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active `ScreenBuffer`. Each screen owns its cursor,
 margins, saved cursor, Kitty keyboard stack, `HistoryRing`, and self-contained rows with lazy cluster payload storage.
-Rows hold primitive cell arrays and handles into their own screen's cluster
-store. The alternate screen has no history.
+Rows hold primitive cell arrays and handles into their own cluster payloads.
+The alternate screen has no history.
 
 `CoreTerminalRenderFrame` translates this storage into public render encodings.
 The borrowed frame is callback-scoped and non-reentrant. Core adds no

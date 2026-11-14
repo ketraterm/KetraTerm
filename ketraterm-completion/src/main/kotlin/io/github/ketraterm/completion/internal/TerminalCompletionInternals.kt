@@ -92,7 +92,7 @@ internal fun TerminalCompletionRequest.commandLineAfterCandidate(candidate: Term
 }
 
 /**
- * Returns whether [candidate] can be applied to this request's active cursor
+ * Returns whether this candidate can be applied to the request's active cursor
  * range without crossing command-line or UTF-16 scalar boundaries.
  */
 internal fun TerminalCompletionCandidate.hasValidReplacementRangeFor(request: TerminalCompletionRequest): Boolean {

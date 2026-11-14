@@ -1238,7 +1238,7 @@ public interface TerminalWorkspaceListener {
      * allowed by host policy and decoded to text.
      *
      * UI products own platform clipboard access. Implementations should avoid
-     * logging or retaining [event.text].
+     * logging or retaining `event.text`.
      *
      * @param tab tab that received the request.
      * @param event decoded clipboard write request.
@@ -1253,7 +1253,7 @@ public interface TerminalWorkspaceListener {
      * product-host user approval.
      *
      * UI products own prompting and platform clipboard access. Implementations
-     * should avoid logging or retaining [event.text].
+     * should avoid logging or retaining `event.text`.
      *
      * @param tab tab that received the request.
      * @param event decoded clipboard prompt request.

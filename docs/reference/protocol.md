@@ -8,8 +8,9 @@ For a capability overview, see [terminal features](../features/terminal.md).
 CSI collection has a shared limit of 32 semicolon/colon fields, including omitted
 fields. Opening field 33 rejects the entire command; no truncated SGR, mode,
 cursor, or query is dispatched. Numeric saturation is independent of this limit.
-CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
-state. Ordinary C0 handling continues during rejection.
+CAN/SUB cancels, ESC starts a new sequence, and reset discards unfinished state.
+EOF ends a stream; reset the parser before reusing it for another stream.
+Ordinary C0 handling continues during rejection.
 
 ## Relative cursor aliases
 

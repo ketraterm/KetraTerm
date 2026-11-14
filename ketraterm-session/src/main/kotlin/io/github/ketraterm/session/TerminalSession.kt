@@ -402,7 +402,7 @@ public class TerminalSession private constructor(
      * Updates are conflated state, not an event log; consumers own collection.
      * No shell integration or render subscription is required.
      *
-     * Title permission authorizes these presentation hints. Explicit hide, RIS,
+     * [HostPolicy.progressPolicy] authorizes these presentation hints. Explicit hide, RIS,
      * progress-permission revocation, and session closure clear them. Active progress
      * expires after five minutes without an accepted report, including when no
      * one collects this flow; identical reports renew that timeout. The timeout
