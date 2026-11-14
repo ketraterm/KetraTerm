@@ -32,6 +32,84 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandOutputTextTest {
     @Test
+    fun `deleting an anchor before or after scrolling stays unknown at every byte split`() =
+        runTest {
+            for (history in listOf(0, 2, 100)) {
+                for (row in listOf(2, 3)) {
+                    for (scrollFirst in listOf(false, true)) {
+                        val scroll = "\u001b[8;1H\r\n"
+                        val deletion = "\u001b[${row - if (scrollFirst) 1 else 0};1H\u001b[M"
+                        val bytes = (if (scrollFirst) scroll + deletion else deletion + scroll).encodeToByteArray()
+                        for (split in 0..bytes.size) {
+                            fixture(rows = 8, history = history) { session, connector ->
+                                val id = command(session, connector, "one\r\ntwo")
+                                assertEquals("one\ntwo", session.commandOutputText(id)?.text)
+
+                                connector.feedFromHost(bytes.copyOfRange(0, split))
+                                connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+
+                                assertNull(session.commandOutputText(id), "history=$history row=$row scrollFirst=$scrollFirst split=$split")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `scrolling preserves complete and partially retained output at every byte split`() =
+        runTest {
+            for (history in listOf(0, 2, 100)) {
+                val partial = history < 3
+                val scrolls = if (partial) history + 3 else 3
+                val bytes = ("\u001b[8;1H" + "\r\n".repeat(scrolls)).encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    fixture(rows = 8, history = history) { session, connector ->
+                        val id = command(session, connector, "one\r\ntwo\r\nthree\r\nfour")
+
+                        connector.feedFromHost(bytes.copyOfRange(0, split))
+                        connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+
+                        assertEquals(
+                            TerminalCommandOutputText(
+                                if (partial) "three\nfour" else "one\ntwo\nthree\nfour",
+                                truncated = false,
+                                historyIncomplete = partial,
+                            ),
+                            session.commandOutputText(id),
+                            "history=$history split=$split",
+                        )
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `reflowed output survives subsequent scrolling at every byte split`() =
+        runTest {
+            val bytes = ("\u001b[8;1H" + "\r\n".repeat(3)).encodeToByteArray()
+            val output = "0123456789abcdef界ghi"
+            for (split in 0..bytes.size) {
+                fixture(columns = 12, rows = 8) { session, connector ->
+                    val id = command(session, connector, output)
+                    session.resizeViewport(7, 8)
+                    assertEquals(output, session.commandOutputText(id)?.text)
+
+                    connector.feedFromHost(bytes.copyOfRange(0, split))
+                    connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+                    session.resizeViewport(20, 8)
+
+                    assertEquals(
+                        // Reflow merges a recorded boundary; its retained text remains extractable.
+                        TerminalCommandOutputText(output, truncated = false, historyIncomplete = true),
+                        session.commandOutputText(id),
+                        "split=$split",
+                    )
+                }
+            }
+        }
+
+    @Test
     fun `clearing a previously reordered viewport accepts fresh command anchors at every byte split`() =
         runTest {
             val bytes = ("\u001b[2J\u001b[H" + PROMPT + "run\r\n" + START + "fresh\r\n" + FINISH + PROMPT).encodeToByteArray()

@@ -16,9 +16,105 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import kotlin.test.*
 
 class TerminalShellIntegrationStateTest {
+    @Test
+    fun `deletion remains destructive when scrolling advances history in the same observation`() {
+        for (history in listOf(0, 2, 64)) {
+            for (deletedRow in listOf(1, 3)) {
+                for (scrollFirst in listOf(false, true)) {
+                    val terminal = TerminalBuffers.create(12, 8, maxHistory = history)
+                    val state = TerminalShellIntegrationState()
+                    state.updateLineOrder(terminal)
+                    val ids = LongArray(8)
+                    terminal.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+                    state.recordCommandStart(ids[1], includeLine = true)
+                    state.recordCommandFinished(ids[3], exitCode = 0)
+                    val record = state.latestCommandRecordId()
+                    assertTrue(state.copyCommandOutputRange(record, LongArray(3)))
+
+                    if (scrollFirst) terminal.scrollUp(1)
+                    terminal.positionCursor(0, deletedRow - if (scrollFirst) 1 else 0)
+                    terminal.deleteLines(1)
+                    if (!scrollFirst) terminal.scrollUp(1)
+                    state.updateLineOrder(terminal)
+
+                    val context = "history=$history deletedRow=$deletedRow scrollFirst=$scrollFirst"
+                    assertFalse(state.copyCommandOutputRange(record, LongArray(3)), context)
+                    assertFalse(state.copyCommandBlockRange(record, LongArray(2)), context)
+                    assertEquals(0, state.commandOutputRecordIdAtLine(ids[2]), context)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `ordinary oldest row eviction preserves a partially retained command range`() {
+        for (history in listOf(0, 2)) {
+            val terminal = TerminalBuffers.create(12, 8, maxHistory = history)
+            val state = TerminalShellIntegrationState()
+            state.updateLineOrder(terminal)
+            val ids = LongArray(4)
+            terminal.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+            state.recordCommandStart(ids[0], includeLine = true)
+            state.recordCommandFinished(ids[3], exitCode = 0)
+
+            terminal.scrollUp(history + 2)
+            state.updateLineOrder(terminal)
+
+            val range = LongArray(3)
+            val record = state.latestCommandRecordId()
+            assertTrue(state.copyCommandOutputRange(record, range), "history=$history")
+            assertContentEquals(longArrayOf(ids[0], ids[3], 1), range)
+            assertEquals(record, state.commandOutputRecordIdAtLine(ids[2]))
+        }
+    }
+
+    @Test
+    fun `ordinary scrolling inspects only the affected suffix after warming a large history`() {
+        val terminal = TerminalBuffers.create(12, 8, maxHistory = 20_000)
+        repeat(1_250) { terminal.scrollUp(8) }
+        terminal.readRenderFrame { assertEquals(10_000, it.historySize) }
+        var rangeRows = 0
+        var identityReads = 0
+        val reader =
+            object : TerminalRenderFrameReader by terminal {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    terminal.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
+                        rangeRows += frame.rows
+                        consumer.accept(
+                            object : TerminalRenderFrame by frame {
+                                override fun lineId(row: Int): Long {
+                                    identityReads++
+                                    return frame.lineId(row)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        val state = TerminalShellIntegrationState()
+        state.updateLineOrder(reader)
+        rangeRows = 0
+        identityReads = 0
+
+        repeat(3) {
+            terminal.scrollUp(1)
+            state.updateLineOrder(reader)
+        }
+
+        assertEquals(3 * (8 + 2), rangeRows)
+        assertTrue(identityReads <= 3 * 8 * 8, "ordinary scrolling read $identityReads identities")
+    }
+
     @Test
     fun `viewport identity replacement invalidates ordering after an insertion`() {
         val terminal = TerminalBuffers.create(12, 8)

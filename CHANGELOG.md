@@ -75,8 +75,9 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 - Added `TerminalSession.commandOutputText` for bounded headless extraction of a completed command’s
   retained output tail. Results preserve graphemes and logical line breaks, distinguishing caller
-  truncation from missing history. Command ranges follow retained row order through insertion
-  and reflow; ambiguous anchors remain unknown. Custom producers can implement the optional contract.
+  truncation from missing history. Command ranges follow retained row order through insertion,
+  deletion, scrolling, and reflow; anchors lost to destructive edits remain unknown.
+  Custom producers can implement the optional contract.
 
 - POSIX path completion preserves quoted and escaped tildes as literal directories
   in both filesystem lookup and inserted text, while bare `~/` continues to expand home.

@@ -215,6 +215,7 @@ public class TerminalShellIntegrationState(
     private var sortedLineIds = LongArray(0)
     private var linePositions = IntArray(0)
     private var orderedLineCount = 0
+    private var orderedLineStartAbsoluteRow = 0L
     private var observedStructure = Long.MIN_VALUE
     private var observedHistoryLayout = Long.MIN_VALUE
     private var observedVisibleStart = Long.MIN_VALUE
@@ -256,14 +257,14 @@ public class TerminalShellIntegrationState(
      * for consumers. The whole call must share the reader's terminal mutation boundary;
      * frames are borrowed only within their callbacks. Acquire that boundary before this
      * model's storage lock. Session-backed producers call it from [TerminalShellIntegration.outputProcessed].
-     * Adjacent wrapped rows may share an identity. Missing anchors after rearrangement
+     * Adjacent wrapped rows may share an identity. Missing anchors after deletion or rearrangement
      * make ranges unknown. Models that omit this call must use consecutive line positions as IDs.
      *
      * @param reader primary-buffer frame reader serialized with producer publications.
      */
     public fun updateLineOrder(reader: TerminalRenderFrameReader) {
         var capture = false
-        var requireExplicitOrder = false
+        var layoutChanged = false
         var scanStart = 0L
         reader.readRenderFrame { frame ->
             if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) return@readRenderFrame
@@ -276,21 +277,11 @@ public class TerminalShellIntegrationState(
                     previous = id
                 }
                 val visibleStart = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-                val layoutChanged = observedHistoryLayout != frame.historyContentGeneration
+                layoutChanged = observedHistoryLayout != frame.historyContentGeneration
                 val historyAdvanced = observedVisibleStart != visibleStart
-                // Deletion can remove anchors while surviving identities remain monotonic.
-                // Reflow has a separate layout generation and retains the numeric-range fallback.
-                requireExplicitOrder = !layoutChanged && !historyAdvanced && observedStructure != frame.structureGeneration
-                if (!explicitLineOrder &&
-                    !rearranged &&
-                    (observedStructure != frame.structureGeneration || observedMetadataRevision != metadataRevision)
-                ) {
-                    capturePromptPredecessors(frame)
-                }
-                capture = layoutChanged ||
-                    historyAdvanced ||
-                    requireExplicitOrder ||
-                    ((explicitLineOrder || rearranged) && observedStructure != frame.structureGeneration)
+                capture = layoutChanged || historyAdvanced || observedStructure != frame.structureGeneration
+                // Keep the previous identity snapshot until the affected suffix has been checked.
+                if (!capture && !explicitLineOrder && observedMetadataRevision != metadataRevision) capturePromptPredecessors(frame)
                 // Rows scrolled out during this batch can hide an insertion from the live viewport.
                 if (!explicitLineOrder && !layoutChanged && !rearranged) {
                     scanStart = (observedVisibleStart - 1).coerceAtLeast(0)
@@ -315,7 +306,8 @@ public class TerminalShellIntegrationState(
                         if (id <= 0 || id < previous) monotonic = false
                         previous = id
                     }
-                    if (!explicitLineOrder && monotonic && !requireExplicitOrder) {
+                    // Reflow may merge logical identities; ordinary scrolling may only evict a prefix.
+                    if (!explicitLineOrder && monotonic && (layoutChanged || !hasMissingRetainedLines(frame))) {
                         capturePromptPredecessors(frame)
                         return@synchronized
                     }
@@ -358,6 +350,19 @@ public class TerminalShellIntegrationState(
         } while (requiresFullOrder)
     }
 
+    /** Detects deleted identities in the affected suffix without treating oldest-row eviction as deletion. */
+    private fun hasMissingRetainedLines(frame: TerminalRenderFrame): Boolean {
+        val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+        val firstPreviousRow = (firstAbsoluteRow - orderedLineStartAbsoluteRow).coerceIn(0L, orderedLineCount.toLong()).toInt()
+        var row = 0
+        for (previousRow in firstPreviousRow until orderedLineCount) {
+            val id = orderedLineIds[previousRow]
+            while (row < frame.rows && frame.lineId(row) < id) row++
+            if (row == frame.rows || frame.lineId(row) != id) return true
+        }
+        return false
+    }
+
     /** Records real neighbours even when increasing identities have gaps after deletion. */
     private fun capturePromptPredecessors(frame: TerminalRenderFrame) {
         if (orderedLineIds.size < frame.rows) {
@@ -366,6 +371,7 @@ public class TerminalShellIntegrationState(
             linePositions = IntArray(frame.rows)
         }
         orderedLineCount = frame.rows
+        orderedLineStartAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
         for (row in 0 until frame.rows) orderedLineIds[row] = frame.lineId(row)
         // Host metadata can arrive after outputProcessed; keep identities, never borrowed frames.
         for (index in 0 until count) {
@@ -1413,6 +1419,7 @@ public class TerminalShellIntegrationState(
     private fun clearLocked() {
         explicitLineOrder = false
         orderedLineCount = 0
+        orderedLineStartAbsoluteRow = 0L
         observedStructure = Long.MIN_VALUE
         observedHistoryLayout = Long.MIN_VALUE
         observedVisibleStart = Long.MIN_VALUE
