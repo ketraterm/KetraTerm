@@ -144,7 +144,7 @@ class HostRepeatTest {
         val parser = TerminalParsers.create(HostCommandAdapter(terminal))
         parser.accept("abcd\rX\u001B[4h\u001B[2b".encodeToByteArray())
         assertEquals("XXXbcd", terminal.getLineAsString(0))
-        parser.accept("\u001B[4l\u001B[?1049h\u001B[?69h\u001B[2;5sA\u001B[5b".encodeToByteArray())
+        parser.accept("\u001B[4l\u001B[?1049h\u001B[?69h\u001B[2;5s\u001B[1;2HA\u001B[5b".encodeToByteArray())
         assertEquals('A'.code, terminal.getCodepointAt(1, 0))
         assertEquals(" AAAA", terminal.getLineAsString(0))
         assertEquals(" AA", terminal.getLineAsString(1))

@@ -377,11 +377,11 @@ public class HostCommandAdapter
         }
 
         override fun setCursorColumn(col: Int) {
-            terminal.positionCursor(col = col, row = terminal.cursorRow)
+            terminal.positionCursorColumn(col)
         }
 
         override fun setCursorRow(row: Int) {
-            terminal.positionCursor(col = terminal.cursorCol, row = row)
+            terminal.positionCursorRow(row)
         }
 
         override fun setCursorAbsolute(

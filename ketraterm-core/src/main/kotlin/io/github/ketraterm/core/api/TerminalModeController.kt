@@ -56,8 +56,8 @@ public interface TerminalModeController {
     /**
      * Enables or disables Origin Mode (DECOM, `CSI ? 6 h` / `CSI ? 6 l`).
      *
-     * When enabled, cursor-home semantics become relative to the active scroll
-     * region rather than the full viewport.
+     * Each call homes the cursor: to the effective left/top margins when enabled,
+     * or to page position `(0, 0)` when disabled.
      *
      * @param enabled `true` to enable origin mode, `false` to disable.
      */
@@ -88,7 +88,8 @@ public interface TerminalModeController {
      * Enables or disables left/right margin mode (DECLRMM, `CSI ? 69 h` / `CSI ? 69 l`).
      *
      * The mode flag is global, while the actual horizontal margins are stored
-     * per screen buffer. Enabling or disabling the mode homes the cursor.
+     * per screen buffer. Changing the mode resets the active horizontal margins
+     * to the page edges and homes the cursor according to [setOriginMode].
      *
      * @param enabled `true` to enable left/right margin mode, `false` to disable.
      */

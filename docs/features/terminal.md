@@ -8,7 +8,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Feature | Support |
 | --- | --- |
 | Cursor movement | Absolute/relative positioning, including [relative cursor aliases](../reference/protocol.md#relative-cursor-aliases), origin mode, DEC and ANSI/SCO save/restore, and configurable forward/backward tab stops. |
-| Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. |
+| Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. DECOM reset permits page addressing outside margins; DECOM set uses margin-relative addressing. See the [core cursor contract](../../ketraterm-core/docs/terminal-core-contract.md#cursor-contract). |
 | Cell editing | Character and column insertion/deletion, erase, protected cells, and selective erase. |
 | Writing modes | Insert/replace, autowrap, and automatic newline modes. |
 | Repeat character | REP (`CSI Ps b`) repeats the preceding retained grapheme with the current pen and ordinary write semantics, subject to a per-command resource limit. See the [protocol contract](../reference/protocol.md#repeat-character). |

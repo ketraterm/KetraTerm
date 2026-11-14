@@ -353,10 +353,10 @@ class HostCommandAdapterTest {
         }
 
         @Test
-        fun `restore honors current margins even while horizontal margin mode is enabled`() {
+        fun `restore preserves page column with origin reset and horizontal margins enabled`() {
             val f = Fixture()
             f.acceptAscii("\u001B[2;10H\u001B[s\u001B[?69h\u001B[3;7s\u001B[u")
-            assertEquals(6, f.terminal.cursorCol)
+            assertEquals(9, f.terminal.cursorCol)
             assertEquals(1, f.terminal.cursorRow)
         }
 
@@ -1354,7 +1354,7 @@ class HostCommandAdapterTest {
             f.end()
 
             assertAll(
-                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorCol) },
                 { assertEquals(0, f.terminal.cursorRow) },
             )
         }
@@ -1626,8 +1626,8 @@ class HostCommandAdapterTest {
                 f.end()
 
                 assertAll(
-                    { assertEquals("  ABC", f.terminal.getLineAsString(0), "chunkSize=$chunkSize") },
-                    { assertEquals(4, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals("ABC", f.terminal.getLineAsString(0), "chunkSize=$chunkSize") },
+                    { assertEquals(3, f.terminal.cursorCol, "chunkSize=$chunkSize") },
                     { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
                 )
             }
@@ -1649,8 +1649,8 @@ class HostCommandAdapterTest {
 
                 assertAll(
                     { assertEquals('X'.code, f.terminal.getCodepointAt(2, 1), "chunkSize=$chunkSize") },
-                    { assertEquals('Y'.code, f.terminal.getCodepointAt(2, 0), "chunkSize=$chunkSize") },
-                    { assertEquals(3, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals('Y'.code, f.terminal.getCodepointAt(0, 0), "chunkSize=$chunkSize") },
+                    { assertEquals(1, f.terminal.cursorCol, "chunkSize=$chunkSize") },
                     { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
                 )
             }

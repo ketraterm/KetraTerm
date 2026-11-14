@@ -11,7 +11,7 @@ There is no single conversion for every command:
 
 | Command family | Parser sink convention | Adapter/core convention |
 | --- | --- | --- |
-| Cursor row/column positioning | Zero-based row/column | Passed unchanged to `positionCursor` |
+| Cursor row/column positioning | Zero-based row/column | Passed unchanged to `positionCursor`, `positionCursorColumn`, or `positionCursorRow` |
 | Vertical scroll region | Zero-based inclusive; `bottom = -1` means omitted | Add one; omitted bottom becomes `terminal.height` |
 | Left/right margins | Zero-based inclusive; `right = -1` means omitted | Add one; omitted right becomes `terminal.width` |
 | Rectangular operations and checksums | DEC one-based inclusive; zero means omitted | Passed unchanged |
@@ -21,6 +21,8 @@ For example, `CSI 2;5 H` arrives as `(row = 1, col = 4)` and is passed directly
 to core. `CSI 2;5 r` arrives as `(top = 1, bottom = 4)` and becomes the core
 margin call `(top = 2, bottom = 5)`. Core applies origin-mode semantics and
 validates or clamps geometry according to each operation's contract.
+CHA and VPA use the single-axis methods so the untouched coordinate is
+preserved rather than interpreted again relative to the origin.
 
 See the parser
 [`TerminalCommandSink`](../../ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt)

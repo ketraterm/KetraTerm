@@ -25,6 +25,251 @@ import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
 class TerminalLeftRightMarginTest {
+    @Test
+    fun `single axis positioning cancels deferred wrap even without a coordinate change`() {
+        for (origin in listOf(false, true)) {
+            for (horizontal in listOf(false, true)) {
+                val buffer = TerminalBuffers.create(10, 8)
+                buffer.setLeftRightMarginMode(true)
+                buffer.setLeftRightMargins(3, 8)
+                buffer.setScrollRegion(3, 7)
+                buffer.setOriginMode(origin)
+                buffer.positionCursor(Int.MAX_VALUE, 1)
+                val column = buffer.cursorCol
+                val row = buffer.cursorRow
+                buffer.writeText("A")
+                if (horizontal) buffer.positionCursorColumn(Int.MAX_VALUE) else buffer.positionCursorRow(1)
+                buffer.writeText("BC")
+                assertEquals('B'.code, buffer.getCodepointAt(column, row))
+                assertEquals('C'.code, buffer.getCodepointAt(2, row + 1))
+                assertEquals(3 to row + 1, buffer.cursorCol to buffer.cursorRow)
+            }
+        }
+    }
+
+    @Test
+    fun `single axis addressing preserves the other absolute coordinate in both origin modes`() {
+        for (origin in listOf(false, true)) {
+            val buffer = TerminalBuffers.create(10, 8)
+            buffer.setLeftRightMarginMode(true)
+            buffer.setLeftRightMargins(3, 8)
+            buffer.setScrollRegion(3, 7)
+            buffer.setOriginMode(origin)
+            buffer.positionCursor(3, 3)
+            val row = buffer.cursorRow
+            buffer.positionCursorColumn(Int.MAX_VALUE)
+            assertEquals((if (origin) 7 else 9) to row, buffer.cursorCol to buffer.cursorRow)
+            buffer.writeText("X")
+            buffer.positionCursorColumn(Int.MIN_VALUE)
+            assertEquals((if (origin) 2 else 0) to row, buffer.cursorCol to buffer.cursorRow)
+            buffer.writeText("Y")
+            assertEquals('Y'.code, buffer.getCodepointAt(if (origin) 2 else 0, row))
+            val col = buffer.cursorCol
+            buffer.positionCursorRow(Int.MAX_VALUE)
+            assertEquals(col to (if (origin) 6 else 7), buffer.cursorCol to buffer.cursorRow)
+            buffer.positionCursorRow(Int.MIN_VALUE)
+            assertEquals(col to (if (origin) 2 else 0), buffer.cursorCol to buffer.cursorRow)
+        }
+    }
+
+    @Test
+    fun `streaming cluster width changes outside margins retain complete spans and wrap at the page edge`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.positionCursor(8, 0)
+        buffer.writeCodepoint(0x2764)
+        buffer.updatePreviousCluster(intArrayOf(0x2764, 0xFE0F))
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(9, 0))
+        assertEquals(9 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.updatePreviousCluster(intArrayOf(0x2764, 0xFE0E))
+        assertEquals(0, buffer.getCodepointAt(9, 0))
+        buffer.writeText("X")
+        assertEquals('X'.code, buffer.getCodepointAt(9, 0))
+        buffer.writeText("Y")
+        assertEquals('Y'.code, buffer.getCodepointAt(2, 1))
+    }
+
+    @Test
+    fun `origin reset addresses the page while origin set addresses both margins`() {
+        val buffer = TerminalBuffers.create(10, 8)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setScrollRegion(3, 7)
+        assertEquals(0 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.setOriginMode(false)
+        assertEquals(0 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.positionCursor(Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals(9 to 7, buffer.cursorCol to buffer.cursorRow)
+        buffer.positionCursor(Int.MIN_VALUE, Int.MIN_VALUE)
+        assertEquals(0 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.setOriginMode(true)
+        assertEquals(2 to 2, buffer.cursorCol to buffer.cursorRow)
+        buffer.positionCursor(Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals(7 to 6, buffer.cursorCol to buffer.cursorRow)
+        buffer.setLeftRightMargins(4, 9)
+        assertEquals(3 to 2, buffer.cursorCol to buffer.cursorRow)
+        buffer.setOriginMode(false)
+        assertEquals(0 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.setOriginMode(true)
+        buffer.setLeftRightMarginMode(false)
+        assertEquals(0 to 2, buffer.cursorCol to buffer.cursorRow)
+    }
+
+    @Test
+    fun `relative movement respects the approached margin and never moves backwards outside it`() {
+        val buffer = TerminalBuffers.create(10, 8)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setScrollRegion(3, 6)
+        buffer.positionCursor(8, 0)
+        buffer.cursorRight(Int.MAX_VALUE)
+        assertEquals(9, buffer.cursorCol)
+        buffer.positionCursor(0, 0)
+        buffer.cursorLeft(Int.MAX_VALUE)
+        assertEquals(0, buffer.cursorCol)
+        buffer.cursorDown(Int.MAX_VALUE)
+        assertEquals(5, buffer.cursorRow)
+        buffer.positionCursor(4, 7)
+        buffer.cursorUp(Int.MAX_VALUE)
+        assertEquals(2, buffer.cursorRow)
+        buffer.cursorLeft(Int.MAX_VALUE)
+        assertEquals(2, buffer.cursorCol)
+        buffer.cursorRight(Int.MAX_VALUE)
+        assertEquals(7, buffer.cursorCol)
+        assertEquals(0, buffer.historySize)
+    }
+
+    @Test
+    fun `extreme margin coordinates clamp before one based conversion`() {
+        val buffer = TerminalBuffers.create(10, 8)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setScrollRegion(3, 7)
+        buffer.setOriginMode(true)
+        buffer.setLeftRightMargins(Int.MIN_VALUE, Int.MAX_VALUE)
+        assertEquals(0 to 2, buffer.cursorCol to buffer.cursorRow)
+        buffer.setScrollRegion(Int.MIN_VALUE, Int.MAX_VALUE)
+        assertEquals(0 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.positionCursor(Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals(9 to 7, buffer.cursorCol to buffer.cursorRow)
+    }
+
+    @Test
+    fun `outside right edge wrap does not scroll a region the cursor is outside`() {
+        for (wide in listOf(false, true)) {
+            val buffer = TerminalBuffers.create(10, 8, maxHistory = 20)
+            buffer.setLeftRightMarginMode(true)
+            buffer.setLeftRightMargins(3, 8)
+            buffer.setScrollRegion(3, 7)
+            buffer.positionCursor(2, 6)
+            buffer.writeText("R")
+            buffer.positionCursor(9, 6)
+            if (wide) {
+                buffer.writeCodepoint('界'.code)
+            } else {
+                buffer.writeText("AX")
+            }
+            assertEquals('R'.code, buffer.getCodepointAt(2, 6))
+            assertEquals(if (wide) '界'.code else 'X'.code, buffer.getCodepointAt(2, 7))
+            assertEquals((if (wide) 4 else 3) to 7, buffer.cursorCol to buffer.cursorRow)
+            assertEquals(0, buffer.historySize)
+        }
+    }
+
+    @Test
+    fun `carriage return and tabs do not pull an outside cursor into the region`() {
+        val buffer = TerminalBuffers.create(20, 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.positionCursor(1, 1)
+        buffer.carriageReturn()
+        assertEquals(0 to 1, buffer.cursorCol to buffer.cursorRow)
+        buffer.cursorBackwardTab(Int.MAX_VALUE)
+        assertEquals(0, buffer.cursorCol)
+        buffer.positionCursor(10, 1)
+        buffer.horizontalTab()
+        assertEquals(16, buffer.cursorCol)
+        buffer.cursorForwardTab(Int.MAX_VALUE)
+        assertEquals(19, buffer.cursorCol)
+        buffer.carriageReturn()
+        assertEquals(2, buffer.cursorCol)
+    }
+
+    @Test
+    fun `outside writes use the screen edge and pending wrap returns to the left margin`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.writeText("LR")
+        buffer.positionCursor(8, 0)
+        buffer.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+        assertEquals("LR      👩‍💻", buffer.getLineAsString(0))
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(9, 0))
+        buffer.saveCursor()
+        buffer.setOriginMode(true)
+        buffer.restoreCursor()
+        assertFalse(buffer.getModeSnapshot().isOriginMode)
+        assertEquals(9 to 0, buffer.cursorCol to buffer.cursorRow)
+        buffer.writeText("X")
+        assertEquals('X'.code, buffer.getCodepointAt(2, 1))
+        assertEquals(3 to 1, buffer.cursorCol to buffer.cursorRow)
+    }
+
+    @Test
+    fun `outside printing with insert mode overwrites without shifting the region`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.writeText("0123456789")
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setInsertMode(true)
+        buffer.positionCursor(0, 0)
+        buffer.writeText("A")
+        buffer.positionCursor(9, 0)
+        buffer.writeText("B")
+        assertEquals("A12345678B", buffer.getLineAsString(0))
+    }
+
+    @Test
+    fun `outside no wrap writes stay at the page edge and reject a split wide glyph`() {
+        val buffer = TerminalBuffers.create(10, 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setAutoWrap(false)
+        buffer.positionCursor(8, 0)
+        buffer.writeCodepoint('界'.code)
+        assertEquals('界'.code, buffer.getCodepointAt(8, 0))
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(9, 0))
+        buffer.writeCodepoint('界'.code)
+        assertEquals(9 to 0, buffer.cursorCol to buffer.cursorRow)
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(9, 0))
+        buffer.writeText("XY")
+        assertEquals('Y'.code, buffer.getCodepointAt(9, 0))
+        assertEquals(0, buffer.getCodepointAt(8, 0))
+        assertEquals(0, buffer.getCodepointAt(7, 0))
+    }
+
+    @Test
+    fun `index and reverse index outside horizontal margins do not scroll the region`() {
+        for (column in listOf(0, 9)) {
+            val buffer = TerminalBuffers.create(10, 6, maxHistory = 20)
+            buffer.setLeftRightMarginMode(true)
+            buffer.setLeftRightMargins(3, 8)
+            buffer.setScrollRegion(2, 4)
+            buffer.positionCursor(2, 3)
+            buffer.writeText("R")
+            buffer.positionCursor(column, 3)
+            buffer.newLine()
+            assertEquals(column to 4, buffer.cursorCol to buffer.cursorRow)
+            assertEquals('R'.code, buffer.getCodepointAt(2, 3))
+            buffer.positionCursor(column, 1)
+            buffer.reverseLineFeed()
+            assertEquals(column to 0, buffer.cursorCol to buffer.cursorRow)
+            assertEquals('R'.code, buffer.getCodepointAt(2, 3))
+            assertEquals(0, buffer.historySize)
+        }
+    }
+
     private fun stateOf(api: TerminalBuffer): TerminalState {
         val componentsField = api.javaClass.getDeclaredField("components")
         componentsField.isAccessible = true
@@ -155,7 +400,7 @@ class TerminalLeftRightMarginTest {
         buffer.setLeftRightMargins(3, 6)
 
         assertAll(
-            { assertEquals(2, buffer.cursorCol) },
+            { assertEquals(0, buffer.cursorCol) },
             { assertEquals(0, buffer.cursorRow) },
         )
     }
@@ -165,6 +410,7 @@ class TerminalLeftRightMarginTest {
         val buffer = TerminalBuffers.create(width = 8, height = 3)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 5)
+        buffer.positionCursor(2, 0)
 
         buffer.writeText("ABCD")
 
@@ -184,6 +430,7 @@ class TerminalLeftRightMarginTest {
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 5)
         buffer.setAutoWrap(false)
+        buffer.positionCursor(2, 0)
 
         buffer.writeText("ABCD")
 
@@ -228,6 +475,7 @@ class TerminalLeftRightMarginTest {
         val state = stateOf(buffer)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 6)
+        buffer.positionCursor(2, 0)
         buffer.writeText("ABCD")
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(6, 'X'.code, 0)
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(7, 'Y'.code, 0)
@@ -251,6 +499,7 @@ class TerminalLeftRightMarginTest {
         val state = stateOf(buffer)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 6)
+        buffer.positionCursor(2, 0)
         buffer.writeText("ABCD")
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(6, 'X'.code, 0)
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(7, 'Y'.code, 0)
@@ -449,17 +698,17 @@ class TerminalLeftRightMarginTest {
     }
 
     @Test
-    fun `cursorAddressing_clampedToLRRegion`() {
+    fun `cursorAddressing_originResetAddressesEntirePage`() {
         val buffer = TerminalBuffers.create(width = 8, height = 4)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 6)
 
         buffer.positionCursor(0, 1)
-        assertEquals(2, buffer.cursorCol)
+        assertEquals(0, buffer.cursorCol)
 
         buffer.positionCursor(99, 2)
         assertAll(
-            { assertEquals(5, buffer.cursorCol) },
+            { assertEquals(7, buffer.cursorCol) },
             { assertEquals(2, buffer.cursorRow) },
         )
     }
@@ -566,6 +815,7 @@ class TerminalLeftRightMarginTest {
         val buffer = TerminalBuffers.create(width = 8, height = 3)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 5)
+        buffer.positionCursor(2, 0)
         buffer.writeText("ABC")
         buffer.saveCursor()
 
@@ -581,7 +831,7 @@ class TerminalLeftRightMarginTest {
     }
 
     @Test
-    fun `restoreCursor_clampsToHorizontalMargins_whenDeclrmmActive`() {
+    fun `restoreCursor_preservesOutsideColumn_whenOriginReset`() {
         val buffer = TerminalBuffers.create(width = 8, height = 3)
         val state = stateOf(buffer)
         buffer.positionCursor(7, 1)
@@ -593,9 +843,9 @@ class TerminalLeftRightMarginTest {
         buffer.writeCodepoint('X'.code)
 
         assertAll(
-            { assertEquals(5, buffer.cursorCol) },
+            { assertEquals(7, buffer.cursorCol) },
             { assertEquals(1, buffer.cursorRow) },
-            { assertEquals('X'.code, buffer.getCodepointAt(5, 1)) },
+            { assertEquals('X'.code, buffer.getCodepointAt(7, 1)) },
             { assertTrue(state.cursor.pendingWrap) },
         )
     }
@@ -819,14 +1069,14 @@ class TerminalLeftRightMarginTest {
                 // Cursor col must always be in [0, width - 1]
                 assertTrue(cursorCol in 0 until buffer.width, "Step $step: Cursor col $cursorCol must be in 0..${buffer.width - 1}")
 
-                // If left/right margins are active (which effectiveLeftMargin/effectiveRightMargin represent),
-                // the cursor column must be within those margins.
-                val left = state.effectiveLeftMargin
-                val right = state.effectiveRightMargin
-                assertTrue(
-                    cursorCol in left..right,
-                    "Step $step: Cursor col $cursorCol must be in effective horizontal margins $left..$right",
-                )
+                if (state.modes.isOriginMode) {
+                    val left = state.effectiveLeftMargin
+                    val right = state.effectiveRightMargin
+                    assertTrue(
+                        cursorCol in left..right,
+                        "Step $step: Origin-relative cursor col $cursorCol must be in $left..$right",
+                    )
+                }
 
                 // 2. No orphan spacer characters in the grid
                 for (r in 0 until buffer.height) {

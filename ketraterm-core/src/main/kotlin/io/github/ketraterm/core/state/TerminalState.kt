@@ -194,6 +194,11 @@ internal class TerminalState(
     val effectiveRightMargin: Int
         get() = if (modes.isLeftRightMarginMode) activeBuffer.rightMargin else dimensions.width - 1
 
+    /** A margin limits movement toward it, but never pulls an outside cursor back inside. */
+    fun cursorLeftBoundary(column: Int): Int = if (column < effectiveLeftMargin) 0 else effectiveLeftMargin
+
+    fun cursorRightBoundary(column: Int): Int = if (column > effectiveRightMargin) dimensions.width - 1 else effectiveRightMargin
+
     val isFullViewportScroll: Boolean
         get() = activeBuffer.isFullViewportScroll(dimensions.height)
     val historySize: Int

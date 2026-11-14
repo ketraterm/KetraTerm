@@ -35,7 +35,9 @@ make separately read grid state coherent.
 
 Cursor positioning and cell reads use zero-based coordinates. With origin mode,
 positioning is relative to the top margin; with both origin and left/right margin
-modes, columns are relative to the left margin. Margin methods and rectangular
+modes, columns are relative to the left margin. With origin mode reset, both
+axes address the entire page regardless of scrolling margins. Single-axis
+positioning preserves the other absolute coordinate. Margin methods and rectangular
 commands retain their documented DEC one-based conventions; zero rectangle
 parameters mean omitted values. The host adapter performs parser-to-core
 coordinate conversion.
@@ -129,9 +131,9 @@ updates without a remembered target. Invalid scalar input is also rejected; see
 
 Cluster continuation preserves the target's attributes. Same-width updates
 preserve cursor position; in-row width changes adjust the following cursor and
-pending wrap against the active right margin. Narrowing clears the released
+pending wrap against the right write boundary. Narrowing clears the released
 spacer. Widening overwrites the next cell only when the span fits inside the
-margin; otherwise the cluster remains one cell. Updates do not insert or shift
+write boundary; otherwise the cluster remains one cell. Updates do not insert or shift
 cells, including in insert mode, and do not undo completed wraps, scrolling,
 overwrites, or insert shifts. A printable write rejected by geometry or disabled
 autowrap clears the target; validation failure preserves it. A valid update with
@@ -182,6 +184,14 @@ integer overflow. Tab traversal is bounded by viewport width, not the supplied
 count. Cursor-affecting commands cancel pending wrap; saving or restoring the
 cursor follows the explicit saved-state rules below.
 
+Setting margins or changing origin mode homes to the effective left/top margins
+with DECOM set, or to page position `(0, 0)` with DECOM reset. Relative movement
+stops at the approached margin; starting beyond it uses the corresponding page
+edge. Printing outside horizontal margins is permitted: the right write boundary
+is the right margin when starting at or left of it, otherwise the page edge.
+Wrapping returns to the effective left margin. LF/RI scroll only when the cursor
+is also within the horizontal margins.
+
 ### `DECSC` / `DECRC`
 
 Each screen has a save slot containing column, row, both pen words, pending wrap,
@@ -189,8 +199,9 @@ and origin mode. Charset designation and locking shifts remain parser-owned.
 The parser selects its charset save slot using the core's actual active screen
 through the command sink.
 
-`restoreCursor` clamps saved coordinates to current bounds. Pending wrap is
-restored only if the resulting column is the active right margin. Without a
+`restoreCursor` restores absolute coordinates, clamping the row to the viewport
+and the column to the page with DECOM reset or horizontal margins with DECOM set.
+Pending wrap is restored only at the right write boundary with autowrap enabled. Without a
 save, it homes to absolute `(0, 0)`, clears pending wrap and origin mode, and
 resets the pen.
 

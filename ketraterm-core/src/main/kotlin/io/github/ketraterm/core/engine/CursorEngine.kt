@@ -39,12 +39,12 @@ internal class CursorEngine(
 
     /** Advances once to the next tab stop, clamped to the active right boundary. */
     private fun advanceToNextTabStop() {
-        state.cursor.col = minOf(state.tabStops.getNextStop(state.cursor.col), rightMargin)
+        state.cursor.col = minOf(state.tabStops.getNextStop(state.cursor.col), state.cursorRightBoundary(state.cursor.col))
     }
 
     /** Retreats once to the previous tab stop, clamped to the active left boundary. */
     private fun retreatToPreviousTabStop() {
-        state.cursor.col = state.tabStops.getPreviousStop(state.cursor.col, leftMargin)
+        state.cursor.col = state.tabStops.getPreviousStop(state.cursor.col, state.cursorLeftBoundary(state.cursor.col))
     }
 
     private inline fun cursorMutation(block: () -> Unit) {
@@ -62,7 +62,7 @@ internal class CursorEngine(
     fun homeCursor() =
         cursorMutation {
             state.cancelPendingWrap()
-            state.cursor.col = leftMargin
+            state.cursor.col = if (state.modes.isOriginMode) leftMargin else 0
             state.cursor.row = if (state.modes.isOriginMode) state.scrollTop else 0
         }
 
@@ -73,7 +73,7 @@ internal class CursorEngine(
     fun carriageReturn() =
         cursorMutation {
             state.cancelPendingWrap()
-            state.cursor.col = leftMargin
+            state.cursor.col = if (state.modes.isOriginMode) leftMargin else state.cursorLeftBoundary(state.cursor.col)
         }
 
     /**
@@ -105,51 +105,63 @@ internal class CursorEngine(
         row: Int,
     ) = cursorMutation {
         state.cancelPendingWrap()
-        val targetCol =
-            if (state.modes.isOriginMode && state.modes.isLeftRightMarginMode) {
-                leftMargin + col.coerceIn(0, rightMargin - leftMargin)
-            } else {
-                col
-            }
-        state.cursor.col = targetCol.coerceIn(leftMargin, rightMargin)
-
-        state.cursor.row =
-            if (state.modes.isOriginMode) {
-                state.scrollTop + row.coerceIn(0, state.scrollBottom - state.scrollTop)
-            } else {
-                state.dimensions.clampRow(row)
-            }
+        state.cursor.col = resolveColumn(col)
+        state.cursor.row = resolveRow(row)
     }
+
+    fun setCursorColumn(col: Int) =
+        cursorMutation {
+            state.cancelPendingWrap()
+            state.cursor.col = resolveColumn(col)
+        }
+
+    fun setCursorRow(row: Int) =
+        cursorMutation {
+            state.cancelPendingWrap()
+            state.cursor.row = resolveRow(row)
+        }
+
+    private fun resolveColumn(col: Int): Int =
+        if (state.modes.isOriginMode) {
+            leftMargin + col.coerceIn(0, rightMargin - leftMargin)
+        } else {
+            state.dimensions.clampCol(col)
+        }
+
+    private fun resolveRow(row: Int): Int =
+        if (state.modes.isOriginMode) {
+            state.scrollTop + row.coerceIn(0, state.scrollBottom - state.scrollTop)
+        } else {
+            state.dimensions.clampRow(row)
+        }
 
     // --- Relative Movement -----------------------------------------------
 
     /**
      * Moves the cursor up by [n] rows (CUU, CSI n A).
      *
-     * If the cursor is within the active scroll region,
-     * movement stops at scrollTop. If the cursor is above the scroll region
-     * (i.e., outside it entirely), it clamps to row 0.
+     * Movement stops at scrollTop when approaching it from below, or at row 0
+     * when already above it.
      */
     fun cursorUp(n: Int): Unit =
         cursorMutation {
             if (n <= 0) return
             state.cancelPendingWrap()
-            val top = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollTop else 0
+            val top = if (state.cursor.row >= state.scrollTop) state.scrollTop else 0
             state.cursor.row = (state.cursor.row - n).coerceAtLeast(top)
         }
 
     /**
      * Moves the cursor down by [n] rows (CUD, CSI n B).
      *
-     * If the cursor is within the active scroll region,
-     * movement stops at scrollBottom. If the cursor is below the scroll region,
-     * it clamps to height - 1.
+     * Movement stops at scrollBottom when approaching it from above, or at
+     * height - 1 when already below it.
      */
     fun cursorDown(n: Int): Unit =
         cursorMutation {
             if (n <= 0) return
             state.cancelPendingWrap()
-            val bottom = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollBottom else height - 1
+            val bottom = if (state.cursor.row <= state.scrollBottom) state.scrollBottom else height - 1
             state.cursor.row += minOf(n, bottom - state.cursor.row)
         }
 
@@ -162,7 +174,7 @@ internal class CursorEngine(
             val reverse = state.modes.isAutoWrap && (state.modes.isReverseWrap || state.modes.isReverseWrapExtended)
             val count = n - if (reverse && state.cursor.pendingWrap) 1 else 0
             state.cancelPendingWrap()
-            val left = if (state.cursor.col < leftMargin) 0 else leftMargin
+            val left = state.cursorLeftBoundary(state.cursor.col)
             if (!reverse) {
                 state.cursor.col -= minOf(count, state.cursor.col - left)
                 return@cursorMutation
@@ -222,18 +234,18 @@ internal class CursorEngine(
     }
 
     /**
-     * Moves the cursor right by [n] columns, clamped to width - 1 (CUF).
+     * Moves right to the right margin, or the page edge when already beyond it (CUF).
      */
     fun cursorRight(n: Int): Unit =
         cursorMutation {
             if (n <= 0) return
             state.cancelPendingWrap()
-            state.cursor.col += minOf(n, rightMargin - state.cursor.col)
+            state.cursor.col += minOf(n, state.cursorRightBoundary(state.cursor.col) - state.cursor.col)
         }
 
     /**
      * Advances the cursor to the next tab stop (HT, U+0009).
-     * Clamps to the right margin if no further stops exist.
+     * Stops at the right margin, or at the page edge when already beyond it.
      * Tab never triggers a line wrap.
      */
     fun horizontalTab() =
@@ -256,7 +268,7 @@ internal class CursorEngine(
             do {
                 advanceToNextTabStop()
                 steps--
-            } while (steps > 0 && state.cursor.col < rightMargin)
+            } while (steps > 0 && state.cursor.col < state.cursorRightBoundary(state.cursor.col))
         }
 
     /**
@@ -273,7 +285,7 @@ internal class CursorEngine(
             do {
                 retreatToPreviousTabStop()
                 steps--
-            } while (steps > 0 && state.cursor.col > leftMargin)
+            } while (steps > 0 && state.cursor.col > state.cursorLeftBoundary(state.cursor.col))
         }
 
     // --- Save / Restore ----------------------------------------------
@@ -316,17 +328,14 @@ internal class CursorEngine(
      * Origin mode is restored as a terminal state, but it does not reinterpret
      * the saved cursor position relative to the current scroll region. The
      * restored row is clamped only to the current viewport height. The restored
-     * column is clamped to the current effective horizontal bounds:
-     * - with DECLRMM off: `0 .. width - 1`
-     * - with DECLRMM on: `leftMargin .. rightMargin`
+     * column is clamped to the page with DECOM reset, or to the current
+     * effective horizontal margins with DECOM set.
      *
      * ## Resize safety
      *
      * A saved pending-wrap state is only valid when the restored cursor is
-     * still on the current effective right margin. If the terminal width or
-     * active horizontal margins changed since [saveCursor], [pendingWrap] is
-     * restored only when `restoredCol == rightMargin`; otherwise it is cleared
-     * to avoid an impossible deferred-wrap state.
+     * still on its right write boundary (the right margin, or the page edge
+     * outside it) and autowrap is enabled. Otherwise it is cleared.
      *
      * ## No prior save
      *
@@ -350,12 +359,19 @@ internal class CursorEngine(
 
             state.modes.isOriginMode = state.savedCursor.isOriginMode
 
-            val restoredCol = state.savedCursor.col.coerceIn(leftMargin, rightMargin)
+            val restoredCol =
+                if (state.modes.isOriginMode) {
+                    state.savedCursor.col.coerceIn(leftMargin, rightMargin)
+                } else {
+                    state.dimensions.clampCol(state.savedCursor.col)
+                }
             val restoredRow = state.savedCursor.row.coerceIn(0, height - 1)
 
             state.cursor.col = restoredCol
             state.cursor.row = restoredRow
-            state.cursor.pendingWrap = state.savedCursor.pendingWrap && restoredCol == rightMargin
+            state.cursor.pendingWrap = state.savedCursor.pendingWrap &&
+                state.modes.isAutoWrap &&
+                restoredCol == state.cursorRightBoundary(restoredCol)
 
             state.pen.restoreAttr(state.savedCursor.attr, state.savedCursor.extendedAttr)
         }

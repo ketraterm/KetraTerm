@@ -41,6 +41,9 @@ public interface TerminalWriter {
      * [writeCluster].
      *
      * Wrapping, scrolling, and wide-character handling are applied automatically.
+     * Writes outside horizontal margins are permitted. They wrap at the right
+     * margin when starting at or left of it, or at the page edge when starting
+     * beyond it. A wrap returns to the effective left margin on the next row.
      *
      * @param codepoint Unicode codepoint to write.
      * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate.
@@ -139,7 +142,8 @@ public interface TerminalWriter {
      * cell or advance past a second grapheme. In-row width changes recompute the following
      * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
      * not reversed. Narrowing blanks the released spacer; widening overwrites the next
-     * cell only if it fits inside the right margin, otherwise the cluster stays in one
+     * cell only if it fits before the write boundary (right margin, or page edge
+     * when outside it), otherwise the cluster stays in one
      * cell. Updates never shift cells, including in insert mode. A write rejected by
      * geometry or disabled autowrap clears the target; invalid input leaves it unchanged.
      * If no remembered printable target remains, valid input is ignored.
@@ -163,7 +167,8 @@ public interface TerminalWriter {
      * Executes a line feed (LF, `0x0A`).
      *
      * Moves the cursor down one row without resetting the column. Scrolls the
-     * active scroll region up if the cursor is on the bottom margin.
+     * active scroll region up if the cursor is on the bottom margin and within
+     * the horizontal margins. Otherwise movement stops at the page edge.
      */
     public fun newLine()
 
@@ -171,15 +176,16 @@ public interface TerminalWriter {
      * Executes Reverse Index (RI, `ESC M`).
      *
      * Moves the cursor up one row without changing the column. Scrolls the
-     * active scroll region down if the cursor is on the top margin.
+     * active scroll region down if the cursor is on the top margin and within
+     * the horizontal margins. Otherwise movement stops at the page edge.
      */
     public fun reverseLineFeed()
 
     /**
      * Executes a carriage return (CR, `0x0D`).
      *
-     * Moves the cursor to the active left boundary on the current row. With
-     * DECLRMM off that is column 0; with DECLRMM on it is the left margin.
+     * Moves to the effective left margin on the current row, or to column 0
+     * when DECOM is reset and the cursor is already left of that margin.
      */
     public fun carriageReturn()
 
@@ -204,7 +210,8 @@ public interface TerminalWriter {
      *
      * [left] and [right] are 1-based inclusive columns per the DECSLRM
      * convention. The request is ignored unless DECLRMM is active. Degenerate
-     * ranges are ignored. A successful margin change homes the cursor.
+     * ranges are ignored. A successful change homes to the effective left/top
+     * margins with DECOM set, or to page position `(0, 0)` with DECOM reset.
      *
      * @param left Left margin column (1-based, inclusive).
      * @param right Right margin column (1-based, inclusive).

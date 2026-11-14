@@ -84,12 +84,12 @@ internal class ScreenBuffer(
         viewportHeight: Int,
         homeCol: Int = 0,
     ) {
-        val t = (top - 1).coerceIn(0, viewportHeight - 1)
-        val b = (bottom - 1).coerceIn(0, viewportHeight - 1)
+        val t = top.coerceIn(1, viewportHeight) - 1
+        val b = bottom.coerceIn(1, viewportHeight) - 1
         if (t >= b) return
         scrollTop = t
         scrollBottom = b
-        cursor.col = homeCol.coerceIn(0, rightMargin)
+        cursor.col = if (isOriginMode) homeCol.coerceIn(0, rightMargin) else 0
         cursor.row = if (isOriginMode) t else 0
         cursor.pendingWrap = false
     }
@@ -111,8 +111,8 @@ internal class ScreenBuffer(
         right: Int,
         viewportWidth: Int,
     ): Boolean {
-        val l = (left - 1).coerceIn(0, viewportWidth - 1)
-        val r = (right - 1).coerceIn(0, viewportWidth - 1)
+        val l = left.coerceIn(1, viewportWidth) - 1
+        val r = right.coerceIn(1, viewportWidth) - 1
         if (l >= r) return false
         leftMargin = l
         rightMargin = r

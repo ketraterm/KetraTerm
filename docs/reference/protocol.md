@@ -664,7 +664,8 @@ original attributes. Core adjusts the following cursor and pending wrap.
 Publication commits grid effects. Later width changes do not relocate the
 cluster, reverse completed wraps/scrolls/insert shifts, or restore overwritten
 text. Narrowing frees a spacer as blank; widening consumes a neighboring cell
-when it fits. At the right margin, text remains in the single available cell.
+when it fits. At the right write boundary (the right margin, or the page edge
+when outside it), text remains in the single available cell.
 A rejected initial write has no continuation target.
 
 Whole-input and split-input placement can therefore differ at margins, over

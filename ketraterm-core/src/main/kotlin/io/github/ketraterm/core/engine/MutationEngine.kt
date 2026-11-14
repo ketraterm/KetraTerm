@@ -201,13 +201,16 @@ internal class MutationEngine(
 
     /**
      * Advances one viewport row, scrolling only when the cursor is exactly on
-     * the active bottom margin.
+     * the active bottom margin and within the horizontal margins.
      *
      * A cursor outside a restricted scroll region never triggers a scroll here,
      * which matches VT behavior for writes below the margins.
      */
-    private fun advanceRow(row: Int): Int =
-        if (row == state.scrollBottom) {
+    private fun advanceRow(
+        row: Int,
+        col: Int = state.cursor.col,
+    ): Int =
+        if (row == state.scrollBottom && col in leftMargin..rightMargin) {
             scrollUpInternal()
             state.scrollBottom
         } else {
@@ -467,11 +470,11 @@ internal class MutationEngine(
         var cCol = state.cursor.col
         var cRow = state.cursor.row
         val widthInCells = if (charWidth == 2) 2 else 1
+        var writeRight = state.cursorRightBoundary(cCol)
 
         if (cRow !in 0 until height ||
             cCol !in 0 until width ||
-            cCol !in leftMargin..rightMargin ||
-            (widthInCells == 2 && cCol >= rightMargin && !state.modes.isAutoWrap)
+            (widthInCells == 2 && cCol >= writeRight && !state.modes.isAutoWrap)
         ) {
             // Extensions belong to this rejected write, never to an earlier printable cell.
             state.clearLastPrintableCell()
@@ -485,23 +488,25 @@ internal class MutationEngine(
             line.wrapped = true
             line.hasOutput = true
             state.markLineChanged(line)
+            cRow = advanceRow(cRow, cCol)
             cCol = leftMargin
-            cRow = advanceRow(cRow)
+            writeRight = rightMargin
             line = getLine(cRow)
         }
 
-        if (widthInCells == 2 && cCol >= rightMargin) {
+        if (widthInCells == 2 && cCol >= writeRight) {
             annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             line.wrapped = true
             line.hasOutput = true
             line.endsWithWrapPadding = cCol == width - 1
             state.markLineChanged(line)
+            cRow = advanceRow(cRow, cCol)
             cCol = leftMargin
-            cRow = advanceRow(cRow)
+            writeRight = rightMargin
             line = getLine(cRow)
         }
 
-        if (state.modes.isInsertMode) {
+        if (state.modes.isInsertMode && cCol in leftMargin..rightMargin) {
             if (line.rawCodepoint(cCol) == TerminalConstants.WIDE_CHAR_SPACER) {
                 annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             }
@@ -518,7 +523,7 @@ internal class MutationEngine(
             if (widthInCells == 1) {
                 line.setCell(cCol + 1, TerminalConstants.EMPTY, state.pen.currentAttr, state.pen.currentExtendedAttr)
             }
-        } else if (widthInCells == 2 && cCol + 1 <= rightMargin) {
+        } else if (widthInCells == 2 && cCol + 1 <= writeRight) {
             annihilateAt(cRow, cCol + 1, state.pen.currentAttr, state.pen.currentExtendedAttr)
         }
 
@@ -540,8 +545,8 @@ internal class MutationEngine(
             cCol += 1
         }
 
-        if (cCol > rightMargin) {
-            state.cursor.col = rightMargin
+        if (cCol > writeRight) {
+            state.cursor.col = writeRight
             state.cursor.row = cRow
             state.cursor.pendingWrap = state.modes.isAutoWrap
             state.rememberPrintableCell(writtenRow, writtenCol)
@@ -575,7 +580,7 @@ internal class MutationEngine(
             charWidth != 2 &&
             !state.cursor.pendingWrap &&
             cRow in 0 until height &&
-            cCol in leftMargin..rightMargin
+            cCol in 0 until width
         ) {
             val line = getLine(cRow)
             if (line.rawCodepoint(cCol) == TerminalConstants.EMPTY) {
@@ -583,7 +588,7 @@ internal class MutationEngine(
                 line.hasOutput = true
                 state.markLineChanged(line)
                 state.rememberPrintableCell(cRow, cCol)
-                if (cCol == rightMargin) {
+                if (cCol == state.cursorRightBoundary(cCol)) {
                     if (state.modes.isAutoWrap) {
                         state.cursor.pendingWrap = true
                     } else {
@@ -727,8 +732,9 @@ internal class MutationEngine(
         val attr = line.getPackedAttr(col)
         val extendedAttr = line.getPackedExtendedAttr(col)
         val oldWidth = if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) 2 else 1
+        val writeRight = state.cursorRightBoundary(col)
 
-        if (clusterWidth == 2 && col + 1 <= rightMargin) {
+        if (clusterWidth == 2 && col + 1 <= writeRight) {
             if (line.rawCodepoint(col + 1) != TerminalConstants.WIDE_CHAR_SPACER) {
                 annihilateAt(row, col + 1)
             }
@@ -737,7 +743,7 @@ internal class MutationEngine(
         }
 
         line.setCluster(col, codepoints, length, attr, extendedAttr)
-        if (clusterWidth == 2 && col + 1 <= rightMargin) {
+        if (clusterWidth == 2 && col + 1 <= writeRight) {
             line.setCell(col + 1, TerminalConstants.WIDE_CHAR_SPACER, attr, extendedAttr)
         }
         adjustCursorAfterClusterWidthChange(row, col, oldWidth, clusterWidth)
@@ -753,12 +759,13 @@ internal class MutationEngine(
     ) {
         if (oldWidth == newWidth || state.cursor.row != row) return
 
+        val writeRight = state.cursorRightBoundary(col)
         val oldEnd = col + oldWidth
-        if (state.cursor.col != oldEnd.coerceAtMost(rightMargin)) return
+        if (state.cursor.col != oldEnd.coerceAtMost(writeRight)) return
 
         val newEnd = col + newWidth
-        state.cursor.col = newEnd.coerceAtMost(rightMargin)
-        state.cursor.pendingWrap = newEnd > rightMargin && state.modes.isAutoWrap
+        state.cursor.col = newEnd.coerceAtMost(writeRight)
+        state.cursor.pendingWrap = newEnd > writeRight && state.modes.isAutoWrap
         state.markCursorChanged()
     }
 
@@ -1767,7 +1774,7 @@ internal class MutationEngine(
             val oldCursorCol = state.cursor.col
             val oldCursorRow = state.cursor.row
             val cRow = state.cursor.row
-            if (cRow == state.scrollTop) {
+            if (cRow == state.scrollTop && state.cursor.col in leftMargin..rightMargin) {
                 scrollDownInternal()
             } else {
                 state.cursor.row = (cRow - 1).coerceAtLeast(0)
