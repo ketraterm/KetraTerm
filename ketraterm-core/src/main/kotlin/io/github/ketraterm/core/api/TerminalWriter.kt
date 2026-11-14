@@ -117,7 +117,9 @@ public interface TerminalWriter {
      * This is the parser-facing ingress for complex printable sequences such as
      * combining-mark clusters, ZWJ emoji, and variation-selector sequences.
      * The core computes the final display width from its active width policy,
-     * including East Asian ambiguous-width mode.
+     * including East Asian ambiguous-width mode. Leading Unicode Prepend characters
+     * are skipped when selecting the width base; its ordinary width and emoji
+     * presentation rules apply. Clusters with no base or a zero-width base occupy one cell.
      * The used prefix is copied into core-owned storage before returning; the caller
      * may immediately reuse the array. At most 32 codepoints are accepted, as defined by
      * [io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS].
@@ -138,8 +140,9 @@ public interface TerminalWriter {
      *
      * The caller owns segmentation and supplies the entire retained sequence, including
      * the previously published prefix. Core preserves the target's attributes, recalculates
-     * width, and adjusts its occupied span and following cursor. This does not insert a new
-     * cell or advance past a second grapheme. In-row width changes recompute the following
+     * width using [writeCluster]'s base-selection policy, and adjusts its occupied span
+     * and following cursor. This does not insert a new cell or advance past a second grapheme.
+     * In-row width changes recompute the following
      * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
      * not reversed. Narrowing blanks the released spacer; widening overwrites the next
      * cell only if it fits before the write boundary (right margin, or page edge

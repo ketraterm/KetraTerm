@@ -29,6 +29,7 @@ internal object UnicodeWidth {
     private val ambiguous = BitSet(GeneratedUnicodeWidthTable.BITSET_LIMIT)
     private val terminalCellGraphics = BitSet(GeneratedUnicodeWidthTable.BITSET_LIMIT)
     private val emojiVariationBase = BitSet(GeneratedUnicodeWidthTable.BITSET_LIMIT)
+    private val prepend = BitSet()
 
     init {
         populate(wide, GeneratedUnicodeWidthTable.WIDE_RANGES)
@@ -36,6 +37,7 @@ internal object UnicodeWidth {
         populate(ambiguous, GeneratedUnicodeWidthTable.AMBIGUOUS_RANGES)
         populate(terminalCellGraphics, GeneratedUnicodeWidthTable.TERMINAL_CELL_GRAPHIC_RANGES)
         populate(emojiVariationBase, GeneratedUnicodeWidthTable.EMOJI_VARIATION_BASE_RANGES)
+        populate(prepend, GeneratedUnicodeWidthTable.PREPEND_RANGES)
     }
 
     /**
@@ -74,6 +76,7 @@ internal object UnicodeWidth {
         return 1
     }
 
+    /** Selects the first non-Prepend base, retaining one cell for prefixes without a base. */
     fun calculateCluster(
         codepoints: IntArray,
         length: Int,
@@ -84,15 +87,19 @@ internal object UnicodeWidth {
 
         var textPresentation = false
         var emojiPresentation = false
+        var baseIndex = -1
         for (index in 0 until length) {
             val codepoint = codepoints[index]
             requireScalar(codepoint)
-            if (index > 0) {
+            if (baseIndex < 0) {
+                if (!prepend.get(codepoint)) baseIndex = index
+            } else {
                 textPresentation = textPresentation || codepoint == TEXT_PRESENTATION_SELECTOR
                 emojiPresentation = emojiPresentation || codepoint == EMOJI_PRESENTATION_SELECTOR
             }
         }
-        val base = codepoints[0]
+        if (baseIndex < 0) return 1
+        val base = codepoints[baseIndex]
         // Presentation widths are a terminal policy for the Unicode-pinned
         // emoji variation bases, not a generic effect of a zero-width selector.
         if (textPresentation && isEmojiVariationBase(base)) return 1

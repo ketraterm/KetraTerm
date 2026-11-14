@@ -346,6 +346,7 @@ foreach ($range in $emojiPresentationRanges) {
 }
 $wideRanges = Merge-Ranges $wideRanges
 $emojiVariationBaseRanges = Read-EmojiVariationBases $emojiVariationSequencesPath
+$prependRanges = Read-NamedPropertyRanges $graphemePath "Prepend"
 
 $zeroRanges = [System.Collections.Generic.List[object]]::new()
 foreach ($range in (Read-PropertyRanges $derivedGeneralCategoryPath { param($p) $p -eq "Mn" -or $p -eq "Me" -or $p -eq "Cf" })) {
@@ -402,6 +403,8 @@ $coreParts.Add("") | Out-Null
 $coreParts.Add((Format-IntArray "EMOJI_VARIATION_BASE_RANGES" $emojiVariationBaseSplit.Low "    " "internal")) | Out-Null
 $coreParts.Add("") | Out-Null
 $coreParts.Add((Format-IntArray "EMOJI_VARIATION_BASE_ASTRAL_RANGES" $emojiVariationBaseSplit.High "    " "internal")) | Out-Null
+$coreParts.Add("") | Out-Null
+$coreParts.Add((Format-IntArray "PREPEND_RANGES" $prependRanges "    " "internal")) | Out-Null
 $coreParts.Add("}") | Out-Null
 
 $coreTarget = Join-Path $Root "ketraterm-core/src/main/kotlin/io/github/ketraterm/core/util/GeneratedUnicodeWidthTable.kt"

@@ -315,8 +315,12 @@ locale, and available fonts:
 - Zero-width classification, terminal cell-graphics overrides, and cluster
   variation-selector presentation rules retain precedence.
 
+Cluster width uses the first scalar after leading Unicode Prepend characters.
+Prefix-only clusters and zero-width bases occupy one cell. Continuations recompute
+width under the [committed-placement rules](#printable-ingress).
+
 Presentation selectors do not universally specify a terminal cell count. For a
-cluster whose leading scalar is a recognized base in the pinned Unicode emoji
+cluster whose selected base is recognized in the pinned Unicode emoji
 variation table, retained VS15 selects one cell and retained VS16 selects two.
 VS15 takes precedence if both selectors are retained. This is KetraTerm's
 terminal compatibility policy; the selector itself has zero scalar width.
