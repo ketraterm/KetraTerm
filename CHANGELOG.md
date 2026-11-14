@@ -82,6 +82,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Rendering and interaction
 
+- Render copies reject invalid custom-frame geometry and out-of-range coordinates
+  consistently. Failed reader callbacks leave mutable copies invalid while preserving
+  the publisher's previous completed frame.
+
 - Search chrome recovers after host message callback failures and restarts cancelled
   observation when reopened.
 

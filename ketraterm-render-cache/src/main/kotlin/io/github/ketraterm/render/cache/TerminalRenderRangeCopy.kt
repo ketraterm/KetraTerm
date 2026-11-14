@@ -56,84 +56,107 @@ public class TerminalRenderRangeCopy(
         endAbsoluteRow: Long,
         checkCancelled: () -> Unit = {},
     ): Boolean {
-        require(startAbsoluteRow >= 0 && endAbsoluteRow >= startAbsoluteRow)
+        require(startAbsoluteRow in 0..endAbsoluteRow)
         firstAbsoluteRow = startAbsoluteRow
         lastAbsoluteRow = startAbsoluteRow - 1L
         cache.reset()
         val requestedEnd = startAbsoluteRow + minOf(endAbsoluteRow - startAbsoluteRow, maxRows - 1L)
-        reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, requestedEnd) { frame ->
-            checkCancelled()
-            val top = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-            firstAbsoluteRow = maxOf(startAbsoluteRow, top)
-            val count = minOf(maxRows, maxOf(1, maxCells / frame.columns))
-            lastAbsoluteRow =
-                minOf(
-                    endAbsoluteRow,
-                    top + frame.rows - 1L,
-                    firstAbsoluteRow + minOf(endAbsoluteRow - firstAbsoluteRow, count - 1L),
-                )
-            if (lastAbsoluteRow < firstAbsoluteRow) return@readRenderFrameForAbsoluteRange
-            val offset = (firstAbsoluteRow - top).toInt()
-            val rows = (lastAbsoluteRow - firstAbsoluteRow + 1L).toInt()
-            val slice =
-                object : TerminalRenderFrame by frame {
-                    override val rows = rows
+        var completed = false
+        try {
+            reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, requestedEnd) { frame ->
+                checkCancelled()
+                frame.requireValidGeometry()
+                val top = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+                firstAbsoluteRow = maxOf(startAbsoluteRow, top)
+                val count = minOf(maxRows, maxOf(1, maxCells / frame.columns))
+                lastAbsoluteRow =
+                    minOf(
+                        endAbsoluteRow,
+                        top + (frame.rows - 1L),
+                        firstAbsoluteRow + minOf(endAbsoluteRow - firstAbsoluteRow, count - 1L),
+                    )
+                if (lastAbsoluteRow < firstAbsoluteRow) return@readRenderFrameForAbsoluteRange
+                val offset = (firstAbsoluteRow - top).toInt()
+                val rows = (lastAbsoluteRow - firstAbsoluteRow + 1L).toInt()
+                val slice =
+                    object : TerminalRenderFrame by frame {
+                        override val rows = rows
 
-                    override fun lineId(row: Int) = frame.lineId(offset + row)
+                        override fun lineId(row: Int) = frame.lineId(offset + row)
 
-                    override fun copyImages(sink: TerminalRenderImageSink) {
-                        frame.copyImages { image, column, row, width, height, sx, sy, sw, sh, top, bottom, z ->
-                            if (bottom > offset && top < offset + rows) {
-                                sink.accept(image, column, row - offset, width, height, sx, sy, sw, sh, top - offset, bottom - offset, z)
+                        override fun copyImages(sink: TerminalRenderImageSink) {
+                            frame.copyImages { image, column, row, width, height, sx, sy, sw, sh, top, bottom, z ->
+                                if (bottom > offset && top < offset + rows) {
+                                    sink.accept(
+                                        image,
+                                        column,
+                                        row - offset,
+                                        width,
+                                        height,
+                                        sx,
+                                        sy,
+                                        sw,
+                                        sh,
+                                        top - offset,
+                                        bottom - offset,
+                                        z,
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    override fun lineGeneration(row: Int) = frame.lineGeneration(offset + row)
+                        override fun lineGeneration(row: Int) = frame.lineGeneration(offset + row)
 
-                    override fun lineWrapped(row: Int) = frame.lineWrapped(offset + row)
+                        override fun lineWrapped(row: Int) = frame.lineWrapped(offset + row)
 
-                    override fun copyCursor(sink: TerminalRenderCursorSink) {
-                        frame.copyCursor { column, row, visible, blinking, shape, generation ->
-                            sink.onCursor(column, row - offset, visible && row - offset in 0 until rows, blinking, shape, generation)
+                        override fun copyCursor(sink: TerminalRenderCursorSink) {
+                            frame.copyCursor { column, row, visible, blinking, shape, generation ->
+                                sink.onCursor(column, row - offset, visible && row - offset in 0 until rows, blinking, shape, generation)
+                            }
+                        }
+
+                        override fun copyLine(
+                            row: Int,
+                            codeWords: IntArray,
+                            codeOffset: Int,
+                            attrWords: LongArray,
+                            attrOffset: Int,
+                            flags: IntArray,
+                            flagOffset: Int,
+                            extraAttrWords: LongArray?,
+                            extraAttrOffset: Int,
+                            hyperlinkIds: IntArray?,
+                            hyperlinkOffset: Int,
+                            clusterSink: TerminalRenderClusterSink?,
+                            clusterDataSink: TerminalRenderClusterDataSink?,
+                        ) {
+                            checkCancelled()
+                            frame.copyLine(
+                                offset + row,
+                                codeWords,
+                                codeOffset,
+                                attrWords,
+                                attrOffset,
+                                flags,
+                                flagOffset,
+                                extraAttrWords,
+                                extraAttrOffset,
+                                hyperlinkIds,
+                                hyperlinkOffset,
+                                clusterSink,
+                                clusterDataSink,
+                            )
                         }
                     }
-
-                    override fun copyLine(
-                        row: Int,
-                        codeWords: IntArray,
-                        codeOffset: Int,
-                        attrWords: LongArray,
-                        attrOffset: Int,
-                        flags: IntArray,
-                        flagOffset: Int,
-                        extraAttrWords: LongArray?,
-                        extraAttrOffset: Int,
-                        hyperlinkIds: IntArray?,
-                        hyperlinkOffset: Int,
-                        clusterSink: TerminalRenderClusterSink?,
-                        clusterDataSink: TerminalRenderClusterDataSink?,
-                    ) {
-                        checkCancelled()
-                        frame.copyLine(
-                            offset + row,
-                            codeWords,
-                            codeOffset,
-                            attrWords,
-                            attrOffset,
-                            flags,
-                            flagOffset,
-                            extraAttrWords,
-                            extraAttrOffset,
-                            hyperlinkIds,
-                            hyperlinkOffset,
-                            clusterSink,
-                            clusterDataSink,
-                        )
-                    }
-                }
-            cache.accept(slice)
+                cache.accept(slice)
+            }
+            completed = true
+            return cache.hasFrame
+        } finally {
+            if (!completed) {
+                cache.reset()
+                lastAbsoluteRow = firstAbsoluteRow - 1L
+            }
         }
-        return cache.hasFrame
     }
 }

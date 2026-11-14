@@ -203,6 +203,10 @@ public final class io/github/ketraterm/render/api/TerminalRenderFrameReader$Defa
 	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 }
 
+public final class io/github/ketraterm/render/api/TerminalRenderFrameValidationKt {
+	public static final fun requireValidGeometry (Lio/github/ketraterm/render/api/TerminalRenderFrame;)V
+}
+
 public abstract interface class io/github/ketraterm/render/api/TerminalRenderImage {
 	public abstract fun copyArgb ([II)V
 	public static synthetic fun copyArgb$default (Lio/github/ketraterm/render/api/TerminalRenderImage;[IIILjava/lang/Object;)V

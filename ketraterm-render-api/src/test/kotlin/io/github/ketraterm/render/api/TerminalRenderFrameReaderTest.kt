@@ -20,6 +20,101 @@ import org.junit.jupiter.api.Test
 
 class TerminalRenderFrameReaderTest {
     @Test
+    fun `default text copy rejects invalid rows and slices before invoking the provider`() {
+        val frame = RecordingFrame(columns = 2, rows = 1)
+        val codes = IntArray(4) { -1 }
+        val flags = IntArray(4) { -1 }
+        val invalidCopies =
+            listOf(
+                { frame.copyTextLine(-1, codes, 0, flags, 0) },
+                { frame.copyTextLine(1, codes, 0, flags, 0) },
+                { frame.copyTextLine(Int.MAX_VALUE, codes, 0, flags, 0) },
+                { frame.copyTextLine(0, codes, -1, flags, 0) },
+                { frame.copyTextLine(0, codes, 3, flags, 0) },
+                { frame.copyTextLine(0, codes, Int.MAX_VALUE, flags, 0) },
+                { frame.copyTextLine(0, codes, 0, flags, -1) },
+                { frame.copyTextLine(0, codes, 0, flags, 3) },
+                { frame.copyTextLine(0, codes, 0, flags, Int.MAX_VALUE) },
+            )
+        for (copy in invalidCopies) {
+            assertThrows(IllegalArgumentException::class.java) { copy() }
+            assertArrayEquals(IntArray(4) { -1 }, codes)
+            assertArrayEquals(IntArray(4) { -1 }, flags)
+        }
+        for ((columns, rows) in listOf(0 to 1, -1 to 1, 1 to 0, 1 to -1)) {
+            assertThrows(IllegalArgumentException::class.java) { RecordingFrame(columns, rows).copyTextLine(0, codes, 0, flags, 0) }
+        }
+    }
+
+    @Test
+    fun `default absolute reader rejects invalid frame geometry before resolving or delivering rows`() {
+        val invalidFrames =
+            listOf(
+                RecordingFrame(0, 1),
+                RecordingFrame(-1, 1),
+                RecordingFrame(1, 0),
+                RecordingFrame(1, -1),
+                RecordingFrame(1, 1, historySize = -1),
+                RecordingFrame(1, 1, scrollbackOffset = 1),
+                RecordingFrame(1, 1, discardedCount = -1),
+                RecordingFrame(1, 2, discardedCount = Long.MAX_VALUE),
+            )
+        for (frame in invalidFrames) {
+            var resolvedReads = 0
+            var delivered = 0
+            val reader =
+                object : TerminalRenderFrameReader {
+                    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(frame)
+
+                    override fun readRenderFrame(
+                        scrollbackOffset: Int,
+                        viewportRows: Int,
+                        consumer: TerminalRenderFrameConsumer,
+                    ) {
+                        resolvedReads++
+                        consumer.accept(frame)
+                    }
+                }
+            assertThrows(IllegalArgumentException::class.java) { reader.readRenderFrameForAbsoluteRange(0, 1) { delivered++ } }
+            assertEquals(0, resolvedReads)
+            assertEquals(0, delivered)
+        }
+    }
+
+    @Test
+    fun `default absolute reader handles the Long boundary and rejects unrepresentable viewport sizes`() {
+        var frame = RecordingFrame(1, 1, discardedCount = Long.MAX_VALUE)
+        var offset = -1
+        var rows = -1
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(frame)
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    offset = scrollbackOffset
+                    rows = viewportRows
+                    consumer.accept(frame)
+                }
+            }
+        reader.readRenderFrameForAbsoluteRange(Long.MAX_VALUE, Long.MAX_VALUE) { assertSame(frame, it) }
+        assertEquals(0, offset)
+        assertEquals(1, rows)
+        frame = RecordingFrame(1, 2, historySize = 1, scrollbackOffset = 1, discardedCount = Long.MAX_VALUE - 1)
+        reader.readRenderFrameForAbsoluteRange(Long.MAX_VALUE - 1, Long.MAX_VALUE) { assertSame(frame, it) }
+        assertEquals(1, offset)
+        assertEquals(2, rows)
+        frame = RecordingFrame(1, 1, historySize = Int.MAX_VALUE)
+        assertThrows(IllegalArgumentException::class.java) {
+            reader.readRenderFrameForAbsoluteRange(0, Int.MAX_VALUE.toLong()) { fail("invalid viewport") }
+        }
+        assertEquals(2, rows, "An overflowing row count must not reach a reader")
+    }
+
+    @Test
     fun `default text copy supports frames implementing only full row copies`() {
         val frame =
             object : RecordingFrame(columns = 3, rows = 1) {

@@ -44,17 +44,17 @@ public interface TerminalRenderFrame {
     public fun copyImages(sink: TerminalRenderImageSink) {}
 
     /**
-     * Number of visible columns in each render row.
+     * Positive number of visible columns in each render row.
      */
     public val columns: Int
 
     /**
-     * Number of visible render rows.
+     * Positive number of visible render rows.
      */
     public val rows: Int
 
     /**
-     * Number of retained off-screen history lines available in this frame.
+     * Nonnegative number of retained off-screen history lines available in this frame.
      */
     public val historySize: Int
         get() = 0
@@ -258,6 +258,9 @@ public interface TerminalRenderFrame {
      * The compatibility implementation delegates to [copyLine] with temporary attribute
      * storage. Allocation-sensitive frame implementations should override this method
      * to skip attribute translation and copying entirely.
+     *
+     * @throws IllegalArgumentException if the frame geometry, [row], or a destination
+     * slice is invalid; the default implementation validates before allocating or copying.
      */
     public fun copyTextLine(
         row: Int,
@@ -267,6 +270,14 @@ public interface TerminalRenderFrame {
         flagOffset: Int = 0,
         clusterDataSink: TerminalRenderClusterDataSink? = null,
     ) {
+        requireValidGeometry()
+        require(row in 0 until rows) { "row must be within frame rows, was $row" }
+        require(codeOffset >= 0 && codeOffset <= codeWords.size && columns <= codeWords.size - codeOffset) {
+            "codeWords slice must contain columns entries"
+        }
+        require(flagOffset >= 0 && flagOffset <= flags.size && columns <= flags.size - flagOffset) {
+            "flags slice must contain columns entries"
+        }
         copyLine(
             row = row,
             codeWords = codeWords,

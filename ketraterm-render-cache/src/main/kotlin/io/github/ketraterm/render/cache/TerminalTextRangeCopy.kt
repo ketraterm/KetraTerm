@@ -18,6 +18,7 @@ package io.github.ketraterm.render.cache
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderClusterDataSink
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.render.api.requireValidGeometry
 
 /**
  * Worker-confined, reusable text-only copy of a bounded absolute row range.
@@ -137,10 +138,16 @@ public class TerminalTextRangeCopy(
         val requestedEnd = startAbsoluteRow + minOf(endAbsoluteRow - startAbsoluteRow, maxRows - 1L)
         reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, requestedEnd) { frame ->
             checkCancelled()
+            frame.requireValidGeometry()
             val top = frame.discardedCount + frame.historySize - frame.scrollbackOffset
             firstAbsoluteRow = maxOf(startAbsoluteRow, top)
             val count = minOf(maxRows, maxOf(1, maxCells / frame.columns))
-            val last = minOf(endAbsoluteRow, top + frame.rows - 1L, firstAbsoluteRow + minOf(endAbsoluteRow - firstAbsoluteRow, count - 1L))
+            val last =
+                minOf(
+                    endAbsoluteRow,
+                    top + (frame.rows - 1L),
+                    firstAbsoluteRow + minOf(endAbsoluteRow - firstAbsoluteRow, count - 1L),
+                )
             if (last < firstAbsoluteRow) return@readRenderFrameForAbsoluteRange
             val offset = (firstAbsoluteRow - top).toInt()
             val copiedRows = (last - firstAbsoluteRow + 1L).toInt()

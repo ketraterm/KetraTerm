@@ -5,6 +5,11 @@ synchronous and supports copying primitive data without requiring per-cell
 objects. Allocation and synchronization depend on the reader and consumer
 implementations.
 
+Frames have positive columns and rows, nonnegative history and discarded counts,
+and a scrollback offset within retained history. Their absolute row range must fit
+in `Long`. `requireValidGeometry()` checks this header without scanning cells;
+default readers and reusable copies reject violations with `IllegalArgumentException`.
+
 ## 1. Frame Reader & Consumer Synchronization
 
 `hasFullScreenMargins` is an optional geometry proof for consumers laying out
