@@ -23,6 +23,19 @@ import kotlin.test.assertNotEquals
 
 class TerminalCompletionLearningModelsTest {
     @Test
+    fun `absent learning metadata uses null and empty strings are rejected on construction and copy`() {
+        val identity = terminalCompletionRankingIdentity("git status")
+        val ranking = TerminalCompletionRankingStats(identity)
+        val replay = TerminalCommandReplay(identity, "git status")
+        for ((profile, directory) in listOf("" to null, null to "", "" to "")) {
+            assertFailsWith<IllegalArgumentException> { TerminalCompletionRankingStats(identity, profile, directory) }
+            assertFailsWith<IllegalArgumentException> { TerminalCommandReplay(identity, "git status", profile, directory) }
+            assertFailsWith<IllegalArgumentException> { ranking.copy(profileId = profile, workingDirectoryUri = directory) }
+            assertFailsWith<IllegalArgumentException> { replay.copy(profileId = profile, workingDirectoryUri = directory) }
+        }
+    }
+
+    @Test
     fun `learning records reject malformed context on construction and copy`() {
         val identity = terminalCompletionRankingIdentity("git status")
         val ranking = TerminalCompletionRankingStats(identity)
@@ -44,7 +57,7 @@ class TerminalCompletionLearningModelsTest {
     @Test
     fun `learning context preserves valid Unicode without normalization`() {
         val identity = terminalCompletionRankingIdentity("git status")
-        for (text in listOf(null, "", "é", "e\u0301", "\uD800\uDC00", "\uDBFF\uDFFF", "👩‍💻", "?", "\uFFFD")) {
+        for (text in listOf(null, " ", "é", "e\u0301", "\uD800\uDC00", "\uDBFF\uDFFF", "👩‍💻", "?", "\uFFFD")) {
             val ranking = TerminalCompletionRankingStats(identity, text, text)
             val replay = TerminalCommandReplay(identity, "git status", text, text)
             assertEquals(text, ranking.profileId)

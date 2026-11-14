@@ -35,6 +35,20 @@ import kotlin.test.assertTrue
 
 class TerminalHistoryInteractionTest {
     @Test
+    fun `empty selections across text batches copy no cells and introduce no newlines`() =
+        onEdt {
+            Fixture(200).use { fixture ->
+                val reader = TerminalSelectionTextReader()
+                fixture.reader.resetVolume()
+                assertEquals("", reader.read(fixture.reader, 0, 3, 130, 3, isBlock = true))
+                assertEquals("", reader.read(fixture.reader, 130, 3, 0, 3, isBlock = true))
+                assertEquals("", reader.read(fixture.reader, 20, 3, 20, 3))
+                assertEquals(0, fixture.reader.textRows)
+                assertEquals(0, fixture.reader.fullRows)
+            }
+        }
+
+    @Test
     fun `navigation and command selection scan identities without copying historical cells`() =
         onEdt {
             for (history in listOf(100, 10_000)) {

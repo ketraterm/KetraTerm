@@ -34,9 +34,11 @@ internal fun requireValidTerminalCompletionLearningContext(
     profileId: String?,
     workingDirectoryUri: String?,
 ) {
-    require(profileId == null || profileId.hasWellFormedTerminalCompletionUtf16()) { "profileId must be well-formed UTF-16" }
-    require(workingDirectoryUri == null || workingDirectoryUri.hasWellFormedTerminalCompletionUtf16()) {
-        "workingDirectoryUri must be well-formed UTF-16"
+    require(profileId == null || profileId.isNotEmpty() && profileId.hasWellFormedTerminalCompletionUtf16()) {
+        "profileId must be non-empty, well-formed UTF-16; use null for absent metadata"
+    }
+    require(workingDirectoryUri == null || workingDirectoryUri.isNotEmpty() && workingDirectoryUri.hasWellFormedTerminalCompletionUtf16()) {
+        "workingDirectoryUri must be non-empty, well-formed UTF-16; use null for absent metadata"
     }
 }
 

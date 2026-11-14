@@ -139,6 +139,47 @@ class SwingTerminalSearchBarTest {
         }
     }
 
+    @Test
+    fun openSearchChromeResumesAfterRepeatedReparentingAndClosedChromeStaysStopped() {
+        lateinit var fixture: RecoveryFixture
+        SwingUtilities.invokeAndWait {
+            fixture = RecoveryFixture()
+            fixture.bar.component.addNotify()
+            fixture.bar.open()
+        }
+        try {
+            repeat(3) { cycle ->
+                SwingUtilities.invokeAndWait {
+                    fixture.bar.component.removeNotify()
+                    fixture.terminal.search("detached-$cycle")
+                    fixture.bar.component.addNotify()
+                    assertTrue(fixture.bar.isOpen())
+                }
+                awaitCounter(fixture.counter, "query:detached-$cycle")
+                var calls = 0
+                SwingUtilities.invokeAndWait {
+                    calls = fixture.counterCalls
+                    fixture.terminal.search("attached-$cycle")
+                }
+                awaitCounter(fixture.counter, "query:attached-$cycle")
+                SwingUtilities.invokeAndWait { assertEquals(calls + 1, fixture.counterCalls) }
+            }
+            SwingUtilities.invokeAndWait { fixture.bar.close() }
+            SwingUtilities.invokeAndWait {
+                val calls = fixture.counterCalls
+                fixture.bar.component.removeNotify()
+                fixture.bar.component.addNotify()
+                fixture.terminal.search("closed")
+                assertEquals(calls, fixture.counterCalls)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                fixture.bar.component.removeNotify()
+                fixture.close()
+            }
+        }
+    }
+
     private class RecoveryFixture : AutoCloseable {
         val terminal = SwingTerminal()
         val defaults = SwingHostMessages.forLocale(Locale.US)

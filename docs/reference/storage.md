@@ -51,6 +51,9 @@ Text fields use unpadded Base64URL. Unsupported versions, malformed rows, and
 inconsistent ranking/replay pairs reject the whole file. Derived matching data
 is recomputed, not persisted.
 
+Optional profile and working-directory metadata uses `null` for absence. Empty
+strings and malformed UTF-16 are rejected before learning state changes.
+
 ## Privacy
 
 Replay filtering excludes leading-whitespace commands, multiline/control-bearing

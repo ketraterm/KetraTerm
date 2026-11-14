@@ -97,6 +97,7 @@ class TerminalTextRangeCopyTest {
         frame.failAtRow = 1
         assertThrows(IllegalStateException::class.java) { copy.read(frame.reader, 0, 2) }
         assertEquals(0, copy.rows)
+        assertTrue(copy.lastAbsoluteRow < copy.firstAbsoluteRow)
         frame.failAtRow = -1
         val failingReader =
             object : TerminalRenderFrameReader by frame.reader {
@@ -111,6 +112,7 @@ class TerminalTextRangeCopyTest {
             }
         assertThrows(IllegalStateException::class.java) { copy.read(failingReader, 0, 2) }
         assertEquals(0, copy.rows)
+        assertTrue(copy.lastAbsoluteRow < copy.firstAbsoluteRow)
         var checks = 0
         assertThrows(java.util.concurrent.CancellationException::class.java) {
             copy.read(frame.reader, 0, 2) { if (++checks == 3) throw java.util.concurrent.CancellationException() }

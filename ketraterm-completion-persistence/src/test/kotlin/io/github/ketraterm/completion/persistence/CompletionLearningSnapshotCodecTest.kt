@@ -21,6 +21,21 @@ import kotlin.test.*
 
 class CompletionLearningSnapshotCodecTest {
     @Test
+    fun `valid optional metadata round trips without losing context identity`() {
+        val original = snapshot("git status")
+        for (profile in listOf(null, "profile", " ", "工程😀")) {
+            for (directory in listOf(null, "file:///repo", "file:///工程")) {
+                val expected =
+                    TerminalCompletionLearningSnapshot(
+                        original.rankingStats.map { it.copy(profileId = profile, workingDirectoryUri = directory) },
+                        original.replayCommands.map { it.copy(profileId = profile, workingDirectoryUri = directory) },
+                    )
+                assertEquals(expected, CompletionLearningSnapshotCodec.decode(CompletionLearningSnapshotCodec.encode(expected)))
+            }
+        }
+    }
+
+    @Test
     fun `current file name and header use the split schema version`() {
         assertEquals("command-completion-learning-v3.tsv", TerminalCompletionLearningCoordinator.currentFileName())
         assertEquals(listOf(HEADER), CompletionLearningSnapshotCodec.encode(TerminalCompletionLearningSnapshot.EMPTY))

@@ -50,16 +50,17 @@ internal class PathCompletionSource(
             return emptyList()
         }
 
-        val pathParts = splitPathPrefix(normalizedPrefix) ?: return emptyList()
+        if (request.shellCapabilities.syntax == TerminalShellSyntax.PLAIN &&
+            normalizedPrefix.startsWith('~') &&
+            !ShellReplacementText.canEncode(normalizedPrefix, context.activeTokenQuote, request.shellCapabilities.quoting)
+        ) {
+            return emptyList()
+        }
+        val expandHome = expandsHome(request, context, normalizedPrefix)
+        val pathParts = splitPathPrefix(normalizedPrefix, expandHome) ?: return emptyList()
         val directoryPortion = pathParts.directoryPrefix
         val filePrefix = pathParts.entryNamePrefix
-        val rawStart = context.replacementStartOffset
-        val posixHome = request.shellCapabilities.syntax == TerminalShellSyntax.POSIX && directoryPortion.startsWith("~/")
-        val expandHome =
-            posixHome &&
-                request.commandLine.getOrNull(rawStart) == '~' &&
-                (request.cursorOffset == rawStart + 1 || request.commandLine.getOrNull(rawStart + 1) == '/')
-        val lookupDirectory = if (posixHome && !expandHome) "./$directoryPortion" else directoryPortion
+        val lookupDirectory = if (directoryPortion.startsWith("~/") && !expandHome) "./$directoryPortion" else directoryPortion
         val entries =
             fileSystemProvider.listDirectory(
                 TerminalDirectoryListingRequest(
@@ -71,7 +72,8 @@ internal class PathCompletionSource(
 
         val pathSeparator = request.shellCapabilities.pathSeparator(prefix)
         // Only the request's home prefix is shell syntax; provider names remain literal.
-        val literalDirectoryPortion = if (expandHome) directoryPortion.substring(2) else directoryPortion
+        val preserveHomePrefix = expandHome && request.shellCapabilities.syntax == TerminalShellSyntax.POSIX
+        val literalDirectoryPortion = if (preserveHomePrefix) directoryPortion.substring(2) else directoryPortion
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
 
@@ -103,7 +105,7 @@ internal class PathCompletionSource(
 
             candidates.offer(
                 TerminalCompletionCandidate(
-                    replacementText = if (expandHome) "~/$replacementText" else replacementText,
+                    replacementText = if (preserveHomePrefix) "~/$replacementText" else replacementText,
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = name + rawSuffix,
@@ -119,9 +121,36 @@ internal class PathCompletionSource(
         return candidates.finish()
     }
 
-    private fun splitPathPrefix(prefix: String): PathParts? {
-        if (prefix == "~") return PathParts(directoryPrefix = "~/", entryNamePrefix = "")
-        if (prefix.startsWith("~") && !prefix.startsWith("~/")) return null
+    private fun expandsHome(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        prefix: String,
+    ): Boolean =
+        when (request.shellCapabilities.syntax) {
+            TerminalShellSyntax.PLAIN -> false
+            // PowerShell path providers expand a leading ~/ even in quoted/escaped arguments.
+            TerminalShellSyntax.POWERSHELL -> prefix == "~" || prefix.startsWith("~/")
+            TerminalShellSyntax.POSIX -> {
+                val start = context.replacementStartOffset
+                if (request.commandLine.getOrNull(start) != '~') {
+                    false
+                } else {
+                    var index = start + 1
+                    while (index < request.cursorOffset && request.commandLine[index] != '/') {
+                        if (request.commandLine[index] in "'\"\\") return false
+                        index++
+                    }
+                    true
+                }
+            }
+        }
+
+    private fun splitPathPrefix(
+        prefix: String,
+        expandHome: Boolean,
+    ): PathParts? {
+        if (expandHome && prefix == "~") return PathParts(directoryPrefix = "~/", entryNamePrefix = "")
+        if (expandHome && prefix.startsWith("~") && !prefix.startsWith("~/")) return null
         val lastSlashIndex = prefix.lastIndexOf('/')
         return if (lastSlashIndex >= 0) {
             PathParts(

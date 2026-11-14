@@ -131,10 +131,12 @@ public class TerminalTextRangeCopy(
         checkCancelled: () -> Unit = {},
     ): Boolean {
         rows = 0
+        lastAbsoluteRow = firstAbsoluteRow - 1L
         require(startAbsoluteRow in 0..endAbsoluteRow)
         clusterSize = 0
         firstAbsoluteRow = startAbsoluteRow
         lastAbsoluteRow = startAbsoluteRow - 1L
+        var copiedLast = lastAbsoluteRow
         val requestedEnd = startAbsoluteRow + minOf(endAbsoluteRow - startAbsoluteRow, maxRows - 1L)
         reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, requestedEnd) { frame ->
             checkCancelled()
@@ -177,9 +179,10 @@ public class TerminalTextRangeCopy(
             activeBuffer = frame.activeBuffer
             contentGeneration = frame.contentGeneration
             historyContentGeneration = frame.historyContentGeneration
-            lastAbsoluteRow = last
+            copiedLast = last
             // Publish only after the reader callback itself has returned successfully.
         }
+        lastAbsoluteRow = copiedLast
         if (lastAbsoluteRow >= firstAbsoluteRow) rows = (lastAbsoluteRow - firstAbsoluteRow + 1L).toInt()
         return rows > 0
     }

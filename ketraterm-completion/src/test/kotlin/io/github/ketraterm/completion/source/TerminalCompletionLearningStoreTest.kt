@@ -32,6 +32,26 @@ import kotlin.test.*
 
 class TerminalCompletionLearningStoreTest {
     @Test
+    fun `empty context is rejected before filtering or retained state changes`() {
+        var filtered = 0
+        val store =
+            TerminalCompletionLearningStore(replayFilter = {
+                filtered++
+                true
+            }, capacity = 1)
+        store.recordCommandResult("git status", true, "profile", "file:///repo", 1L)
+        val before = store.snapshot()
+        for ((profile, directory) in listOf("" to "file:///repo", "profile" to "")) {
+            assertFailsWith<IllegalArgumentException> { store.recordCommandResult("git log", true, profile, directory, 2L) }
+            for (feedback in TerminalCompletionFeedbackKind.entries) {
+                assertFailsWith<IllegalArgumentException> { store.recordSuggestionFeedback("git log", feedback, profile, directory, 2L) }
+            }
+            assertSame(before, store.snapshot())
+            assertEquals(1, filtered)
+        }
+    }
+
+    @Test
     fun `malformed learning context is rejected before filtering mutation or capacity eviction`() {
         var filterCalls = 0
         val store =

@@ -135,7 +135,7 @@ public class TerminalCompletionLearningStore
          * @param workingDirectoryUri optional working-directory URI.
          * @param usedAtEpochMillis host timestamp for the execution event.
          * @return `true` if the retained exact-command rows changed.
-         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
+         * @throws IllegalArgumentException if a recordable event has empty or malformed UTF-16 context metadata; use null when absent.
          */
         public fun recordCommandResult(
             commandLine: String,
@@ -175,7 +175,7 @@ public class TerminalCompletionLearningStore
          * @param workingDirectoryUri optional working-directory URI.
          * @param feedbackAtEpochMillis host timestamp for the feedback event.
          * @return `true` if the retained exact-command rows changed.
-         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
+         * @throws IllegalArgumentException if a recordable event has empty or malformed UTF-16 context metadata; use null when absent.
          */
         public fun recordSuggestionFeedback(
             commandLine: String,

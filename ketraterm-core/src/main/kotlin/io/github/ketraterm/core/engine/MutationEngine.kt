@@ -1659,12 +1659,12 @@ internal class MutationEngine(
 
     private fun clearViewportInternal() {
         state.graphics.clear(state.isAltScreenActive, history = false)
-        state.markVisualChanged()
         for (row in 0 until height.coerceAtMost(state.ring.size)) {
             val line = getLine(row)
             state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
             state.markLineChanged(line)
         }
+        state.markStructureChanged()
     }
 
     /** Retains occupied primary rows for Kitty ED 22, then applies ordinary ED 2. */

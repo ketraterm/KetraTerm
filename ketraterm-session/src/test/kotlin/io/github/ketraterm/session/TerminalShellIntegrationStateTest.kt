@@ -20,6 +20,32 @@ import kotlin.test.*
 
 class TerminalShellIntegrationStateTest {
     @Test
+    fun `viewport identity replacement invalidates ordering after an insertion`() {
+        val terminal = TerminalBuffers.create(12, 8)
+        val state = TerminalShellIntegrationState()
+        state.updateLineOrder(terminal)
+        terminal.insertLines(1)
+        state.updateLineOrder(terminal)
+        var structure = 0L
+        terminal.readRenderFrame { structure = it.structureGeneration }
+
+        terminal.clearScreen()
+        val ids = LongArray(3)
+        terminal.readRenderFrame { frame ->
+            assertNotEquals(structure, frame.structureGeneration)
+            for (row in ids.indices) ids[row] = frame.lineId(row)
+        }
+        state.updateLineOrder(terminal)
+        state.recordCommandStart(ids[1], includeLine = true)
+        state.recordCommandFinished(ids[2], exitCode = 0)
+        state.updateLineOrder(terminal)
+
+        val range = LongArray(3)
+        assertTrue(state.copyCommandOutputRange(state.latestCommandRecordId(), range))
+        assertContentEquals(longArrayOf(ids[1], ids[2], 1), range)
+    }
+
+    @Test
     fun `late host prompt publication uses the retained predecessor across an identity gap`() {
         val terminal = TerminalBuffers.create(12, 8)
         terminal.positionCursor(0, 2)

@@ -32,6 +32,47 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandOutputTextTest {
     @Test
+    fun `clearing a previously reordered viewport accepts fresh command anchors at every byte split`() =
+        runTest {
+            val bytes = ("\u001b[2J\u001b[H" + PROMPT + "run\r\n" + START + "fresh\r\n" + FINISH + PROMPT).encodeToByteArray()
+            for (split in 0..bytes.size) {
+                fixture(rows = 8) { session, connector ->
+                    connector.feedFromHost("\u001b[L".encodeToByteArray())
+                    connector.feedFromHost(bytes.copyOfRange(0, split))
+                    connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+                    val state = session.shellIntegrationState
+                    val id = state.latestCommandRecordId()
+                    assertEquals(
+                        TerminalCommandOutputText("fresh", truncated = false, historyIncomplete = false),
+                        session.commandOutputText(id),
+                        "split=$split",
+                    )
+                    session.readRenderFrame { frame -> assertEquals(id, state.commandOutputRecordIdAtLine(frame.lineId(1))) }
+                }
+            }
+        }
+
+    @Test
+    fun `standalone deletion of either command anchor makes output unknown at every byte split`() =
+        runTest {
+            for (row in listOf(2, 3)) {
+                val bytes = "\u001b[$row;1H\u001b[M".encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    fixture(rows = 8) { session, connector ->
+                        val id = command(session, connector, "one\r\ntwo")
+                        assertEquals(
+                            TerminalCommandOutputText("one\ntwo", truncated = false, historyIncomplete = false),
+                            session.commandOutputText(id),
+                        )
+                        connector.feedFromHost(bytes.copyOfRange(0, split))
+                        connector.feedFromHost(bytes.copyOfRange(split, bytes.size))
+                        assertNull(session.commandOutputText(id), "deleted row=$row split=$split")
+                    }
+                }
+            }
+        }
+
+    @Test
     fun `same line prompt after deletion clips to the actual predecessor without missing history`() =
         runTest {
             fixture(columns = 30, rows = 8) { session, connector ->

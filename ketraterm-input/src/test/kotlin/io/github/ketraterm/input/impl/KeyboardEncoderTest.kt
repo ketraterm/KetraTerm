@@ -32,6 +32,41 @@ import org.junit.jupiter.api.Test
 
 class KeyboardEncoderTest {
     @Test
+    fun `Kitty optional enhancements preserve legacy control keys with lock modifiers`() {
+        for (flags in listOf(2, 4, 6)) {
+            for (locks in listOf(
+                TerminalModifiers.CAPS_LOCK,
+                TerminalModifiers.NUM_LOCK,
+                TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK,
+            )) {
+                for ((key, expected) in listOf(
+                    TerminalKey.ENTER to byteArrayOf(13),
+                    TerminalKey.TAB to byteArrayOf(9),
+                    TerminalKey.ESCAPE to byteArrayOf(27),
+                    TerminalKey.BACKSPACE to byteArrayOf(127),
+                )) {
+                    assertBytes(expected, TerminalKeyEvent.key(key, locks), kittyKeyboardBits(flags))
+                }
+                assertBytes(esc("[Z"), TerminalKeyEvent.key(TerminalKey.TAB, locks or TerminalModifiers.SHIFT), kittyKeyboardBits(flags))
+            }
+        }
+    }
+
+    @Test
+    fun `Kitty releases report identity and locks without associated text`() {
+        assertBytes(
+            esc("[97;65:3u"),
+            TerminalKeyEvent(
+                codepoint = 'a'.code,
+                associatedText = "a",
+                modifiers = TerminalModifiers.CAPS_LOCK,
+                type = TerminalKeyEventType.RELEASE,
+            ),
+            kittyKeyboardBits(26),
+        )
+    }
+
+    @Test
     fun `Kitty associated text streams complete scalar parameters across scratch boundaries`() {
         val output = ReferenceRecordingHostOutput()
         val encoder = KeyboardEncoder(output, InputScratchBuffer())

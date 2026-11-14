@@ -29,11 +29,11 @@ import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
  *
  * @property identityDigest opaque identity of the matching ranking row.
  * @property commandLine exact case- and whitespace-preserved command text shown to the user.
- * @property profileId optional host profile id associated with the command.
- * @property workingDirectoryUri optional working-directory URI associated with the command.
+ * @property profileId nonempty host profile id, or null when absent.
+ * @property workingDirectoryUri nonempty working-directory URI, or null when absent.
  * @throws IllegalArgumentException if the digest is invalid, [commandLine] is
  * blank, multiline, malformed UTF-16, oversized, or contains a disallowed ISO control.
- * Context metadata must also be well-formed UTF-16.
+ * Context metadata must also be nonempty, well-formed UTF-16; use null when absent.
  */
 @ExperimentalTerminalCompletionApi
 public data class TerminalCommandReplay(

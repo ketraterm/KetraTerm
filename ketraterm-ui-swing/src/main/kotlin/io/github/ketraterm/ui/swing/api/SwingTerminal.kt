@@ -246,7 +246,6 @@ public class SwingTerminal
                 rows = settings.rows,
                 rowCapacityReserve = TRANSIENT_RENDER_ROW_RESERVE,
             )
-        private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
         private val stickyCommandHeader = StickyCommandHeader(chrome, hostServices.fontResolver)
@@ -4030,7 +4029,6 @@ public class SwingTerminal
             stickyCommandHeader.reset()
             painter.clearImages()
             renderCache.reset()
-            searchCache.reset()
         }
 
         private fun handlePublishedFrameOnEdt() =

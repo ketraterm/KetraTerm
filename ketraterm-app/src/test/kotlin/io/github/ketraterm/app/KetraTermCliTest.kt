@@ -38,6 +38,88 @@ class KetraTermCliTest {
     lateinit var directory: Path
 
     @Test
+    fun `missing or replaced default helper directories are replaced with fresh private locations`() {
+        for (replace in listOf(false, true)) {
+            val cli = KetraTermCli(directory.resolve("config.toml"))
+            val original = Path.of(cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+            val retired = original.resolveSibling("${original.fileName}-retired")
+            val owned = mutableListOf(original)
+            try {
+                if (replace) {
+                    Files.move(original, retired)
+                    owned.add(retired)
+                    Files.createDirectory(original)
+                    Files.writeString(original.resolve("ketra"), "untrusted replacement")
+                } else {
+                    Files.delete(original.resolve("ketra"))
+                    Files.delete(original.resolve("ketra.bat"))
+                    Files.delete(original)
+                }
+                val fresh = Path.of(cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+                owned.add(fresh)
+                assertNotEquals(original, fresh)
+                assertEquals(fresh.toString(), cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+                assertTrue(Files.isRegularFile(fresh.resolve("ketra")))
+                assertOwnerOnlyDirectory(fresh)
+                if (replace) assertEquals("untrusted replacement", Files.readString(original.resolve("ketra")))
+            } finally {
+                for (path in owned) {
+                    Files.deleteIfExists(path.resolve("ketra"))
+                    Files.deleteIfExists(path.resolve("ketra.bat"))
+                    Files.deleteIfExists(path)
+                }
+            }
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a symlink replacing the private helper directory is never followed`() {
+        val cli = KetraTermCli(directory.resolve("config.toml"))
+        val original = Path.of(cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+        val target = Files.createDirectory(directory.resolve("symlink-target"))
+        val sentinel = Files.writeString(target.resolve("ketra"), "unrelated target")
+        var fresh: Path? = null
+        try {
+            Files.delete(original.resolve("ketra"))
+            Files.delete(original.resolve("ketra.bat"))
+            Files.delete(original)
+            Files.createSymbolicLink(original, target)
+
+            fresh = Path.of(cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
+
+            assertNotEquals(original, fresh)
+            assertOwnerOnlyDirectory(fresh)
+            assertEquals("unrelated target", Files.readString(sentinel))
+            assertFalse(Files.exists(target.resolve("ketra.bat")))
+            assertTrue(Files.isSymbolicLink(original))
+        } finally {
+            Files.deleteIfExists(original)
+            fresh?.let {
+                Files.deleteIfExists(it.resolve("ketra"))
+                Files.deleteIfExists(it.resolve("ketra.bat"))
+                Files.deleteIfExists(it)
+            }
+        }
+    }
+
+    private fun assertOwnerOnlyDirectory(path: Path) {
+        val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java)
+        if (posix != null) {
+            assertEquals(PosixFilePermissions.fromString("rwx------"), posix.readAttributes().permissions())
+        } else {
+            val acl = assertNotNull(Files.getFileAttributeView(path, AclFileAttributeView::class.java))
+            assertEquals(
+                setOf(Files.getOwner(path)),
+                acl.acl
+                    .filter { it.type() == AclEntryType.ALLOW }
+                    .map { it.principal() }
+                    .toSet(),
+            )
+        }
+    }
+
+    @Test
     fun `default helpers use distinct private directories and reuse them within an owner`() {
         val first = KetraTermCli(directory.resolve("config.toml"))
         val second = KetraTermCli(directory.resolve("config.toml"))
@@ -50,19 +132,7 @@ class KetraTermCliTest {
             for (helper in listOf(firstDirectory, secondDirectory)) {
                 assertTrue(Files.isRegularFile(helper.resolve("ketra")))
                 assertTrue(Files.isRegularFile(helper.resolve("ketra.bat")))
-                val posix = Files.getFileAttributeView(helper, PosixFileAttributeView::class.java)
-                if (posix != null) {
-                    assertEquals(PosixFilePermissions.fromString("rwx------"), posix.readAttributes().permissions())
-                } else {
-                    val acl = assertNotNull(Files.getFileAttributeView(helper, AclFileAttributeView::class.java))
-                    assertEquals(
-                        setOf(Files.getOwner(helper)),
-                        acl.acl
-                            .filter { it.type() == AclEntryType.ALLOW }
-                            .map { it.principal() }
-                            .toSet(),
-                    )
-                }
+                assertOwnerOnlyDirectory(helper)
             }
         } finally {
             for (helper in listOf(firstDirectory, secondDirectory)) {

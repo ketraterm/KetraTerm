@@ -77,6 +77,7 @@ internal class TerminalSelectionTextReader {
                 forward -> caretColumn
                 else -> anchorColumn
             }.coerceIn(0, columns)
+        if (startColumn == endColumn && (isBlock || first == last)) return ""
         val result = StringBuilder()
         var next = first
         var previousWrapped = false

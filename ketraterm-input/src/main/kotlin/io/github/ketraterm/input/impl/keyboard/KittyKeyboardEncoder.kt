@@ -70,6 +70,7 @@ internal class KittyKeyboardEncoder(
     ) {
         val key = event.key
         val modifiers = event.modifiers
+        val textModifiers = modifiers and (TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK).inv()
         val isDisambiguate = (kittyFlags and KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES) != 0
         val isReportEventTypes = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) != 0
         val isReportAlternateKeys = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS) != 0
@@ -110,7 +111,7 @@ internal class KittyKeyboardEncoder(
                     if (isReportAll ||
                         !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
-                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                        (!isDisambiguate && textModifiers != TerminalModifiers.NONE)
                     ) {
                         CsiWriter.writeCsiU(
                             scratch,
@@ -132,7 +133,7 @@ internal class KittyKeyboardEncoder(
                     if (isReportAll ||
                         !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
-                        (!isDisambiguate && modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)
+                        (!isDisambiguate && textModifiers != TerminalModifiers.NONE && textModifiers != TerminalModifiers.SHIFT)
                     ) {
                         CsiWriter.writeCsiU(
                             scratch,
@@ -145,7 +146,7 @@ internal class KittyKeyboardEncoder(
                     } else if (isDisambiguate) {
                         writeDisambiguatedTab(modifiers)
                     } else {
-                        if (modifiers == TerminalModifiers.SHIFT) {
+                        if (textModifiers == TerminalModifiers.SHIFT) {
                             output.writeBytes(TerminalSequences.BACK_TAB, 0, TerminalSequences.BACK_TAB.size)
                         } else {
                             output.writeByte(ControlCode.HT)
@@ -155,7 +156,7 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.ESCAPE -> {
-                    if (isDisambiguate || isReportAll || !hasPressEncodingSemantics || modifiers != TerminalModifiers.NONE) {
+                    if (isDisambiguate || isReportAll || !hasPressEncodingSemantics || textModifiers != TerminalModifiers.NONE) {
                         CsiWriter.writeCsiU(
                             scratch,
                             output,
@@ -174,7 +175,7 @@ internal class KittyKeyboardEncoder(
                     if (isReportAll ||
                         !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
-                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                        (!isDisambiguate && textModifiers != TerminalModifiers.NONE)
                     ) {
                         CsiWriter.writeCsiU(
                             scratch,
@@ -218,8 +219,8 @@ internal class KittyKeyboardEncoder(
                 if (event.unshiftedCodepoint != TerminalKeyEvent.NO_CODEPOINT) event.unshiftedCodepoint else codepoint
             val shiftedCodepoint = if (isReportAlternateKeys) event.shiftedCodepoint else TerminalKeyEvent.NO_CODEPOINT
             val baseLayoutCodepoint = if (isReportAlternateKeys) event.baseLayoutCodepoint else TerminalKeyEvent.NO_CODEPOINT
-            val associatedText = if (isReportAssociatedText && isReportAll) event.associatedText else null
-            val textModifiers = modifiers and (TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK).inv()
+            val associatedText =
+                if (isReportAssociatedText && isReportAll && event.type != TerminalKeyEventType.RELEASE) event.associatedText else null
             if (isReportAll || (textModifiers != TerminalModifiers.NONE && textModifiers != TerminalModifiers.SHIFT)) {
                 CsiWriter.writeCsiU(
                     scratch,

@@ -27,6 +27,19 @@ import org.junit.jupiter.api.Test
 
 class DefaultTerminalInputEncoderCoreStateTest {
     @Test
+    fun `real Kitty flag transitions keep control keys usable and report locks when requested`() {
+        val terminal = TerminalBuffers.create(4, 2)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+        terminal.setKittyKeyboardFlags(2)
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CAPS_LOCK))
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.NUM_LOCK))
+        terminal.setKittyKeyboardFlags(8)
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CAPS_LOCK))
+        assertArrayEquals(byteArrayOf(13, 9) + esc("[13;65u"), output.bytes)
+    }
+
+    @Test
     fun `uses real core application cursor mode for keyboard encoding`() {
         val terminal = TerminalBuffers.create(width = 4, height = 2)
         val output = RecordingHostOutput()

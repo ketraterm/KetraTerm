@@ -50,3 +50,7 @@ bin/
 /graphify-out
 ### Node.js tooling ###
 node_modules/
+
+### Local review artifacts ###
+/docs/reviews/
+/ketraterm-benchmarks/experiments/

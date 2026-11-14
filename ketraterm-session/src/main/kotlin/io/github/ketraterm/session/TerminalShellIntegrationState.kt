@@ -263,6 +263,7 @@ public class TerminalShellIntegrationState(
      */
     public fun updateLineOrder(reader: TerminalRenderFrameReader) {
         var capture = false
+        var requireExplicitOrder = false
         var scanStart = 0L
         reader.readRenderFrame { frame ->
             if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) return@readRenderFrame
@@ -277,6 +278,9 @@ public class TerminalShellIntegrationState(
                 val visibleStart = frame.discardedCount + frame.historySize - frame.scrollbackOffset
                 val layoutChanged = observedHistoryLayout != frame.historyContentGeneration
                 val historyAdvanced = observedVisibleStart != visibleStart
+                // Deletion can remove anchors while surviving identities remain monotonic.
+                // Reflow has a separate layout generation and retains the numeric-range fallback.
+                requireExplicitOrder = !layoutChanged && !historyAdvanced && observedStructure != frame.structureGeneration
                 if (!explicitLineOrder &&
                     !rearranged &&
                     (observedStructure != frame.structureGeneration || observedMetadataRevision != metadataRevision)
@@ -285,6 +289,7 @@ public class TerminalShellIntegrationState(
                 }
                 capture = layoutChanged ||
                     historyAdvanced ||
+                    requireExplicitOrder ||
                     ((explicitLineOrder || rearranged) && observedStructure != frame.structureGeneration)
                 // Rows scrolled out during this batch can hide an insertion from the live viewport.
                 if (!explicitLineOrder && !layoutChanged && !rearranged) {
@@ -310,7 +315,7 @@ public class TerminalShellIntegrationState(
                         if (id <= 0 || id < previous) monotonic = false
                         previous = id
                     }
-                    if (!explicitLineOrder && monotonic) {
+                    if (!explicitLineOrder && monotonic && !requireExplicitOrder) {
                         capturePromptPredecessors(frame)
                         return@synchronized
                     }

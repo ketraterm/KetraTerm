@@ -114,11 +114,14 @@ public class SwingTerminalSearchBar
             component.addHierarchyListener {
                 if (it.changeFlags and
                     HierarchyEvent.DISPLAYABILITY_CHANGED
-                        .toLong() != 0L &&
-                    !component.isDisplayable
+                        .toLong() != 0L
                 ) {
-                    searchObservation?.cancel()
-                    searchObservation = null
+                    if (!component.isDisplayable) {
+                        searchObservation?.cancel()
+                        searchObservation = null
+                    } else if (isOpen()) {
+                        ensureObservingSearch()
+                    }
                 }
             }
             queryField.toolTipText = messages.message("search.queryToolTip")
@@ -213,16 +216,16 @@ public class SwingTerminalSearchBar
             refreshColors()
             component.isVisible = true
             setQueryText(terminal.currentSearchState().query)
-            if (searchObservation?.isActive != true) {
-                searchObservation =
-                    searchScope.launch {
-                        terminal.searchState.collect { refreshCounter() }
-                    }
-            }
+            ensureObservingSearch()
             refreshCounter()
             revalidateHost()
             queryField.requestFocusInWindow()
             queryField.selectAll()
+        }
+
+        private fun ensureObservingSearch() {
+            if (searchObservation?.isActive == true) return
+            searchObservation = searchScope.launch { terminal.searchState.collect { refreshCounter() } }
         }
 
         /**

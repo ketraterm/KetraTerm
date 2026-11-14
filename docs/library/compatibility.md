@@ -160,7 +160,7 @@ release history remains in the [changelog](../../CHANGELOG.md).
 | Pre-bound custom input encoder | `TerminalInputEncoderFactory` with session-owned output; implement synchronous input-policy updates. |
 | Earlier buffer factory return type | `TerminalRenderBuffer`; changed JVM return descriptors require recompilation. |
 | Non-null shortcut lookup | Handle null for legitimately unbound actions. |
-| Workspace/persistence development artifacts | Product-only modules; library hosts own these concerns. |
+| Workspace/persistence development artifacts | Published since 0.5.0 as [`ketraterm-workspace`](../../ketraterm-workspace/README.md) and [`ketraterm-completion-persistence`](../../ketraterm-completion-persistence/README.md). |
 
 See [configuration](configuration.md), [session assembly](../../ketraterm-session/README.md#custom-assembly),
 and [Swing APIs](../../ketraterm-ui-swing/README.md) for current usage.

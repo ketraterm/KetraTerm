@@ -21,10 +21,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
   editing operations and checksum queries on the same geometry policy.
 - Kitty text-mode keys emit text only on press and repeat; release reports remain
   available for enhanced keys and report-all mode. Associated-text reports support
-  long text commits without truncation.
+  long text commits without truncation and omit text on release reports.
 - Kitty keyboard stacks restore a baseline established by setting flags after a
   nested push/pop. Their 32-entry limit includes the active entry.
-- Legacy key routing ignores CapsLock and NumLock modifiers, retaining NumLock's
+- Legacy and Kitty text-key routing ignore CapsLock and NumLock modifiers, retaining NumLock's
   numeric keypad behavior and Kitty lock metadata.
 
 - Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
@@ -36,8 +36,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Completion and shell integration
 
-- Learning rejects malformed UTF-16 profile and directory metadata before changing
-  retained state, preventing later persistence encoding failures.
+- Learning rejects empty or malformed UTF-16 profile and directory metadata before changing
+  retained state. Use `null` for absent context.
 
 - Local completion rejects Windows network roots hidden in working-directory URIs,
   including encoded separators, and rejects URI queries and fragments. Explicitly

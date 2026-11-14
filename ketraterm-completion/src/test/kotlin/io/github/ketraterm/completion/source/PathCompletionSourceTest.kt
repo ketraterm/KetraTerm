@@ -24,6 +24,60 @@ import kotlin.test.*
 
 class PathCompletionSourceTest {
     @Test
+    fun `slashless literal tilde prefixes complete entries in the working directory`() =
+        runBlocking {
+            for ((line, expected) in listOf(
+                "cd '~" to "'~foobar/'",
+                "cd \\~" to "\\~foobar/",
+                "cd '~foo" to "'~foobar/'",
+                "cd \\~foo" to "\\~foobar/",
+                "cd ~\"foo" to "\\~foobar/",
+            )) {
+                val source =
+                    PathCompletionSource({ listing ->
+                        assertEquals("", listing.directoryPrefix, line)
+                        assertEquals(if (line.endsWith("~")) "~" else "~foo", listing.entryNamePrefix, line)
+                        listOf(TerminalFileEntry("~foobar", true))
+                    })
+                assertEquals(expected, source.complete(request(line, "file:///project")).single().replacementText, line)
+            }
+        }
+
+    @Test
+    fun `PowerShell provider home expansion survives quoting and escaping while tilde names stay literal`() =
+        runBlocking {
+            for ((line, expected) in listOf("cd ~/D" to "~/Documents/", "cd '~/D" to "'~/Documents/'", "cd `~/D" to "~/Documents/")) {
+                val source =
+                    PathCompletionSource({ listing ->
+                        assertEquals("~/", listing.directoryPrefix, line)
+                        listOf(TerminalFileEntry("Documents", true))
+                    })
+                assertEquals(
+                    expected,
+                    source.complete(request(line, "file:///project", TerminalShellCapabilities.POWERSHELL)).single().replacementText,
+                )
+            }
+            val literal =
+                PathCompletionSource({ listing ->
+                    assertEquals("", listing.directoryPrefix)
+                    assertEquals("~foo", listing.entryNamePrefix)
+                    listOf(TerminalFileEntry("~foobar", true))
+                })
+            assertEquals(
+                "'~foobar/'",
+                literal.complete(request("cd '~foo", "file:///project", TerminalShellCapabilities.POWERSHELL)).single().replacementText,
+            )
+        }
+
+    @Test
+    fun `unsupported home syntax is rejected before directory lookup`() =
+        runBlocking {
+            val source = PathCompletionSource({ error("unsupported home syntax must not perform I/O") })
+            assertTrue(source.complete(request("cd ~someone", "file:///project")).isEmpty())
+            assertTrue(source.complete(request("cd ~/D", "file:///project", TerminalShellCapabilities.PLAIN)).isEmpty())
+        }
+
+    @Test
     fun `home expansion preserves quoted escaped and mixed literal tilde paths`() =
         runBlocking {
             for ((line, directory, replacement) in listOf(
