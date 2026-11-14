@@ -13,6 +13,12 @@ format template: the parser implements this configuration subset, rather than
 the full TOML language. Arrays, inline tables, and multiline values are not
 configuration values.
 
+Double-quoted strings (including triple-quoted strings on one line) decode TOML
+1.0 escapes: `\b`, `\t`, `\n`, `\f`, `\r`, `\"`, `\\`, `\uXXXX`, and
+`\UXXXXXXXX`. Unicode escapes must identify scalar values. Single-quoted strings
+preserve backslashes literally. Malformed strings, unsupported escapes, and text
+after a closing delimiter other than a `#` comment are rejected.
+
 A small configuration can override only the preferences you need:
 
 ```toml
@@ -168,8 +174,8 @@ no control characters.
 
 For Windows paths, single-quoted literal strings preserve backslashes:
 `path = 'C:\tools\pwsh.exe'`. Keep each value on one physical line. The settings
-writer preserves quotes, significant whitespace, Unicode, and backslashes;
-values requiring escapes use the parser's supported triple-quoted form. Saving
+writer preserves quotes, significant whitespace, Unicode, and backslashes
+using single-line triple-quoted strings. Saving
 replaces the file with canonical generated content, so custom comments and
 unknown keys are not retained.
 

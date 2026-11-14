@@ -33,6 +33,66 @@ import kotlin.test.*
 
 class KetraTermConfigTest {
     @Test
+    fun `hand edited basic strings decode and survive canonical save and restart`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        Files.writeString(
+            file,
+            """
+            [shell]
+            path = "C:\\tools\\pwsh.exe" # an escaped Windows path
+            start_directory = "C:\\Users\\Jos\u00E9\\\U0001F600\\"
+            startup_command = "echo \"#ready\"" # keep the quoted hash
+            [font]
+            family = "\u0046ira Code"
+            """.trimIndent(),
+        )
+        val manager = KetraTermConfigManager(file)
+        val loaded = manager.load()
+        assertEquals("C:\\tools\\pwsh.exe", loaded.shellPath)
+        assertEquals("C:\\Users\\José\\😀\\", loaded.startDirectory)
+        assertEquals("echo \"#ready\"", loaded.startupCommand)
+        assertEquals("Fira Code", loaded.fontFamily)
+        assertFalse(Files.exists(directory.resolve("config.toml.broken")))
+
+        manager.save(loaded)
+        assertEquals(loaded, KetraTermConfigManager(file).load())
+        assertFalse(Files.exists(directory.resolve("config.toml.broken")))
+    }
+
+    @Test
+    fun `malformed quoted strings preserve the original file and recover with denied permissions`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val backup = directory.resolve("config.toml.broken")
+        val manager = KetraTermConfigManager(file)
+        val recovery =
+            KetraTermConfig(
+                clipboardRead = TerminalClipboardPermission.DENY,
+                clipboardWrite = TerminalClipboardPermission.DENY,
+                titlePermission = TerminalTitlePermission.DENY,
+            )
+        for (raw in listOf("\"C:\\tools\\pwsh.exe\"", "\"\\uD800\"", "\"unterminated", "'''value''' trailing")) {
+            val original =
+                """
+                [shell]
+                path = $raw
+                [security]
+                clipboard_write = 'allow'
+                clipboard_read = 'allow'
+                title_permission = 'allow'
+                """.trimIndent()
+            Files.writeString(file, original)
+
+            assertEquals(recovery, manager.load())
+            assertEquals(original, Files.readString(backup))
+            assertEquals(recovery, KetraTermConfigManager(file).load())
+        }
+    }
+
+    @Test
     fun `automatic suggestion mode defaults safely and survives configuration persistence`(
         @TempDir directory: Path,
     ) {

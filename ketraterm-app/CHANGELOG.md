@@ -32,6 +32,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Startup and session recovery
 
+- Hand-edited TOML basic strings decode escapes correctly, including quoted `#`
+  characters and Windows paths. Malformed strings use configuration recovery.
 - New configurations use 100 × 28 cells and 10,000 scrollback lines. The initial window fits the
   available desktop; saved preferences remain effective.
 - Linux and other non-Windows/macOS platforms choose an installed monospace font, with
