@@ -42,6 +42,7 @@ import java.util.*
  * @param specs static command specs shared by providers created from this registry.
  * @param learningStore bounded learning shared by ranking and persistence.
  * @param onPersistenceLoadFailure host diagnostic invoked when existing learning cannot be loaded safely.
+ * @param previousPersistencePath previous learning location to relocate on first enable, or null.
  */
 internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
@@ -51,6 +52,7 @@ internal class StandaloneCompletionRegistry private constructor(
     onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
     ioDispatcher: CoroutineDispatcher,
+    previousPersistencePath: Path?,
 ) {
     private val lifecycleLock = Any()
     private var closed = false
@@ -63,6 +65,7 @@ internal class StandaloneCompletionRegistry private constructor(
             persistenceEnabled = persistenceEnabled,
             ioDispatcher = ioDispatcher,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
+            previousPersistencePath = previousPersistencePath,
         )
     private val sources =
         listOf(
@@ -234,6 +237,7 @@ internal class StandaloneCompletionRegistry private constructor(
             onPersistenceLoadFailure: (Throwable) -> Unit = {},
             workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
             ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            previousPersistencePath: Path? = null,
         ): StandaloneCompletionRegistry {
             val completionScope =
                 CoroutineScope(SupervisorJob() + workerDispatcher + CoroutineName("standalone-completion"))
@@ -246,6 +250,7 @@ internal class StandaloneCompletionRegistry private constructor(
                     onPersistenceLoadFailure = onPersistenceLoadFailure,
                     completionScope = completionScope,
                     ioDispatcher = ioDispatcher,
+                    previousPersistencePath = previousPersistencePath,
                 )
             } catch (failure: Throwable) {
                 completionScope.cancel()

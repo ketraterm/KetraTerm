@@ -36,6 +36,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Completion and shell integration
 
+- Learning persistence uses the stable `command-completion-learning.tsv` filename with
+  schema versioning in its header. Existing versioned files and an optional previous
+  location migrate on first enable; current files take precedence and reset clears old locations.
+
 - Learning rejects empty or malformed UTF-16 profile and directory metadata before changing
   retained state. Use `null` for absent context.
 

@@ -512,60 +512,10 @@ internal class KetraTermConfigManager(
 
     companion object {
         /**
-         * Resolves the default configuration path on disk for this operating system.
-         *
-         * @param osName operating system name used for platform selection.
-         * @param env environment variables map.
-         * @param userHome current user's home directory path.
-         * @return the resolved [Path] to the configuration file on disk.
-         */
-        internal fun getDefaultPath(
-            osName: String = System.getProperty("os.name"),
-            env: Map<String, String> = System.getenv(),
-            userHome: String = System.getProperty("user.home"),
-        ): Path {
-            // 1. System property override
-            val sysProp = System.getProperty("ketraterm.config.path")
-            if (!sysProp.isNullOrBlank()) {
-                return Path.of(sysProp)
-            }
-
-            // 2. Env variable override
-            val envVar = env["KetraTerm_CONFIG_PATH"]
-            if (!envVar.isNullOrBlank()) {
-                return Path.of(envVar)
-            }
-
-            // 3. OS-specific default configuration directories
-            val os = osName.lowercase(Locale.ROOT)
-            return when {
-                os.contains("windows") -> {
-                    val appData = env["APPDATA"]
-                    if (!appData.isNullOrBlank()) {
-                        Path.of(appData, "KetraTerm", "config.toml")
-                    } else {
-                        Path.of(userHome, ".config", "ketraterm", "config.toml")
-                    }
-                }
-                os.contains("mac") -> {
-                    Path.of(userHome, "Library", "Application Support", "KetraTerm", "config.toml")
-                }
-                else -> {
-                    val xdgConfig = env["XDG_CONFIG_HOME"]
-                    if (!xdgConfig.isNullOrBlank()) {
-                        Path.of(xdgConfig, "ketraterm", "config.toml")
-                    } else {
-                        Path.of(userHome, ".config", "ketraterm", "config.toml")
-                    }
-                }
-            }
-        }
-
-        /**
          * Returns a manager configured with the OS-specific default configuration path.
          *
          * @return a default [KetraTermConfigManager] instance.
          */
-        fun getDefault(): KetraTermConfigManager = KetraTermConfigManager(getDefaultPath())
+        fun getDefault(): KetraTermConfigManager = KetraTermConfigManager(KetraTermStoragePaths().configPath)
     }
 }

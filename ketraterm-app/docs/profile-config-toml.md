@@ -213,12 +213,16 @@ The first nonblank override wins:
 | --- | --- |
 | Windows | `%APPDATA%\KetraTerm\config.toml`; without `APPDATA`, `~\.config\ketraterm\config.toml`. |
 | macOS | `~/Library/Application Support/KetraTerm/config.toml`. |
-| Linux and other platforms | `$XDG_CONFIG_HOME/ketraterm/config.toml`; without `XDG_CONFIG_HOME`, `~/.config/ketraterm/config.toml`. |
+| Linux and other platforms | `$XDG_CONFIG_HOME/ketraterm/config.toml`; without a valid absolute `XDG_CONFIG_HOME`, `~/.config/ketraterm/config.toml`. |
 
 Override values name the file, rather than its parent directory. The app's
 `ketra info` companion command reports the active path; `ketra config` opens it
 through the helper's editor selection. Native helpers are not installed into
 WSL or Ubuntu launcher profiles.
+
+Default installations keep learned suggestions in the platform's persistent-state
+location; nondefault configuration paths retain colocated learning. See
+[storage locations and migration](../../docs/reference/storage.md#locations).
 
 ## 3. Configuration Backup & Fallback Lifecycle
 

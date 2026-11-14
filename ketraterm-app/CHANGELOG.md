@@ -12,6 +12,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Suggestions
 
+- Save learned suggestions under Local AppData on Windows and XDG state storage on Linux,
+  separately from default configuration, using `command-completion-learning.tsv`.
+  Existing learning relocates on first enable;
+  nondefault configuration paths retain colocated learning.
 - Added opt-in inline completion previews, including when suggestion popups are disabled.
   Existing history-inline preferences migrate automatically.
 - Popups show alternatives to the inline preview without briefly duplicating it.

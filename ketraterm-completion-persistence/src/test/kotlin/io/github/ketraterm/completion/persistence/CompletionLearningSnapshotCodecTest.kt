@@ -36,8 +36,8 @@ class CompletionLearningSnapshotCodecTest {
     }
 
     @Test
-    fun `current file name and header use the split schema version`() {
-        assertEquals("command-completion-learning-v3.tsv", TerminalCompletionLearningCoordinator.currentFileName())
+    fun `stable file name is independent of the versioned schema header`() {
+        assertEquals("command-completion-learning.tsv", TerminalCompletionLearningCoordinator.currentFileName())
         assertEquals(listOf(HEADER), CompletionLearningSnapshotCodec.encode(TerminalCompletionLearningSnapshot.EMPTY))
     }
 

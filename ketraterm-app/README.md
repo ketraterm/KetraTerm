@@ -64,6 +64,8 @@ inline previews, popup mode (**Off**, **On request**, or **Automatic**), shortcu
 and learning persistence. Add shortcuts by pressing the keys; click a shortcut
 chip to remove it. Removing Enter from **Accept selected popup** keeps Enter
 available to the shell.
+See [persistent storage](../docs/reference/storage.md) for learning locations,
+migration, and reset behavior.
 Ctrl+Space requests suggestions when the popup surface is enabled, even when
 automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.

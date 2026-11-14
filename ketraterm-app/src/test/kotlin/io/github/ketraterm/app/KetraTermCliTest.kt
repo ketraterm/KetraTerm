@@ -30,6 +30,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.*
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
@@ -60,7 +61,7 @@ class KetraTermCliTest {
                 assertNotEquals(original, fresh)
                 assertEquals(fresh.toString(), cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
                 assertTrue(Files.isRegularFile(fresh.resolve("ketra")))
-                assertOwnerOnlyDirectory(fresh)
+                assertPrivateDirectory(fresh)
                 if (replace) assertEquals("untrusted replacement", Files.readString(original.resolve("ketra")))
             } finally {
                 for (path in owned) {
@@ -89,7 +90,7 @@ class KetraTermCliTest {
             fresh = Path.of(cli.prepare(profile(), emptyMap()).environment.getValue("PATH"))
 
             assertNotEquals(original, fresh)
-            assertOwnerOnlyDirectory(fresh)
+            assertPrivateDirectory(fresh)
             assertEquals("unrelated target", Files.readString(sentinel))
             assertFalse(Files.exists(target.resolve("ketra.bat")))
             assertTrue(Files.isSymbolicLink(original))
@@ -103,18 +104,26 @@ class KetraTermCliTest {
         }
     }
 
-    private fun assertOwnerOnlyDirectory(path: Path) {
+    private fun assertPrivateDirectory(path: Path) {
         val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java)
         if (posix != null) {
             assertEquals(PosixFilePermissions.fromString("rwx------"), posix.readAttributes().permissions())
         } else {
             val acl = assertNotNull(Files.getFileAttributeView(path, AclFileAttributeView::class.java))
+            // Elevated Windows accounts may create directories owned by Administrators.
+            // The access grant must still name only the launching user.
+            val user = path.fileSystem.userPrincipalLookupService.lookupPrincipalByName(System.getProperty("user.name"))
+            val grants = acl.acl.filter { it.type() == AclEntryType.ALLOW }
             assertEquals(
-                setOf(Files.getOwner(path)),
-                acl.acl
-                    .filter { it.type() == AclEntryType.ALLOW }
-                    .map { it.principal() }
-                    .toSet(),
+                setOf(user),
+                grants.map { it.principal() }.toSet(),
+            )
+            assertTrue(
+                grants.any { entry ->
+                    entry.permissions().containsAll(EnumSet.allOf(AclEntryPermission::class.java)) &&
+                        entry.flags().containsAll(setOf(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT))
+                },
+                "The launching user must have full access inherited by helper files and subdirectories: $grants",
             )
         }
     }
@@ -132,7 +141,7 @@ class KetraTermCliTest {
             for (helper in listOf(firstDirectory, secondDirectory)) {
                 assertTrue(Files.isRegularFile(helper.resolve("ketra")))
                 assertTrue(Files.isRegularFile(helper.resolve("ketra.bat")))
-                assertOwnerOnlyDirectory(helper)
+                assertPrivateDirectory(helper)
             }
         } finally {
             for (helper in listOf(firstDirectory, secondDirectory)) {
@@ -288,7 +297,7 @@ class KetraTermCliTest {
     fun `helper PATH comparison follows platform casing rules`(windows: Boolean) {
         val helper = directory.resolve("Helpers")
         val separator = if (windows) ';' else ':'
-        val differentlyCasedPath = "${helper.toString().uppercase(java.util.Locale.ROOT)}${separator}original-bin"
+        val differentlyCasedPath = "${helper.toString().uppercase(Locale.ROOT)}${separator}original-bin"
         val prepared =
             KetraTermCli(directory.resolve("config.toml"), helper, windows).prepare(
                 profile(mapOf("PATH" to differentlyCasedPath)),

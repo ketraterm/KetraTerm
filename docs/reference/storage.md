@@ -9,12 +9,21 @@ application/project settings. Library embedders choose their own persistence.
 | --- | --- |
 | Standalone preferences | Resolved `config.toml`; see [path resolution](../../ketraterm-app/docs/profile-config-toml.md#2-directory-resolution-hierarchy). |
 | Malformed standalone configuration backup | `<config filename>.broken` beside the configuration; see [recovery behavior](../../ketraterm-app/docs/profile-config-toml.md#3-configuration-backup--fallback-lifecycle). |
-| Standalone completion learning | `command-completion-learning-v3.tsv` beside the configuration. |
-| IntelliJ completion learning | `ketraterm/command-completion-learning-v3.tsv` under the IDE system directory. |
+| Standalone completion learning — Windows | `%LOCALAPPDATA%\KetraTerm\command-completion-learning.tsv`; without `LOCALAPPDATA`, use `~/AppData/Local/KetraTerm/`. |
+| Standalone completion learning — macOS | `~/Library/Application Support/KetraTerm/command-completion-learning.tsv`. |
+| Standalone completion learning — Linux and other platforms | `$XDG_STATE_HOME/ketraterm/command-completion-learning.tsv`; default `~/.local/state/ketraterm/`. |
+| IntelliJ completion learning | The IDE system directory under `ketraterm/`; the filename follows the plugin's persistence-library version. |
 | IntelliJ tab state | Project workspace storage; see [tab restoration](../features/desktop.md#product-integration). |
 
 Raw terminal output is not saved automatically. Explicit output export is a
 separate user action.
+
+XDG roots must be absolute; unset, blank, relative, or invalid values use the
+default. A nondefault configuration path keeps its learning file beside it.
+Existing learning moves on first enable if the destination is absent. The current
+file takes precedence, followed by its old `-v3.tsv` sibling, then the previous
+configuration location. Unsupported files are preserved instead of falling back
+to older evidence. Reset clears all known previous locations.
 
 ## Completion learning
 
@@ -30,7 +39,8 @@ Use **Reset learned suggestions...** in settings to clear learned commands and
 ranking preferences from memory and disk, even when suggestions or persistence
 are disabled. The action asks for confirmation and reports success after saved
 data is cleared. Errors allow retry, and closing settings does not cancel the
-reset. The file keeps an empty format header. Shell history and terminal output
+reset. The file keeps an empty format header, and a distinct previous location is
+cleared too. Shell history and terminal output
 are unaffected; later activity can be learned according to the current settings.
 
 Learning is saved periodically and at shutdown. Products allow up to 500 ms for
@@ -40,6 +50,7 @@ Integrators should follow the [persistence lifecycle contract](../../ketraterm-c
 ## File format
 
 Version 3 starts with `KetraTerm_COMMAND_COMPLETION_LEARNING<TAB>3`.
+The stable filename is independent of the schema version recorded in the header.
 Ranking rows precede replay rows:
 
 | Row | Stored fields |

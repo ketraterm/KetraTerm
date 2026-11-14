@@ -18,9 +18,7 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -34,6 +32,138 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class StandaloneCompletionRegistryPersistenceTest {
     @Test
+    fun `versioned learning from either platform state or config migrates to the stable filename`(
+        @TempDir directory: Path,
+    ) = runTest {
+        for (legacyInState in listOf(false, true)) {
+            val root = directory.resolve("case-$legacyInState")
+            val destination = root.resolve("state").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+            val previous = root.resolve("config").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+            val legacy = (if (legacyInState) destination else previous).resolveSibling("command-completion-learning-v3.tsv")
+            val seed = registry(TerminalCompletionLearningStore(), legacy, persistenceEnabled = true)
+            seed.recordFinishedCommand("git status", true, null, null, 1L)
+            seed.closeAndFlush()
+            val learning = TerminalCompletionLearningStore()
+            val current = registry(learning, destination, persistenceEnabled = true, previousPath = previous)
+            try {
+                runCurrent()
+                assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
+                assertFalse(Files.exists(legacy))
+                assertTrue(Files.exists(destination))
+                current.resetLearning().await()
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+            } finally {
+                current.closeAndFlush()
+            }
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(destination))
+        }
+    }
+
+    @Test
+    fun `previous learning relocates only on enable and merges once with live activity`(
+        @TempDir directory: Path,
+    ) = runTest {
+        val previous = directory.resolve("config/learning.tsv")
+        val destination = directory.resolve("state/learning.tsv")
+        val seed = registry(TerminalCompletionLearningStore(), previous, persistenceEnabled = true)
+        seed.recordFinishedCommand("git status", true, null, null, 1L)
+        seed.closeAndFlush()
+
+        val learning = TerminalCompletionLearningStore()
+        val current = registry(learning, destination, persistenceEnabled = false, previousPath = previous)
+        try {
+            runCurrent()
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+            assertTrue(Files.exists(previous))
+            assertFalse(Files.exists(destination))
+            current.recordFinishedCommand("npm test", true, null, null, 2L)
+
+            current.setPersistenceEnabled(true)
+            runCurrent()
+            assertFalse(Files.exists(previous))
+            assertTrue(Files.exists(destination))
+            assertEquals(
+                setOf("git status", "npm test"),
+                learning
+                    .snapshot()
+                    .replayCommands
+                    .map { it.commandLine }
+                    .toSet(),
+            )
+            val hydrated = learning.snapshot()
+            current.setPersistenceEnabled(false)
+            current.setPersistenceEnabled(true)
+            runCurrent()
+            assertEquals(hydrated, learning.snapshot())
+        } finally {
+            current.closeAndFlush()
+        }
+        assertEquals(learning.snapshot(), persistedSnapshot(destination))
+    }
+
+    @Test
+    fun `reset supersedes queued relocation and also clears previous learning when persistence is disabled`(
+        @TempDir directory: Path,
+    ) = runTest {
+        for (enabled in listOf(false, true)) {
+            val previous = directory.resolve("previous-$enabled.tsv")
+            val destination = directory.resolve("state-$enabled/learning.tsv")
+            val seed = registry(TerminalCompletionLearningStore(), previous, persistenceEnabled = true)
+            seed.recordFinishedCommand("git status", true, null, null, 1L)
+            seed.closeAndFlush()
+            val learning = TerminalCompletionLearningStore()
+            val current = registry(learning, destination, persistenceEnabled = enabled, previousPath = previous)
+            try {
+                current.recordFinishedCommand("live command", true, null, null, 2L)
+                current.resetLearning().await()
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+                assertFalse(Files.exists(previous))
+                current.setPersistenceEnabled(true)
+                runCurrent()
+                assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+            } finally {
+                current.closeAndFlush()
+            }
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(destination))
+        }
+    }
+
+    @Test
+    fun `unsupported previous learning is preserved until explicit reset`(
+        @TempDir directory: Path,
+    ) = runTest {
+        val previous =
+            runInterruptible(Dispatchers.IO) { Files.writeString(directory.resolve("previous.tsv"), "unsupported previous data") }
+        val destination = directory.resolve("state/learning.tsv")
+        val failures = mutableListOf<Throwable>()
+        val learning = TerminalCompletionLearningStore()
+        val current =
+            StandaloneCompletionRegistry.create(
+                persistencePath = destination,
+                previousPersistencePath = previous,
+                persistenceEnabled = true,
+                learningStore = learning,
+                specs = emptyList(),
+                workerDispatcher = StandardTestDispatcher(testScheduler),
+                ioDispatcher = StandardTestDispatcher(testScheduler),
+                onPersistenceLoadFailure = failures::add,
+            )
+        try {
+            runCurrent()
+            assertEquals(1, failures.size)
+            current.recordFinishedCommand("live command", true, null, null, 2L)
+            assertEquals("unsupported previous data", runInterruptible(Dispatchers.IO) { Files.readString(previous) })
+            assertFalse(Files.exists(destination))
+            current.resetLearning().await()
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+            assertFalse(Files.exists(previous))
+            assertEquals(TerminalCompletionLearningSnapshot.EMPTY, persistedSnapshot(destination))
+        } finally {
+            current.closeAndFlush()
+        }
+    }
+
+    @Test
     fun `disable preserves disk state and replacement runtime loads only saved learning`(
         @TempDir directory: Path,
     ) = runTest {
@@ -41,7 +171,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         val seed = registry(TerminalCompletionLearningStore(), path, persistenceEnabled = true)
         seed.recordFinishedCommand("git status", true, null, null, 1L)
         seed.closeAndFlush()
-        val saved = Files.readAllBytes(path)
+        val saved = runInterruptible(Dispatchers.IO) { Files.readAllBytes(path) }
         repeat(3) {
             val learning = TerminalCompletionLearningStore()
             val current = registry(learning, path, persistenceEnabled = true)
@@ -49,7 +179,7 @@ class StandaloneCompletionRegistryPersistenceTest {
             current.closeWithoutFlush()
             current.recordFinishedCommand("late command", true, null, null, 3L)
             assertFalse(learning.snapshot().replayCommands.any { it.commandLine == "late command" })
-            assertContentEquals(saved, Files.readAllBytes(path))
+            assertContentEquals(saved, runInterruptible(Dispatchers.IO) { Files.readAllBytes(path) })
         }
         assertEquals(listOf("git status"), persistedSnapshot(path).replayCommands.map { it.commandLine })
     }
@@ -109,9 +239,11 @@ class StandaloneCompletionRegistryPersistenceTest {
         val registry = registry(learning, path, persistenceEnabled = true)
         runCurrent()
         assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
-        Files.delete(path)
-        Files.delete(parent)
-        Files.writeString(parent, "blocks the persistence directory")
+        runInterruptible(Dispatchers.IO) {
+            Files.delete(path)
+            Files.delete(parent)
+            Files.writeString(parent, "blocks the persistence directory")
+        }
         registry.recordFinishedCommand("npm test", true, null, null, 2L)
         val completionJob = requireNotNull(registry.completionScope.coroutineContext[Job])
 
@@ -153,6 +285,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         learning: TerminalCompletionLearningStore,
         path: Path,
         persistenceEnabled: Boolean,
+        previousPath: Path? = null,
     ): StandaloneCompletionRegistry =
         StandaloneCompletionRegistry.create(
             persistencePath = path,
@@ -161,6 +294,7 @@ class StandaloneCompletionRegistryPersistenceTest {
             learningStore = learning,
             workerDispatcher = StandardTestDispatcher(testScheduler),
             ioDispatcher = StandardTestDispatcher(testScheduler),
+            previousPersistencePath = previousPath,
         )
 
     private suspend fun TestScope.persistedSnapshot(path: Path): TerminalCompletionLearningSnapshot =

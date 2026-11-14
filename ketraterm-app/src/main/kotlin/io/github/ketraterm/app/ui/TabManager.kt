@@ -1418,6 +1418,7 @@ internal class TabManager(
     private fun createCompletionRegistry(persistenceEnabled: Boolean): StandaloneCompletionRegistry =
         StandaloneCompletionRegistry.create(
             persistencePath = settings.commandCompletionStatsPath,
+            previousPersistencePath = settings.previousCommandCompletionStatsPath,
             persistenceEnabled = persistenceEnabled,
             onPersistenceLoadFailure = { LOGGER.log(Level.WARNING, "Completion learning could not be loaded", it) },
         )
