@@ -30,12 +30,8 @@ internal class TerminalModeControllerImpl(
     private val cursorEngine: CursorEngine,
     private val responseChannel: BufferResponseChannel,
 ) : TerminalModeController {
-    private inline fun mutateMode(block: () -> Unit) {
-        block()
-    }
-
     override fun setInsertMode(enabled: Boolean) {
-        mutateMode { state.modes.isInsertMode = enabled }
+        state.modes.isInsertMode = enabled
     }
 
     override fun setAutoWrap(enabled: Boolean) {
@@ -52,22 +48,20 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setOriginMode(enabled: Boolean) {
-        mutateMode {
-            state.modes.isOriginMode = enabled
-            cursorEngine.homeCursor()
-        }
+        state.modes.isOriginMode = enabled
+        cursorEngine.homeCursor()
     }
 
     override fun setApplicationCursorKeys(enabled: Boolean) {
-        mutateMode { state.modes.isApplicationCursorKeys = enabled }
+        state.modes.isApplicationCursorKeys = enabled
     }
 
     override fun setApplicationKeypad(enabled: Boolean) {
-        mutateMode { state.modes.isApplicationKeypad = enabled }
+        state.modes.isApplicationKeypad = enabled
     }
 
     override fun setBackarrowKeyMode(sendsBackspace: Boolean) {
-        mutateMode { state.modes.setBackarrowKeyMode(sendsBackspace) }
+        state.modes.setBackarrowKeyMode(sendsBackspace)
     }
 
     override fun setLeftRightMarginMode(enabled: Boolean) {
@@ -79,23 +73,23 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setNewLineMode(enabled: Boolean) {
-        mutateMode { state.modes.isNewLineMode = enabled }
+        state.modes.isNewLineMode = enabled
     }
 
     override fun setMouseTrackingMode(mode: io.github.ketraterm.protocol.MouseTrackingMode) {
-        mutateMode { state.modes.mouseTrackingMode = mode }
+        state.modes.mouseTrackingMode = mode
     }
 
     override fun setMouseEncodingMode(mode: io.github.ketraterm.protocol.MouseEncodingMode) {
-        mutateMode { state.modes.mouseEncodingMode = mode }
+        state.modes.mouseEncodingMode = mode
     }
 
     override fun setBracketedPasteEnabled(enabled: Boolean) {
-        mutateMode { state.modes.isBracketedPasteEnabled = enabled }
+        state.modes.isBracketedPasteEnabled = enabled
     }
 
     override fun setFocusReportingEnabled(enabled: Boolean) {
-        mutateMode { state.modes.isFocusReportingEnabled = enabled }
+        state.modes.isFocusReportingEnabled = enabled
     }
 
     override fun setAlternateScrollEnabled(enabled: Boolean) {
@@ -107,11 +101,11 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setModifyOtherKeysMode(mode: Int) {
-        mutateMode { state.modes.modifyOtherKeysMode = mode }
+        state.modes.modifyOtherKeysMode = mode
     }
 
     override fun setFormatOtherKeysMode(mode: Int) {
-        mutateMode { state.modes.formatOtherKeysMode = mode }
+        state.modes.formatOtherKeysMode = mode
     }
 
     override fun setKeyModifierOption(
@@ -139,57 +133,41 @@ internal class TerminalModeControllerImpl(
     override fun resetKeyFormatOptions() = state.modes.resetKeyFormatOptions()
 
     override fun setKittyKeyboardFlags(flags: Int) {
-        mutateMode {
-            state.modes.kittyKeyboardFlags = state.activeBuffer.setKittyKeyboardFlags(flags)
-        }
+        state.modes.kittyKeyboardFlags = state.activeBuffer.setKittyKeyboardFlags(flags)
     }
 
     override fun pushKittyKeyboardFlags(flags: Int) {
-        mutateMode {
-            state.modes.kittyKeyboardFlags = state.activeBuffer.pushKittyKeyboardFlags(flags)
-        }
+        state.modes.kittyKeyboardFlags = state.activeBuffer.pushKittyKeyboardFlags(flags)
     }
 
     override fun popKittyKeyboardFlags(count: Int) {
-        mutateMode {
-            state.modes.kittyKeyboardFlags = state.activeBuffer.popKittyKeyboardFlags(count)
-        }
+        state.modes.kittyKeyboardFlags = state.activeBuffer.popKittyKeyboardFlags(count)
     }
 
     override fun setReverseVideo(enabled: Boolean) {
-        mutateMode {
-            if (state.modes.isReverseVideo == enabled) return@mutateMode
-            state.modes.isReverseVideo = enabled
-            state.markGlobalAttributesChanged()
-        }
+        if (state.modes.isReverseVideo == enabled) return
+        state.modes.isReverseVideo = enabled
+        state.markGlobalAttributesChanged()
     }
 
     override fun setCursorVisible(enabled: Boolean) {
-        mutateMode {
-            if (state.modes.isCursorVisible == enabled) return@mutateMode
-            state.modes.isCursorVisible = enabled
-            state.markCursorChanged()
-        }
+        if (state.modes.isCursorVisible == enabled) return
+        state.modes.isCursorVisible = enabled
+        state.markCursorChanged()
     }
 
     override fun setCursorBlinking(enabled: Boolean) {
-        mutateMode {
-            if (state.modes.isCursorBlinking == enabled) return@mutateMode
-            state.modes.isCursorBlinking = enabled
-            state.markCursorChanged()
-        }
+        if (state.modes.isCursorBlinking == enabled) return
+        state.modes.isCursorBlinking = enabled
+        state.markCursorChanged()
     }
 
     override fun setCursorShape(shape: TerminalRenderCursorShape) {
-        mutateMode {
-            state.cursorShape = shape
-        }
+        state.cursorShape = shape
     }
 
     override fun setDefaultCursorShape(shape: TerminalRenderCursorShape) {
-        mutateMode {
-            state.defaultCursorShape = shape
-        }
+        state.defaultCursorShape = shape
     }
 
     override fun resetCursorStyle() {
@@ -198,11 +176,11 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setTreatAmbiguousAsWide(enabled: Boolean) {
-        mutateMode { state.modes.treatAmbiguousAsWide = enabled }
+        state.modes.treatAmbiguousAsWide = enabled
     }
 
     override fun setSynchronizedOutput(enabled: Boolean) {
-        mutateMode { state.modes.isSynchronizedOutput = enabled }
+        state.modes.isSynchronizedOutput = enabled
     }
 
     override fun setColorSchemeReportingEnabled(enabled: Boolean) {
@@ -215,11 +193,11 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setBellIsUrgent(enabled: Boolean) {
-        mutateMode { state.modes.isBellIsUrgent = enabled }
+        state.modes.isBellIsUrgent = enabled
     }
 
     override fun setPopOnBell(enabled: Boolean) {
-        mutateMode { state.modes.isPopOnBell = enabled }
+        state.modes.isPopOnBell = enabled
     }
 
     override fun enterAltBufferWithoutCursorSave(clearBeforeEnter: Boolean) {
@@ -256,15 +234,13 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setThemePalette(palette: TerminalColorPalette) {
-        mutateMode {
-            val themeChanged = state.themePalette != palette
-            state.themePalette = palette
-            if (state.palette != palette) {
-                state.palette = palette
-                state.markVisibleLinesChanged()
-            }
-            if (themeChanged) responseChannel.notifyColorSchemeChanged()
+        val themeChanged = state.themePalette != palette
+        state.themePalette = palette
+        if (state.palette != palette) {
+            state.palette = palette
+            state.markVisibleLinesChanged()
         }
+        if (themeChanged) responseChannel.notifyColorSchemeChanged()
     }
 
     override fun pushColors() {
@@ -291,12 +267,10 @@ internal class TerminalModeControllerImpl(
         color: Int,
     ) {
         if (index !in 0..255 || state.palette.indexedColor(index) == color) return
-        mutateMode {
-            val newIndexed = state.palette.toIndexedColorsArray()
-            newIndexed[index] = color
-            state.palette = state.palette.copy(indexedColors = newIndexed)
-            state.markVisibleLinesChanged()
-        }
+        val newIndexed = state.palette.toIndexedColorsArray()
+        newIndexed[index] = color
+        state.palette = state.palette.copy(indexedColors = newIndexed)
+        state.markVisibleLinesChanged()
     }
 
     override fun setDynamicColor(
