@@ -28,8 +28,8 @@ and IntelliJ product implementation APIs
 are outside the supported publication boundary.
 
 Kotlin 2.4 and JDK 25 are the minimum supported consumer versions. The build uses
-Kotlin 2.4.20, JVM target 25, and JVM default-method compatibility bridges.
-Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-only
+Kotlin 2.4.21, JVM target 25, and JVM default-method compatibility bridges.
+Consumer checks exercise Kotlin 2.4.0/2.4.21 and both Gradle metadata and POM-only
 resolution. A host replacing dependencies with a platform runtime must verify
 that runtime separately.
 
