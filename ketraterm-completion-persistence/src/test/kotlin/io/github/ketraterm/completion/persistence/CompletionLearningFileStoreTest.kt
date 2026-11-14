@@ -26,6 +26,31 @@ import kotlin.test.*
 
 class CompletionLearningFileStoreTest {
     @Test
+    fun `supplementary Unicode contexts survive file persistence and hydration exactly`() {
+        val files = CompletionLearningFileStore(path("completion-unicode-context"))
+        val learning = TerminalCompletionLearningStore()
+        val profiles = listOf("shell😀", "shell👩‍💻", "shell\uD800\uDC00", "shell\uDBFF\uDFFF", "shell?", "shell\uFFFD")
+        for ((index, profile) in profiles.withIndex()) {
+            learning.recordCommandResult("git status", true, profile, "file:///repo/$profile/", index + 1L)
+        }
+        val expected = learning.snapshot()
+        files.persist(expected)
+        val loaded = files.loadSnapshot().loadedSnapshot()
+        assertEquals(expected, loaded)
+        val hydrated = TerminalCompletionLearningStore()
+        hydrated.mergeSnapshot(loaded)
+        assertEquals(expected, hydrated.snapshot())
+        assertEquals(
+            profiles.toSet(),
+            hydrated
+                .snapshot()
+                .rankingStats
+                .map { it.profileId }
+                .toSet(),
+        )
+    }
+
+    @Test
     fun `persist replaces the file synchronously`() {
         val path = path("completion-store")
         val store = CompletionLearningFileStore(path)

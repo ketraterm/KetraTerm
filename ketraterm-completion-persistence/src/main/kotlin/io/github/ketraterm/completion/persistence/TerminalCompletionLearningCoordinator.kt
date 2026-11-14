@@ -124,6 +124,7 @@ public class TerminalCompletionLearningCoordinator
          * @param profileId optional host profile identifier.
          * @param workingDirectoryUri optional working-directory URI captured for the command.
          * @param usedAtEpochMillis non-negative completion timestamp.
+         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
          */
         public fun recordCommandResult(
             commandLine: String,
@@ -155,6 +156,7 @@ public class TerminalCompletionLearningCoordinator
          * @param profileId optional host profile identifier.
          * @param workingDirectoryUri optional working-directory URI captured for the event.
          * @param feedbackAtEpochMillis non-negative feedback timestamp.
+         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
          */
         public fun recordSuggestionFeedback(
             commandLine: String,

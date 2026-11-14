@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+import io.github.ketraterm.completion.internal.requireValidTerminalCompletionLearningContext
 
 /**
  * Aggregated ranking evidence for one opaque exact-command identity.
@@ -36,7 +37,8 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * @property lastUsedEpochMillis newest execution or acceptance timestamp represented by this row;
  * dismissal does not renew usage recency.
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
- * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
+ * negative, successful executions exceed total executions, [lastUsedEpochMillis] is negative,
+ * or context metadata contains malformed UTF-16.
  */
 @ExperimentalTerminalCompletionApi
 public data class TerminalCompletionRankingStats
@@ -54,6 +56,7 @@ public data class TerminalCompletionRankingStats
     ) {
         init {
             requireValidTerminalCompletionRankingDigest(identityDigest)
+            requireValidTerminalCompletionLearningContext(profileId, workingDirectoryUri)
             require(useCount >= 0) { "useCount must be >= 0, was $useCount" }
             require(successCount >= 0) { "successCount must be >= 0, was $successCount" }
             require(successCount <= useCount) { "successCount must be <= useCount, was $successCount > $useCount" }

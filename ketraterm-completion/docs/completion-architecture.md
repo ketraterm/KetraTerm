@@ -254,7 +254,9 @@ operation mutates evidence. Admission filtering does not retroactively remove
 retained rows. `clear()` removes all retained evidence and replay while
 preserving the configured filter and capacity.
 
-Blank, multiline, or malformed UTF-16 command events are ignored. Plaintext
+Blank, multiline, or malformed UTF-16 command events are ignored. Recordable
+events and learning records require well-formed UTF-16 profile/directory metadata;
+invalid context throws before filtering or mutation. Plaintext
 eligibility additionally limits text to 4,096 UTF-16 code units and 8,192 UTF-8
 bytes, rejects ISO controls other than internal tabs, respects leading-space or
 tab privacy, and applies a conservative credential classifier. Approval cannot

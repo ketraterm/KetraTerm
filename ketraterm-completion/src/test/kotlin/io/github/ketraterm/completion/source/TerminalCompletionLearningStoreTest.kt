@@ -32,6 +32,41 @@ import kotlin.test.*
 
 class TerminalCompletionLearningStoreTest {
     @Test
+    fun `malformed learning context is rejected before filtering mutation or capacity eviction`() {
+        var filterCalls = 0
+        val store =
+            TerminalCompletionLearningStore(replayFilter = {
+                filterCalls++
+                true
+            }, capacity = 1)
+        store.recordCommandResult("git status", true, "profile", "file:///repo", 1L)
+        val before = store.snapshot()
+        for (malformed in listOf("\uD800", "\uDC00", "x\uD800y", "\uD800x\uDC00", "\uDC00\uD800", "😀\uD800")) {
+            for ((profile, directory) in listOf(malformed to "file:///repo", "profile" to "file:///repo/$malformed")) {
+                for (command in listOf("git status", "git log")) {
+                    for (successful in listOf(false, true)) {
+                        assertFailsWith<IllegalArgumentException> {
+                            store.recordCommandResult(command, successful, profile, directory, 2L)
+                        }
+                    }
+                    for (feedback in TerminalCompletionFeedbackKind.entries) {
+                        assertFailsWith<IllegalArgumentException> {
+                            store.recordSuggestionFeedback(command, feedback, profile, directory, 2L)
+                        }
+                    }
+                    assertSame(before, store.snapshot())
+                    assertEquals(1, filterCalls)
+                }
+            }
+        }
+        assertTrue(store.recordCommandResult("git status", true, "profile", "file:///repo", 3L))
+        val after = store.snapshot()
+        assertEquals(2, after.rankingStats.single().useCount)
+        assertEquals(3L, after.rankingStats.single().lastUsedEpochMillis)
+        assertEquals(listOf("git status"), after.replayCommands.map { it.commandLine })
+    }
+
+    @Test
     fun `complete snapshot identity remains stable until mutation`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()

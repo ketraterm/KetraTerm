@@ -82,6 +82,25 @@ class CompletionLearningSnapshotCodecTest {
     }
 
     @Test
+    fun `malformed UTF-8 metadata in either lane rejects the complete snapshot`() {
+        val valid = CompletionLearningSnapshotCodec.encode(snapshot("git status"))
+        for (invalidUtf8 in listOf("wyg", "7aCA", "8J-Y")) {
+            for ((row, fields) in listOf(1 to listOf(2, 3), 2 to listOf(3, 4))) {
+                for (field in fields) {
+                    val malformed = valid.toMutableList()
+                    malformed[row] =
+                        valid[row]
+                            .split('\t')
+                            .toMutableList()
+                            .also { it[field] = invalidUtf8 }
+                            .joinToString("\t")
+                    assertNull(CompletionLearningSnapshotCodec.decode(malformed), "row=$row field=$field bytes=$invalidUtf8")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `legacy and unknown schemas are rejected`() {
         assertNull(CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t2")))
         assertNull(CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_LEARNING\t999")))

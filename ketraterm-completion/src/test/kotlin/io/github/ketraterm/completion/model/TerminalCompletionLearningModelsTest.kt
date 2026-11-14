@@ -23,6 +23,38 @@ import kotlin.test.assertNotEquals
 
 class TerminalCompletionLearningModelsTest {
     @Test
+    fun `learning records reject malformed context on construction and copy`() {
+        val identity = terminalCompletionRankingIdentity("git status")
+        val ranking = TerminalCompletionRankingStats(identity)
+        val replay = TerminalCommandReplay(identity, "git status")
+        for (malformed in listOf("\uD800", "\uDC00", "x\uD800y", "\uD800x\uDC00", "\uDC00\uD800", "😀\uD800")) {
+            for ((profile, directory) in listOf(malformed to "file:///repo", "profile" to "file:///repo/$malformed")) {
+                assertFailsWith<IllegalArgumentException> {
+                    TerminalCompletionRankingStats(identity, profile, directory)
+                }
+                assertFailsWith<IllegalArgumentException> {
+                    TerminalCommandReplay(identity, "git status", profile, directory)
+                }
+                assertFailsWith<IllegalArgumentException> { ranking.copy(profileId = profile, workingDirectoryUri = directory) }
+                assertFailsWith<IllegalArgumentException> { replay.copy(profileId = profile, workingDirectoryUri = directory) }
+            }
+        }
+    }
+
+    @Test
+    fun `learning context preserves valid Unicode without normalization`() {
+        val identity = terminalCompletionRankingIdentity("git status")
+        for (text in listOf(null, "", "é", "e\u0301", "\uD800\uDC00", "\uDBFF\uDFFF", "👩‍💻", "?", "\uFFFD")) {
+            val ranking = TerminalCompletionRankingStats(identity, text, text)
+            val replay = TerminalCommandReplay(identity, "git status", text, text)
+            assertEquals(text, ranking.profileId)
+            assertEquals(text, ranking.workingDirectoryUri)
+            assertEquals(text, replay.profileId)
+            assertEquals(text, replay.workingDirectoryUri)
+        }
+    }
+
+    @Test
     fun `ranking stats reject invalid digests and negative values`() {
         assertFailsWith<IllegalArgumentException> {
             stats(identityDigest = "plaintext-command")

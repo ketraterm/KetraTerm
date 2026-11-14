@@ -35,6 +35,9 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Completion and shell integration
 
+- Learning rejects malformed UTF-16 profile and directory metadata before changing
+  retained state, preventing later persistence encoding failures.
+
 - Local completion rejects Windows network roots hidden in working-directory URIs,
   including encoded separators, and rejects URI queries and fragments. Explicitly
   typed UNC paths remain available with local directory metadata.

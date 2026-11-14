@@ -30,6 +30,16 @@ internal fun isRecordableTerminalCompletionCommand(commandLine: String): Boolean
 
 internal fun String.hasTerminalCompletionLineBreak(): Boolean = indexOf('\n') >= 0 || indexOf('\r') >= 0
 
+internal fun requireValidTerminalCompletionLearningContext(
+    profileId: String?,
+    workingDirectoryUri: String?,
+) {
+    require(profileId == null || profileId.hasWellFormedTerminalCompletionUtf16()) { "profileId must be well-formed UTF-16" }
+    require(workingDirectoryUri == null || workingDirectoryUri.hasWellFormedTerminalCompletionUtf16()) {
+        "workingDirectoryUri must be well-formed UTF-16"
+    }
+}
+
 private fun String.hasWellFormedTerminalCompletionUtf16(): Boolean {
     var index = 0
     while (index < length) {

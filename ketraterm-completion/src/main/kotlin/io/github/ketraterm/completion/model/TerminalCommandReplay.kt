@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.internal.isStructurallyValidTerminalCompletionReplay
+import io.github.ketraterm.completion.internal.requireValidTerminalCompletionLearningContext
 import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
 
 /**
@@ -32,6 +33,7 @@ import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
  * @property workingDirectoryUri optional working-directory URI associated with the command.
  * @throws IllegalArgumentException if the digest is invalid, [commandLine] is
  * blank, multiline, malformed UTF-16, oversized, or contains a disallowed ISO control.
+ * Context metadata must also be well-formed UTF-16.
  */
 @ExperimentalTerminalCompletionApi
 public data class TerminalCommandReplay(
@@ -42,6 +44,7 @@ public data class TerminalCommandReplay(
 ) {
     init {
         requireValidTerminalCompletionRankingDigest(identityDigest)
+        requireValidTerminalCompletionLearningContext(profileId, workingDirectoryUri)
         require(isStructurallyValidTerminalCompletionReplay(commandLine)) {
             "commandLine must be well-formed, bounded, single-line text without ISO controls other than tab"
         }

@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.internal.CompletionLearningIndexes
+import io.github.ketraterm.completion.internal.requireValidTerminalCompletionLearningContext
 import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
@@ -134,6 +135,7 @@ public class TerminalCompletionLearningStore
          * @param workingDirectoryUri optional working-directory URI.
          * @param usedAtEpochMillis host timestamp for the execution event.
          * @return `true` if the retained exact-command rows changed.
+         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
          */
         public fun recordCommandResult(
             commandLine: String,
@@ -143,6 +145,7 @@ public class TerminalCompletionLearningStore
             usedAtEpochMillis: Long,
         ): Boolean {
             if (!isRecordableStatsEvent(commandLine, usedAtEpochMillis)) return false
+            requireValidTerminalCompletionLearningContext(profileId, workingDirectoryUri)
             val identityDigest = terminalCompletionRankingIdentity(commandLine)
             val replayCommand =
                 commandLine.takeIf {
@@ -172,6 +175,7 @@ public class TerminalCompletionLearningStore
          * @param workingDirectoryUri optional working-directory URI.
          * @param feedbackAtEpochMillis host timestamp for the feedback event.
          * @return `true` if the retained exact-command rows changed.
+         * @throws IllegalArgumentException if a recordable event has malformed UTF-16 context metadata.
          */
         public fun recordSuggestionFeedback(
             commandLine: String,
@@ -181,6 +185,7 @@ public class TerminalCompletionLearningStore
             feedbackAtEpochMillis: Long,
         ): Boolean {
             if (!isRecordableStatsEvent(commandLine, feedbackAtEpochMillis)) return false
+            requireValidTerminalCompletionLearningContext(profileId, workingDirectoryUri)
             val identityDigest = terminalCompletionRankingIdentity(commandLine)
             return synchronized(lock) {
                 val changed =
