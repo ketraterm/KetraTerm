@@ -1,0 +1,17 @@
+format=1
+basis=published-release
+repository=https://repo.maven.apache.org/maven2/
+baseRevision=03a67a5c03370dee57bed3654a3a146a508947a8
+libraryVersion=0.5.0
+kotlinVersion=2.4.20
+jvmTarget=25
+jdkVersion=25.0.4.1+1-b610.67
+jdkVendor=JetBrains
+clientSha256=608446e2bc76529eee550e4626549dd0db270708c6177d98fe4a4857efe5ebf0
+artifact=io.github.ketraterm:ketraterm-completion-persistence:0.5.0 sha256=5a327f5eaf538763b9a38e96b2d05c945c47cd379b7cd6d558779a66bd6702d0
+artifact=io.github.ketraterm:ketraterm-completion:0.5.0 sha256=ca12735db9b19e6d2ef784dd6a3b8a174b14d82a505e33194a5b363cc3db7af4
+artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
+artifact=org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2 sha256=5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd
+artifact=org.jetbrains:annotations:23.0.0 sha256=7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05
+source=src/main/java/consumer/JavaConsumer.java sha256=374fccfeac6cc4629325acc40d50bc6a7e6d6d43c50a24fd8c0cee9278035f71
+source=src/main/kotlin/consumer/KotlinConsumer.kt sha256=79ad618eb83f276f9ff6deeea494584b97f472187e1554cd50d1d4c307ed27e4

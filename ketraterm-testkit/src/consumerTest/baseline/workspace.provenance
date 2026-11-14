@@ -1,0 +1,25 @@
+format=1
+basis=published-release
+repository=https://repo.maven.apache.org/maven2/
+baseRevision=03a67a5c03370dee57bed3654a3a146a508947a8
+libraryVersion=0.5.0
+kotlinVersion=2.4.20
+jvmTarget=25
+jdkVersion=25.0.4.1+1-b610.67
+jdkVendor=JetBrains
+clientSha256=00ef6e92abeeb3cc154205092d918ca5341961495c436d5039f3c508764decfa
+artifact=io.github.ketraterm:ketraterm-core:0.5.0 sha256=f53707bfa0f20befa568861a44e6dfa7e25636eaa06289049e6b704b2a629989
+artifact=io.github.ketraterm:ketraterm-host:0.5.0 sha256=0259230a4e6beb93f4c1e2afb04eacd6957571d0765bc6845bd44f1d705f9014
+artifact=io.github.ketraterm:ketraterm-input:0.5.0 sha256=2bc851e4e60c726dee0329e6a042397d25dfa346bd6d066be2711ad9ae3eaed5
+artifact=io.github.ketraterm:ketraterm-parser:0.5.0 sha256=61c7ee3ee0d30e1040a0b463ee109830e23179cde762efc11b56ea2b63d037eb
+artifact=io.github.ketraterm:ketraterm-protocol:0.5.0 sha256=6e3260d0fd593ca9a29d2359b8aa5c0dcfe0f55c7fb7323ef7eafdd907b1ab53
+artifact=io.github.ketraterm:ketraterm-render-api:0.5.0 sha256=2a08b1ee639bb1cb43c7bee509ca4d327b693673aaed0d94aa4b60894ba2bbbf
+artifact=io.github.ketraterm:ketraterm-render-cache:0.5.0 sha256=599a36aed60512358ab8a4f8785ed78b5f1ea7ce5ae46484b25f0d3083a68bf1
+artifact=io.github.ketraterm:ketraterm-session:0.5.0 sha256=a6995b888da3bcd5c52e57e190d26d79497c0e0f39afba39ff578eaa9fd9ea5d
+artifact=io.github.ketraterm:ketraterm-transport-api:0.5.0 sha256=4ea0c309d1ff60042ec56d9a94dce1e7b53787d16c468d8601b04ee866acbf06
+artifact=io.github.ketraterm:ketraterm-workspace:0.5.0 sha256=ee0bfbdb2d993db4f74b607189da97cff1ecaad3ae77f2f87798955b7e84f6c5
+artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
+artifact=org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2 sha256=5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd
+artifact=org.jetbrains:annotations:23.0.0 sha256=7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05
+source=src/main/java/consumer/JavaConsumer.java sha256=bd06c5491e234366e6b4fba2b9d3406d4b913b715aca04b06f3e3613d1b045b8
+source=src/main/kotlin/consumer/KotlinConsumer.kt sha256=40fe4835650bdfcac2d857fd2bf3f017be72c6da6e4e7b6ef8e3b1969836a99a

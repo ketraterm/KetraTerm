@@ -346,8 +346,24 @@ fun JavaExec.configureConsumerBuild(
     kotlinCompilerVersion: String =
         org.jetbrains.kotlin.gradle.plugin
             .getKotlinPluginVersion(logger),
+    releasedLibraryVersion: String? = null,
 ) {
-    dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryPublicationRepository"))
+    dependsOn(preparePublishedConsumers)
+    if (releasedLibraryVersion == null) dependsOn(rootProject.tasks.named("prepareLibraryPublicationRepository"))
+    require(releasedLibraryVersion == null || !releasedLibraryVersion.endsWith("-SNAPSHOT")) {
+        "A released baseline must use an immutable release version"
+    }
+    val libraryRepository =
+        if (releasedLibraryVersion == null) {
+            rootProject.layout.buildDirectory
+                .dir("library-publication-repository")
+                .get()
+                .asFile
+                .toURI()
+                .toString()
+        } else {
+            "https://repo.maven.apache.org/maven2/"
+        }
     usesService(publishedConsumerFixture)
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
     classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
@@ -360,8 +376,8 @@ fun JavaExec.configureConsumerBuild(
         "--no-daemon",
         "--max-workers=2",
         "-PkotlinVersion=$kotlinCompilerVersion",
-        "-PlibraryVersion=${project.version}",
-        "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-publication-repository").get().asFile.toURI()}",
+        "-PlibraryVersion=${releasedLibraryVersion ?: project.version}",
+        "-PlibraryRepository=$libraryRepository",
         "-PmetadataMode=$metadata",
         "-PsupportedLibraryNames=${(rootProject.extra["publishedDependencyNames"] as Set<*>).joinToString(",")}",
         verificationTask,
@@ -443,23 +459,35 @@ val compiledClientUpgradeTest =
         )
     }
 
-tasks.register<JavaExec>("recordCompiledClientBaseline") {
+val compiledClientBaselineModules =
+    providers.gradleProperty("compiledClientBaselineModules").map { it.split(',').map(String::trim).toSet() }
+
+val compileClientBaseline =
+    tasks.register<JavaExec>("compileClientBaseline") {
+        group = "verification"
+        description = "Intentionally recompiles and replaces the retained consumer baseline for review."
+        val releasedVersion = providers.gradleProperty("compiledClientBaselineVersion").orNull
+        configureConsumerBuild("gradle", ":recordCompiledClientBaseline", releasedLibraryVersion = releasedVersion)
+        args("-PbaselineBasis=${if (releasedVersion == null) "reviewed-working-tree" else "published-release"}")
+        compiledClientBaselineModules.orNull?.let { args("-PbaselineModules=${it.joinToString(",")}") }
+        val revision =
+            providers.gradleProperty("compiledClientBaselineRevision").orElse(
+                providers
+                    .exec { commandLine("git", "rev-parse", "HEAD") }
+                    .standardOutput.asText
+                    .map(String::trim),
+            )
+        args("-PbaselineRevision=${revision.get()}")
+    }
+
+tasks.register<Copy>("recordCompiledClientBaseline") {
     group = "verification"
-    description = "Intentionally recompiles and replaces the retained consumer baseline for review."
-    configureConsumerBuild("gradle", "recordCompiledClientBaseline")
-    val revision =
-        providers.gradleProperty("compiledClientBaselineRevision").orElse(
-            providers
-                .exec { commandLine("git", "rev-parse", "HEAD") }
-                .standardOutput.asText
-                .map(String::trim),
-        )
-    args("-PbaselineRevision=${revision.get()}")
-    doLast {
-        copy {
-            from(consumerFixtureDirectory.map { it.dir("baseline") })
-            into(layout.projectDirectory.dir("src/consumerTest/baseline"))
-        }
+    description = "Records the deliberately compiled consumer baseline for review."
+    dependsOn(compileClientBaseline)
+    from(consumerFixtureDirectory.map { it.dir("baseline") })
+    into(layout.projectDirectory.dir("src/consumerTest/baseline"))
+    compiledClientBaselineModules.orNull?.let { selected ->
+        include(selected.flatMap { listOf("$it.jar", "$it.provenance") })
     }
 }
 

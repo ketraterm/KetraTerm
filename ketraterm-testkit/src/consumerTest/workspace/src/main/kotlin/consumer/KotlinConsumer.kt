@@ -26,6 +26,10 @@ fun main() {
     val profile = TerminalProfile("bash", "Bash", listOf("bash"))
     check(profile.kind == TerminalProfileKind.BASH)
     check(profile.shellEnvironment == TerminalShellEnvironment.Empty)
+    val renamed = profile.copy(displayName = "Renamed Bash")
+    check(renamed.id == profile.id && renamed.displayName == "Renamed Bash")
+    val (id, label, command) = renamed
+    check(id == "bash" && label == "Renamed Bash" && command == listOf("bash"))
     val options = TerminalWorkspaceOpenOptions.create { it.columns = 120 }
     check(options.columns == 120)
     check(options.copy { it.rows = 42 }.rows == 42)

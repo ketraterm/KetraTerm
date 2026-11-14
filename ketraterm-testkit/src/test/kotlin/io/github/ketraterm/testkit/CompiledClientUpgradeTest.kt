@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.MethodSource
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -40,52 +42,7 @@ class CompiledClientUpgradeTest {
     lateinit var directory: Path
 
     @ParameterizedTest
-    @CsvSource(
-        "parser,gradle,current",
-        "parser,pom,current",
-        "host,gradle,current",
-        "host,pom,current",
-        "completion,gradle,current",
-        "completion,pom,current",
-        "ui-swing,gradle,current",
-        "ui-swing,pom,current",
-        "pty,gradle,current",
-        "pty,pom,current",
-        "parser,gradle,2.4.0",
-        "parser,pom,2.4.0",
-        "host,gradle,2.4.0",
-        "host,pom,2.4.0",
-        "completion,gradle,2.4.0",
-        "completion,pom,2.4.0",
-        "ui-swing,gradle,2.4.0",
-        "ui-swing,pom,2.4.0",
-        "pty,gradle,2.4.0",
-        "pty,pom,2.4.0",
-        "core,gradle,current",
-        "core,pom,current",
-        "core,gradle,2.4.0",
-        "core,pom,2.4.0",
-        "host-spi,gradle,current",
-        "host-spi,pom,current",
-        "host-spi,gradle,2.4.0",
-        "host-spi,pom,2.4.0",
-        "render-cache,gradle,current",
-        "render-cache,pom,current",
-        "render-cache,gradle,2.4.0",
-        "render-cache,pom,2.4.0",
-        "completion-host,gradle,current",
-        "completion-host,pom,current",
-        "completion-host,gradle,2.4.0",
-        "completion-host,pom,2.4.0",
-        "shell-integration,gradle,current",
-        "shell-integration,pom,current",
-        "shell-integration,gradle,2.4.0",
-        "shell-integration,pom,2.4.0",
-        "ui-swing-host,gradle,current",
-        "ui-swing-host,pom,current",
-        "ui-swing-host,gradle,2.4.0",
-        "ui-swing-host,pom,2.4.0",
-    )
+    @MethodSource("upgradeCases")
     fun `already compiled Kotlin and Java clients run against the current publication`(
         module: String,
         metadata: String,
@@ -96,33 +53,56 @@ class CompiledClientUpgradeTest {
     }
 
     @Test
-    fun `upgrade check rejects removal of a class used by the retained client`() {
-        val runtime = runtimeClasspath("parser", "gradle")
-        val parser = runtime.single { it.fileName.toString().startsWith("ketraterm-parser-") }
-        val incompatibleRuntime = runtime.filterNot { it == parser }
-        assertTrue(incompatibleRuntime.none { it == parser })
-        val result = runClient("parser", incompatibleRuntime)
-        assertNotEquals(0, result.exitCode)
-        assertTrue(result.output.contains("NoClassDefFoundError"), result.output)
-        assertTrue(result.output.contains("io/github/ketraterm/parser"), result.output)
+    fun `every resolved consumer has a retained jar and provenance in every runtime variant`() {
+        val baseline = Path.of(checkNotNull(System.getProperty("ketraterm.compiledClientBaseline")))
+        val modules = runtimeModules("gradle", "current").toSet()
+        assertTrue(modules.isNotEmpty(), "No published consumer runtimes were prepared")
+        assertEquals(modules, baseline.listDirectoryEntries("*.jar").map { it.nameWithoutExtension }.toSet(), "Retained client inventory")
+        assertEquals(modules, baseline.listDirectoryEntries("*.provenance").map { it.nameWithoutExtension }.toSet(), "Provenance inventory")
+        for ((metadata, kotlinRuntime) in RUNTIME_VARIANTS) {
+            assertEquals(modules, runtimeModules(metadata, kotlinRuntime).toSet(), "$metadata/$kotlinRuntime runtime inventory")
+        }
     }
 
-    @Test
-    fun `upgrade check rejects removal of a method used by the retained client`() {
-        val source = directory.resolve("TerminalParsers.java")
+    @ParameterizedTest
+    @CsvSource("parser", "workspace", "completion-persistence")
+    fun `upgrade check rejects removal of a class used by the retained client`(module: String) {
+        val runtime = runtimeClasspath(module, "gradle")
+        val library = runtime.single { it.fileName.toString().startsWith("ketraterm-$module-") }
+        val incompatibleRuntime = runtime.filterNot { it == library }
+        assertTrue(incompatibleRuntime.none { it == library })
+        val result = runClient(module, incompatibleRuntime)
+        assertNotEquals(0, result.exitCode)
+        assertTrue(result.output.contains("NoClassDefFoundError"), result.output)
+        assertTrue(result.output.contains("io/github/ketraterm/${module.replace('-', '/')}"), result.output)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "parser,io.github.ketraterm.parser.api,TerminalParsers,create",
+        "workspace,io.github.ketraterm.workspace,TerminalWorkspaceOpenOptions,create",
+        "completion-persistence,io.github.ketraterm.completion.persistence,TerminalCompletionLearningCoordinator,currentFileName",
+    )
+    fun `upgrade check rejects removal of a method used by the retained client`(
+        module: String,
+        packageName: String,
+        className: String,
+        method: String,
+    ) {
+        val source = directory.resolve("$className.java")
         source.writeText(
             """
-            package io.github.ketraterm.parser.api;
-            public final class TerminalParsers {}
+            package $packageName;
+            public final class $className {}
             """.trimIndent(),
         )
         val classes = directory.resolve("incompatible-library").createDirectories()
         val compiler = checkNotNull(ToolProvider.getSystemJavaCompiler()) { "Upgrade controls require a JDK" }
         assertEquals(0, compiler.run(null, null, null, "--release", "25", "-proc:none", "-d", classes.toString(), source.toString()))
-        val result = runClient("parser", listOf(classes) + runtimeClasspath("parser", "gradle"))
+        val result = runClient(module, listOf(classes) + runtimeClasspath(module, "gradle"))
         assertNotEquals(0, result.exitCode)
         assertTrue(result.output.contains("NoSuchMethodError"), result.output)
-        assertTrue(result.output.contains("TerminalParsers.create"), result.output)
+        assertTrue(result.output.contains("$className.$method"), result.output)
     }
 
     private fun runtimeClasspath(
@@ -163,6 +143,11 @@ class CompiledClientUpgradeTest {
                     .reader()
                     .use(::load)
             }
+        if (module == "workspace" || module == "completion-persistence") {
+            assertEquals("published-release", provenance.getProperty("basis"), "$module requires a released-client baseline")
+            assertEquals("0.5.0", provenance.getProperty("libraryVersion"), "$module baseline release changed without review")
+            assertEquals("https://repo.maven.apache.org/maven2/", provenance.getProperty("repository"))
+        }
         val sha256 = MessageDigest.getInstance("SHA-256").digest(jar.readBytes()).joinToString("") { "%02x".format(it) }
         assertEquals(provenance.getProperty("clientSha256"), sha256, "The retained $module client differs from its provenance")
         JarFile(jar.toFile()).use { client ->
@@ -210,4 +195,25 @@ class CompiledClientUpgradeTest {
         val exitCode: Int,
         val output: String,
     )
+
+    private companion object {
+        val RUNTIME_VARIANTS = listOf("gradle" to "current", "pom" to "current", "gradle" to "2.4.0", "pom" to "2.4.0")
+
+        fun runtimeModules(
+            metadata: String,
+            kotlinRuntime: String,
+        ): List<String> =
+            Path
+                .of(checkNotNull(System.getProperty("ketraterm.compiledClientRuntimes")))
+                .resolve("$metadata/$kotlinRuntime")
+                .listDirectoryEntries("*.txt")
+                .map { it.nameWithoutExtension }
+                .sorted()
+
+        @JvmStatic
+        fun upgradeCases(): List<Arguments> =
+            RUNTIME_VARIANTS.flatMap { (metadata, kotlinRuntime) ->
+                runtimeModules(metadata, kotlinRuntime).map { Arguments.of(it, metadata, kotlinRuntime) }
+            }
+    }
 }
