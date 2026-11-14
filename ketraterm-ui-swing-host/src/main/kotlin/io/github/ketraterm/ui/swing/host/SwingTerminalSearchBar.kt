@@ -33,6 +33,8 @@ import kotlin.coroutines.CoroutineContext
  * whether to instantiate this class, where to mount [component], and which
  * shortcuts invoke its actions. The bar installs no command shortcuts; normal
  * Swing focus traversal and button activation remain available.
+ * Non-cancellation status-update failures are logged and shown as failed status;
+ * observation continues with the next search state.
  *
  * @param terminal terminal whose headless search API backs this bar.
  * @param messages host message bundle, read on the EDT outside painting. Static labels are captured at construction.
@@ -84,14 +86,15 @@ public class SwingTerminalSearchBar
         private var searchObservation: Job? = null
         private val searchScope =
             CoroutineScope(
-                object : CoroutineDispatcher() {
-                    override fun isDispatchNeeded(context: CoroutineContext) = !SwingUtilities.isEventDispatchThread()
+                SupervisorJob() +
+                    object : CoroutineDispatcher() {
+                        override fun isDispatchNeeded(context: CoroutineContext) = !SwingUtilities.isEventDispatchThread()
 
-                    override fun dispatch(
-                        context: CoroutineContext,
-                        block: Runnable,
-                    ) = SwingUtilities.invokeLater(block)
-                },
+                        override fun dispatch(
+                            context: CoroutineContext,
+                            block: Runnable,
+                        ) = SwingUtilities.invokeLater(block)
+                    },
             )
 
         /**
@@ -210,7 +213,7 @@ public class SwingTerminalSearchBar
             refreshColors()
             component.isVisible = true
             setQueryText(terminal.currentSearchState().query)
-            if (searchObservation == null) {
+            if (searchObservation?.isActive != true) {
                 searchObservation =
                     searchScope.launch {
                         terminal.searchState.collect { refreshCounter() }
@@ -371,51 +374,62 @@ public class SwingTerminalSearchBar
         }
 
         private fun refreshCounter() {
-            val state = terminal.currentSearchState()
-            when {
-                state.failure != null -> {
-                    counterLabel.foreground = colors.counterErrorForeground ?: colors.counterForeground
-                    queryField.statusBorderColor = colors.textFieldErrorBorder
-                }
-                state.query.isNotEmpty() && !state.isSearching && state.resultCount == 0 -> {
-                    counterLabel.foreground = colors.counterNoMatchForeground ?: colors.counterForeground
-                    queryField.statusBorderColor = colors.textFieldNoMatchBorder
-                }
-                else -> {
-                    counterLabel.foreground = colors.counterForeground
-                    queryField.statusBorderColor = null
-                }
-            }
-            counterLabel.text =
+            try {
+                val state = terminal.currentSearchState()
                 when {
-                    state.failure is PatternSyntaxException -> messages.message("search.invalidRegex")
-                    state.failure != null -> failedText
-                    state.isSearching -> searchingText
-                    state.isCountLimited -> messages.message("search.matchCounterLimited", state.resultCount - 1)
-                    else ->
-                        messages.message(
-                            "search.matchCounter",
-                            if (state.resultCount ==
-                                0
-                            ) {
-                                0
-                            } else {
-                                state.activeResultIndex + 1
-                            },
-                            state.resultCount,
-                        )
+                    state.failure != null -> {
+                        counterLabel.foreground = colors.counterErrorForeground ?: colors.counterForeground
+                        queryField.statusBorderColor = colors.textFieldErrorBorder
+                    }
+                    state.query.isNotEmpty() && !state.isSearching && state.resultCount == 0 -> {
+                        counterLabel.foreground = colors.counterNoMatchForeground ?: colors.counterForeground
+                        queryField.statusBorderColor = colors.textFieldNoMatchBorder
+                    }
+                    else -> {
+                        counterLabel.foreground = colors.counterForeground
+                        queryField.statusBorderColor = null
+                    }
                 }
-            counterLabel.toolTipText = state.failure?.localizedMessage ?: messages.message("search.counterToolTip")
-            counterLabel.accessibleContext.accessibleDescription =
-                if (state.failure == null) counterLabel.text else "${counterLabel.text}: ${counterLabel.toolTipText}"
-            val width =
-                maxOf(
-                    counterLabel.minimumSize.width,
-                    counterLabel.getFontMetrics(counterLabel.font).stringWidth(counterLabel.text) + 8,
-                )
-            if (width != counterLabel.preferredSize.width) {
-                counterLabel.preferredSize = Dimension(width, COMMAND_BUTTON_HEIGHT)
-                revalidateHost()
+                counterLabel.text =
+                    when {
+                        state.failure is PatternSyntaxException -> messages.message("search.invalidRegex")
+                        state.failure != null -> failedText
+                        state.isSearching -> searchingText
+                        state.isCountLimited -> messages.message("search.matchCounterLimited", state.resultCount - 1)
+                        else ->
+                            messages.message(
+                                "search.matchCounter",
+                                if (state.resultCount ==
+                                    0
+                                ) {
+                                    0
+                                } else {
+                                    state.activeResultIndex + 1
+                                },
+                                state.resultCount,
+                            )
+                    }
+                counterLabel.toolTipText = state.failure?.localizedMessage ?: messages.message("search.counterToolTip")
+                counterLabel.accessibleContext.accessibleDescription =
+                    if (state.failure == null) counterLabel.text else "${counterLabel.text}: ${counterLabel.toolTipText}"
+                val width =
+                    maxOf(
+                        counterLabel.minimumSize.width,
+                        counterLabel.getFontMetrics(counterLabel.font).stringWidth(counterLabel.text) + 8,
+                    )
+                if (width != counterLabel.preferredSize.width) {
+                    counterLabel.preferredSize = Dimension(width, COMMAND_BUTTON_HEIGHT)
+                    revalidateHost()
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                LOGGER.log(System.Logger.Level.WARNING, "Terminal search status update failed", failure)
+                counterLabel.foreground = colors.counterErrorForeground ?: colors.counterForeground
+                queryField.statusBorderColor = colors.textFieldErrorBorder
+                counterLabel.text = failedText
+                counterLabel.toolTipText = failedText
+                counterLabel.accessibleContext.accessibleDescription = failedText
             }
         }
 
@@ -714,6 +728,8 @@ public class SwingTerminalSearchBar
         }
 
         private companion object {
+            private val LOGGER = System.getLogger(SwingTerminalSearchBar::class.java.name)
+
             private fun escapeHtml(text: String): String =
                 text
                     .replace("&", "&amp;")

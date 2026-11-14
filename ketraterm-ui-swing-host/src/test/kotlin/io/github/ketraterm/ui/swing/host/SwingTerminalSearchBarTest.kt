@@ -19,7 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,15 +32,174 @@ import java.beans.PropertyChangeListener
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.logging.Handler
+import java.util.logging.LogRecord
+import java.util.logging.Logger
 import javax.swing.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSearchBarTest {
+    @Test
+    fun callbackFailureShowsFailedStatusAndRecoversWithoutClosingOrLosingFutureObservations() {
+        for (key in listOf("search.matchCounter", "search.counterToolTip")) {
+            lateinit var fixture: RecoveryFixture
+            SwingUtilities.invokeAndWait { fixture = RecoveryFixture() }
+            try {
+                val failure = IllegalStateException("message callback failed")
+                SwingUtilities.invokeAndWait {
+                    fixture.bar.open()
+                    fixture.failKey = key
+                    fixture.nextFailure = failure
+                    fixture.terminal.search("broken")
+                }
+                fixture.failureObserved.get(10, TimeUnit.SECONDS)
+                SwingUtilities.invokeAndWait {
+                    assertTrue(fixture.bar.isOpen())
+                    assertEquals("broken", fixture.terminal.currentSearchState().query)
+                    assertEquals(fixture.defaults.message("search.failed"), fixture.counter.text)
+                    assertEquals(fixture.counter.text, fixture.counter.toolTipText)
+                    assertEquals(fixture.counter.text, fixture.counter.accessibleContext.accessibleDescription)
+                    assertEquals(Color.RED, fixture.counter.foreground)
+                    assertSame(failure, fixture.diagnostics.single().thrown)
+                    fixture.terminal.search("recovered")
+                }
+                awaitCounter(fixture.counter, "query:recovered")
+                SwingUtilities.invokeAndWait {
+                    assertEquals(Color.BLUE, fixture.counter.foreground)
+                    fixture.bar.close()
+                    fixture.bar.open()
+                    fixture.terminal.search("after-reopen")
+                }
+                awaitCounter(fixture.counter, "query:after-reopen")
+            } finally {
+                SwingUtilities.invokeAndWait { fixture.close() }
+            }
+        }
+    }
+
+    @Test
+    fun cancellationStopsTheObservationWithoutReportingFailureAndOpeningRestartsIt() {
+        lateinit var fixture: RecoveryFixture
+        SwingUtilities.invokeAndWait { fixture = RecoveryFixture() }
+        try {
+            SwingUtilities.invokeAndWait {
+                fixture.bar.open()
+                fixture.nextFailure = CancellationException("observation cancelled")
+                fixture.terminal.search("cancelled")
+            }
+            fixture.failureObserved.get(10, TimeUnit.SECONDS)
+            var callsAfterCancellation = 0
+            SwingUtilities.invokeAndWait {
+                callsAfterCancellation = fixture.counterCalls
+                fixture.terminal.search("while-cancelled")
+            }
+            SwingUtilities.invokeAndWait {
+                assertEquals(callsAfterCancellation, fixture.counterCalls)
+                assertTrue(fixture.diagnostics.isEmpty())
+                fixture.bar.open()
+                fixture.terminal.search("restarted")
+            }
+            awaitCounter(fixture.counter, "query:restarted")
+        } finally {
+            SwingUtilities.invokeAndWait { fixture.close() }
+        }
+    }
+
+    @Test
+    fun closingAndRemovingSearchChromeStopObservationUntilItIsOpenedAgain() {
+        lateinit var fixture: RecoveryFixture
+        SwingUtilities.invokeAndWait { fixture = RecoveryFixture() }
+        try {
+            for (removeFromHierarchy in listOf(false, true)) {
+                var callsAfterRemoval = 0
+                SwingUtilities.invokeAndWait {
+                    fixture.bar.open()
+                    if (removeFromHierarchy) {
+                        fixture.bar.component.addNotify()
+                        assertTrue(fixture.bar.component.isDisplayable)
+                        fixture.bar.component.removeNotify()
+                        assertFalse(fixture.bar.component.isDisplayable)
+                    } else {
+                        fixture.bar.close()
+                    }
+                    callsAfterRemoval = fixture.counterCalls
+                    fixture.terminal.search("detached-$removeFromHierarchy")
+                }
+                SwingUtilities.invokeAndWait {
+                    assertEquals(callsAfterRemoval, fixture.counterCalls)
+                    assertTrue(fixture.diagnostics.isEmpty())
+                    fixture.bar.open()
+                    fixture.terminal.search("reattached-$removeFromHierarchy")
+                }
+                awaitCounter(fixture.counter, "query:reattached-$removeFromHierarchy")
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { fixture.close() }
+        }
+    }
+
+    private class RecoveryFixture : AutoCloseable {
+        val terminal = SwingTerminal()
+        val defaults = SwingHostMessages.forLocale(Locale.US)
+        var nextFailure: Exception? = null
+        var failKey = "search.matchCounter"
+        var counterCalls = 0
+        val failureObserved = CompletableFuture<Unit>()
+        val diagnostics = mutableListOf<LogRecord>()
+        private val logger = Logger.getLogger(SwingTerminalSearchBar::class.java.name)
+        private val handler =
+            object : Handler() {
+                override fun publish(record: LogRecord) {
+                    check(SwingUtilities.isEventDispatchThread())
+                    diagnostics += record
+                }
+
+                override fun flush() = Unit
+
+                override fun close() = Unit
+            }
+        val bar =
+            SwingTerminalSearchBar(terminal) { key, arguments ->
+                check(SwingUtilities.isEventDispatchThread())
+                if (key == "search.matchCounter") counterCalls++
+                if (key == failKey) {
+                    nextFailure?.let { failure ->
+                        nextFailure = null
+                        failureObserved.complete(Unit)
+                        throw failure
+                    }
+                }
+                if (key == "search.matchCounter") "query:${terminal.currentSearchState().query}" else defaults.message(key, *arguments)
+            }
+        val counter = descendants(bar.component).filterIsInstance<JLabel>().single()
+
+        init {
+            check(SwingUtilities.isEventDispatchThread())
+            logger.addHandler(handler)
+            bar.refreshColors(
+                SwingTerminalSearchColors.create {
+                    it.counterErrorForeground = Color.RED
+                    it.counterForeground = Color.BLUE
+                },
+            )
+        }
+
+        override fun close() {
+            check(SwingUtilities.isEventDispatchThread())
+            nextFailure = null
+            try {
+                bar.close()
+                terminal.dispose()
+            } finally {
+                logger.removeHandler(handler)
+            }
+        }
+
+        private fun descendants(component: Component): List<Component> =
+            listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+    }
+
     @Test
     fun searchFitsNarrowPanesAndCollapsedOptionsKeepTheirState() {
         SwingUtilities.invokeAndWait {

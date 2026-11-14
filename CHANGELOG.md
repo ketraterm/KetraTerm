@@ -82,6 +82,9 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Rendering and interaction
 
+- Search chrome recovers after host message callback failures and restarts cancelled
+  observation when reopened.
+
 - Swing tracks repeat and release for extended function and system keys, and clears
   pending keyboard state on focus loss and session binding changes.
 

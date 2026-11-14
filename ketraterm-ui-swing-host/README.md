@@ -50,6 +50,10 @@ active highlights. Removing the bar from a displayable hierarchy also cancels
 its observation. `open`, `close`, and `refreshColors` enqueue work when called
 off the EDT; read `isOpen` and manipulate `component` on the EDT.
 
+Host message callback failures are logged through `System.Logger` and show failed
+status; later search updates retry. Cancellation stops observation, and `open()`
+can restart it.
+
 The bar installs no command shortcuts, including Enter, Shift+Enter, or Escape.
 Hosts invoke `performAction(SwingTerminalSearchAction)` on the EDT and bind those
 commands through their own action system. It returns `false` when search is closed.
