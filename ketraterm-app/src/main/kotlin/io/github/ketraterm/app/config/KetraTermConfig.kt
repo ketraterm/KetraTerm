@@ -185,7 +185,7 @@ internal data class KetraTermConfig(
      * Published bounds and defaults for all terminal configuration fields.
      *
      * These constants are the single source of truth shared by:
-     * - [KetraTermConfig.init] validity assertions.
+     * - [KetraTermConfig] constructor validation.
      * - [KetraTermConfigManager] TOML clamping before constructing a config.
      * - The standalone settings dialog spinner min/max values.
      *

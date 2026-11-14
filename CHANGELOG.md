@@ -15,7 +15,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 - Select cluster width and emoji presentation from the base after leading Unicode
   Prepend characters, preserving wide CJK and emoji allocation.
 - Use DEC page-relative addressing with origin mode reset, including outside
-  horizontal margins. Single-axis cursor positioning preserves the other axis.
+  horizontal margins. Single-axis cursor positioning preserves the other axis;
+  line insertion and deletion ignore cursors outside the scrolling region.
 - Clip DEC rectangle coordinates after overflow-safe origin rebasing, keeping
   editing operations and checksum queries on the same geometry policy.
 - Kitty text-mode keys emit text only on press and repeat; release reports remain

@@ -25,6 +25,26 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class HostHorizontalMarginTest {
+    @Test
+    fun `line edits outside horizontal margins are ignored and cancel deferred wrap`() {
+        for (command in listOf('L', 'M')) {
+            for (count in listOf("", "2147483647")) {
+                val setup = "\u001B[3;3HKEEP\u001B[4;3HSTAY\u001B[?69h\u001B[3;8s\u001B[2;6r"
+                for (column in listOf(1, 10)) {
+                    val position = "\u001B[3;${column}H"
+                    val pendingWrap = if (column == 10) "X" else ""
+                    assertStream("$setup$position$pendingWrap\u001B[$count${command}Y") { terminal ->
+                        assertEquals("KEEP", terminal.getLineAsString(2).substring(2, 6))
+                        assertEquals("STAY", terminal.getLineAsString(3).substring(2, 6))
+                        assertEquals('Y'.code, terminal.getCodepointAt(column - 1, 2))
+                        assertEquals(if (column == 1) 1 to 2 else 9 to 2, terminal.cursorCol to terminal.cursorRow)
+                        assertEquals(0, terminal.historySize)
+                    }
+                }
+            }
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["H", "f"])
     fun `CUP and HVP address the whole page with origin reset and margins with origin set`(command: String) {

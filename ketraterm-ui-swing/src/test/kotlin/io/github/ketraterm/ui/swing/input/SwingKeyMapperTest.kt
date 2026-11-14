@@ -66,7 +66,7 @@ class SwingKeyMapperTest {
                         KeyEvent.VK_MULTIPLY,
                         KeyEvent.VK_SUBTRACT,
                         KeyEvent.VK_ADD,
-                    )
+                    ),
                 )
             }
         for (code in codes) {

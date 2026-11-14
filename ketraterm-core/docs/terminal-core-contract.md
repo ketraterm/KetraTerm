@@ -154,7 +154,7 @@ from the top of the viewport may admit rows to primary history; partial-width
 scrolling never does. Downward scrolling does not consume history.
 
 `ICH` / `DCH` operate within horizontal margins; `IL` / `DL` operate within the
-vertical region and do nothing when the cursor is outside it. Vertical scrolling
+scrolling region and do nothing when the cursor is outside either axis. Vertical scrolling
 and line edits preserve cells outside horizontal margins, except complete
 occupants crossing a slice boundary. `ECH` erases without shifting; zero means
 one cell and negative values are ignored. Rectangle operations use their

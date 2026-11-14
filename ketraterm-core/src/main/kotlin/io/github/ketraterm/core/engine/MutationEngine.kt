@@ -783,7 +783,7 @@ internal class MutationEngine(
         val cRow = state.cursor.row
         val top = state.scrollTop
         val bottom = state.scrollBottom
-        if (cRow !in top..bottom) return
+        if (cRow !in top..bottom || state.cursor.col !in leftMargin..rightMargin) return
 
         val times = count.coerceAtMost(bottom - cRow + 1)
         if (times <= 0) return

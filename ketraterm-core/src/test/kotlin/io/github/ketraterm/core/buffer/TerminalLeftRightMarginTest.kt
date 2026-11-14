@@ -26,6 +26,40 @@ import kotlin.random.Random
 
 class TerminalLeftRightMarginTest {
     @Test
+    fun `line insertion and deletion outside horizontal margins preserve complete occupants and generations`() {
+        for (alternate in listOf(false, true)) {
+            for (column in listOf(0, 1, 8, 9)) {
+                for (insert in listOf(false, true)) {
+                    val buffer = TerminalBuffers.create(10, 6, maxHistory = 20)
+                    if (alternate) buffer.enterAltBuffer()
+                    for (row in 0 until 6) {
+                        buffer.positionCursor(0, row)
+                        buffer.writeText("0123456789")
+                        buffer.positionCursor(1, row)
+                        buffer.writeCodepoint('界'.code)
+                        buffer.positionCursor(7, row)
+                        buffer.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+                    }
+                    buffer.setLeftRightMarginMode(true)
+                    buffer.setLeftRightMargins(3, 8)
+                    buffer.setScrollRegion(2, 5)
+                    buffer.positionCursor(column, 2)
+                    val before = List(6) { buffer.getLineAsString(it) }
+                    var generation = 0L
+                    buffer.readRenderFrame { generation = it.frameGeneration }
+
+                    if (insert) buffer.insertLines(Int.MAX_VALUE) else buffer.deleteLines(Int.MAX_VALUE)
+
+                    assertEquals(before, List(6) { buffer.getLineAsString(it) })
+                    assertEquals(column to 2, buffer.cursorCol to buffer.cursorRow)
+                    assertEquals(0, buffer.historySize)
+                    buffer.readRenderFrame { assertEquals(generation, it.frameGeneration) }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `single axis positioning cancels deferred wrap even without a coordinate change`() {
         for (origin in listOf(false, true)) {
             for (horizontal in listOf(false, true)) {
