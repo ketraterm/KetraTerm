@@ -20,11 +20,12 @@ import io.github.ketraterm.core.buffer.HistoryRing
 import io.github.ketraterm.core.model.Cursor
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.SavedCursorState
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 
 /**
  * Represents a single cohesive terminal screen (primary or alternate).
  *
- * Owns its row ring, cursor, DECSC save slot, and active scroll margins.
+ * Owns its row ring, cursor, DECSC save slot, scroll margins, and Kitty keyboard stack.
  * Each row owns its own cluster payloads and can be retained or discarded independently.
  *
  * Resize lifecycle:
@@ -55,9 +56,12 @@ internal class ScreenBuffer(
     val cursor = Cursor()
     val savedCursor = SavedCursorState()
 
-    var kittyKeyboardFlags: Int = 0
-    internal val kittyKeyboardStack = IntArray(32)
-    internal var kittyKeyboardDepth = 0
+    private val kittyKeyboardStack = IntArray(32)
+    var kittyKeyboardDepth: Int = 0
+        private set
+
+    val kittyKeyboardFlags: Int
+        get() = if (kittyKeyboardDepth == 0) 0 else kittyKeyboardStack[kittyKeyboardDepth - 1]
 
     var scrollTop: Int = 0
         private set
@@ -203,37 +207,31 @@ internal class ScreenBuffer(
         }
     }
 
-    fun pushKittyKeyboardFlags(
-        flags: Int,
-        currentFlags: Int,
-    ): Int {
-        if (kittyKeyboardDepth >= kittyKeyboardStack.size) {
-            System.arraycopy(kittyKeyboardStack, 1, kittyKeyboardStack, 0, kittyKeyboardStack.size - 1)
-            kittyKeyboardStack[kittyKeyboardStack.size - 1] = currentFlags
-        } else {
-            kittyKeyboardStack[kittyKeyboardDepth] = currentFlags
-            kittyKeyboardDepth++
-        }
-        kittyKeyboardFlags = flags
-        return flags
+    fun setKittyKeyboardFlags(flags: Int): Int {
+        if (kittyKeyboardDepth == 0) kittyKeyboardDepth = 1
+        val supportedFlags = flags and KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK
+        kittyKeyboardStack[kittyKeyboardDepth - 1] = supportedFlags
+        return supportedFlags
     }
 
-    fun popKittyKeyboardFlags(
-        count: Int,
-        currentFlags: Int,
-    ): Int {
-        var nextFlags = currentFlags
-        if (count > 0) {
-            kittyKeyboardDepth -= minOf(count, kittyKeyboardDepth)
-            nextFlags = if (kittyKeyboardDepth == 0) 0 else kittyKeyboardStack[kittyKeyboardDepth]
+    fun pushKittyKeyboardFlags(flags: Int): Int {
+        // Kitty preserves a default zero baseline even when the first operation is a push.
+        if (kittyKeyboardDepth == 0) setKittyKeyboardFlags(0)
+        if (kittyKeyboardDepth == kittyKeyboardStack.size) {
+            System.arraycopy(kittyKeyboardStack, 1, kittyKeyboardStack, 0, kittyKeyboardStack.size - 1)
+        } else {
+            kittyKeyboardDepth++
         }
-        kittyKeyboardFlags = nextFlags
-        return nextFlags
+        return setKittyKeyboardFlags(flags)
+    }
+
+    fun popKittyKeyboardFlags(count: Int): Int {
+        if (count > 0) kittyKeyboardDepth -= minOf(count, kittyKeyboardDepth)
+        return kittyKeyboardFlags
     }
 
     fun clearKittyKeyboardStack() {
         kittyKeyboardDepth = 0
-        kittyKeyboardFlags = 0
     }
 
     private fun clearLineAsNew(

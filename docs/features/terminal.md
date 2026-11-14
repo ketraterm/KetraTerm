@@ -51,7 +51,7 @@ placement can depend on input chunk boundaries. See the
 | --- | --- |
 | Keyboard | Cursor/function/keypad keys, modifiers, application modes, Backarrow mode, and committed text. |
 | xterm key resources | modifyOtherKeys and independent modifier/format resources with status queries. |
-| Kitty keyboard | Progressive flag negotiation and encoding; available flags depend on host input metadata. |
+| Kitty keyboard | Progressive flag negotiation and encoding, with screen-local stacks that restore set baselines; available flags depend on host input metadata. [Stack contract](../../ketraterm-core/docs/terminal-core-contract.md#mode-state-contract). |
 | Paste | Bracketed paste, control-character protection, and configurable newline handling. |
 | Mouse tracking | X10, normal, button-event, and any-event tracking. |
 | Mouse behavior | Mode 1007 controls alternate-screen wheel-to-cursor-key input; XTSHIFTESCAPE (`CSI > Ps s`) requests Shift mouse capture. Hosts retain control over reporting and wheel translation. |

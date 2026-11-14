@@ -35,6 +35,47 @@ import org.junit.jupiter.params.provider.ValueSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalKeyboardProtocolTest {
     @Test
+    fun `wire Kitty baseline restoration agrees with replies and keyboard encoding at every split`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val steps =
+                listOf(
+                    "\u001b[=1u\u001b[?u" to "\u001b[?1u\u001b[27ua",
+                    "\u001b[>8u\u001b[?u" to "\u001b[?8u\u001b[27u\u001b[97u",
+                    "\u001b[<1u\u001b[?u" to "\u001b[?1u\u001b[27ua",
+                    "\u001b[<1u\u001b[?u" to "\u001b[?0u\u001ba",
+                )
+            for (split in 0..steps.maxOf { it.first.length }) {
+                val connector = MockConnector()
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(20, 3),
+                        connector,
+                        kittyKeyboardSupportedFlags = 31,
+                        workerDispatcher = dispatcher,
+                        ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
+                    ).use { session ->
+                        session.start(20, 3)
+                        val expected = StringBuilder()
+                        for ((wire, output) in steps) {
+                            val bytes = wire.encodeToByteArray()
+                            val boundary = split.coerceAtMost(bytes.size)
+                            connector.feedFromHost(bytes, 0, boundary)
+                            connector.feedFromHost(bytes, boundary, bytes.size - boundary)
+                            session.encodeKey(TerminalKeyEvent.key(TerminalKey.ESCAPE))
+                            session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                            runCurrent()
+                            expected.append(output)
+                            assertArrayEquals(expected.toString().encodeToByteArray(), connector.writtenBytes, "split=$split wire=$wire")
+                        }
+                        assertFalse(session.isClosed)
+                    }
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `ordinary Kitty admission rolls back all streamed chunks after an encoding failure`() =
         runTest {
             val connector = MockConnector()

@@ -21,6 +21,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 - Kitty text-mode keys emit text only on press and repeat; release reports remain
   available for enhanced keys and report-all mode. Associated-text reports support
   long text commits without truncation.
+- Kitty keyboard stacks restore a baseline established by setting flags after a
+  nested push/pop. Their 32-entry limit includes the active entry.
 - Legacy key routing ignores CapsLock and NumLock modifiers, retaining NumLock's
   numeric keypad behavior and Kitty lock metadata.
 

@@ -287,12 +287,13 @@ Reverse-wrap, input reporting, and presentation setters preserve it. `resetCurso
 restores the configured default shape and enables the blink flag without
 changing visibility, position, or pending wrap; the host owns blink animation.
 
-Kitty keyboard flags and stacks are screen-local. Each stack retains at most 32
-saved entries, evicting the oldest on overflow. A positive counted pop resets
-flags when the retained stack is exhausted, including exact exhaustion; a
-partial pop restores the last popped flags. Nonpositive counts do nothing, and
-work is constant regardless of the requested count. Soft and hard reset clear
-both stacks. Serialize these operations with other core mutation.
+Kitty keyboard stacks are screen-local and retain at most 32 entries including
+the active entry, evicting the oldest on overflow. Setting flags replaces the
+current entry or creates a baseline when empty; zero remains a valid entry.
+Pushing onto an empty stack first establishes a zero baseline. Pop activates the
+surviving top entry, or zero if empty. Nonpositive core counts do nothing, and
+pop work is independent of the requested count. Soft and hard reset clear both
+stacks. Serialize these operations with other core mutation.
 
 ## Unicode scalar and width policy
 

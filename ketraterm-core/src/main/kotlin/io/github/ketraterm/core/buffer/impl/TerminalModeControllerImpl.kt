@@ -140,20 +140,19 @@ internal class TerminalModeControllerImpl(
 
     override fun setKittyKeyboardFlags(flags: Int) {
         mutateMode {
-            state.modes.kittyKeyboardFlags = flags
-            state.activeBuffer.kittyKeyboardFlags = flags
+            state.modes.kittyKeyboardFlags = state.activeBuffer.setKittyKeyboardFlags(flags)
         }
     }
 
     override fun pushKittyKeyboardFlags(flags: Int) {
         mutateMode {
-            state.modes.kittyKeyboardFlags = state.activeBuffer.pushKittyKeyboardFlags(flags, state.modes.kittyKeyboardFlags)
+            state.modes.kittyKeyboardFlags = state.activeBuffer.pushKittyKeyboardFlags(flags)
         }
     }
 
     override fun popKittyKeyboardFlags(count: Int) {
         mutateMode {
-            state.modes.kittyKeyboardFlags = state.activeBuffer.popKittyKeyboardFlags(count, state.modes.kittyKeyboardFlags)
+            state.modes.kittyKeyboardFlags = state.activeBuffer.popKittyKeyboardFlags(count)
         }
     }
 

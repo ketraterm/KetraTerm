@@ -1124,15 +1124,117 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
-            // 3. Pop 1 count exhausts the stack: CSI < 1 u
+            // 3. Pop restores the baseline established by set: CSI < 1 u
             f.acceptAscii("\u001B[<1u")
-            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
             // 4. Push 8, then pop using default count (omitted parameter) which defaults to 1: CSI < u
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
             f.acceptAscii("\u001B[<u")
+            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<u")
             assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `Kitty baseline set push and counted pop replies agree across every byte split`() {
+            val cases =
+                listOf(
+                    "\u001B[=1u\u001B[?u\u001B[>8u\u001B[?u\u001B[<1u\u001B[?u\u001B[<1u\u001B[?u" to listOf(1, 8, 1, 0),
+                    "\u001B[=1u\u001B[>8u\u001B[<2u\u001B[?u" to listOf(0),
+                    "\u001B[=1u\u001B[>u\u001B[?u\u001B[<0u\u001B[?u" to listOf(0, 1),
+                    "\u001B[=4;2u\u001B[>8u\u001B[=16;2u\u001B[?u\u001B[<u\u001B[?u" to listOf(24, 4),
+                    "\u001B[=3u\u001B[>8u\u001B[=8;3u\u001B[>2u\u001B[<u\u001B[?u\u001B[<u\u001B[?u" to listOf(0, 3),
+                    "\u001B[=0u\u001B[>8u\u001B[<u\u001B[?u\u001B[<u\u001B[?u" to listOf(0, 0),
+                    "\u001B[=1u\u001B[=1;3u\u001B[?u\u001B[<u\u001B[?u" to listOf(0, 0),
+                    "\u001B[=1u\u001B[>8u\u001B[<99999999999999999999u\u001B[?u\u001B[>2u\u001B[<u\u001B[?u" to listOf(0, 0),
+                )
+            for ((commands, replies) in cases) {
+                val bytes = (commands + "X").encodeToByteArray()
+                val expectedReplies = replies.joinToString("") { "\u001B[?${it}u" }
+                for (split in 0..bytes.size) {
+                    val f = Fixture(kittyKeyboardSupportedFlags = 31)
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.end()
+                    assertAll(
+                        "commands=$commands split=$split",
+                        { assertEquals(expectedReplies, f.drainResponses()) },
+                        { assertEquals(replies.last(), f.terminal.getModeSnapshot().kittyKeyboardFlags) },
+                        { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0)) },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `Kitty capacity counts active entries and evicts the oldest baseline on the wire`() {
+            for (pushes in listOf(30, 31, 32, 33, 64)) {
+                for (count in listOf(30, 31, 32, 33, Int.MAX_VALUE)) {
+                    val setup = "\u001B[=1u" + "\u001B[>8u".repeat(pushes)
+                    val bytes = "\u001B[<${count}u\u001B[?uX".encodeToByteArray()
+                    val expected =
+                        when {
+                            count >= minOf(pushes + 1, 32) -> 0
+                            count == pushes -> 1
+                            else -> 8
+                        }
+                    for (split in 0..bytes.size) {
+                        val f = Fixture()
+                        f.acceptAscii(setup)
+                        f.parser.accept(bytes, 0, split)
+                        f.parser.accept(bytes, split, bytes.size - split)
+                        f.end()
+                        assertAll(
+                            "pushes=$pushes count=$count split=$split",
+                            { assertEquals(expected, f.terminal.getModeSnapshot().kittyKeyboardFlags) },
+                            { assertEquals("\u001B[?${expected}u", f.drainResponses()) },
+                            { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0)) },
+                        )
+                    }
+                }
+            }
+        }
+
+        @Test
+        fun `Kitty baselines remain screen local through retaining and clearing screen transitions`() {
+            for (mode in listOf(47, 1047, 1049)) {
+                val wire =
+                    "\u001B[=1u\u001B[>8u\u001B[?${mode}h\u001B[=2u\u001B[>4u\u001B[<u\u001B[?u" +
+                        "\u001B[?${mode}l\u001B[<u\u001B[?u\u001B[?${mode}h\u001B[?u\u001B[<u\u001B[?uX"
+                val bytes = wire.encodeToByteArray()
+                val altFlags = if (mode == 47) 2 else 0
+                for (split in 0..bytes.size) {
+                    val f = Fixture(kittyKeyboardSupportedFlags = 31)
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.end()
+                    assertAll(
+                        "mode=$mode split=$split",
+                        { assertEquals("\u001B[?2u\u001B[?1u\u001B[?${altFlags}u\u001B[?0u", f.drainResponses()) },
+                        { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0)) },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `wire resets clear both Kitty baselines and prevent stale restoration`() {
+            for (reset in listOf("\u001B" + "c", "\u001B[!p")) {
+                val bytes =
+                    "${reset}\u001B[?u\u001B[?1049l\u001B[<u\u001B[?u\u001B[>8u\u001B[<u\u001B[?uX"
+                        .encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = Fixture()
+                    f.acceptAscii("\u001B[=1u\u001B[>8u\u001B[?1049h\u001B[=1u\u001B[>8u")
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.end()
+                    assertEquals("\u001B[?0u\u001B[?0u\u001B[?0u", f.drainResponses(), "reset=$reset split=$split")
+                    assertEquals('X'.code, f.terminal.getCodepointAt(0, 0))
+                }
+            }
         }
 
         @Test

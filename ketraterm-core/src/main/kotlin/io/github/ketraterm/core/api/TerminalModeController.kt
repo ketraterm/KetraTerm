@@ -195,7 +195,8 @@ public interface TerminalModeController {
     public fun setFormatOtherKeysMode(mode: Int)
 
     /**
-     * Sets active Kitty keyboard progressive-enhancement flags.
+     * Replaces the active screen's current Kitty keyboard flags, creating a
+     * baseline entry if its stack is empty. Setting zero retains that entry.
      *
      * Core stores the supported bit subset in its packed input-mode word so the
      * input encoder can read one coherent snapshot without touching core
@@ -206,9 +207,9 @@ public interface TerminalModeController {
     public fun setKittyKeyboardFlags(flags: Int)
 
     /**
-     * Pushes the current Kitty keyboard progressive-enhancement flags to the stack,
-     * and sets the new active flags.
-     * Each screen retains at most 32 entries, evicting the oldest when full.
+     * Pushes a new active Kitty keyboard flag entry, preserving the previous one.
+     * An empty stack first receives a zero baseline. Each screen retains at most
+     * 32 entries including the active entry, evicting the oldest when full.
      *
      * @param flags Kitty keyboard flags to push and activate.
      */
@@ -217,7 +218,8 @@ public interface TerminalModeController {
     /**
      * Pops up to [count] entries from the active screen's Kitty keyboard stack.
      * A positive count that empties the stack (or finds it empty) resets all flags
-     * to zero. Otherwise, restores the last popped flags. Work is independent of
+     * to zero. Otherwise, activates the surviving top entry, including a baseline
+     * established by [setKittyKeyboardFlags]. Work is independent of
      * [count]; nonpositive counts leave flags and stack unchanged.
      *
      * @param count Number of times to pop from the stack.

@@ -144,7 +144,6 @@ internal class TerminalState(
         graphics.invalidateTransfer()
         primaryCursorShape = cursorShape
         primaryCursorBlinking = modes.isCursorBlinking
-        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         if (clearBeforeEnter) {
             graphics.clear(true, data = true)
             altBuffer.clearGrid(pen.blankAttr, pen.blankExtendedAttr, dimensions.height)
@@ -170,7 +169,6 @@ internal class TerminalState(
     fun exitAltScreen() {
         if (!isAltScreenActive) return
         graphics.invalidateTransfer()
-        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         activeBuffer = primaryBuffer
         modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
         cursorShape = primaryCursorShape

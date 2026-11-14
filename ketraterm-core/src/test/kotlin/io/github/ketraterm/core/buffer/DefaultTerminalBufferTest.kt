@@ -414,6 +414,8 @@ class DefaultTerminalBufferTest {
 
         // Pop on primary
         buffer.popKittyKeyboardFlags(1)
+        assertEquals(1, state.modes.kittyKeyboardFlags)
+        buffer.popKittyKeyboardFlags(1)
         assertEquals(0, state.modes.kittyKeyboardFlags)
     }
 }
