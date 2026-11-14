@@ -23,6 +23,8 @@ internal class InputScratchBuffer(
     var length: Int = 0
         private set
 
+    val remainingCapacity: Int get() = bytes.size - length
+
     fun clear() {
         length = 0
     }

@@ -2013,18 +2013,15 @@ public class TerminalSession private constructor(
             val offset = unpackScrollbackOffset(request)
             val rows = unpackViewportRows(request)
 
-            val modeSnapshot = terminal.getModeSnapshot()
-            if (modeSnapshot.isSynchronizedOutput) {
-                scheduleSynchronizedOutputTimeout()
-                return
-            }
-
-            cancelSynchronizedOutputTimeout()
-
             val context = currentCoroutineContext()
             try {
                 synchronized(mutationLock) {
                     if (isSessionClosed()) return
+                    if (terminal.getModeSnapshot().isSynchronizedOutput) {
+                        scheduleSynchronizedOutputTimeout()
+                        return
+                    }
+                    cancelSynchronizedOutputTimeout()
                     runtime.publisher.updateAndPublish(this, offset, rows)
                     publishedGeneration = generation
                     context.ensureActive()

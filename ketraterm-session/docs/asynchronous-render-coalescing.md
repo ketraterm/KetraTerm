@@ -35,7 +35,8 @@ A failed cache copy leaves the previous successful publication readable.
 The worker returns rather than retrying in a loop; a later invalidation can
 trigger another attempt. Cancellation propagates.
 
-Synchronized-output mode defers normal publication. A worker-dispatcher timer
+Synchronized-output mode defers normal publication. Eligibility is checked under
+the same mutation lock as frame copying and promotion. A worker-dispatcher timer
 turns that mode off after the 100 ms safety timeout and invalidates rendering.
 Normal mode disable cancels the timer. Timer dispatch can be delayed by scheduler
 load, so this is not a real-time deadline.

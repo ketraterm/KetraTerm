@@ -19,7 +19,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 - Clip DEC rectangle coordinates after overflow-safe origin rebasing, keeping
   editing operations and checksum queries on the same geometry policy.
 - Kitty text-mode keys emit text only on press and repeat; release reports remain
-  available for enhanced keys and report-all mode.
+  available for enhanced keys and report-all mode. Associated-text reports support
+  long text commits without truncation.
+- Legacy key routing ignores CapsLock and NumLock modifiers, retaining NumLock's
+  numeric keypad behavior and Kitty lock metadata.
 
 - Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
   a single extreme count from triggering billions of synchronous grid mutations.
@@ -88,6 +91,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
   unsupported schemes before contacting the desktop.
 
 ### Session and PTY
+
+- Synchronized output remains deferred when mode changes race with render publication.
 
 - PTY options and workspace launch profiles preserve empty arguments after the executable, including
   through configuration copies.

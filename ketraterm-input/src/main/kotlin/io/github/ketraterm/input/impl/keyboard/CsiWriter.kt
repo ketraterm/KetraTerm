@@ -25,7 +25,7 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput
  *
  * All sequence-building operations are written directly into a pre-allocated [InputScratchBuffer]
  * to prevent heap allocations on the critical hot path of terminal input handling, and then
- * flushed to the [TerminalHostOutput] byte sink.
+ * flushed to the [TerminalHostOutput] byte sink. Associated text is streamed in bounded chunks.
  */
 internal object CsiWriter {
     /**
@@ -42,7 +42,8 @@ internal object CsiWriter {
         level: Int,
         application: Boolean,
     ) {
-        val modified = modifiers != TerminalModifiers.NONE && level >= 0
+        val modifier = TerminalModifiers.toCsiModifierParam(modifiers)
+        val modified = modifier != 1 && level >= 0
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte(if (application && (!modified || level == 0)) 'O'.code else '['.code)
@@ -54,7 +55,7 @@ internal object CsiWriter {
             scratch.appendByte('1'.code)
             scratch.appendByte(';'.code)
         }
-        if (modified) scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+        if (modified) scratch.appendDecimal(modifier)
         scratch.appendByte(finalByte)
         scratch.writeTo(output)
     }
@@ -139,9 +140,10 @@ internal object CsiWriter {
         scratch.appendByte('['.code)
         scratch.appendDecimal(number)
 
-        if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
+        val modifier = modifierParam(modifiers, kittyModifiers)
+        if (modifier != 1 || eventType != NO_EVENT_TYPE) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
+            scratch.appendDecimal(modifier)
             if (eventType != NO_EVENT_TYPE) {
                 scratch.appendByte(':'.code)
                 scratch.appendDecimal(eventType)
@@ -191,10 +193,11 @@ internal object CsiWriter {
             }
         }
 
-        val hasModifierField = modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE
+        val modifier = modifierParam(modifiers, kittyModifiers)
+        val hasModifierField = modifier != 1 || forceModifier || eventType != NO_EVENT_TYPE
         if (hasModifierField) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
+            scratch.appendDecimal(modifier)
             if (eventType != NO_EVENT_TYPE) {
                 scratch.appendByte(':'.code)
                 scratch.appendDecimal(eventType)
@@ -204,7 +207,7 @@ internal object CsiWriter {
         if (associatedText != null) {
             if (!hasModifierField) scratch.appendByte(';'.code)
             scratch.appendByte(';'.code)
-            appendAssociatedText(scratch, associatedText)
+            appendAssociatedText(scratch, output, associatedText)
         }
 
         scratch.appendByte('u'.code)
@@ -216,10 +219,16 @@ internal object CsiWriter {
 
     private fun appendAssociatedText(
         scratch: InputScratchBuffer,
+        output: TerminalHostOutput,
         text: String,
     ) {
         var index = 0
         while (index < text.length) {
+            // Reserve a separator, seven scalar digits (U+10FFFF), and the final 'u'.
+            if (scratch.remainingCapacity < 9) {
+                scratch.writeTo(output)
+                scratch.clear()
+            }
             if (index > 0) scratch.appendByte(':'.code)
             val codepoint = text.codePointAt(index)
             scratch.appendDecimal(codepoint)

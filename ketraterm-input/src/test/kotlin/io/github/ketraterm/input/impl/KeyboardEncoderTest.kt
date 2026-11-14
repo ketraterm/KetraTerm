@@ -27,11 +27,111 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
-import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class KeyboardEncoderTest {
+    @Test
+    fun `Kitty associated text streams complete scalar parameters across scratch boundaries`() {
+        val output = ReferenceRecordingHostOutput()
+        val encoder = KeyboardEncoder(output, InputScratchBuffer())
+        val expected = StringBuilder()
+        for (text in listOf("a".repeat(19), "a".repeat(20), "a".repeat(4096), "界e\u0301👩‍💻\uDBFF\uDFFF".repeat(30))) {
+            encoder.encode(TerminalKeyEvent.text(text), kittyKeyboardBits(24))
+            expected.append("\u001b[0;;").append(text.codePoints().toArray().joinToString(":")).append('u')
+        }
+        encoder.encode(TerminalKeyEvent.codepoint('a'.code), kittyKeyboardBits(8))
+        expected.append("\u001b[97u")
+        assertArrayEquals(expected.toString().encodeToByteArray(), output.bytes)
+        for (array in output.writeBytesCalls) assertSame(output.writeBytesCalls.first(), array)
+    }
+
+    @Test
+    fun `long Kitty associated text retains alternate keys modifiers and event type once`() {
+        val text = "A".repeat(40)
+        assertBytes(
+            esc("[97:65:113;66:2;" + List(40) { "65" }.joinToString(":") + "u"),
+            TerminalKeyEvent.codepoint(
+                'A'.code,
+                TerminalModifiers.SHIFT or TerminalModifiers.CAPS_LOCK,
+                unshiftedCodepoint = 'a'.code,
+                shiftedCodepoint = 'A'.code,
+                baseLayoutCodepoint = 'q'.code,
+                associatedText = text,
+                type = TerminalKeyEventType.REPEAT,
+            ),
+            kittyKeyboardBits(31),
+        )
+    }
+
+    @Test
+    fun `Kitty associated text scratch recovers after an intermediate sink failure`() {
+        val output =
+            object : RecordingHostOutput() {
+                var writes = 0
+
+                override fun writeBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    if (++writes == 2) throw IllegalStateException("sink failed")
+                    super.writeBytes(bytes, offset, length)
+                }
+            }
+        val encoder = KeyboardEncoder(output, InputScratchBuffer())
+        assertThrows(IllegalStateException::class.java) {
+            encoder.encode(TerminalKeyEvent.text("a".repeat(100)), kittyKeyboardBits(24))
+        }
+        val prefix = output.bytes
+        encoder.encode(TerminalKeyEvent.text("b"), kittyKeyboardBits(24))
+        assertArrayEquals(prefix + esc("[0;;98u"), output.bytes)
+    }
+
+    @Test
+    fun `lock state does not modify legacy tab cursor function or editing keys`() {
+        for (locks in listOf(
+            TerminalModifiers.CAPS_LOCK,
+            TerminalModifiers.NUM_LOCK,
+            TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK,
+        )) {
+            assertBytes(bytes(9), TerminalKeyEvent.key(TerminalKey.TAB, locks))
+            assertBytes(esc("[Z"), TerminalKeyEvent.key(TerminalKey.TAB, locks or TerminalModifiers.SHIFT))
+            for (application in listOf(false, true)) {
+                val mode = if (application) TerminalModeBits.APPLICATION_CURSOR_KEYS else 0L
+                assertBytes(esc(if (application) "OA" else "[A"), TerminalKeyEvent.key(TerminalKey.UP, locks), mode)
+                assertBytes(esc(if (application) "OH" else "[H"), TerminalKeyEvent.key(TerminalKey.HOME, locks), mode)
+                assertBytes(esc("[1;5A"), TerminalKeyEvent.key(TerminalKey.UP, locks or TerminalModifiers.CTRL), mode)
+            }
+            assertBytes(esc("OP"), TerminalKeyEvent.key(TerminalKey.F1, locks))
+            assertBytes(esc("[15~"), TerminalKeyEvent.key(TerminalKey.F5, locks))
+            assertBytes(esc("[3~"), TerminalKeyEvent.key(TerminalKey.DELETE, locks))
+        }
+    }
+
+    @Test
+    fun `modifyOtherKeys routing ignores locks but retains effective modifiers`() {
+        for (locks in listOf(
+            TerminalModifiers.CAPS_LOCK,
+            TerminalModifiers.NUM_LOCK,
+            TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK,
+        )) {
+            for (mode in listOf(1, 2)) {
+                assertBytes(ascii("A"), TerminalKeyEvent.codepoint('A'.code, locks), modifyOtherKeysBits(mode))
+                assertBytes(bytes(9), TerminalKeyEvent.key(TerminalKey.TAB, locks), modifyOtherKeysBits(mode))
+                assertBytes(bytes(13), TerminalKeyEvent.key(TerminalKey.ENTER, locks), modifyOtherKeysBits(mode))
+            }
+            assertBytes(ascii("A"), TerminalKeyEvent.codepoint('A'.code, locks or TerminalModifiers.SHIFT), modifyOtherKeysBits(1))
+            assertBytes(esc("[27;5;97~"), TerminalKeyEvent.codepoint('a'.code, locks or TerminalModifiers.CTRL), modifyOtherKeysBits(2))
+            assertBytes(
+                esc("[97;5u"),
+                TerminalKeyEvent.codepoint('a'.code, locks or TerminalModifiers.CTRL),
+                modifyOtherKeysBits(2) or formatOtherKeysBits(1),
+            )
+            assertBytes(esc("[9;${locks + 1}u"), TerminalKeyEvent.key(TerminalKey.TAB, locks), kittyKeyboardBits(8))
+        }
+    }
+
     @Test
     fun `Kitty plain text has no release bytes unless all keys are reported`() {
         for (flags in listOf(2, 3)) {
