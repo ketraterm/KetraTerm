@@ -81,6 +81,7 @@ val publishedLibraryNames =
         "ketraterm-transport-api",
         "ketraterm-session",
         "ketraterm-shell-integration",
+        "ketraterm-shell-launch",
         "ketraterm-ui-swing",
         "ketraterm-ui-swing-host",
         "ketraterm-pty",

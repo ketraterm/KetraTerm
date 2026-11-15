@@ -18,14 +18,8 @@ All types are in `io.github.ketraterm.workspace`.
 | `TerminalWorkspaceTab` | Session identity and live title, directory, color, and process-title preferences. |
 | `TerminalWorkspaceListener` | Host-neutral lifecycle, metadata, window-intent, and clipboard callbacks. |
 | `TerminalWorkspaceOpenOptions` | Validated immutable initial session options. |
-| `TerminalProfile`, `TerminalProfileKind`, `TerminalProfileRegistry` | Launch vocabulary, presentation classification, and built-in profile discovery. |
-| `TerminalShellEnvironment` | Host-selected environment overrides and a PATH prefix. |
-| Internal shell bootstrappers | Prepare shell startup hooks and environment reapplication without interpreting terminal output. |
-| `powershell-completion.ps1` resource | Install the private PSReadLine request bindings, read the live buffer, and serialize bounded native completion results with the supplied request ID. |
-| `fish-completion.fish` resource | Confirm the live fish editor buffer without accepting predictions or invoking candidate completers, using the shared private completion protocol. |
-| `path-commands.sh` resource | Shared Bash/zsh PATH enumeration in an isolated subshell, with optional native directory-type filtering, shell executable checks, and a builtin fallback. |
-| Internal `ShellCommandInventoryFiles` | Own the private session mailbox, bounded I/O polling, and cleanup; forward bytes to the shell-integration decoder. |
-| `bash-completion.bash`, `zsh-completion.zsh` resources | Combine shell tables with discovered executables and publish bounded inventory snapshots. |
+| `TerminalProfileRegistry` | Discover built-in profiles. |
+| `TerminalShellLaunch` dependency | Prepare shell hooks and inventory resources through the shared launch library. |
 
 ## Lifecycle and concurrency
 
@@ -52,7 +46,7 @@ termination before the workspace operation reached its worker.
 
 ## Dependency boundary
 
-`ketraterm-session` is the API dependency. PTY, shell integration, render API, and
+`ketraterm-session` and `ketraterm-shell-launch` are API dependencies. PTY, render API, and
 coroutines are implementation dependencies. The workspace chooses local launch
 wiring, while PTY owns process mechanics and session owns synchronization. UI
 views, completion services, preference persistence, and product commands stay in

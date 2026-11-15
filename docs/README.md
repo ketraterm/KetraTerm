@@ -19,6 +19,8 @@
 Module READMEs provide usage examples. Each module's `Module.md` describes its
 dependencies and structure; its `docs/` directory holds detailed contracts.
 
+- [Host-owned shell launches](../ketraterm-shell-launch/README.md): shell hooks without workspace or PTY ownership.
+
 ## Reference
 
 - [Terminal protocols](reference/protocol.md): collection limits, replies, and streaming text behavior.

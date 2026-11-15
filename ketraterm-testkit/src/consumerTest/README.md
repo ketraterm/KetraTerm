@@ -101,7 +101,7 @@ in root `publicationChecks`, rather than testkit's ordinary `test` task or
 ./gradlew :ketraterm-testkit:compiledClientUpgradeTest
 ```
 
-Thirteen tracked `baseline/*.jar` clients run against the current staged runtime
+Fourteen tracked `baseline/*.jar` clients run against the current staged runtime
 publications in both metadata modes and with the current Kotlin runtime and
 Kotlin 2.4.0. This produces 52 successful-client cases. Inventory checks require
 a retained JAR and provenance for every source consumer. Class- and method-removal
@@ -125,6 +125,8 @@ Workspace and completion-persistence clients were compiled against Maven Central
 `0.5.0` artifacts; their provenance records that release and repository. They
 exercise Java/Kotlin constructors, defaults and copies, listener defaults, and
 persistence recording, feedback, hydration, reset, and shutdown.
+
+The shell-launch client starts with the new API. Its provenance identifies the reviewed working tree.
 
 ### Updating a retained baseline
 

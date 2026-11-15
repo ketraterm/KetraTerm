@@ -85,7 +85,7 @@ retain a second authoritative progress state. Tab removal cancels observation.
 
 ## Profiles and launch options
 
-[`TerminalProfile`](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt)
+[`TerminalProfile`](../ketraterm-shell-launch/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt)
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
 as a list, rather than split from a command string. The executable must be nonempty;
@@ -123,7 +123,7 @@ Products own preference schemas, persistence, and the host actions permitted by
 ## Shell metadata ownership
 
 The local session factory selects `OscShellIntegration` and, when enabled,
-prepares interactive PowerShell, Bash, zsh, or fish hooks. Explicit script or
+uses [shell launch](../ketraterm-shell-launch/README.md) to prepare interactive PowerShell, Bash, zsh, or fish hooks. Explicit script or
 command entry points are preserved rather than converted into interactive
 launches. Explicit WSL shell launches can receive hooks; startup commands require
 a directly configured interactive shell with hooks enabled. Invalid startup

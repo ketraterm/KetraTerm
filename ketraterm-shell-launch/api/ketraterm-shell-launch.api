@@ -1,0 +1,88 @@
+public final class io/github/ketraterm/shell/launch/TerminalShellLaunch : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/ketraterm/shell/launch/TerminalShellLaunch$Companion;
+	public final fun attach (Lio/github/ketraterm/session/TerminalSession;)V
+	public fun close ()V
+	public final fun environment (Ljava/util/Map;)Ljava/util/Map;
+	public final fun getProfile ()Lio/github/ketraterm/workspace/TerminalProfile;
+	public final fun getPromptMarkersExpected ()Z
+	public final fun getShellIntegration ()Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+	public static final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;Z)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+	public static final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;ZLjava/nio/file/Path;)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+}
+
+public final class io/github/ketraterm/shell/launch/TerminalShellLaunch$Companion {
+	public final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+	public final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;Z)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+	public final fun prepare (Lio/github/ketraterm/workspace/TerminalProfile;ZLjava/nio/file/Path;)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+	public static synthetic fun prepare$default (Lio/github/ketraterm/shell/launch/TerminalShellLaunch$Companion;Lio/github/ketraterm/workspace/TerminalProfile;ZLjava/nio/file/Path;ILjava/lang/Object;)Lio/github/ketraterm/shell/launch/TerminalShellLaunch;
+}
+
+public final class io/github/ketraterm/workspace/TerminalProfile {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;Lio/github/ketraterm/workspace/TerminalProfileKind;Lio/github/ketraterm/workspace/TerminalShellEnvironment;Lio/github/ketraterm/session/TerminalStartupCommand;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;Lio/github/ketraterm/workspace/TerminalProfileKind;Lio/github/ketraterm/workspace/TerminalShellEnvironment;Lio/github/ketraterm/session/TerminalStartupCommand;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Ljava/nio/file/Path;
+	public final fun component6 ()Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public final fun component7 ()Lio/github/ketraterm/workspace/TerminalShellEnvironment;
+	public final fun component8 ()Lio/github/ketraterm/session/TerminalStartupCommand;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;Lio/github/ketraterm/workspace/TerminalProfileKind;Lio/github/ketraterm/workspace/TerminalShellEnvironment;Lio/github/ketraterm/session/TerminalStartupCommand;)Lio/github/ketraterm/workspace/TerminalProfile;
+	public static synthetic fun copy$default (Lio/github/ketraterm/workspace/TerminalProfile;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;Lio/github/ketraterm/workspace/TerminalProfileKind;Lio/github/ketraterm/workspace/TerminalShellEnvironment;Lio/github/ketraterm/session/TerminalStartupCommand;ILjava/lang/Object;)Lio/github/ketraterm/workspace/TerminalProfile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommand ()Ljava/util/List;
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getEnvironment ()Ljava/util/Map;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getKind ()Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public final fun getShellEnvironment ()Lio/github/ketraterm/workspace/TerminalShellEnvironment;
+	public final fun getStartupCommand ()Lio/github/ketraterm/session/TerminalStartupCommand;
+	public final fun getWorkingDirectory ()Ljava/nio/file/Path;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/workspace/TerminalProfileKind : java/lang/Enum {
+	public static final field BASH Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field COMMAND_PROMPT Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field Companion Lio/github/ketraterm/workspace/TerminalProfileKind$Companion;
+	public static final field DEFAULT Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field FISH Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field GIT_BASH Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field NUSHELL Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field POWERSHELL Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field UBUNTU Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field UNIX_SHELL Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field WSL Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static final field ZSH Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/workspace/TerminalProfileKind;
+	public static fun values ()[Lio/github/ketraterm/workspace/TerminalProfileKind;
+}
+
+public final class io/github/ketraterm/workspace/TerminalProfileKind$Companion {
+	public final fun classify (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lio/github/ketraterm/workspace/TerminalProfileKind;
+}
+
+public final class io/github/ketraterm/workspace/TerminalShellEnvironment {
+	public static final field Companion Lio/github/ketraterm/workspace/TerminalShellEnvironment$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/Map;Ljava/lang/String;)Lio/github/ketraterm/workspace/TerminalShellEnvironment;
+	public static synthetic fun copy$default (Lio/github/ketraterm/workspace/TerminalShellEnvironment;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/workspace/TerminalShellEnvironment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPathPrefix ()Ljava/lang/String;
+	public final fun getVariables ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/workspace/TerminalShellEnvironment$Companion {
+	public final fun getEmpty ()Lio/github/ketraterm/workspace/TerminalShellEnvironment;
+}
+

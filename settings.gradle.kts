@@ -36,6 +36,7 @@ include(
     ":ketraterm-transport-api",
     ":ketraterm-session",
     ":ketraterm-shell-integration",
+    ":ketraterm-shell-launch",
     ":ketraterm-testkit",
     ":ketraterm-workspace",
     ":ketraterm-app",

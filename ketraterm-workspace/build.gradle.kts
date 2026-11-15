@@ -22,8 +22,9 @@ dependencies {
     val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
 
     api(project(":ketraterm-session"))
+    api(project(":ketraterm-shell-launch"))
     implementation(project(":ketraterm-pty"))
-    implementation(project(":ketraterm-shell-integration"))
+    testImplementation(project(":ketraterm-shell-integration"))
     implementation(project(":ketraterm-render-api"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
