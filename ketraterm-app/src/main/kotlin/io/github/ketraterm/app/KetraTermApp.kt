@@ -25,6 +25,10 @@ import javax.swing.SwingUtilities
  * Starts the KetraTerm standalone terminal application.
  */
 fun main(args: Array<String>) {
+    if (System.getProperty("os.name").startsWith("Linux", ignoreCase = true)) {
+        // JBR's Wayland toolkit needs the installed desktop file's basename before AWT starts.
+        System.getProperties().putIfAbsent("awt.app.id", "ketraterm-KetraTerm")
+    }
     KetraTermApp.start(args.toList())
 }
 

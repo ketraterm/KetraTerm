@@ -114,7 +114,7 @@ jobs:
         if: matrix.package_os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot dpkg-dev
+          sudo apt-get install -y rpm fakeroot dpkg-dev desktop-file-utils
 
       - name: Prepare JPackage Input
         run: |
@@ -242,6 +242,15 @@ jobs:
             tar -czf dist/KetraTerm-Linux-x64.tar.gz -C packaging/app-image KetraTerm
           fi
 
+      - name: Prepare Linux Desktop Resources
+        if: matrix.package_os == 'linux'
+        shell: bash
+        run: |
+          mkdir -p ketraterm-app/build/jpackage/linux-resources
+          cp packaging/jpackage/linux/KetraTerm.desktop ketraterm-app/build/jpackage/linux-resources/
+          # With --app-image, jpackage regenerates desktop icons from its resource directory.
+          cp packaging/icons/ketraterm.png ketraterm-app/build/jpackage/linux-resources/KetraTerm.png
+
       - name: Build Native Installer(s)
         shell: bash
         run: |
@@ -257,22 +266,46 @@ jobs:
           elif [ "${{ runner.os }}" = "macOS" ]; then
             jpackage --type dmg \
               --app-image packaging/app-image/KetraTerm.app \
+              --icon packaging/icons/ketraterm.icns \
               --app-version "${{ steps.native_version.outputs.native_version }}" \
               --dest packaging/installer
           else
-            # DEB
-            jpackage --type deb \
-              --app-image packaging/app-image/KetraTerm \
-              --app-version "${{ steps.native_version.outputs.native_version }}" \
-              --dest packaging/installer \
-              --linux-shortcut
-            # RPM
-            jpackage --type rpm \
-              --app-image packaging/app-image/KetraTerm \
-              --app-version "${{ steps.native_version.outputs.native_version }}" \
-              --dest packaging/installer \
-              --linux-shortcut
+            for package_type in deb rpm; do
+              jpackage --type "$package_type" \
+                --app-image packaging/app-image/KetraTerm \
+                --app-version "${{ steps.native_version.outputs.native_version }}" \
+                --dest packaging/installer \
+                --resource-dir ketraterm-app/build/jpackage/linux-resources \
+                --linux-menu-group 'Utility;TerminalEmulator' \
+                --linux-shortcut
+            done
           fi
+
+      - name: Verify Linux Desktop Integration
+        if: matrix.package_os == 'linux'
+        shell: bash
+        run: |
+          extracted=$(mktemp -d)
+          dpkg-deb --extract packaging/installer/*.deb "$extracted"
+          app_lib="$extracted/opt/ketraterm/lib"
+          cmp packaging/icons/ketraterm.png "$app_lib/KetraTerm.png"
+          desktop_file="$app_lib/ketraterm-KetraTerm.desktop"
+          desktop-file-validate "$desktop_file"
+          grep -Fx 'StartupWMClass=io-github-ketraterm-app-KetraTermAppKt' "$desktop_file"
+
+      - name: Verify macOS Desktop Integration
+        if: matrix.package_os == 'macos'
+        shell: bash
+        run: |
+          mounted=$(mktemp -d)
+          hdiutil attach packaging/installer/*.dmg -mountpoint "$mounted" -nobrowse -readonly
+          trap 'hdiutil detach "$mounted"' EXIT
+          contents="$mounted/KetraTerm.app/Contents"
+          plutil -lint "$contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$contents/Info.plist")" = io.github.ketraterm
+          icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$contents/Info.plist")
+          cmp packaging/icons/ketraterm.icns "$contents/Resources/$icon"
+          cmp packaging/icons/ketraterm.icns "$mounted/.VolumeIcon.icns"
 
       - name: Rename and Collect Installers
         shell: bash

@@ -34,6 +34,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 - Fixed quoted text and Windows paths in manually edited configuration files.
 - New configurations use 100 × 28 cells and 10,000 scrollback lines; the initial window fits the desktop.
 - Improved default monospace font selection on Linux and other non-Windows/macOS platforms.
+- Linux installers preserve the KetraTerm icon and associate running windows with the application launcher.
+- macOS disk images use the KetraTerm volume icon.
 - New Windows configurations prefer modern PowerShell when installed, preserving saved shell choices.
 - Failed sessions keep their output with an exit-status banner and Close button.
 
