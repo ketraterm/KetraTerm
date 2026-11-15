@@ -45,6 +45,7 @@ internal class KetraTermSettings(
 
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
     private val updateLock = Any()
+    private var paneSettings: Pair<KetraTermConfig, SwingSettings>? = null
 
     val theme: TerminalTheme
         get() = TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK
@@ -61,31 +62,36 @@ internal class KetraTermSettings(
     val previousCommandCompletionStatsPath: Path
         get() = configManager.configPath.resolveSibling(TerminalCompletionLearningCoordinator.currentFileName())
 
-    /** Derives pane settings without changing stored preferences. */
+    /** Reuses the immutable pane settings until the published preferences change. */
+    @Synchronized
     fun current(): SwingSettings {
         val config = config
-        val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
-        return SwingSettings.create { draft ->
-            draft.font = Font(resolvedFamily, Font.PLAIN, config.fontSize)
-            draft.columns = config.columns
-            draft.rows = config.rows
-            draft.palette = (TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK).createPalette()
-            draft.treatAmbiguousAsWide = config.treatAmbiguousAsWide
-            draft.cursorBlinkMillis = config.cursorBlinkMillis
-            draft.useSystemFallbackFonts = config.useSystemFallbackFonts
-            draft.visualBellEnabled = config.visualBell
-            draft.pasteControlPolicy = config.pasteControlPolicy
-            draft.cursorShape = parseCursorShape(config.cursorShape)
-            draft.promptDecoration = config.promptDecoration
-            draft.stickyCommandHeadersEnabled = config.stickyCommandHeadersEnabled
-            draft.lineHeight = config.lineHeight
-            draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
-            draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled
-            draft.inlineShellSuggestionsEnabled = config.inlineSuggestionsEnabled
-            draft.shellSuggestionAutomaticMode = config.shellSuggestionAutomaticMode
-            draft.acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter
-            draft.scrollOnOutput = config.scrollOnOutput
+        paneSettings?.let { (preferences, settings) ->
+            if (preferences === config) return settings
         }
+        val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
+        return SwingSettings
+            .create { draft ->
+                draft.font = Font(resolvedFamily, Font.PLAIN, config.fontSize)
+                draft.columns = config.columns
+                draft.rows = config.rows
+                draft.palette = (TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK).createPalette()
+                draft.treatAmbiguousAsWide = config.treatAmbiguousAsWide
+                draft.cursorBlinkMillis = config.cursorBlinkMillis
+                draft.useSystemFallbackFonts = config.useSystemFallbackFonts
+                draft.visualBellEnabled = config.visualBell
+                draft.pasteControlPolicy = config.pasteControlPolicy
+                draft.cursorShape = parseCursorShape(config.cursorShape)
+                draft.promptDecoration = config.promptDecoration
+                draft.stickyCommandHeadersEnabled = config.stickyCommandHeadersEnabled
+                draft.lineHeight = config.lineHeight
+                draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
+                draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled
+                draft.inlineShellSuggestionsEnabled = config.inlineSuggestionsEnabled
+                draft.shellSuggestionAutomaticMode = config.shellSuggestionAutomaticMode
+                draft.acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter
+                draft.scrollOnOutput = config.scrollOnOutput
+            }.also { paneSettings = config to it }
     }
 
     /** Builds permissions for all output in a session, independent of its launch command. */

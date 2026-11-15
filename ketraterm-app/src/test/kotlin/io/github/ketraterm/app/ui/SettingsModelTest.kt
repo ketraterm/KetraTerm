@@ -54,6 +54,24 @@ class SettingsModelTest {
     }
 
     @Test
+    fun `pane settings refresh before change listeners run`() {
+        val original = settings.current()
+        assertSame(original, settings.current())
+        var observed = original
+        settings.addChangeListener {
+            observed = settings.current()
+            assertSame(observed, settings.current())
+        }
+
+        settings.update(settings.config.copy(fontSize = original.font.size + 1, theme = TerminalTheme.CAMPBELL.id))
+
+        assertNotSame(original, observed)
+        assertEquals(original.font.size + 1, observed.font.size)
+        assertEquals(TerminalTheme.CAMPBELL.createPalette(), observed.palette)
+        assertSame(observed, settings.current())
+    }
+
+    @Test
     fun `pane settings preserve suggestion preferences and automatic modes`() {
         for (mode in SwingShellSuggestionAutomaticMode.entries) {
             val preferences =
@@ -147,6 +165,7 @@ class SettingsModelTest {
         settings = KetraTermSettings(manager) { throw IOException("Disk is full") }
         model = SettingsModel(settings, registry)
         val initial = settings.config
+        val initialPaneSettings = settings.current()
         val draft = initial.copy(fontSize = 24, visualBell = false)
         var notifications = 0
         settings.addChangeListener { notifications++ }
@@ -155,6 +174,7 @@ class SettingsModelTest {
         SwingUtilities.invokeAndWait {}
 
         assertEquals(initial, settings.config)
+        assertSame(initialPaneSettings, settings.current())
         assertEquals(initial, manager.load())
         assertEquals(initial, model.initialUiState)
         assertTrue(model.hasChanges(draft))

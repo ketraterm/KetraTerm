@@ -12,59 +12,37 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Suggestions
 
-- Save learned suggestions under Local AppData on Windows and XDG state storage on Linux,
-  separately from default configuration, using `command-completion-learning.tsv`.
-  Existing learning relocates on first enable;
-  nondefault configuration paths retain colocated learning.
-- Added opt-in inline completion previews, including when suggestion popups are disabled.
-  Existing history-inline preferences migrate automatically.
-- Popups show alternatives to the inline preview without briefly duplicating it.
-- Right Arrow accepts an inline preview. After browsing the popup, Tab or Enter inserts the
-  selected suggestion without executing it; passive popups preserve shell Tab/Enter behavior.
-- Added a Suggestions settings page for inline previews, popup mode, learning, and customizable
-  shortcuts. Press keys to record a shortcut; click its chip to remove it.
-- PowerShell suggestions stay responsive while native inline predictions are visible.
-- Ctrl+Space passes through to the running application when shell completion cannot start.
+- Added optional inline suggestions, accepted with Right Arrow, even with popups disabled.
+- Suggestion popups show alternatives to the inline preview. After browsing, Tab or Enter
+  inserts the selected suggestion without running it.
+- Added a Suggestions settings page for inline previews, popups, saved learning, and shortcuts.
+- Improved PowerShell suggestions when native predictions are visible.
+- Ctrl+Space reaches the running application when shell suggestions are unavailable.
+- Saved suggestions move automatically to standard per-user storage for default configurations.
 
 ### Keyboard, selection, and navigation
 
-- Large selection copies and command-output exports extract text off the UI thread.
-  Cancelling export before choosing a destination avoids extraction; unavailable output
-  leaves an existing destination untouched.
-- Native clipboard access and browser activation run off the UI thread. Paste review stays
-  on the UI thread, and closing or replacing the originating pane discards pending paste results.
-
-- Added temporary font zoom and reset for each pane, Windows Ctrl+Shift+C/V clipboard shortcuts,
-  and window-scoped tab and pane shortcuts.
-- History paging keeps one row of context. Shift+Home/End jumps to oldest history or live output.
-- Double- and triple-click dragging selects whole words or rows. Word selection preserves wide
-  characters and keeps neighboring paths out of whitespace selections.
+- Improved responsiveness when copying large selections, exporting output, pasting, and opening links.
+- Added temporary font zoom and reset per pane, plus Ctrl+Shift+C/V for copy and paste on Windows.
+- Tab and pane shortcuts apply to the active window.
+- History paging keeps one row of context; Shift+Home/End jumps to the oldest history or live output.
+- Double- and triple-click dragging selects whole words or rows, with improved word selection.
 
 ### Startup and session recovery
 
-- Configuration loads before UI construction. Shell discovery for tabs, splits,
-  and settings runs on workers; directory-aware menus resolve paths without blocking the UI.
-- Hand-edited TOML basic strings decode escapes correctly, including quoted `#`
-  characters and Windows paths. Malformed strings use configuration recovery.
-- New configurations use 100 × 28 cells and 10,000 scrollback lines. The initial window fits the
-  available desktop; saved preferences remain effective.
-- Linux and other non-Windows/macOS platforms choose an installed monospace font, with
-  `Monospaced` as the fallback.
-- Fresh Windows configurations prefer modern PowerShell when installed, with Windows PowerShell
-  as fallback. Saved shell choices remain effective.
-- Failed sessions retain their output with an exit-status banner and Close button, including
-  transport failures and unknown exit statuses. Successful exits close normally.
+- Improved startup and responsiveness when opening tabs, splits, settings, and directory menus.
+- Fixed quoted text and Windows paths in manually edited configuration files.
+- New configurations use 100 × 28 cells and 10,000 scrollback lines; the initial window fits the desktop.
+- Improved default monospace font selection on Linux and other non-Windows/macOS platforms.
+- New Windows configurations prefer modern PowerShell when installed, preserving saved shell choices.
+- Failed sessions keep their output with an exit-status banner and Close button.
 
 ### Security and notifications
 
-- Install the companion CLI in a private temporary directory instead of trusting
-  a predictable shared temporary path; replace a removed or replaced directory
-  with a fresh private location.
-- Pastes containing line breaks or control characters show an escaped preview for review,
-  with Cancel selected by default.
-- Invalid clipboard or title permissions deny access and identify the affected setting.
-  Configuration recovery also denies these permissions.
-- Bell feedback is limited to once every 500 ms per window.
+- Protected the bundled `ketra` command against tampering.
+- Multiline pastes and pastes with control characters show a review dialog with Cancel selected.
+- Invalid clipboard or title permissions block access and identify the affected setting.
+- Limited repeated bell alerts to twice per second per window.
 
 ## [0.5.0] - 2026-11-09
 

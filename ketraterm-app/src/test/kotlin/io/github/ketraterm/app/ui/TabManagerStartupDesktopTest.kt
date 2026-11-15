@@ -1000,9 +1000,15 @@ class TabManagerStartupDesktopTest {
         val release = CompletableFuture<Unit>()
         val shown = CompletableFuture<Dimension>()
         val outputStarted = CompletableFuture<Boolean>()
+        var packCount = 0
         val frame =
             onEdt {
                 object : JFrame() {
+                    override fun pack() {
+                        packCount++
+                        super.pack()
+                    }
+
                     override fun setVisible(visible: Boolean) {
                         super.setVisible(visible)
                         if (visible) shown.complete(size)
@@ -1037,6 +1043,7 @@ class TabManagerStartupDesktopTest {
             onEdt {
                 assertFalse(shown.isDone, "The empty window must not be shown while the pane is still starting")
                 assertTrue(frame.isDisplayable, "The hidden peer must keep AWT alive while terminal creation is blocked")
+                assertEquals(0, packCount, "The empty window must not be laid out before its pane exists")
             }
             release.complete(Unit)
             val packed = shown.get(10, TimeUnit.SECONDS)
@@ -1164,12 +1171,12 @@ class TabManagerStartupDesktopTest {
         configManager.save(KetraTermConfig(smartSuggestionsEnabled = false, showForegroundProcessName = false))
         val settings = KetraTermSettings(configManager)
         val profile = TerminalProfile("startup", "Startup", listOf("unused"), workingDirectory = directory)
-        val failure = IllegalStateException("Packing failed")
+        val failure = IllegalStateException("Peer creation failed")
         val frame =
             onEdt {
                 object : JFrame() {
-                    override fun pack() {
-                        super.pack()
+                    override fun addNotify() {
+                        super.addNotify()
                         throw failure
                     }
                 }
