@@ -1222,7 +1222,8 @@ public class SwingTerminal
          *
          * The component uses the selected integration's command metadata and reveals
          * the command's prompt-start line when present, otherwise its command
-         * start line. This method may be called from any thread; component state
+         * start line. When that line is already the navigation anchor, it reveals
+         * the preceding command. This method may be called from any thread; component state
          * is updated asynchronously on the EDT.
          */
         public fun scrollToPreviousCommand() {

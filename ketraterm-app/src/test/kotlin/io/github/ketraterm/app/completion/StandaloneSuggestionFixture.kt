@@ -363,6 +363,26 @@ internal class StandaloneSuggestionFixture private constructor(
         private const val COLUMNS = 100
         private const val ROWS = 24
 
+        internal suspend fun submitExit(session: TerminalSession) {
+            session.commandEditChanges.first {
+                val edit = session.captureCommandEdit() ?: return@first false
+                val line = edit.commandLine
+                try {
+                    // Cancelling suggestions can leave a native query without an editor receipt.
+                    if (line.requiresShellConfirmation && !session.confirmCommandEdit(edit)) return@first false
+                    session.submitInput(
+                        edit,
+                        listOf(
+                            TerminalTextReplacementEvent(line.commandText.length - line.cursorOffset, line.cursorOffset, "exit"),
+                            TerminalKeyEvent.key(TerminalKey.ENTER),
+                        ),
+                    ) == TerminalInputAdmission.ACCEPTED
+                } finally {
+                    edit.cancel()
+                }
+            }
+        }
+
         internal suspend fun awaitEditableLine(
             session: TerminalSession,
             line: String,
@@ -431,20 +451,7 @@ internal class StandaloneSuggestionFixture private constructor(
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.
                 withContext(Dispatchers.Swing) { created.terminal.setShellSuggestionProvider(null) }
-                withTimeout(15.seconds) {
-                    tab.session.commandEditChanges.first {
-                        // A shell redraw can temporarily invalidate the context after the scenario.
-                        val edit = tab.session.captureCommandEdit() ?: return@first false
-                        val line = edit.commandLine
-                        tab.session.submitInput(
-                            edit,
-                            listOf(
-                                TerminalTextReplacementEvent(line.commandText.length - line.cursorOffset, line.cursorOffset, "exit"),
-                                TerminalKeyEvent.key(TerminalKey.ENTER),
-                            ),
-                        ) == TerminalInputAdmission.ACCEPTED
-                    }
-                }
+                withTimeout(15.seconds) { submitExit(tab.session) }
                 created.awaitClosedAfterExit()
             } catch (caught: Throwable) {
                 failure = caught

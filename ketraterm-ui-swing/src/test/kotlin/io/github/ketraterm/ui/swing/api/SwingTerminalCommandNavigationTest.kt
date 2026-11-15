@@ -235,7 +235,7 @@ class SwingTerminalCommandNavigationTest {
     }
 
     @Test
-    fun `previous command from inside command output reveals current command prompt`() {
+    fun `previous command reveals current prompt then walks to older commands`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val component =
@@ -254,6 +254,14 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {}
 
         assertEquals(1, component.viewportState().renderOffset)
+        SwingUtilities.invokeAndWait {
+            component.scrollToPreviousCommand()
+            assertEquals(5, component.viewportState().renderOffset)
+            component.scrollToPreviousCommand()
+            assertEquals(5, component.viewportState().renderOffset)
+            component.scrollToNextCommand()
+            assertEquals(1, component.viewportState().renderOffset)
+        }
         session.close()
     }
 

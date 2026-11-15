@@ -44,7 +44,11 @@ internal class TerminalCommandInteractionController(
         val targetRecordId =
             if (previous) {
                 if (ownerRecordId != TerminalShellIntegrationCommandRecord.NONE) {
-                    ownerRecordId
+                    if (shellState.commandAnchorLineId(ownerRecordId) == anchorLineId) {
+                        shellState.previousCommandRecordId(ownerRecordId)
+                    } else {
+                        ownerRecordId
+                    }
                 } else {
                     shellState.previousCommandRecordIdBeforeLine(anchorLineId)
                 }

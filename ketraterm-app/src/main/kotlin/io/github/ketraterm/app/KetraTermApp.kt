@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app
 
+import io.github.ketraterm.app.ui.captureCleanupFailure
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.nio.file.Path
 import java.util.*
@@ -24,6 +25,10 @@ import javax.swing.SwingUtilities
  * Starts the KetraTerm standalone terminal application.
  */
 fun main(args: Array<String>) {
+    if (System.getProperty("os.name").startsWith("Linux", ignoreCase = true)) {
+        // JBR's Wayland toolkit needs the installed desktop file's basename before AWT starts.
+        System.getProperties().putIfAbsent("awt.app.id", "ketraterm-KetraTerm")
+    }
     KetraTermApp.start(args.toList())
 }
 
@@ -74,12 +79,19 @@ private object KetraTermApp {
         SwingUtilities.invokeLater {
             KetraTermLookAndFeel.install()
             io.github.ketraterm.app.ui.Chrome
-                .applyPalette(settings.current().palette)
+                .applyPalette(settings.theme.createPalette())
             val window =
                 io.github.ketraterm.app.ui
                     .WindowFactory(settings, profileRegistry, availableProfiles)
                     .createWindow()
             window.openInitialTab(initialProfile)
+            // Resolve fonts while the workspace worker creates the PTY. The pane reuses this snapshot.
+            try {
+                settings.current()
+            } catch (failure: Throwable) {
+                captureCleanupFailure(failure) { window.frame.dispose() }
+                throw failure
+            }
         }
     }
 }

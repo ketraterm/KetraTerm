@@ -52,13 +52,6 @@ internal class WindowFactory(
             JFrame(Chrome.APP_TITLE).apply {
                 defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
                 minimumSize = Dimension(720, 420)
-                iconImages =
-                    listOf(
-                        FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 16, 16).image,
-                        FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 32, 32).image,
-                        FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 48, 48).image,
-                        FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 128, 128).image,
-                    )
             }
 
         val tabContentPanel =
@@ -269,7 +262,7 @@ internal data class Window(
         try {
             // A displayable window keeps AWT alive while daemon workers create the first terminal.
             // Keep it hidden until the installed pane supplies the configured grid dimensions.
-            frame.pack()
+            frame.addNotify()
             val accepted =
                 tabManager.openTab(
                     profile,
@@ -288,7 +281,18 @@ internal data class Window(
                     },
                     onComplete = finish,
                 )
-            if (!accepted) finish(false)
+            if (!accepted) {
+                finish(false)
+                return
+            }
+            // Rasterize window icons while the worker creates the PTY, before the pane can be shown.
+            frame.iconImages =
+                listOf(
+                    FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 16, 16).image,
+                    FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 32, 32).image,
+                    FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 48, 48).image,
+                    FlatSVGIcon("io/github/ketraterm/app/icons/logo.svg", 128, 128).image,
+                )
         } catch (failure: Throwable) {
             captureCleanupFailure(failure) { finish(false) }
             throw failure
