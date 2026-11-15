@@ -23,7 +23,9 @@ import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalOutputParserFactory
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
@@ -33,6 +35,7 @@ import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -50,6 +53,115 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
+    @Test
+    fun `both host factories refresh row order before the first semantic command publication`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            for (versioned in listOf(false, true)) {
+                val state = TerminalShellIntegrationState()
+                val factory =
+                    if (versioned) {
+                        TerminalShellIntegrationFactory.host(state, TerminalShellCommandLineState())
+                    } else {
+                        TerminalShellIntegrationFactory.host(state)
+                    }
+                val connector = MockConnector()
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(12, 8),
+                        connector,
+                        shellIntegration = factory,
+                        workerDispatcher = dispatcher,
+                        ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
+                    ).use { session ->
+                        session.start(12, 8)
+                        connector.feedFromHost("\u001b[2;1H\u001b[Lone\r\ntwo".ascii())
+                        val ids = LongArray(3)
+                        session.readRenderFrame { frame -> for (row in ids.indices) ids[row] = frame.lineId(row) }
+                        assertTrue(ids[1] > ids[2])
+                        state.recordCommandStart(ids[1], includeLine = true)
+                        state.recordCommandFinished(ids[2], exitCode = 0)
+                        val id = state.latestCommandRecordId()
+                        val range = LongArray(3)
+                        assertTrue(state.copyCommandOutputRange(id, range))
+                        assertArrayEquals(longArrayOf(ids[1], ids[2], 1), range)
+                        session.resizeViewport(12, 9)
+                        assertTrue(state.copyCommandOutputRange(id, range))
+                        assertArrayEquals(longArrayOf(ids[1], ids[2], 1), range)
+                    }
+            }
+        }
+
+    @Test
+    fun `wire Kitty event type negotiation does not duplicate text on release`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    session.start()
+                    connector.feedFromHost("\u001B[>2u".ascii())
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code, type = TerminalKeyEventType.RELEASE))
+                    runCurrent()
+                    assertEquals("a", connector.writtenBytes.asciiText())
+                }
+        }
+
+    @Test
+    fun `oversized REP admits bounded work then processes output and completes cleanup`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val counts = mutableListOf<Int>()
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(9, 4, maxHistory = 3),
+                    MockConnector(),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                    parserFactory =
+                        TerminalOutputParserFactory { sink, clipboardBudget ->
+                            TerminalParsers.create(
+                                object : TerminalCommandSink by sink {
+                                    override fun writeRepeatedCluster(
+                                        codepoints: IntArray,
+                                        length: Int,
+                                        count: Int,
+                                    ) {
+                                        check(count in 1..65_535) { "unbounded REP entered session mutation: $count" }
+                                        counts += count
+                                        sink.writeRepeatedCluster(codepoints, length, count)
+                                    }
+                                },
+                                clipboardBudget,
+                            )
+                        },
+                ).use { session ->
+                    session.start()
+                    val bytes = "👩‍💻\u001B[2147483647b\u001B[b\r\nDONE".encodeToByteArray()
+                    session.onBytes(bytes, 0, bytes.size)
+                    assertEquals(listOf(65_535, 1), counts)
+                    session.readRenderFrame { frame ->
+                        val codes = IntArray(frame.columns)
+                        frame.copyTextLine(3, codes, flags = IntArray(frame.columns))
+                        assertArrayEquals(intArrayOf('D'.code, 'O'.code, 'N'.code, 'E'.code, 0, 0, 0, 0, 0), codes)
+                    }
+                    session.requestClose()
+                    runCurrent()
+                    val closed = session.state.value as TerminalSessionState.Closed
+                    assertTrue(closed.event.locallyRequested)
+                    assertNull(closed.event.failure)
+                }
+        }
+
     @Test
     fun `standard session permits host notifications by default`() =
         runTest {
@@ -209,7 +321,7 @@ class TerminalSessionTest {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             val recorded = MockConnector()
-            val entered = CountDownLatch(1)
+            val entered = CompletableDeferred<Unit>()
             val release = CountDownLatch(1)
             var holdResize = true
             var firstOutput = false
@@ -223,7 +335,7 @@ class TerminalSessionTest {
                         recorded.resize(columns, rows)
                         if (holdResize) {
                             holdResize = false
-                            entered.countDown()
+                            entered.complete(Unit)
                             check(release.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Resize was not released" }
                         }
                     }
@@ -251,7 +363,7 @@ class TerminalSessionTest {
             session.use {
                 SessionTestThread("pre-start-resize") { session.resizeViewport(13, 5) }.use { resizer ->
                     try {
-                        assertTrue(entered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                        entered.await()
                         SessionTestThread("current-geometry-start") { session.start() }.use { starter ->
                             try {
                                 starter.awaitBlockedBy(resizer)
@@ -276,13 +388,13 @@ class TerminalSessionTest {
     fun `startup attempts serialize while close can interrupt connector startup`(operation: String) =
         runTest {
             val recorded = MockConnector()
-            val entered = CountDownLatch(1)
+            val entered = CompletableDeferred<Unit>()
             val release = CountDownLatch(1)
             val connector =
                 object : TerminalConnector by recorded {
                     override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
                         recorded.start(listener)
-                        entered.countDown()
+                        entered.complete(Unit)
                         check(release.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Startup was not released" }
                     }
                 }
@@ -297,7 +409,7 @@ class TerminalSessionTest {
                 ).use { session ->
                     SessionTestThread("session-start") { session.start(10, 3) }.use { starter ->
                         try {
-                            assertTrue(entered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                            entered.await()
                             assertSame(TerminalSessionState.Created, session.state.value)
                             session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
                             session.encodePaste(TerminalPasteEvent("x"))
@@ -691,7 +803,7 @@ class TerminalSessionTest {
                     ioDispatcher = StandardTestDispatcher(testScheduler),
                     cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
-            val leased = CountDownLatch(1)
+            val leased = CompletableDeferred<Unit>()
             val release = CountDownLatch(1)
             session.use {
                 session.start(10, 3)
@@ -701,13 +813,13 @@ class TerminalSessionTest {
                     CompletableFuture.runAsync {
                         session.readPublishedFrame { frame ->
                             assertEquals('O'.code, frame.codeWords[0])
-                            leased.countDown()
+                            leased.complete(Unit)
                             release.await()
                             assertEquals('O'.code, frame.codeWords[0])
                         }
                     }
                 try {
-                    assertTrue(leased.await(10, TimeUnit.SECONDS))
+                    leased.await()
                     connector.feedFromHost("\rFINAL".ascii())
                     session.close()
                     assertEquals(
@@ -717,7 +829,7 @@ class TerminalSessionTest {
                     assertTrue(session.state.value is TerminalSessionState.Closed)
                 } finally {
                     release.countDown()
-                    reader.get(10, TimeUnit.SECONDS)
+                    reader.await()
                 }
             }
         }

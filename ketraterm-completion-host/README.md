@@ -66,7 +66,10 @@ Shell parsing and quoting stay in the completion engine.
 
 `TerminalLocalFileUriResolver` accepts `file:` working-directory URIs with an
 empty authority or `localhost`. Unsupported schemes, remote authorities, and
-malformed paths produce no local result. Resolution is lexical and performs no
+malformed paths produce no local result. Queries and fragments are rejected,
+as are Windows network roots hidden in decoded URI paths. Explicit UNC argument
+prefixes remain supported with local working-directory metadata.
+Resolution is lexical and performs no
 filesystem access; normalization does not confine access to a workspace or
 resolve symbolic links. A host with remote filesystems or restricted access
 should provide its own `TerminalFileSystemProvider` from the completion API.

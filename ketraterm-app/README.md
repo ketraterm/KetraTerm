@@ -64,6 +64,8 @@ inline previews, popup mode (**Off**, **On request**, or **Automatic**), shortcu
 and learning persistence. Add shortcuts by pressing the keys; click a shortcut
 chip to remove it. Removing Enter from **Accept selected popup** keeps Enter
 available to the shell.
+See [persistent storage](../docs/reference/storage.md) for learning locations,
+migration, and reset behavior.
 Ctrl+Space requests suggestions when the popup surface is enabled, even when
 automatic popups are disabled. Without
 an editable shell context, it passes through to the running application.
@@ -87,7 +89,8 @@ ketra config
 
 `config` opens the active configuration file using the platform helper's editor
 selection. WSL and Ubuntu launcher profiles do not receive the native helper or
-native configuration paths.
+native configuration paths. Helpers are installed in a private, randomly named
+temporary directory with owner-only access and are removed on normal JVM exit.
 
 <a id="maintainer-entry-points"></a>
 

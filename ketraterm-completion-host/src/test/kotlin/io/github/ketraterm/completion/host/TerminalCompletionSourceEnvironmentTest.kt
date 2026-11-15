@@ -18,6 +18,8 @@ package io.github.ketraterm.completion.host
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,6 +27,15 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class TerminalCompletionSourceEnvironmentTest {
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    fun `Git directory overrides and fallback cannot manufacture remote source metadata`() {
+        for (path in listOf("//server/share/repo", "\\\\server\\share\\repo")) {
+            assertNull(resolve(request("git -C '$path' switch fe")), path)
+            assertNull(resolve(request("git -C child switch fe", directory = null), project = Path.of(path)), path)
+        }
+    }
+
     private val projectDirectory = Path.of("completion-project").toAbsolutePath().normalize()
 
     @Test

@@ -64,10 +64,11 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         val key = event.key
+        val modifiers = event.modifiers and (TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK).inv()
         if (key != null) {
-            encodeSpecialKey(key, event.modifiers, modeBits)
+            encodeSpecialKey(key, modifiers, modeBits, TerminalModifiers.hasNumLock(event.modifiers))
         } else {
-            encodeCodepoint(event.codepoint, event.modifiers, modeBits)
+            encodeCodepoint(event.codepoint, modifiers, modeBits)
         }
     }
 
@@ -117,6 +118,7 @@ internal class LegacyKeyboardEncoder(
         key: TerminalKey,
         modifiers: Int,
         modeBits: Long,
+        numLock: Boolean,
     ) {
         val resource = XtermKeyMappingTable.RESOURCES[key.ordinal]
         val code = XtermKeyMappingTable.CODES[key.ordinal]
@@ -126,11 +128,11 @@ internal class LegacyKeyboardEncoder(
         }
         when (key) {
             TerminalKey.ENTER -> encodeEnter(modifiers, modeBits)
-            TerminalKey.NUMPAD_ENTER -> encodeKeypad(key, modifiers, modeBits)
+            TerminalKey.NUMPAD_ENTER -> encodeKeypad(key, modifiers, modeBits, numLock)
             TerminalKey.TAB -> encodeTab(modifiers, modeBits)
             TerminalKey.BACKSPACE -> encodeBackspace(modifiers, modeBits)
             TerminalKey.ESCAPE -> encodeEscape(modifiers, modeBits)
-            else -> encodeMappedKey(key, modifiers, modeBits)
+            else -> encodeMappedKey(key, modifiers, modeBits, numLock)
         }
     }
 
@@ -138,6 +140,7 @@ internal class LegacyKeyboardEncoder(
         key: TerminalKey,
         modifiers: Int,
         modeBits: Long,
+        numLock: Boolean,
     ) {
         val functionLevel = TerminalInputState.keyModifierOption(modeBits, XtermKeyResource.FUNCTION_KEYS)
         if (functionLevel == -1 && key.ordinal in TerminalKey.F1.ordinal..TerminalKey.F35.ordinal) {
@@ -153,12 +156,12 @@ internal class LegacyKeyboardEncoder(
         }
         if (key.ordinal in TerminalKey.F13.ordinal..TerminalKey.F24.ordinal) {
             val baseKey = TERMINAL_KEYS[TerminalKey.F1.ordinal + key.ordinal - TerminalKey.F13.ordinal]
-            encodeMappedKey(baseKey, modifiers or TerminalModifiers.SHIFT, modeBits)
+            encodeMappedKey(baseKey, modifiers or TerminalModifiers.SHIFT, modeBits, numLock)
             return
         }
         if (key.ordinal in TerminalKey.F25.ordinal..TerminalKey.F35.ordinal) {
             val baseKey = TERMINAL_KEYS[TerminalKey.F1.ordinal + key.ordinal - TerminalKey.F25.ordinal]
-            encodeMappedKey(baseKey, modifiers or TerminalModifiers.CTRL, modeBits)
+            encodeMappedKey(baseKey, modifiers or TerminalModifiers.CTRL, modeBits, numLock)
             return
         }
 
@@ -234,7 +237,7 @@ internal class LegacyKeyboardEncoder(
         val hasNormalKeypad = KeyMappingTable.NORMAL_KEYPAD_ASCII[keyOrdinal] >= 0
         val hasAppKeypad = KeyMappingTable.APPLICATION_KEYPAD_FINALS[keyOrdinal] >= 0
         if (hasNormalKeypad || hasAppKeypad) {
-            encodeKeypad(key, modifiers, modeBits)
+            encodeKeypad(key, modifiers, modeBits, numLock)
             return
         }
     }
@@ -326,6 +329,7 @@ internal class LegacyKeyboardEncoder(
         key: TerminalKey,
         modifiers: Int,
         modeBits: Long,
+        numLock: Boolean,
     ) {
         val keyOrdinal = key.ordinal
 
@@ -335,7 +339,7 @@ internal class LegacyKeyboardEncoder(
 
         // Num Lock overrides this event's legacy keypad encoding, not terminal mode.
         // Extended xterm and Kitty reports retain their own earlier routing.
-        if (TerminalInputState.isApplicationKeypad(modeBits) && !TerminalModifiers.hasNumLock(modifiers)) {
+        if (TerminalInputState.isApplicationKeypad(modeBits) && !numLock) {
             if (key == TerminalKey.NUMPAD_BEGIN) {
                 CsiWriter.writeCsiLetter(scratch, output, 'E'.code)
                 return

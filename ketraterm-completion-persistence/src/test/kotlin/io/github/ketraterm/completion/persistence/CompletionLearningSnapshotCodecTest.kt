@@ -21,8 +21,23 @@ import kotlin.test.*
 
 class CompletionLearningSnapshotCodecTest {
     @Test
-    fun `current file name and header use the split schema version`() {
-        assertEquals("command-completion-learning-v3.tsv", TerminalCompletionLearningCoordinator.currentFileName())
+    fun `valid optional metadata round trips without losing context identity`() {
+        val original = snapshot("git status")
+        for (profile in listOf(null, "profile", " ", "工程😀")) {
+            for (directory in listOf(null, "file:///repo", "file:///工程")) {
+                val expected =
+                    TerminalCompletionLearningSnapshot(
+                        original.rankingStats.map { it.copy(profileId = profile, workingDirectoryUri = directory) },
+                        original.replayCommands.map { it.copy(profileId = profile, workingDirectoryUri = directory) },
+                    )
+                assertEquals(expected, CompletionLearningSnapshotCodec.decode(CompletionLearningSnapshotCodec.encode(expected)))
+            }
+        }
+    }
+
+    @Test
+    fun `stable file name is independent of the versioned schema header`() {
+        assertEquals("command-completion-learning.tsv", TerminalCompletionLearningCoordinator.currentFileName())
         assertEquals(listOf(HEADER), CompletionLearningSnapshotCodec.encode(TerminalCompletionLearningSnapshot.EMPTY))
     }
 
@@ -79,6 +94,25 @@ class CompletionLearningSnapshotCodecTest {
         val invalidUtf8Replay = "H\t$OTHER_DIGEST\twyg\t\t"
 
         assertNull(CompletionLearningSnapshotCodec.decode(listOf(HEADER, invalidUtf8Replay)))
+    }
+
+    @Test
+    fun `malformed UTF-8 metadata in either lane rejects the complete snapshot`() {
+        val valid = CompletionLearningSnapshotCodec.encode(snapshot("git status"))
+        for (invalidUtf8 in listOf("wyg", "7aCA", "8J-Y")) {
+            for ((row, fields) in listOf(1 to listOf(2, 3), 2 to listOf(3, 4))) {
+                for (field in fields) {
+                    val malformed = valid.toMutableList()
+                    malformed[row] =
+                        valid[row]
+                            .split('\t')
+                            .toMutableList()
+                            .also { it[field] = invalidUtf8 }
+                            .joinToString("\t")
+                    assertNull(CompletionLearningSnapshotCodec.decode(malformed), "row=$row field=$field bytes=$invalidUtf8")
+                }
+            }
+        }
     }
 
     @Test

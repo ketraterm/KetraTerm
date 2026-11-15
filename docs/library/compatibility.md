@@ -28,8 +28,8 @@ and IntelliJ product implementation APIs
 are outside the supported publication boundary.
 
 Kotlin 2.4 and JDK 25 are the minimum supported consumer versions. The build uses
-Kotlin 2.4.20, JVM target 25, and JVM default-method compatibility bridges.
-Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-only
+Kotlin 2.4.21, JVM target 25, and JVM default-method compatibility bridges.
+Consumer checks exercise Kotlin 2.4.0/2.4.21 and both Gradle metadata and POM-only
 resolution. A host replacing dependencies with a platform runtime must verify
 that runtime separately.
 
@@ -143,6 +143,7 @@ release history remains in the [changelog](../../CHANGELOG.md).
 
 | Earlier shape | Current integration |
 | --- | --- |
+| Custom `TerminalCursor` implementations or compiled Kotlin delegates before single-axis positioning | Implement `positionCursorColumn` and `positionCursorRow`, preserving the other axis and applying the same origin rules as `positionCursor`; recompile implementations/delegates. See the [cursor contract](../../ketraterm-core/docs/terminal-core-contract.md#cursor-contract). |
 | Custom parser/core implementations or compiled Kotlin delegates before REP | Implement `writeRepeatedCluster(codepoints, length, count)` on `TerminalCommandSink` and `TerminalWriter`, and recompile implementations/delegates. The array is borrowed synchronously; apply the current pen and ordinary write semantics to each copy. See the [REP contract](../reference/protocol.md#repeat-character). |
 | Custom parser/core implementations or compiled Kotlin delegates before graphics commands | Implement `graphicsTransferGeneration` and `applyGraphicsCommand` on `TerminalCommandSink` and the core's `TerminalGraphics` role, now part of `TerminalBuffer`; core implementations also accept immutable images through `applyDecodedGraphicsCommand`. Recompile implementations and Kotlin delegates. Consume borrowed controls/data synchronously and preserve response permission. Existing render-frame providers retain empty-image defaults; providers supplying images must implement `copyImages` and its generation contract. |
 | Session construction and synchronous UI mutation before decoded graphics | Existing construction signatures and Kotlin default arguments remain available; an additional overload accepts an independent cleanup dispatcher. Preserve `TerminalGraphicsOutputParser` in built-in parser decorators. Run gated settings/clear/geometry off UI threads; use Swing binding/mutation completion callbacks and `requestClose` for UI disposal. Connector startup/output must tolerate concurrent close. See the [session contract](../../ketraterm-session/docs/session-concurrency-locks.md). |
@@ -159,7 +160,7 @@ release history remains in the [changelog](../../CHANGELOG.md).
 | Pre-bound custom input encoder | `TerminalInputEncoderFactory` with session-owned output; implement synchronous input-policy updates. |
 | Earlier buffer factory return type | `TerminalRenderBuffer`; changed JVM return descriptors require recompilation. |
 | Non-null shortcut lookup | Handle null for legitimately unbound actions. |
-| Workspace/persistence development artifacts | Product-only modules; library hosts own these concerns. |
+| Workspace/persistence development artifacts | Published since 0.5.0 as [`ketraterm-workspace`](../../ketraterm-workspace/README.md) and [`ketraterm-completion-persistence`](../../ketraterm-completion-persistence/README.md). |
 
 See [configuration](configuration.md), [session assembly](../../ketraterm-session/README.md#custom-assembly),
 and [Swing APIs](../../ketraterm-ui-swing/README.md) for current usage.

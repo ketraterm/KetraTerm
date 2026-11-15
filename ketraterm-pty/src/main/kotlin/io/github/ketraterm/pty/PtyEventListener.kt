@@ -220,7 +220,7 @@ public interface PtyEventListener {
      * Called when OSC 52 clipboard write policy permits a decoded text payload.
      *
      * Implementations own platform clipboard access and should avoid retaining
-     * [event.text] longer than needed to complete the write.
+     * `event.text` longer than needed to complete the write.
      *
      * @param session session that received the request.
      * @param event decoded clipboard write request.
@@ -234,7 +234,7 @@ public interface PtyEventListener {
      * Called when OSC 52 clipboard write policy requires a product-host prompt.
      *
      * Implementations own user prompting and platform clipboard access. They
-     * should avoid retaining [event.text] longer than needed to complete the
+     * should avoid retaining `event.text` longer than needed to complete the
      * prompt and possible write.
      *
      * @param session session that received the request.

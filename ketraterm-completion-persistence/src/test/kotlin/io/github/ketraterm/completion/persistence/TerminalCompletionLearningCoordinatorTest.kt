@@ -33,6 +33,50 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCompletionLearningCoordinatorTest {
     @Test
+    fun `rejected metadata preserves checkpoints and subsequent learning remains writable`() =
+        runTest {
+            val files = RecordingSnapshotFiles()
+            val learning = TerminalCompletionLearningStore()
+            val loadFailures = mutableListOf<Throwable>()
+            val coordinator = coordinator(learning, files, onPersistenceLoadFailure = loadFailures::add)
+            runCurrent()
+            coordinator.recordCommandResult("git status", true, "shell😀", "file:///repo/界", 1L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            val before = learning.snapshot()
+            assertEquals(listOf(before), files.writes)
+
+            for ((profile, directory) in listOf("shell\uD800" to "file:///repo", "shell" to "file:///repo/\uDC00")) {
+                for (successful in listOf(false, true)) {
+                    assertFailsWith<IllegalArgumentException> {
+                        coordinator.recordCommandResult("git log", successful, profile, directory, 2L)
+                    }
+                }
+                for (feedback in TerminalCompletionFeedbackKind.entries) {
+                    assertFailsWith<IllegalArgumentException> {
+                        coordinator.recordSuggestionFeedback("git status", feedback, profile, directory, 2L)
+                    }
+                }
+                assertSame(before, learning.snapshot())
+            }
+            advanceTimeBy((CHECKPOINT_INTERVAL_MILLIS * 2).milliseconds)
+            runCurrent()
+            assertEquals(listOf(before), files.writes)
+            assertEquals(1, files.writeAttempts.get())
+
+            coordinator.recordSuggestionFeedback("git status", TerminalCompletionFeedbackKind.ACCEPTED, "shell😀", "file:///repo/界", 3L)
+            coordinator.recordCommandResult("git log", true, "shell👩‍💻", "file:///repo/\uD800\uDC00", 4L)
+            coordinator.closeAndFlush()
+            assertEquals(2, files.writeAttempts.get())
+            assertEquals(learning.snapshot(), files.writes.last())
+            for (snapshot in files.writes) {
+                assertEquals(snapshot, CompletionLearningSnapshotCodec.decode(CompletionLearningSnapshotCodec.encode(snapshot)))
+            }
+            assertTrue(loadFailures.isEmpty())
+        }
+
+    @Test
     fun `non-flushing close cancels pending hydration without reading or writing`() =
         runTest {
             val files = RecordingSnapshotFiles()
@@ -66,16 +110,16 @@ class TerminalCompletionLearningCoordinatorTest {
     @Test
     fun `non-flushing close awaits in-flight load and prevents later checkpoint`() =
         runTest {
-            val loadStarted = CountDownLatch(1)
+            val loadStarted = CompletableDeferred<Unit>()
             val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(beforeLoad = {
-                    loadStarted.countDown()
+                    loadStarted.complete(Unit)
                     check(releaseLoad.await(5, TimeUnit.SECONDS))
                 })
             val coordinator = coordinator(TerminalCompletionLearningStore(), files, ioDispatcher = Dispatchers.IO)
             try {
-                assertTrue(loadStarted.await(5, TimeUnit.SECONDS))
+                loadStarted.await()
                 coordinator.recordCommandResult("git status", true, null, null, 1L)
                 val closing = launch(start = CoroutineStart.UNDISPATCHED) { coordinator.closeWithoutFlush() }
                 assertFalse(closing.isCompleted)
@@ -197,13 +241,13 @@ class TerminalCompletionLearningCoordinatorTest {
     @Test
     fun `reset during hydration discards the loaded snapshot`() =
         runTest {
-            val loadStarted = CountDownLatch(1)
+            val loadStarted = CompletableDeferred<Unit>()
             val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(
                     initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("old command", 1L)),
                     beforeLoad = {
-                        loadStarted.countDown()
+                        loadStarted.complete(Unit)
                         check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
                     },
                 )
@@ -211,9 +255,10 @@ class TerminalCompletionLearningCoordinatorTest {
             val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
 
             try {
-                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
-                coordinator.resetLearning()
+                loadStarted.await()
+                val reset = coordinator.resetLearning()
                 releaseLoad.countDown()
+                reset.await()
                 coordinator.closeAndFlush()
 
                 assertSame(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
@@ -236,8 +281,9 @@ class TerminalCompletionLearningCoordinatorTest {
                 )
             runCurrent()
 
-            coordinator.resetLearning()
+            val reset = coordinator.resetLearning()
             runCurrent()
+            reset.await()
             coordinator.closeAndFlush()
 
             assertEquals(1, diagnostics.size)
@@ -328,13 +374,13 @@ class TerminalCompletionLearningCoordinatorTest {
     @Test
     fun `event recorded during hydration is immediately visible and persisted after merge`() =
         runTest {
-            val loadStarted = CountDownLatch(1)
+            val loadStarted = CompletableDeferred<Unit>()
             val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(
                     initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
                     beforeLoad = {
-                        loadStarted.countDown()
+                        loadStarted.complete(Unit)
                         check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
                     },
                 )
@@ -342,7 +388,7 @@ class TerminalCompletionLearningCoordinatorTest {
             val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
 
             try {
-                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
+                loadStarted.await()
                 coordinator.recordCommandResult("npm test", true, null, null, 2L)
                 assertEquals(listOf("npm test"), learning.snapshot().replayCommands.map { it.commandLine })
 
@@ -362,13 +408,13 @@ class TerminalCompletionLearningCoordinatorTest {
     @Test
     fun `disable during hydration lets the started load merge but prevents writes`() =
         runTest {
-            val loadStarted = CountDownLatch(1)
+            val loadStarted = CompletableDeferred<Unit>()
             val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(
                     initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
                     beforeLoad = {
-                        loadStarted.countDown()
+                        loadStarted.complete(Unit)
                         check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
                     },
                 )
@@ -376,7 +422,7 @@ class TerminalCompletionLearningCoordinatorTest {
             val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
 
             try {
-                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
+                loadStarted.await()
                 coordinator.recordCommandResult("npm test", true, null, null, 2L)
                 coordinator.setPersistenceEnabled(false)
                 releaseLoad.countDown()
@@ -535,10 +581,11 @@ class TerminalCompletionLearningCoordinatorTest {
 
             assertEquals(1, learning.snapshot().rankingStats.size)
             assertTrue(learning.snapshot().replayCommands.isEmpty())
+            val lines = withContext(Dispatchers.IO) { Files.readAllLines(path) }
             val persisted =
                 requireNotNull(
                     CompletionLearningSnapshotCodec.decode(
-                        Files.readAllLines(path),
+                        lines,
                     ),
                 )
             assertEquals(1, persisted.rankingStats.size)
@@ -843,16 +890,16 @@ class TerminalCompletionLearningCoordinatorTest {
     @Test
     fun `cancelling a close waiter does not wait for blocked file IO`() =
         runTest {
-            val loadFinished = CountDownLatch(1)
-            val writeStarted = CountDownLatch(1)
+            val loadFinished = CompletableDeferred<Unit>()
+            val writeStarted = CompletableDeferred<Unit>()
             val releaseWrite = CountDownLatch(1)
             val workerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             try {
                 val files =
                     RecordingSnapshotFiles(
-                        afterLoad = loadFinished::countDown,
+                        afterLoad = { loadFinished.complete(Unit) },
                         beforePersist = {
-                            writeStarted.countDown()
+                            writeStarted.complete(Unit)
                             releaseWrite.await()
                         },
                     )
@@ -865,12 +912,12 @@ class TerminalCompletionLearningCoordinatorTest {
                         checkpointIntervalMillis = CHECKPOINT_INTERVAL_MILLIS,
                         ioDispatcher = Dispatchers.IO,
                     )
-                assertTrue(loadFinished.await(5L, TimeUnit.SECONDS))
+                loadFinished.await()
                 coordinator.recordCommandResult("git status", true, null, null, 42L)
 
                 val closeWaiter = async { coordinator.closeAndFlush() }
                 runCurrent()
-                assertTrue(writeStarted.await(5L, TimeUnit.SECONDS))
+                writeStarted.await()
                 closeWaiter.cancel()
                 runCurrent()
 
@@ -879,7 +926,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 assertEquals(1, files.writeAttempts.get())
             } finally {
                 releaseWrite.countDown()
-                workerScope.cancel()
+                workerScope.coroutineContext.job.cancelAndJoin()
             }
         }
 
@@ -892,7 +939,7 @@ class TerminalCompletionLearningCoordinatorTest {
             val start = CompletableDeferred<Unit>()
             val recordings =
                 List(CONCURRENT_RECORDINGS) { index ->
-                    async<Throwable?>(Dispatchers.Default) {
+                    async(Dispatchers.Default) {
                         start.await()
                         try {
                             coordinator.recordCommandResult("git status", true, null, null, index + 1L)

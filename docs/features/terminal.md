@@ -8,10 +8,10 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Feature | Support |
 | --- | --- |
 | Cursor movement | Absolute/relative positioning, including [relative cursor aliases](../reference/protocol.md#relative-cursor-aliases), origin mode, DEC and ANSI/SCO save/restore, and configurable forward/backward tab stops. |
-| Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. |
+| Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. DECOM reset permits page addressing outside margins; DECOM set uses margin-relative addressing. See the [core cursor contract](../../ketraterm-core/docs/terminal-core-contract.md#cursor-contract). |
 | Cell editing | Character and column insertion/deletion, erase, protected cells, and selective erase. |
 | Writing modes | Insert/replace, autowrap, and automatic newline modes. |
-| Repeat character | REP (`CSI Ps b`) repeats the preceding retained grapheme with the current pen and ordinary write semantics. See the [protocol contract](../reference/protocol.md#repeat-character). |
+| Repeat character | REP (`CSI Ps b`) repeats the preceding retained grapheme with the current pen and ordinary write semantics, subject to a per-command resource limit. See the [protocol contract](../reference/protocol.md#repeat-character). |
 | Reverse wrap | Modes 45/1045 apply to BS and CUB with autowrap enabled: soft-wrapped rows only (45), or hard breaks and top-to-bottom margin cycling (1045). |
 | Rectangular operations | Erase, selective erase, fill, copy, attribute changes/reversal, and base VT420 checksum. Copy/checksum use the active page only. |
 | Alternate screen | Modes 47/1047/1049, screen-local saved cursor state, and primary scrollback preservation. |
@@ -20,7 +20,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Resets | Hard reset, soft reset, screen/history erase, Kitty ED 22 [screen-to-history clear](../reference/protocol.md#screen-to-history-clear), and DEC alignment test. |
 | Synchronized output | Mode 2026 delays frame publication until completion or timeout. |
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
-| Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. Mode 2027 reports grapheme processing as permanently enabled; see [mode status](../reference/protocol.md#mode-status-reports). |
+| Unicode | UTF-8 decoding, grapheme segmentation using Unicode 17 property tables, combining marks, wide characters, and emoji sequences. See [segmentation coverage](../../ketraterm-parser/docs/grapheme-segmentation.md#2-grapheme-segmentation-unicode-uax-29). Mode 2027 reports grapheme processing as permanently enabled; see [mode status](../reference/protocol.md#mode-status-reports). |
 | Stream handling | Incremental decoding across byte chunks, malformed UTF-8 recovery, and bounded CSI/OSC/DCS collection with cancellation and overflow recovery. |
 | Width policy | Pinned Unicode width tables, configurable ambiguous width, and base-specific VS15/VS16 cell allocation; unsupported presentation bases retain their ordinary width. See the [core contract](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). |
 
@@ -51,7 +51,7 @@ placement can depend on input chunk boundaries. See the
 | --- | --- |
 | Keyboard | Cursor/function/keypad keys, modifiers, application modes, Backarrow mode, and committed text. |
 | xterm key resources | modifyOtherKeys and independent modifier/format resources with status queries. |
-| Kitty keyboard | Progressive flag negotiation and encoding; available flags depend on host input metadata. |
+| Kitty keyboard | Progressive flag negotiation and encoding, with screen-local stacks that restore set baselines; available flags depend on host input metadata. [Stack contract](../../ketraterm-core/docs/terminal-core-contract.md#mode-state-contract). |
 | Paste | Bracketed paste, control-character protection, and configurable newline handling. |
 | Mouse tracking | X10, normal, button-event, and any-event tracking. |
 | Mouse behavior | Mode 1007 controls alternate-screen wheel-to-cursor-key input; XTSHIFTESCAPE (`CSI > Ps s`) requests Shift mouse capture. Hosts retain control over reporting and wheel translation. |

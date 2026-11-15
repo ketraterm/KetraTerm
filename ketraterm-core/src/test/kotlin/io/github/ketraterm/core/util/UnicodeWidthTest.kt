@@ -28,6 +28,59 @@ import java.util.stream.Stream
 @DisplayName("UnicodeWidth Test Suite")
 class UnicodeWidthTest {
     @ParameterizedTest
+    @ValueSource(
+        ints = [
+            0x0600, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2, 0x0D4E,
+            0x110BD, 0x110CD, 0x111C2, 0x111C3, 0x113D1, 0x1193F, 0x11941,
+            0x11A84, 0x11A89, 0x11D46, 0x11F02,
+        ],
+    )
+    fun `leading Prepend characters defer width to the following base`(prepend: Int) {
+        for (ambiguousAsWide in listOf(false, true)) {
+            assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(prepend, 'A'.code), 2, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(prepend, 0x754C), 2, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(prepend, 0x1F600), 2, ambiguousAsWide))
+            assertEquals(if (ambiguousAsWide) 2 else 1, UnicodeWidth.calculateCluster(intArrayOf(prepend, 0x00A1), 2, ambiguousAsWide))
+        }
+    }
+
+    @Test
+    fun `multiple Prepend characters select one base within the used prefix`() {
+        assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x0D4E, 0x110BD, 0x754C), 4, false))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x0D4E, 0x754C), 2, false))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0x0600, -1), 1, false))
+        assertEquals(
+            1,
+            UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x0301, 0x754C), 3, false),
+            "only leading Prepend characters are skipped",
+        )
+        assertEquals(
+            1,
+            UnicodeWidth.calculateCluster(intArrayOf(0x11A3A, 0x754C), 2, false),
+            "non-Prepend narrow bases retain their width",
+        )
+        assertEquals(0, UnicodeWidth.calculateCluster(intArrayOf(0x0600), 0, false))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x231A, 0x2615, 0x2764, 0x1F610])
+    fun `presentation selectors apply to the base after leading Prepend characters`(base: Int) {
+        for (ambiguousAsWide in listOf(false, true)) {
+            assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x110BD, base, 0xFE0E), 4, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x110BD, base, 0xFE0F), 4, ambiguousAsWide))
+            assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0x0600, base, 0xFE0F, 0xFE0E), 4, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x754C, 0xFE0E), 3, ambiguousAsWide))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x0600, 0x0D4E, 0x110BD, 0x11F02])
+    fun `prefix only clusters keep one cell even for repeated Prepend characters`(prepend: Int) {
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(prepend), 1, false))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(prepend, prepend), 2, true))
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [0x231A, 0x2615, 0x2620, 0x2699, 0x26A1, 0x2708, 0x2764, 0x2B50, 0x1F610])
     fun `recognized emoji variation bases use the explicit presentation width`(base: Int) {
         assertTrue(UnicodeWidth.isEmojiVariationBase(base))
@@ -57,11 +110,13 @@ class UnicodeWidthTest {
     }
 
     @Test
-    fun `VS15 only affects a recognized leading base in the used cluster prefix`() {
+    fun `VS15 only affects the selected base in the used cluster prefix`() {
         assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x4E00, 0x2764, 0xFE0E), 3, false))
         assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x2615, 0xFE0E), 1, false))
         assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0xFE0E), 1, false))
         assertEquals(0, UnicodeWidth.calculate(0xFE0E, false))
+        assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0x2615, 0xFE0E), 2, false))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0x0600, 0xFE0F), 2, false))
     }
 
     @ParameterizedTest
@@ -69,7 +124,13 @@ class UnicodeWidthTest {
     fun `non scalars have no width and cannot hide behind presentation selectors`(cp: Int) {
         for (wide in listOf(false, true)) {
             assertThrows(IllegalArgumentException::class.java) { UnicodeWidth.calculate(cp, wide) }
-            for (cluster in listOf(intArrayOf(cp), intArrayOf(cp, 0xFE0E), intArrayOf(0x2764, 0xFE0F, cp))) {
+            for (cluster in listOf(
+                intArrayOf(cp),
+                intArrayOf(cp, 0xFE0E),
+                intArrayOf(0x2764, 0xFE0F, cp),
+                intArrayOf(0x0600, cp),
+                intArrayOf(0x0600, 0x2764, 0xFE0F, cp),
+            )) {
                 assertThrows(IllegalArgumentException::class.java) {
                     UnicodeWidth.calculateCluster(cluster, cluster.size, wide)
                 }

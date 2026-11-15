@@ -50,6 +50,10 @@ active highlights. Removing the bar from a displayable hierarchy also cancels
 its observation. `open`, `close`, and `refreshColors` enqueue work when called
 off the EDT; read `isOpen` and manipulate `component` on the EDT.
 
+Host message callback failures are logged through `System.Logger` and show failed
+status; later search updates retry. Cancellation stops observation, and `open()`
+can restart it.
+
 The bar installs no command shortcuts, including Enter, Shift+Enter, or Escape.
 Hosts invoke `performAction(SwingTerminalSearchAction)` on the EDT and bind those
 commands through their own action system. It returns `false` when search is closed.
@@ -61,10 +65,9 @@ normal Swing button behavior and remain available without command bindings.
 For a plain Swing host, map keystrokes on
 `searchBar.component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)`
 and install corresponding `AbstractAction`s in its `actionMap`, calling
-`searchBar.performAction(action)`. The standalone app owns its defaults; the
-IntelliJ plugin registers IDE actions so keymap remapping and multi-stroke shortcuts
-remain platform responsibilities. Keep search bindings scoped to the bar so they
-do not intercept terminal or unrelated editor input.
+`searchBar.performAction(action)`. Hosts own defaults, keymap remapping, and
+multi-stroke shortcuts. Keep search bindings scoped to the bar so they
+do not intercept terminal or unrelated application input.
 
 ### Search colors
 

@@ -30,6 +30,18 @@ internal fun isRecordableTerminalCompletionCommand(commandLine: String): Boolean
 
 internal fun String.hasTerminalCompletionLineBreak(): Boolean = indexOf('\n') >= 0 || indexOf('\r') >= 0
 
+internal fun requireValidTerminalCompletionLearningContext(
+    profileId: String?,
+    workingDirectoryUri: String?,
+) {
+    require(profileId == null || profileId.isNotEmpty() && profileId.hasWellFormedTerminalCompletionUtf16()) {
+        "profileId must be non-empty, well-formed UTF-16; use null for absent metadata"
+    }
+    require(workingDirectoryUri == null || workingDirectoryUri.isNotEmpty() && workingDirectoryUri.hasWellFormedTerminalCompletionUtf16()) {
+        "workingDirectoryUri must be non-empty, well-formed UTF-16; use null for absent metadata"
+    }
+}
+
 private fun String.hasWellFormedTerminalCompletionUtf16(): Boolean {
     var index = 0
     while (index < length) {
@@ -92,7 +104,7 @@ internal fun TerminalCompletionRequest.commandLineAfterCandidate(candidate: Term
 }
 
 /**
- * Returns whether [candidate] can be applied to this request's active cursor
+ * Returns whether this candidate can be applied to the request's active cursor
  * range without crossing command-line or UTF-16 scalar boundaries.
  */
 internal fun TerminalCompletionCandidate.hasValidReplacementRangeFor(request: TerminalCompletionRequest): Boolean {

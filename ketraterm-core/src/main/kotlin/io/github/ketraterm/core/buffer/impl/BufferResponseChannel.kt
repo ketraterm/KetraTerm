@@ -24,6 +24,7 @@ import io.github.ketraterm.core.model.CellColorKind
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.core.util.withResolvedRectangle
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import io.github.ketraterm.render.api.TerminalColorBehavior
@@ -235,7 +236,7 @@ internal class BufferResponseChannel(
     ) {
         if (requestId < 0 || page !in 0..1) return
 
-        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+        state.withResolvedRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
             var checksum = 0
             for (row in topRow..bottomRow) {
                 val line = state.ring[state.resolveRingIndex(row)]
@@ -380,36 +381,6 @@ internal class BufferResponseChannel(
         if (AttributeCodec.isBlink(primary)) value = value or CHECKSUM_BLINK
         if (AttributeCodec.isBold(primary)) value = value or CHECKSUM_BOLD
         return value
-    }
-
-    /** Resolves DEC rectangle coordinates according to the core's active origin/margin policy. */
-    private inline fun withRectangle(
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-        block: (topRow: Int, leftCol: Int, bottomRow: Int, rightCol: Int) -> Unit,
-    ) {
-        val originRows = state.modes.isOriginMode
-        val originColumns = originRows && state.modes.isLeftRightMarginMode
-        val rowBase = if (originRows) state.scrollTop else 0
-        val rowLimit = if (originRows) state.scrollBottom else state.dimensions.height - 1
-        val colBase = if (originColumns) state.effectiveLeftMargin else 0
-        val colLimit = if (originColumns) state.effectiveRightMargin else state.dimensions.width - 1
-
-        val requestedTop = rowBase + if (top <= 0) 0 else top - 1
-        val requestedLeft = colBase + if (left <= 0) 0 else left - 1
-        val requestedBottom = rowBase + if (bottom <= 0) rowLimit - rowBase else bottom - 1
-        val requestedRight = colBase + if (right <= 0) colLimit - colBase else right - 1
-        if (requestedTop > requestedBottom || requestedLeft > requestedRight) return
-
-        val topRow = requestedTop.coerceIn(rowBase, rowLimit)
-        val leftCol = requestedLeft.coerceIn(colBase, colLimit)
-        val bottomRow = requestedBottom.coerceIn(rowBase, rowLimit)
-        val rightCol = requestedRight.coerceIn(colBase, colLimit)
-        if (topRow > bottomRow || leftCol > rightCol) return
-
-        block(topRow, leftCol, bottomRow, rightCol)
     }
 
     private fun enqueuePrimaryDeviceAttributes() {

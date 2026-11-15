@@ -16,6 +16,9 @@ npm run preview
 
 Open `http://localhost:4173`. Output is written to `build/website` at the repository
 root. Run `./gradlew :dokkaGenerate` from the root first to include local API docs.
+Documentation publication also checks unresolved KDoc links. To run that check
+from the repository root, capture a fresh `:dokkaGenerate --rerun-tasks --console=plain`
+build log and pass its path to `node .github/scripts/dokka-links.mjs`.
 
 ## Content
 

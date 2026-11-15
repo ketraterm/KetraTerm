@@ -29,7 +29,8 @@ public object TerminalLocalFileUriResolver {
      * Resolves [value] without reinterpreting remote file authorities locally.
      *
      * Empty authorities and `localhost` are accepted. Other schemes,
-     * authorities, and malformed values return `null`.
+     * authorities, queries, fragments, and malformed values return `null`.
+     * Windows network roots hidden in the decoded path are also rejected.
      *
      * @param value candidate working-directory URI.
      * @return normalized absolute local path, or `null` when unsupported.
@@ -40,10 +41,16 @@ public object TerminalLocalFileUriResolver {
         return try {
             val uri = URI(value)
             if (!uri.scheme.equals("file", ignoreCase = true)) return null
+            if (uri.rawQuery != null || uri.rawFragment != null) return null
             val authority = uri.authority
             if (!authority.isNullOrEmpty() && !authority.equals("localhost", ignoreCase = true)) return null
-            val localUri = URI("file", null, uri.path ?: return null, null)
-            Paths.get(localUri).toAbsolutePath().normalize()
+            val decodedPath = uri.path ?: return null
+            // Windows accepts both separators, including percent-decoded backslashes.
+            if (java.io.File.separatorChar == '\\' && decodedPath.replace('\\', '/').startsWith("//")) return null
+            val localUri = URI("file", null, decodedPath, null)
+            val path = Paths.get(localUri).toAbsolutePath().normalize()
+            if (path.fileSystem.separator == "\\" && path.root?.toString()?.startsWith("\\\\") == true) return null
+            path
         } catch (_: URISyntaxException) {
             null
         } catch (_: IllegalArgumentException) {

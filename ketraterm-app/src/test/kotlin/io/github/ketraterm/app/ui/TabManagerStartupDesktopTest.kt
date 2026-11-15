@@ -48,14 +48,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
-import java.awt.CardLayout
-import java.awt.Component
-import java.awt.Container
-import java.awt.DefaultKeyboardFocusManager
-import java.awt.Dimension
-import java.awt.KeyEventDispatcher
-import java.awt.KeyboardFocusManager
-import java.awt.Toolkit
+import java.awt.*
 import java.awt.event.ContainerAdapter
 import java.awt.event.ContainerEvent
 import java.awt.event.InputEvent
@@ -65,11 +58,7 @@ import java.lang.reflect.Proxy
 import java.nio.file.Path
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
-import javax.swing.JButton
-import javax.swing.JFrame
-import javax.swing.JPanel
-import javax.swing.JTextArea
-import javax.swing.SwingUtilities
+import javax.swing.*
 import kotlin.test.*
 
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
@@ -633,7 +622,7 @@ class TabManagerStartupDesktopTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["first", "tab", "split"])
+    @ValueSource(strings = ["first", "tab", "split", "late-layout"])
     fun `installed panes use their laid out grid at first output`(
         kind: String,
         @TempDir directory: Path,
@@ -679,7 +668,7 @@ class TabManagerStartupDesktopTest {
                         workspaceFactory = { listener ->
                             var created = 0
                             workspace(listener) { options ->
-                                val recordOutput = ++created == if (kind == "first") 1 else 2
+                                val recordOutput = ++created == if (kind == "tab" || kind == "split") 2 else 1
                                 lateinit var session: TerminalSession
                                 session =
                                     idleSession(options, onStart = {
@@ -690,10 +679,27 @@ class TabManagerStartupDesktopTest {
                                 session
                             }
                         },
-                    ).also { assertTrue(it.openTab(profile, onComplete = opened::complete)) }
+                    ).also {
+                        assertTrue(
+                            it.openTab(
+                                profile,
+                                beforeStart = { complete ->
+                                    complete(null)
+                                    if (kind == "late-layout") {
+                                        // Invalidate parent layout after startup queues its viewport attempt.
+                                        // A successful resize of the old child bounds must not start output.
+                                        content.border = BorderFactory.createEmptyBorder(0, 0, 0, 73)
+                                        content.invalidate()
+                                        assertFalse(content.isValid)
+                                    }
+                                },
+                                onComplete = opened::complete,
+                            ),
+                        )
+                    }
                 }
             assertTrue(opened.get(10, TimeUnit.SECONDS))
-            if (kind != "first") {
+            if (kind == "tab" || kind == "split") {
                 val settled = CompletableFuture<Throwable?>()
                 onEdt {
                     frame.validate()
@@ -962,32 +968,48 @@ class TabManagerStartupDesktopTest {
             release.complete(Unit)
             val packed = shown.get(10, TimeUnit.SECONDS)
             assertTrue(outputStarted.get(10, TimeUnit.SECONDS), "Shell output must start after initial window packing")
+            val verified = CompletableFuture<Unit>()
             onEdt {
-                val screen = frame.graphicsConfiguration
-                val available =
-                    screen.bounds.apply {
-                        val insets = frame.toolkit.getScreenInsets(screen)
-                        x += insets.left
-                        y += insets.top
-                        width -= insets.left + insets.right
-                        height -= insets.top + insets.bottom
-                    }
-                assertTrue(available.contains(frame.bounds), "Initial bounds ${frame.bounds} must fit $available")
                 val pane = requireNotNull(manager.selectedPane)
-                val visible = pane.terminal.visibleGridSize()
-                assertTrue(visible.width in 2..columns)
-                assertTrue(visible.height in 1..rows)
-                if (frame.preferredSize.width <= available.width && frame.preferredSize.height <= available.height) {
-                    assertEquals(Dimension(columns, rows), visible)
-                }
-                pane.tab.session.readRenderFrame { rendered ->
-                    assertEquals(visible.width, rendered.columns)
-                    assertEquals(visible.height, rendered.rows)
-                }
-                assertEquals(columns, settings.config.columns)
-                assertEquals(rows, settings.config.rows)
-                assertEquals(frame.size, packed)
+                // Showing the native window can enqueue further layout and resize work.
+                // Check the live grid in its completion callback, before another EDT event.
+                synchronizeInitialViewport(
+                    isCurrent = { frame.isDisplayable && !pane.tab.session.isClosed },
+                    resize = { complete ->
+                        frame.validate()
+                        pane.terminal.resizeSessionToVisibleGrid(complete)
+                    },
+                    onComplete = { failure ->
+                        runCatching {
+                            assertNull(failure)
+                            val screen = frame.graphicsConfiguration
+                            val available =
+                                screen.bounds.apply {
+                                    val insets = frame.toolkit.getScreenInsets(screen)
+                                    x += insets.left
+                                    y += insets.top
+                                    width -= insets.left + insets.right
+                                    height -= insets.top + insets.bottom
+                                }
+                            assertTrue(available.contains(frame.bounds), "Initial bounds ${frame.bounds} must fit $available")
+                            val visible = pane.terminal.visibleGridSize()
+                            assertTrue(visible.width in 2..columns)
+                            assertTrue(visible.height in 1..rows)
+                            if (frame.preferredSize.width <= available.width && frame.preferredSize.height <= available.height) {
+                                assertEquals(Dimension(columns, rows), visible)
+                            }
+                            pane.tab.session.readRenderFrame { rendered ->
+                                assertEquals(visible.width, rendered.columns)
+                                assertEquals(visible.height, rendered.rows)
+                            }
+                            assertEquals(columns, settings.config.columns)
+                            assertEquals(rows, settings.config.rows)
+                            assertEquals(frame.size, packed)
+                        }.fold(verified::complete, verified::completeExceptionally)
+                    },
+                )
             }
+            verified.get(10, TimeUnit.SECONDS)
         } finally {
             release.complete(Unit)
             close(manager, frame)

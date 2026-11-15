@@ -1777,4 +1777,38 @@ internal object GeneratedUnicodeWidthTable {
 
     internal val EMOJI_VARIATION_BASE_ASTRAL_RANGES: IntArray =
         intArrayOf()
+
+    internal val PREPEND_RANGES: IntArray =
+        intArrayOf(
+            0x600,
+            0x605,
+            0x6DD,
+            0x6DD,
+            0x70F,
+            0x70F,
+            0x890,
+            0x891,
+            0x8E2,
+            0x8E2,
+            0xD4E,
+            0xD4E,
+            0x110BD,
+            0x110BD,
+            0x110CD,
+            0x110CD,
+            0x111C2,
+            0x111C3,
+            0x113D1,
+            0x113D1,
+            0x1193F,
+            0x1193F,
+            0x11941,
+            0x11941,
+            0x11A84,
+            0x11A89,
+            0x11D46,
+            0x11D46,
+            0x11F02,
+            0x11F02,
+        )
 }

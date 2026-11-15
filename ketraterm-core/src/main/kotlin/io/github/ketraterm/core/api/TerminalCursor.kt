@@ -29,10 +29,10 @@ public interface TerminalCursor {
      * and clamped within it. When DECOM is inactive, [row] is absolute in the
      * viewport.
      *
-     * Column handling depends on DECLRMM:
-     * - with DECLRMM off, [col] is absolute in the viewport
-     * - with DECLRMM on and DECOM off, [col] is absolute but clamped to the active horizontal margins
-     * - with both DECLRMM and DECOM on, [col] is relative to the left margin
+     * With DECOM inactive, [col] addresses the entire viewport even when
+     * DECLRMM is active. With DECOM active, [col] is relative to the effective
+     * left margin and clamped to the horizontal margins (the page edges when
+     * DECLRMM is inactive).
      *
      * @param col Target column (0-based).
      * @param row Target row (0-based).
@@ -43,10 +43,22 @@ public interface TerminalCursor {
     )
 
     /**
+     * Positions the column (CHA), preserving the row and cancelling pending wrap.
+     * [col] is zero-based and follows [positionCursor]'s origin and bounds rules.
+     */
+    public fun positionCursorColumn(col: Int)
+
+    /**
+     * Positions the row (VPA), preserving the column and cancelling pending wrap.
+     * [row] is zero-based and follows [positionCursor]'s origin and bounds rules.
+     */
+    public fun positionCursorRow(row: Int)
+
+    /**
      * Moves the cursor up by [n] rows (CUU, `CSI n A`).
      *
-     * Stops at the top of the scroll region when the cursor is inside it,
-     * or at row 0 when outside. Non-positive values are no-ops.
+     * Stops at the top margin when approaching it from below, or at row 0
+     * when already above it. Non-positive values are no-ops.
      *
      * @param n Number of rows. Must be >= 1.
      */
@@ -55,8 +67,8 @@ public interface TerminalCursor {
     /**
      * Moves the cursor down by [n] rows (CUD, `CSI n B`).
      *
-     * Stops at the bottom of the scroll region when the cursor is inside it,
-     * or at the last row when outside. Non-positive values are no-ops.
+     * Stops at the bottom margin when approaching it from above, or at the
+     * last row when already below it. Non-positive values are no-ops.
      *
      * @param n Number of rows. Must be >= 1.
      */
@@ -78,8 +90,8 @@ public interface TerminalCursor {
     /**
      * Moves the cursor right by [n] columns (CUF, `CSI n C`).
      *
-     * Clamps to the viewport right edge when DECLRMM is off, or to the active
-     * right margin when DECLRMM is on.
+     * Stops at the effective right margin, or at the viewport right edge
+     * when already beyond that margin.
      *
      * @param n Number of columns. Non-positive values are no-ops.
      */
@@ -118,7 +130,7 @@ public interface TerminalCursor {
      * the current xterm-style fallback implemented by the core.
      *
      * Charset designation and shift state remain outside this contract because
-     * they belong to the parser layer, not to `:terminal-core`.
+     * they belong to the parser layer, not to `:ketraterm-core`.
      */
     public fun restoreCursor()
 
@@ -150,8 +162,8 @@ public interface TerminalCursor {
     /**
      * Clears all tab stops (TBC 3, `CSI 3 g`).
      *
-     * After this call, [horizontalTab] advances the cursor directly to the right
-     * margin until stops are re-established. As a non-printing control, TBC 3
+     * After this call, [horizontalTab] advances directly to its right boundary
+     * until stops are re-established. As a non-printing control, TBC 3
      * cancels any pending wrap.
      */
     public fun clearAllTabStops()
@@ -160,8 +172,8 @@ public interface TerminalCursor {
      * Advances the cursor to the next tab stop (HT, `0x09`).
      *
      * Clamps to the active right boundary when no stop exists to the right.
-     * With DECLRMM off, that boundary is `width - 1`; with DECLRMM on, it is
-     * the active horizontal right margin. HT never triggers a line wrap.
+     * The boundary is the effective right margin, or the page edge when already
+     * beyond that margin. HT never triggers a line wrap.
      */
     public fun horizontalTab()
 
@@ -170,8 +182,7 @@ public interface TerminalCursor {
      *
      * A count of `0` uses the ANSI default of `1`. The cursor never wraps:
      * if fewer than [count] stops remain, movement clamps at the active right
-     * boundary. With DECLRMM off, that boundary is `width - 1`; with
-     * DECLRMM on, it is the active horizontal right margin.
+     * boundary, as defined by [horizontalTab].
      *
      * @param count Number of tab stops to advance.
      */
@@ -182,8 +193,7 @@ public interface TerminalCursor {
      *
      * A count of `0` uses the ANSI default of `1`. The cursor never wraps:
      * if fewer than [count] stops exist to the left, movement clamps at the
-     * active left boundary. With DECLRMM off, that boundary is column `0`;
-     * with DECLRMM on, it is the active horizontal left margin.
+     * effective left margin, or column `0` when already left of that margin.
      *
      * @param count Number of tab stops to move backward.
      */

@@ -30,6 +30,8 @@ public object TerminalParsers {
      * Retains the first 32 codepoints of each grapheme, including its base. Excess
      * continuations advance segmentation context but are not emitted, so they do
      * not create cells or contribute to stored, rendered, or copied text.
+     * REP counts are capped at 65,535 additional copies per command before sink
+     * dispatch, limiting synchronous output amplification for every sink.
      *
      * @param sink The command sink where parsed terminal commands will be delivered.
      * @param clipboardWriteLimitBytes Supplies the permitted decoded-byte budget when OSC 52

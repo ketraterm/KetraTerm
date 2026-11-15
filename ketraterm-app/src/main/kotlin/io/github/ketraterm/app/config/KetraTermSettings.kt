@@ -53,8 +53,12 @@ internal class KetraTermSettings(
     val configPath: Path
         get() = configManager.configPath
 
-    /** Path for the compact persisted command-completion stats index. */
-    val commandCompletionStatsPath: Path
+    /** Fixed platform state path, or a colocated path for a nondefault configuration. */
+    val commandCompletionStatsPath: Path =
+        KetraTermStoragePaths().learningPathFor(configManager.configPath)
+
+    /** Previous destination, considered only when the current learning file is absent. */
+    val previousCommandCompletionStatsPath: Path
         get() = configManager.configPath.resolveSibling(TerminalCompletionLearningCoordinator.currentFileName())
 
     /** Derives pane settings without changing stored preferences. */

@@ -53,6 +53,9 @@ internal interface CommandDispatcher {
 internal object AnsiCommandDispatcher : CommandDispatcher {
     private const val RECTANGLE_ATTRIBUTE_START: Int = 4
 
+    // Bound output amplification before entering any synchronous sink, regardless of cell width.
+    private const val MAX_REPETITIONS: Int = 65_535
+
     private fun dispatchModeStatus(
         sink: TerminalCommandSink,
         state: ParserState,
@@ -145,7 +148,11 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                     !state.parameterValueSaturated &&
                     state.lastGraphicLength > 0
                 ) {
-                    sink.writeRepeatedCluster(state.clusterBuffer, state.lastGraphicLength, countParam(state, 0))
+                    sink.writeRepeatedCluster(
+                        state.clusterBuffer,
+                        state.lastGraphicLength,
+                        countParam(state, 0).coerceAtMost(MAX_REPETITIONS),
+                    )
                 }
             }
             CsiCommand.DECRQM_ANSI -> dispatchModeStatus(sink, state, decPrivate = false)

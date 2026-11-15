@@ -8,19 +8,19 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
-| `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
-| `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |
+| `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. Running processes and historical output are not restored. |
+| `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps do not provide this standalone configuration surface. |
+| `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. |
 | `TODO(host/profile)` | A standalone quick/drop-down terminal with platform-appropriate activation and focus handling. Ordinary terminal windows do not provide this workflow. |
 | `TODO(host/profile)` | A product read-only session toggle that blocks outbound user input while retaining output, selection, and search. Read-only render frames and closed-session presentation are different capabilities. |
 | `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
-| `TODO(host/profile)` | Add installed standalone-product smoke tests to release verification. [Full CI](development/testing.md#ci) gates publication on the exact release revision's JVM, native PTY, desktop, ABI, consumer, and package-metadata checks; those checks do not verify installed products. IDE verification is owned by the [plugin repository](https://github.com/ketraterm/KetraTerm-IntelliJ). |
+| `TODO(host/profile)` | Add installed standalone-product smoke tests to release verification. [Full CI](development/testing.md#ci) gates publication on the exact release revision's JVM, native PTY, desktop, ABI, consumer, and package-metadata checks; those checks do not verify installed products. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
 
 ## Completion and suggestions
 
-Completion is implemented and enabled by default in the standalone app and
-IntelliJ plugin. The engine and shared popup remain
+Completion is implemented and enabled by default in the standalone app.
+The engine and shared popup remain
 [experimental](features/completion.md#stability-experimental); library consumers
 can customize or replace both. See the [completion catalog](features/completion.md)
 for supported sources, matching, learning, and UI behavior.
@@ -78,6 +78,7 @@ they are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
+| `TODO(parser)` | Unicode GB9c Indic conjunct segmentation using `Indic_Conjunct_Break` properties. Current [grapheme coverage](../ketraterm-parser/docs/grapheme-segmentation.md#2-grapheme-segmentation-unicode-uax-29) does not include this rule. |
 | `TODO(parser/core/host)` | **Medium priority:** Implement XTSAVE and XTRESTORE (`CSI ? Pm s` / `CSI ? Pm r`) for DEC modes. Applications using them cannot currently restore the mode state they saved. |
 | `TODO(parser/core/session/render/ui/policy)` | Kitty graphics extensions beyond the [implemented inline image subset](features/terminal.md#host-integration-and-queries): indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media. The [implementation contract](development/kitty-graphics-contract.md) defines existing resource and lifecycle policies. |
 | `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |
@@ -91,6 +92,8 @@ they are not release commitments.
 
 ## Accepted limitations
 
+- REP output amplification is bounded per command. Counts above the supported
+  limit are capped before sink dispatch; see the [REP contract](reference/protocol.md#repeat-character).
 - Terminal grids require at least two columns so wide occupants remain intact.
   Creation and resize reject smaller widths; pixel-based viewport layout clamps to two columns.
 - Grapheme processing is always enabled (mode 2027 reports permanently set).
@@ -142,10 +145,3 @@ they are not release commitments.
 - `TODO(policy)`: feature needs an explicit security or compatibility policy before implementation.
 
 Combined labels name every owner needed to close one gap; `host/profile` means product-host integration rather than the parser-to-core adapter. A policy or test limitation alone does not imply missing parser behavior.
-
-## Resolved audit findings
-
-| Owner | Historical finding | Resolution |
-| --- | --- | --- |
-| `TODO(host/profile)` | Configurable command-finished alerts based on shell metadata, duration, and focus state. Command-finished listeners and terminal-requested OSC notifications already exist; neither product turns completion of a long-running command into an automatic alert. | **Resolved 2026-10-29.** Both products now provide opt-in duration/focus alerts with live session permission and lifecycle checks. See the [contract](reference/notifications.md#command-finished-alerts) and [verification record](development/command-finished-alerts.md). |
-| `TODO(parser/session/ui/host/profile/policy)` | ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work. | **Resolved 2026-10-30.** Documented OSC 9;4 states now drive retained, permission-controlled session progress and both products, with percentage/spinning shell-icon rings and five-minute stale expiry. Products always enable progress independently of title permission; embedders can control progress separately. See the [contract](reference/protocol.md#progress-reporting) and [verification record](development/osc-progress-reporting.md). |

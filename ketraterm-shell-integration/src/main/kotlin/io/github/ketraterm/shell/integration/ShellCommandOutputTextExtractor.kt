@@ -68,16 +68,39 @@ internal class ShellCommandOutputTextExtractor {
         var first = -1
         var last = -1
         var count = 0
+        var startRow = -1
+        var endRow = -1
+        var monotonic = true
+        var previousId = 0L
         // Inspect identities only. Cell content is copied lazily, backwards, within both limits.
         for (row in 0 until frame.rows) {
             val id = frame.lineId(row)
-            if (id == start) startRetained = true
-            if (id == end) endRetained = true
+            if (id <= 0 || id < previousId) monotonic = false
+            previousId = id
+            if (id == start && !startRetained) {
+                startRetained = true
+                startRow = row
+            }
+            if (id == end) {
+                endRetained = true
+                endRow = row
+            }
             if (id in start..end && (inclusive || id != start)) {
                 if (first < 0) first = row
                 last = row
                 count++
             }
+        }
+        if (startRetained && endRetained) {
+            first = startRow
+            if (!inclusive) {
+                while (first <= endRow && frame.lineId(first) == start) first++
+            }
+            last = endRow
+            if (first > last) return null
+            count = last - first + 1
+        } else if (!monotonic) {
+            return null
         }
         if (last < 0) return null
         val codes = IntArray(frame.columns)
@@ -92,11 +115,6 @@ internal class ShellCommandOutputTextExtractor {
         var truncated = false
         var row = last
         rows@ while (row >= first) {
-            val id = frame.lineId(row)
-            if (id !in start..end || (!inclusive && id == start)) {
-                // Do not join text across rows belonging to another record after row rearrangement.
-                return null
-            }
             if (copiedRows == maxRows) {
                 truncated = true
                 break

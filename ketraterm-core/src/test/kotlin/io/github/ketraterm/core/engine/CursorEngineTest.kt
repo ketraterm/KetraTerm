@@ -358,13 +358,13 @@ class CursorEngineTest {
         }
 
         @Test
-        fun `cursor below scroll region clamps to row 0 (not scrollTop)`() {
+        fun `cursor below scroll region stops at the top margin`() {
             val s = state(height = 6)
             val e = engine(s)
             setScrollRegion(s, top = 1, bottom = 3)
             s.cursor.row = 5 // below scroll region
             e.cursorUp(99)
-            assertEquals(0, s.cursor.row)
+            assertEquals(1, s.cursor.row)
         }
 
         @Test
@@ -435,13 +435,13 @@ class CursorEngineTest {
         }
 
         @Test
-        fun `cursor above scroll region clamps to height-1 (not scrollBottom)`() {
+        fun `cursor above scroll region stops at the bottom margin`() {
             val s = state(height = 6)
             val e = engine(s)
             setScrollRegion(s, top = 2, bottom = 4)
             s.cursor.row = 0 // above scroll region
             e.cursorDown(99)
-            assertEquals(5, s.cursor.row)
+            assertEquals(4, s.cursor.row)
         }
 
         @Test

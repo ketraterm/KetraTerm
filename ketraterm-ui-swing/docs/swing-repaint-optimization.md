@@ -128,6 +128,10 @@ offscreen rows and closed-session output. Extraction may clip evicted rows or
 clear invalidated selection; resulting listener notifications occur outside the
 frame lease. Clipboard copying shares this extraction.
 
+Extraction returns `null` if content or layout changes during copying, rather
+than combining text from different revisions. Ordinary edits preserve the range
+for a later attempt.
+
 `TerminalSelectionRange` uses absolute physical rows and half-open cell edges.
 It describes a region, not frozen text. Scrolling preserves it; reflow, history
 replacement, rebinding, and observed buffer changes invalidate its context.

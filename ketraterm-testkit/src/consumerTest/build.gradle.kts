@@ -199,6 +199,15 @@ subprojects {
     val provenanceDirectory = rootProject.layout.projectDirectory.dir("baseline")
     val baselineRevision = providers.gradleProperty("baselineRevision")
     val baselineLibraryVersion = providers.gradleProperty("libraryVersion")
+    val baselineRepository = providers.gradleProperty("libraryRepository")
+    val baselineBasis = providers.gradleProperty("baselineBasis").getOrElse("reviewed-working-tree")
+    require(baselineBasis in setOf("reviewed-working-tree", "published-release")) { "Unknown baseline basis: $baselineBasis" }
+    require(baselineBasis != "published-release" || !baselineLibraryVersion.get().endsWith("-SNAPSHOT")) {
+        "A published-release baseline cannot use a snapshot version"
+    }
+    require(baselineBasis != "published-release" || baselineRepository.get() == "https://repo.maven.apache.org/maven2/") {
+        "Published-release baselines must resolve from Maven Central"
+    }
     val baselineKotlinVersion = providers.gradleProperty("kotlinVersion")
     val baselineCompiler =
         extensions.getByType<JavaToolchainService>().compilerFor {
@@ -219,7 +228,8 @@ subprojects {
             provenanceDirectory.file("$consumerName.provenance").asFile.writeText(
                 buildString {
                     appendLine("format=1")
-                    appendLine("basis=reviewed-working-tree")
+                    appendLine("basis=$baselineBasis")
+                    if (baselineBasis == "published-release") appendLine("repository=${baselineRepository.get()}")
                     appendLine("baseRevision=${baselineRevision.get()}")
                     appendLine("libraryVersion=${baselineLibraryVersion.get()}")
                     appendLine("kotlinVersion=${baselineKotlinVersion.get()}")
@@ -308,5 +318,12 @@ tasks.register("prepareCompiledClientRuntime") {
     dependsOn(subprojects.map { it.tasks.named("prepareCompiledClientRuntime") })
 }
 tasks.register("recordCompiledClientBaseline") {
-    dependsOn(subprojects.map { it.tasks.named("recordCompiledClientBaseline") })
+    val selected =
+        providers
+            .gradleProperty("baselineModules")
+            .map { it.split(',').map(String::trim).toSet() }
+            .getOrElse(subprojects.map { it.name }.toSet())
+    val known = subprojects.map { it.name }.toSet()
+    require(selected.isNotEmpty() && selected.all { it in known }) { "Unknown baseline modules: ${selected - known}" }
+    dependsOn(subprojects.filter { it.name in selected }.map { it.tasks.named("recordCompiledClientBaseline") })
 }

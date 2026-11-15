@@ -41,6 +41,8 @@ public abstract interface class io/github/ketraterm/core/api/TerminalCursor {
 	public static synthetic fun cursorUp$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
 	public abstract fun horizontalTab ()V
 	public abstract fun positionCursor (II)V
+	public abstract fun positionCursorColumn (I)V
+	public abstract fun positionCursorRow (I)V
 	public abstract fun resetCursor ()V
 	public abstract fun restoreCursor ()V
 	public abstract fun saveCursor ()V

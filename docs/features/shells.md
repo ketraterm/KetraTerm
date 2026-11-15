@@ -1,6 +1,6 @@
 # Shell support
 
-The standalone app and IntelliJ plugin share local shell discovery and startup
+The standalone app uses the workspace library's local shell discovery and startup
 hooks. Library users choose their own process, transport, and shell integration.
 
 ## Automatic discovery
@@ -139,7 +139,7 @@ emit usable metadata. Remote directory reports are metadata, not local paths.
 Profiles carry an executable/argument list, working directory, and environment.
 Hosts can also select variables and a PATH prefix to reapply after supported
 interactive shell startup files; without hooks, these affect only the initial
-process environment. The IntelliJ product uses this for its optional project JDK.
+process environment. Hosts can use this to apply a selected project toolchain.
 Native standalone profiles also receive the `ketra version`, `ketra info`, and
 `ketra config` companion commands. WSL/Ubuntu launchers do not receive that native helper.
 

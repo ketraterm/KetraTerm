@@ -19,12 +19,314 @@ import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandReplay
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
+import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.test.*
 
 class CompletionLearningFileStoreTest {
+    @TempDir
+    lateinit var directory: Path
+
+    @Test
+    fun `standard filenames automatically migrate the legacy sibling without a product override`() {
+        val previous = directory.resolve(LEGACY_FILE_NAME)
+        val current = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val expected = snapshot("git status")
+        CompletionLearningFileStore(previous).persist(expected)
+        val original = Files.readAllBytes(previous)
+
+        assertEquals(expected, CompletionLearningFileStore(current).loadSnapshot().loadedSnapshot())
+
+        assertFalse(Files.exists(previous))
+        assertContentEquals(original, Files.readAllBytes(current))
+    }
+
+    @Test
+    fun `migration prefers the current file then its legacy sibling then the previous location`() {
+        for (winner in 0..3) {
+            val root = directory.resolve("case-$winner")
+            val current = root.resolve("state").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+            val previous = root.resolve("config").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+            val candidates = listOf(current, current.resolveSibling(LEGACY_FILE_NAME), previous, previous.resolveSibling(LEGACY_FILE_NAME))
+            val original = mutableMapOf<Path, ByteArray>()
+            for (index in winner..3) {
+                CompletionLearningFileStore(candidates[index]).persist(snapshot("command $index"))
+                original[candidates[index]] = Files.readAllBytes(candidates[index])
+            }
+
+            assertEquals(
+                snapshot("command $winner"),
+                CompletionLearningFileStore(current, previousPath = previous).loadSnapshot().loadedSnapshot(),
+            )
+
+            assertContentEquals(original.getValue(candidates[winner]), Files.readAllBytes(current))
+            if (winner != 0) assertFalse(Files.exists(candidates[winner]))
+            for (index in winner + 1..3) assertContentEquals(original.getValue(candidates[index]), Files.readAllBytes(candidates[index]))
+        }
+    }
+
+    @Test
+    fun `a rejected legacy sibling blocks fallback to an older location`() {
+        val current = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val previous = directory.resolve("config").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val legacy = Files.writeString(current.resolveSibling(LEGACY_FILE_NAME), "unsupported newer state")
+        CompletionLearningFileStore(previous.resolveSibling(LEGACY_FILE_NAME)).persist(snapshot("older command"))
+
+        assertSame(CompletionLearningFileLoadOutcome.Rejected, CompletionLearningFileStore(current, previousPath = previous).loadSnapshot())
+
+        assertEquals("unsupported newer state", Files.readString(legacy))
+        assertTrue(Files.exists(previous.resolveSibling(LEGACY_FILE_NAME)))
+        assertFalse(Files.exists(current))
+    }
+
+    @Test
+    fun `reset clears all legacy locations without hydration`() {
+        val current = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val previous = directory.resolve("config").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        Files.createDirectories(previous.parent)
+        val stale = listOf(current.resolveSibling(LEGACY_FILE_NAME), previous, previous.resolveSibling(LEGACY_FILE_NAME))
+        for (file in stale) Files.writeString(file, "unsupported stale data")
+        val files = CompletionLearningFileStore(current, previousPath = previous)
+
+        files.reset()
+
+        for (file in stale) assertFalse(Files.exists(file), file.toString())
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `reset attempts every previous location even when multiple removals fail`() {
+        val current = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val previous = directory.resolve("config").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        for (blocked in listOf(current.resolveSibling(LEGACY_FILE_NAME), previous)) {
+            Files.createDirectories(blocked)
+            Files.writeString(blocked.resolve("child"), "prevent directory removal")
+        }
+        val removable = Files.writeString(previous.resolveSibling(LEGACY_FILE_NAME), "stale learning")
+        val files = CompletionLearningFileStore(current, previousPath = previous)
+
+        val failure = assertFailsWith<IOException> { files.reset() }
+
+        assertEquals(1, failure.suppressed.size)
+        assertFalse(Files.exists(removable))
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `custom filenames do not implicitly adopt another files legacy sibling`() {
+        val legacy = directory.resolve(LEGACY_FILE_NAME)
+        CompletionLearningFileStore(legacy).persist(snapshot("unrelated command"))
+        val files = CompletionLearningFileStore(directory.resolve("custom.tsv"))
+
+        assertSame(CompletionLearningFileLoadOutcome.Missing, files.loadSnapshot())
+        files.reset()
+        assertTrue(Files.exists(legacy))
+    }
+
+    @Test
+    fun `a valid previous snapshot is relocated once without changing its bytes`() {
+        val previous = directory.resolve("config/learning.tsv")
+        val current = directory.resolve("state/learning.tsv")
+        val expected = snapshot("git status", "git log")
+        CompletionLearningFileStore(previous).persist(expected)
+        val originalBytes = Files.readAllBytes(previous)
+        val files = CompletionLearningFileStore(current, previousPath = previous)
+
+        assertEquals(expected, files.loadSnapshot().loadedSnapshot())
+        assertFalse(Files.exists(previous))
+        assertContentEquals(originalBytes, Files.readAllBytes(current))
+        assertEquals(expected, files.loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `an existing destination is authoritative even when it is rejected`() {
+        for (rejected in listOf(false, true)) {
+            val previous = directory.resolve("previous-$rejected.tsv")
+            val current = directory.resolve("current-$rejected.tsv")
+            CompletionLearningFileStore(previous).persist(snapshot("old command"))
+            val expected = snapshot("current command")
+            CompletionLearningFileStore(current).persist(expected)
+            if (rejected) Files.writeString(current, "unsupported format")
+            val currentBytes = Files.readAllBytes(current)
+            val previousBytes = Files.readAllBytes(previous)
+            val reads = mutableListOf<Path>()
+            val files =
+                CompletionLearningFileStore(current, previousPath = previous, openInput = {
+                    reads.add(it)
+                    Files.newInputStream(it)
+                })
+
+            val outcome = files.loadSnapshot()
+            if (rejected) {
+                assertSame(CompletionLearningFileLoadOutcome.Rejected, outcome)
+            } else {
+                assertEquals(expected, outcome.loadedSnapshot())
+            }
+            assertEquals(listOf(current), reads)
+            assertContentEquals(currentBytes, Files.readAllBytes(current))
+            assertContentEquals(previousBytes, Files.readAllBytes(previous))
+        }
+    }
+
+    @Test
+    fun `rejected or unreadable previous files are preserved without creating a destination`() {
+        val previous = directory.resolve("previous.tsv")
+        val current = directory.resolve("state/learning.tsv")
+        for (contents in listOf("unsupported format", "x".repeat(MAX_FILE_BYTES + 1))) {
+            Files.writeString(previous, contents)
+            assertSame(
+                CompletionLearningFileLoadOutcome.Rejected,
+                CompletionLearningFileStore(current, previousPath = previous).loadSnapshot(),
+            )
+            assertEquals(contents, Files.readString(previous))
+            assertFalse(Files.exists(current))
+        }
+        CompletionLearningFileStore(previous).persist(snapshot("git status"))
+        val failure = IOException("read denied")
+        val files = CompletionLearningFileStore(current, previousPath = previous, openInput = { throw failure })
+        assertSame(failure, assertIs<CompletionLearningFileLoadOutcome.Failed>(files.loadSnapshot()).cause)
+        assertTrue(Files.exists(previous))
+        assertFalse(Files.exists(current))
+    }
+
+    @Test
+    fun `failed directory creation leaves the previous snapshot available for recovery`() {
+        val previous = directory.resolve("previous.tsv")
+        CompletionLearningFileStore(previous).persist(snapshot("git status"))
+        val blocker = Files.writeString(directory.resolve("blocked"), "not a directory")
+        val files = CompletionLearningFileStore(blocker.resolve("learning.tsv"), previousPath = previous)
+        assertIs<CompletionLearningFileLoadOutcome.Failed>(files.loadSnapshot())
+        assertEquals(snapshot("git status"), CompletionLearningFileStore(previous).loadSnapshot().loadedSnapshot())
+        assertEquals("not a directory", Files.readString(blocker))
+    }
+
+    @Test
+    fun `a destination created during migration wins without replacing either snapshot`() {
+        val previous = directory.resolve("previous.tsv")
+        val current = directory.resolve("current.tsv")
+        val previousSnapshot = snapshot("old command")
+        val currentSnapshot = snapshot("new command")
+        CompletionLearningFileStore(previous).persist(previousSnapshot)
+        val files =
+            CompletionLearningFileStore(current, previousPath = previous, openInput = { path ->
+                if (path == previous) {
+                    val bytes = Files.readAllBytes(path)
+                    CompletionLearningFileStore(current).persist(currentSnapshot)
+                    ByteArrayInputStream(bytes)
+                } else {
+                    Files.newInputStream(path)
+                }
+            })
+
+        assertEquals(currentSnapshot, files.loadSnapshot().loadedSnapshot())
+        assertEquals(previousSnapshot, CompletionLearningFileStore(previous).loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `concurrent relocation is observed as a normal current snapshot`() {
+        val previous = directory.resolve("previous.tsv")
+        val current = directory.resolve("current.tsv")
+        val expected = snapshot("git status")
+        CompletionLearningFileStore(previous).persist(expected)
+        val files =
+            CompletionLearningFileStore(current, previousPath = previous, openInput = { path ->
+                if (path == previous) {
+                    val bytes = Files.readAllBytes(path)
+                    Files.move(previous, current)
+                    ByteArrayInputStream(bytes)
+                } else {
+                    Files.newInputStream(path)
+                }
+            })
+
+        assertEquals(expected, files.loadSnapshot().loadedSnapshot())
+        assertFalse(Files.exists(previous))
+    }
+
+    @Test
+    fun `reset clears a previous file without first hydrating it`() {
+        val previous = Files.writeString(directory.resolve("previous.tsv"), "unsupported previous data")
+        val current = directory.resolve("state/learning.tsv")
+        val files = CompletionLearningFileStore(current, previousPath = previous)
+
+        files.reset()
+
+        assertFalse(Files.exists(previous))
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `ordinary writes preserve an ignored unsupported previous file until reset`() {
+        val previous = Files.writeString(directory.resolve("previous.tsv"), "unsupported previous data")
+        val current = directory.resolve("current.tsv")
+        CompletionLearningFileStore(current).persist(snapshot("current command"))
+        val files = CompletionLearningFileStore(current, previousPath = previous)
+        assertEquals(snapshot("current command"), files.loadSnapshot().loadedSnapshot())
+
+        files.persist(snapshot("new command"))
+
+        assertEquals("unsupported previous data", Files.readString(previous))
+        files.reset()
+        assertFalse(Files.exists(previous))
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+    }
+
+    @Test
+    fun `an identical previous path never removes the current snapshot`() {
+        val current = directory.resolve("current.tsv")
+        val expected = snapshot("git status")
+        val files = CompletionLearningFileStore(current, previousPath = directory.resolve("unused/../current.tsv"))
+        files.persist(expected)
+        assertEquals(expected, files.loadSnapshot().loadedSnapshot())
+        files.reset()
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+        assertTrue(Files.exists(current))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a parent directory alias never removes the current snapshot during cleanup`() {
+        val target = Files.createDirectory(directory.resolve("target"))
+        val alias = Files.createSymbolicLink(directory.resolve("alias"), target)
+        val current = target.resolve("learning.tsv")
+        val files = CompletionLearningFileStore(current, previousPath = alias.resolve("learning.tsv"))
+        files.persist(snapshot("git status"))
+        files.reset()
+        assertEquals(TerminalCompletionLearningSnapshot.EMPTY, files.loadSnapshot().loadedSnapshot())
+        assertTrue(Files.exists(alias.resolve("learning.tsv")))
+    }
+
+    @Test
+    fun `supplementary Unicode contexts survive file persistence and hydration exactly`() {
+        val files = CompletionLearningFileStore(path("completion-unicode-context"))
+        val learning = TerminalCompletionLearningStore()
+        val profiles = listOf("shell😀", "shell👩‍💻", "shell\uD800\uDC00", "shell\uDBFF\uDFFF", "shell?", "shell\uFFFD")
+        for ((index, profile) in profiles.withIndex()) {
+            learning.recordCommandResult("git status", true, profile, "file:///repo/$profile/", index + 1L)
+        }
+        val expected = learning.snapshot()
+        files.persist(expected)
+        val loaded = files.loadSnapshot().loadedSnapshot()
+        assertEquals(expected, loaded)
+        val hydrated = TerminalCompletionLearningStore()
+        hydrated.mergeSnapshot(loaded)
+        assertEquals(expected, hydrated.snapshot())
+        assertEquals(
+            profiles.toSet(),
+            hydrated
+                .snapshot()
+                .rankingStats
+                .map { it.profileId }
+                .toSet(),
+        )
+    }
+
     @Test
     fun `persist replaces the file synchronously`() {
         val path = path("completion-store")
@@ -136,7 +438,7 @@ class CompletionLearningFileStoreTest {
     fun `each write uses a unique same-directory temporary file and cleans it`() {
         val directory = createTempDirectory("completion-store-temporary")
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        val temporaryFiles = mutableListOf<java.nio.file.Path>()
+        val temporaryFiles = mutableListOf<Path>()
         val store =
             CompletionLearningFileStore(
                 path = path,
@@ -248,6 +550,7 @@ class CompletionLearningFileStoreTest {
     private fun path(prefix: String) = createTempDirectory(prefix).resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     private companion object {
+        private const val LEGACY_FILE_NAME = "command-completion-learning-v3.tsv"
         private const val HEADER = "KetraTerm_COMMAND_COMPLETION_LEARNING\t3\n"
         private const val MAX_FILE_BYTES = 2_000_256
         private const val MAX_FILE_LINES = 1 + 2_048 + 2_048

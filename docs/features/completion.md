@@ -2,7 +2,7 @@
 
 KetraTerm's optional completion engine combines command specifications, paths,
 host-provided sources, and bounded local learning. It can run independently of
-a terminal or use the Swing/IntelliJ suggestion UI.
+a terminal or use the reusable Swing suggestion UI.
 
 ## Stability: experimental
 
@@ -20,9 +20,9 @@ the same stability contract.
 
 ## Availability
 
-Completion and automatic suggestions are **enabled by default in both products**
+Completion and automatic suggestions are **enabled by default in the standalone app**
 for eligible shell profiles, including PowerShell with prompt hooks and PSReadLine.
-Press Ctrl+Space (or the configured IDE action shortcut) to request suggestions
+Press Ctrl+Space (or the configured shortcut) to request suggestions
 explicitly, including when automatic popups are disabled.
 Settings expose the master switch, automatic popups, acceptance shortcuts, and
 optional learning persistence. The standalone **Suggestions** page offers popup
@@ -42,8 +42,7 @@ Whole-command replays have a small row budget; learned ranking continues to
 influence live results. See the
 [history suggestion policy](../../ketraterm-completion/docs/completion-architecture.md#history-suggestion-policy).
 
-Use **Reset learning…** on the standalone Suggestions page, or the IDE's learning
-reset control, to clear learned commands and
+Use **Reset learning…** on the standalone Suggestions page to clear learned commands and
 ranking preferences. See [saved learning and reset behavior](../reference/storage.md#completion-learning).
 
 Terminal suggestions require an editable command context, normally supplied by
@@ -74,8 +73,8 @@ Automatic refreshes cannot replace an active Ctrl+Space request.
 After Escape, automatic suggestions remain dismissed across cursor movement and
 focus changes until the command text changes. Completion candidates that leave the
 command text unchanged are omitted; explicit completion remains available.
-Enter acceptance and automatic popups are preferences; IntelliJ also uses its
-active keymap. Shell-native Tab completion remains a separate facility.
+Enter acceptance and automatic popups are preferences. Shell-native Tab completion
+remains a separate facility.
 
 ### Argument hints
 
@@ -89,27 +88,28 @@ its optional reference/file argument from subsequent pathspecs; `add` and
 or saved as command text. Native results without specification metadata may omit them.
 
 The shared Swing popup exposes normal and selected hint colors through
-`SwingShellSuggestionStyle`; the IntelliJ view follows the IDE theme. Custom
+`SwingShellSuggestionStyle`. Custom
 providers can set `argumentHint`, and custom views choose how to display it.
 
 ## Sources by host
 
 This table describes the sources available when completion is enabled.
 
-| Source | Standalone | IntelliJ plugin |
-| --- | --- | --- |
-| Built-in command specifications | Yes | Yes |
-| Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. | Same native bridge. |
-| Bash command inventory | Commands, alias definitions, functions, and enabled builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. | Same inventory and command authority. |
-| zsh command inventory | Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires `zsh/parameter` and `base64`; verified with zsh 5.9. Literal aliases inform argument semantics. | Same inventory and command authority. |
-| Files and directories | Bounded local directory scans. | The same bounded local scans, including files outside the IDE index or excluded from the project. |
-| Project-wide files | No project index. | IDE fuzzy filename lookup with match highlighting, while the terminal is inside the project's content roots. Names containing literal backslashes use ordinary directory completion because IntelliJ's VFS excludes them. |
-| Git branches and tags | Bounded local Git queries for modeled reference arguments. | Local/remote branches and tags from IDE repositories. |
-| Git remote names | Bounded `git remote` query of local configuration. | Configured remotes from the selected IDE repository. |
-| Recent Git commits | No dynamic source. | Up to 50 commits for supported commit arguments. |
-| Git changed paths | Ordinary path completion. | IDE change-list paths for supported Git commands. |
-| Gradle tasks | Built-in lifecycle tasks. | Also tasks from the deepest imported build root containing the terminal directory or completed `-p`/`--project-dir` target. |
-| Learned commands and tokens | In-memory learning when enabled. | In-memory learning when enabled. |
+| Source | Standalone |
+| --- | --- |
+| Built-in command specifications | Yes |
+| Live PowerShell completion | Commands, session functions, aliases, and installed argument completers through the current PSReadLine session. |
+| Bash command inventory | Commands, alias definitions, functions, and enabled builtins discovered in the shell at each prompt. Requires Bash 5.3+ and `base64`. Literal aliases inform argument semantics. |
+| zsh command inventory | Enabled commands, ordinary alias definitions, functions (including autoloads), and builtins discovered at each prompt. Requires `zsh/parameter` and `base64`; verified with zsh 5.9. Literal aliases inform argument semantics. |
+| Files and directories | Bounded local directory scans. |
+| Git branches and tags | Bounded local Git queries for modeled reference arguments. |
+| Git remote names | Bounded `git remote` query of local configuration. |
+| Git changed paths | Ordinary path completion. |
+| Gradle tasks | Built-in lifecycle tasks. |
+| Learned commands and tokens | In-memory learning when enabled. |
+
+The [IntelliJ plugin](https://github.com/ketraterm/KetraTerm-IntelliJ) documents its
+own sources and product integration.
 
 ### Working directory and remote shells
 
@@ -120,14 +120,13 @@ or malformed directory metadata is never replaced with unrelated local data.
 For Git commands, completed root `-C` options select the directory for all applicable
 sources; `switch -C` names a branch and does not change that directory.
 Relative values build on the preceding directory; an empty value leaves
-it unchanged. IntelliJ uses the project directory only when shell directory
-metadata is absent.
+it unchanged.
 
 ### Git suggestions
 
 Git suggestions use local repository data, including configured remotes and
 locally known tracking branches. They do not query a remote server. Standalone
-runs bounded Git queries; IntelliJ uses its repository model. Missing Git or an
+runs bounded Git queries. Missing Git or an
 unavailable repository leaves other suggestion sources usable. Standalone queries
 use the host's Git executable and environment, so shell-local toolchain changes
 are not reflected in them.

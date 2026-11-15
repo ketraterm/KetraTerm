@@ -26,6 +26,8 @@ import java.util.*
 
 /** Strict internal line codec for split completion learning. */
 internal object CompletionLearningSnapshotCodec {
+    const val LEGACY_FILE_NAME = "command-completion-learning-v3.tsv"
+
     fun currentFileName(): String = FILE_NAME
 
     fun encode(snapshot: TerminalCompletionLearningSnapshot): List<String> =
@@ -141,7 +143,7 @@ internal object CompletionLearningSnapshotCodec {
             .toString()
 
     private const val FORMAT_VERSION = 3
-    private const val FILE_NAME = "command-completion-learning-v$FORMAT_VERSION.tsv"
+    private const val FILE_NAME = "command-completion-learning.tsv"
     private const val HEADER = "KetraTerm_COMMAND_COMPLETION_LEARNING\t$FORMAT_VERSION"
     private const val RANKING_FIELD_COUNT = 10
     private const val REPLAY_FIELD_COUNT = 5

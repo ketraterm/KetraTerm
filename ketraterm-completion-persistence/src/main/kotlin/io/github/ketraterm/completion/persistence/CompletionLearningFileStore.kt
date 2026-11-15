@@ -50,6 +50,9 @@ internal interface CompletionLearningSnapshotFileStore {
 
     /** Atomically replaces the file with one bounded, sanitized [snapshot]. */
     fun persist(snapshot: TerminalCompletionLearningSnapshot)
+
+    /** Clears the destination and any previous location owned by this store. */
+    fun reset() = persist(TerminalCompletionLearningSnapshot.EMPTY)
 }
 
 /** Bounded local-file implementation used by the persistence coordinator. */
@@ -57,14 +60,56 @@ internal class CompletionLearningFileStore(
     private val path: Path,
     private val openInput: (Path) -> InputStream = { Files.newInputStream(it) },
     private val createTemporaryFile: (Path, String, String) -> Path = Files::createTempFile,
+    previousPath: Path? = null,
 ) : CompletionLearningSnapshotFileStore {
-    override fun loadSnapshot(): CompletionLearningFileLoadOutcome =
+    private val previousPaths =
+        buildList<Path> {
+            fun addLegacySibling(location: Path) {
+                if (location.fileName.toString() == CompletionLearningSnapshotCodec.currentFileName()) {
+                    add(location.resolveSibling(CompletionLearningSnapshotCodec.LEGACY_FILE_NAME))
+                }
+            }
+            addLegacySibling(path)
+            if (previousPath != null) {
+                add(previousPath)
+                addLegacySibling(previousPath)
+            }
+        }.map { it.toAbsolutePath().normalize() }
+            .filter { it != path.toAbsolutePath().normalize() }
+            .distinct()
+
+    override fun loadSnapshot(): CompletionLearningFileLoadOutcome {
+        val current = readSnapshot(path)
+        if (current != CompletionLearningFileLoadOutcome.Missing) return current
+        for (previous in previousPaths) {
+            val previousSnapshot = readSnapshot(previous)
+            if (previousSnapshot == CompletionLearningFileLoadOutcome.Missing) continue
+            if (previousSnapshot !is CompletionLearningFileLoadOutcome.Loaded) return previousSnapshot
+            return try {
+                Files.createDirectories(requireNotNull(path.toAbsolutePath().parent))
+                // Do not replace a destination created since the initial read.
+                try {
+                    Files.move(previous, path)
+                } catch (_: FileAlreadyExistsException) {
+                    // Another owner established the authoritative destination.
+                } catch (_: NoSuchFileException) {
+                    // A concurrent migration may already have moved the previous file.
+                }
+                readSnapshot(path)
+            } catch (failure: Exception) {
+                CompletionLearningFileLoadOutcome.Failed(failure)
+            }
+        }
+        return CompletionLearningFileLoadOutcome.Missing
+    }
+
+    private fun readSnapshot(path: Path): CompletionLearningFileLoadOutcome =
         try {
             val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
             if (!attributes.isRegularFile) {
                 CompletionLearningFileLoadOutcome.Rejected
             } else {
-                val decoded = readBoundedLines()?.let(CompletionLearningSnapshotCodec::decode)
+                val decoded = readBoundedLines(path)?.let(CompletionLearningSnapshotCodec::decode)
                 val snapshot = decoded?.sanitizeReplay()
                 if (snapshot == null || !snapshotFitsBounds(snapshot)) {
                     CompletionLearningFileLoadOutcome.Rejected
@@ -95,6 +140,26 @@ internal class CompletionLearningFileStore(
         }
     }
 
+    override fun reset() {
+        persist(TerminalCompletionLearningSnapshot.EMPTY)
+        removePreviousFiles()
+    }
+
+    private fun removePreviousFiles() {
+        var failure: Exception? = null
+        for (previous in previousPaths) {
+            try {
+                // Parent-directory aliases must not turn cleanup into deletion of the current file.
+                if (!Files.isSameFile(path, previous)) Files.delete(previous)
+            } catch (_: NoSuchFileException) {
+                // Migration normally already removed the previous path.
+            } catch (cleanupFailure: Exception) {
+                if (failure == null) failure = cleanupFailure else failure.addSuppressed(cleanupFailure)
+            }
+        }
+        failure?.let { throw it }
+    }
+
     private fun requireEncodedBounds(lines: List<String>) {
         var writtenBytes = 0
         for (line in lines) {
@@ -121,7 +186,7 @@ internal class CompletionLearningFileStore(
         }
     }
 
-    private fun readBoundedLines(): List<String>? {
+    private fun readBoundedLines(path: Path): List<String>? {
         val bytes = openInput(path).use { input -> input.readNBytes(MAX_FILE_BYTES + 1) }
         if (bytes.size > MAX_FILE_BYTES) return null
 

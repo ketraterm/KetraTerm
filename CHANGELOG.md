@@ -12,11 +12,40 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Headless runtime
 
+- Select cluster width and emoji presentation from the base after leading Unicode
+  Prepend characters, preserving wide CJK and emoji allocation.
+- Use DEC page-relative addressing with origin mode reset, including outside
+  horizontal margins. Single-axis cursor positioning preserves the other axis;
+  line insertion and deletion ignore cursors outside the scrolling region.
+- Clip DEC rectangle coordinates after overflow-safe origin rebasing, keeping
+  editing operations and checksum queries on the same geometry policy.
+- Kitty text-mode keys emit text only on press and repeat; release reports remain
+  available for enhanced keys and report-all mode. Associated-text reports support
+  long text commits without truncation and omit text on release reports.
+- Kitty keyboard stacks restore a baseline established by setting flags after a
+  nested push/pop. Their 32-entry limit includes the active entry.
+- Legacy and Kitty text-key routing ignore CapsLock and NumLock modifiers, retaining NumLock's
+  numeric keypad behavior and Kitty lock metadata.
+
+- Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
+  a single extreme count from triggering billions of synchronous grid mutations.
+
 - The complete headless pipeline, including PNG graphics decoding, now runs without AWT or
   `java.desktop`. PNG output uses immutable ARGB pixels; Gradle and Maven consumer checks enforce
   desktop independence.
 
 ### Completion and shell integration
+
+- Learning persistence uses the stable `command-completion-learning.tsv` filename with
+  schema versioning in its header. Existing versioned files and an optional previous
+  location migrate on first enable; current files take precedence and reset clears old locations.
+
+- Learning rejects empty or malformed UTF-16 profile and directory metadata before changing
+  retained state. Use `null` for absent context.
+
+- Local completion rejects Windows network roots hidden in working-directory URIs,
+  including encoded separators, and rejects URI queries and fragments. Explicitly
+  typed UNC paths remain available with local directory metadata.
 
 - Added experimental caller-controlled inline suggestions with independent providers, guarded
   acceptance, and configurable keymaps. Popup and inline automation have separate configurable
@@ -50,9 +79,24 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 - Added `TerminalSession.commandOutputText` for bounded headless extraction of a completed command’s
   retained output tail. Results preserve graphemes and logical line breaks, distinguishing caller
-  truncation from missing history. Custom producers can implement the optional contract.
+  truncation from missing history. Command ranges follow retained row order through insertion,
+  deletion, scrolling, and reflow; anchors lost to destructive edits remain unknown.
+  Custom producers can implement the optional contract.
+
+- POSIX path completion preserves quoted and escaped tildes as literal directories
+  in both filesystem lookup and inserted text, while bare `~/` continues to expand home.
 
 ### Rendering and interaction
+
+- Render copies reject invalid custom-frame geometry and out-of-range coordinates
+  consistently. Failed reader callbacks leave mutable copies invalid while preserving
+  the publisher's previous completed frame.
+
+- Search chrome recovers after host message callback failures and restarts cancelled
+  observation when reopened.
+
+- Swing tracks repeat and release for extended function and system keys, and clears
+  pending keyboard state on focus loss and session binding changes.
 
 - Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking
   whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while
@@ -65,6 +109,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
   unsupported schemes before contacting the desktop.
 
 ### Session and PTY
+
+- Synchronized output remains deferred when mode changes race with render publication.
 
 - PTY options and workspace launch profiles preserve empty arguments after the executable, including
   through configuration copies.

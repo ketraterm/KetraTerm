@@ -127,7 +127,10 @@ public interface TerminalShellIntegration {
      */
     public fun bufferCleared(buffer: TerminalRenderBufferKind): Unit = Unit
 
-    /** Optional synchronous finalization after a parser batch, before startup submission. */
+    /**
+     * Optional synchronous finalization after a parser batch or terminal resize.
+     * Called under session mutation serialization, before startup submission or render publication.
+     */
     public fun outputProcessed(): Unit = Unit
 
     /**

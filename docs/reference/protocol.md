@@ -8,8 +8,9 @@ For a capability overview, see [terminal features](../features/terminal.md).
 CSI collection has a shared limit of 32 semicolon/colon fields, including omitted
 fields. Opening field 33 rejects the entire command; no truncated SGR, mode,
 cursor, or query is dispatched. Numeric saturation is independent of this limit.
-CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
-state. Ordinary C0 handling continues during rejection.
+CAN/SUB cancels, ESC starts a new sequence, and reset discards unfinished state.
+EOF ends a stream; reset the parser before reusing it for another stream.
+Ordinary C0 handling continues during rejection.
 
 ## Relative cursor aliases
 
@@ -43,9 +44,13 @@ parser reset, RIS, and DECSTR clear it.
 
 Copies use the current pen and width policy, insert mode, margins, autowrap,
 and scrolling, as ordinary printable writes do. REP does not copy the original
-cell's attributes or read text back from the grid. Counts through `Int.MAX_VALUE`
-are accepted; work is proportional to generated output without a count-sized
-temporary buffer. Numeric overflow, extra fields, colon subparameters, private
+cell's attributes or read text back from the grid. Valid counts above 65,535 are
+capped to 65,535 additional copies per command before any sink is called. This
+resource limit bounds synchronous output amplification, including wide and
+clustered graphics. Each subsequent REP has its own limit; the source graphic
+is preserved. The direct core `writeRepeatedCluster` API remains caller-controlled
+and does not apply this wire-input limit. No count-sized temporary buffer is
+created. Numeric overflow, extra fields, colon subparameters, private
 markers, and intermediates reject REP. The shared [CSI limits](#csi-parameters)
 and cancellation rules apply.
 
@@ -117,16 +122,15 @@ monotonic time and needs no collector. The five-minute limit is KetraTerm produc
 policy, not a protocol requirement. Reallowing permission does not restore stale
 progress; an application must send a new report.
 
-Both products replace the shell icon with a thin progress ring while progress is
+The standalone app replaces the shell icon with a thin progress ring while progress is
 active. Normal, error and warning states use accent, red and amber arcs filled
 according to the percentage; indeterminate work uses a rotating arc. Tab names
 remain unchanged. Localized tooltips/accessibility text retain the numeric/status
-information, and the selected session's window/tool-window title retains status.
-Hidden progress restores the shell icon. Both products always enable progress independently of
+information, and the selected session's window title retains status.
+Hidden progress restores the shell icon. The standalone app enables progress independently of
 the existing title permission. Library embedders control progress separately
 through `HostPolicy.progressPolicy`.
-Standalone additionally uses per-window taskbar state/value APIs where supported;
-IntelliJ retains ownership of the IDE's global taskbar. A standalone split tab
+Standalone additionally uses per-window taskbar state/value APIs where supported. A split tab
 uses its active pane, following the existing title-selection convention. Queued
 UI refreshes are bounded and read the latest retained state at delivery, so a
 late callback cannot restore cleared progress.
@@ -437,7 +441,7 @@ ANSI and DEC namespaces are independent.
 
 Mode 3 reports the last DECCOLM selection, not measured window width. Mode 1048
 is an action and reports unsupported. Standalone declares supported bell actions;
-IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
+embedding hosts choose their own report capabilities. Requests accept one mode parameter; malformed, overflowing,
 cancelled, or incomplete requests receive no reply. Queries do not mutate state.
 See the [mode reference](../../ketraterm-protocol/docs/protocol-modes.md) for names.
 
@@ -660,7 +664,8 @@ original attributes. Core adjusts the following cursor and pending wrap.
 Publication commits grid effects. Later width changes do not relocate the
 cluster, reverse completed wraps/scrolls/insert shifts, or restore overwritten
 text. Narrowing frees a spacer as blank; widening consumes a neighboring cell
-when it fits. At the right margin, text remains in the single available cell.
+when it fits. At the right write boundary (the right margin, or the page edge
+when outside it), text remains in the single available cell.
 A rejected initial write has no continuation target.
 
 Whole-input and split-input placement can therefore differ at margins, over

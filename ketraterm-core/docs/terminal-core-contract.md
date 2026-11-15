@@ -35,7 +35,9 @@ make separately read grid state coherent.
 
 Cursor positioning and cell reads use zero-based coordinates. With origin mode,
 positioning is relative to the top margin; with both origin and left/right margin
-modes, columns are relative to the left margin. Margin methods and rectangular
+modes, columns are relative to the left margin. With origin mode reset, both
+axes address the entire page regardless of scrolling margins. Single-axis
+positioning preserves the other absolute coordinate. Margin methods and rectangular
 commands retain their documented DEC one-based conventions; zero rectangle
 parameters mean omitted values. The host adapter performs parser-to-core
 coordinate conversion.
@@ -129,9 +131,9 @@ updates without a remembered target. Invalid scalar input is also rejected; see
 
 Cluster continuation preserves the target's attributes. Same-width updates
 preserve cursor position; in-row width changes adjust the following cursor and
-pending wrap against the active right margin. Narrowing clears the released
+pending wrap against the right write boundary. Narrowing clears the released
 spacer. Widening overwrites the next cell only when the span fits inside the
-margin; otherwise the cluster remains one cell. Updates do not insert or shift
+write boundary; otherwise the cluster remains one cell. Updates do not insert or shift
 cells, including in insert mode, and do not undo completed wraps, scrolling,
 overwrites, or insert shifts. A printable write rejected by geometry or disabled
 autowrap clears the target; validation failure preserves it. A valid update with
@@ -152,7 +154,7 @@ from the top of the viewport may admit rows to primary history; partial-width
 scrolling never does. Downward scrolling does not consume history.
 
 `ICH` / `DCH` operate within horizontal margins; `IL` / `DL` operate within the
-vertical region and do nothing when the cursor is outside it. Vertical scrolling
+scrolling region and do nothing when the cursor is outside either axis. Vertical scrolling
 and line edits preserve cells outside horizontal margins, except complete
 occupants crossing a slice boundary. `ECH` erases without shifting; zero means
 one cell and negative values are ignored. Rectangle operations use their
@@ -182,6 +184,14 @@ integer overflow. Tab traversal is bounded by viewport width, not the supplied
 count. Cursor-affecting commands cancel pending wrap; saving or restoring the
 cursor follows the explicit saved-state rules below.
 
+Setting margins or changing origin mode homes to the effective left/top margins
+with DECOM set, or to page position `(0, 0)` with DECOM reset. Relative movement
+stops at the approached margin; starting beyond it uses the corresponding page
+edge. Printing outside horizontal margins is permitted: the right write boundary
+is the right margin when starting at or left of it, otherwise the page edge.
+Wrapping returns to the effective left margin. LF/RI scroll only when the cursor
+is also within the horizontal margins.
+
 ### `DECSC` / `DECRC`
 
 Each screen has a save slot containing column, row, both pen words, pending wrap,
@@ -189,8 +199,9 @@ and origin mode. Charset designation and locking shifts remain parser-owned.
 The parser selects its charset save slot using the core's actual active screen
 through the command sink.
 
-`restoreCursor` clamps saved coordinates to current bounds. Pending wrap is
-restored only if the resulting column is the active right margin. Without a
+`restoreCursor` restores absolute coordinates, clamping the row to the viewport
+and the column to the page with DECOM reset or horizontal margins with DECOM set.
+Pending wrap is restored only at the right write boundary with autowrap enabled. Without a
 save, it homes to absolute `(0, 0)`, clears pending wrap and origin mode, and
 resets the pen.
 
@@ -276,12 +287,13 @@ Reverse-wrap, input reporting, and presentation setters preserve it. `resetCurso
 restores the configured default shape and enables the blink flag without
 changing visibility, position, or pending wrap; the host owns blink animation.
 
-Kitty keyboard flags and stacks are screen-local. Each stack retains at most 32
-saved entries, evicting the oldest on overflow. A positive counted pop resets
-flags when the retained stack is exhausted, including exact exhaustion; a
-partial pop restores the last popped flags. Nonpositive counts do nothing, and
-work is constant regardless of the requested count. Soft and hard reset clear
-both stacks. Serialize these operations with other core mutation.
+Kitty keyboard stacks are screen-local and retain at most 32 entries including
+the active entry, evicting the oldest on overflow. Setting flags replaces the
+current entry or creates a baseline when empty; zero remains a valid entry.
+Pushing onto an empty stack first establishes a zero baseline. Pop activates the
+surviving top entry, or zero if empty. Nonpositive core counts do nothing, and
+pop work is independent of the requested count. Soft and hard reset clear both
+stacks. Serialize these operations with other core mutation.
 
 ## Unicode scalar and width policy
 
@@ -304,8 +316,12 @@ locale, and available fonts:
 - Zero-width classification, terminal cell-graphics overrides, and cluster
   variation-selector presentation rules retain precedence.
 
+Cluster width uses the first scalar after leading Unicode Prepend characters.
+Prefix-only clusters and zero-width bases occupy one cell. Continuations recompute
+width under the [committed-placement rules](#printable-ingress).
+
 Presentation selectors do not universally specify a terminal cell count. For a
-cluster whose leading scalar is a recognized base in the pinned Unicode emoji
+cluster whose selected base is recognized in the pinned Unicode emoji
 variation table, retained VS15 selects one cell and retained VS16 selects two.
 VS15 takes precedence if both selectors are retained. This is KetraTerm's
 terminal compatibility policy; the selector itself has zero scalar width.

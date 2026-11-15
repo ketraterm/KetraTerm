@@ -41,6 +41,9 @@ public interface TerminalWriter {
      * [writeCluster].
      *
      * Wrapping, scrolling, and wide-character handling are applied automatically.
+     * Writes outside horizontal margins are permitted. They wrap at the right
+     * margin when starting at or left of it, or at the page edge when starting
+     * beyond it. A wrap returns to the effective left margin on the next row.
      *
      * @param codepoint Unicode codepoint to write.
      * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate.
@@ -55,6 +58,7 @@ public interface TerminalWriter {
      * The used prefix of [codepoints] is consumed synchronously and is not retained.
      * Non-positive counts leave the buffer unchanged after validating the grapheme.
      * Work is proportional to the generated output; no count-sized buffer is created.
+     * Direct callers control this work; the parser's wire REP limit is applied before sink dispatch.
      *
      * @param codepoints Unicode scalars forming one grapheme.
      * @param length Used prefix length, in `1..32` and at most the size of [codepoints].
@@ -113,7 +117,9 @@ public interface TerminalWriter {
      * This is the parser-facing ingress for complex printable sequences such as
      * combining-mark clusters, ZWJ emoji, and variation-selector sequences.
      * The core computes the final display width from its active width policy,
-     * including East Asian ambiguous-width mode.
+     * including East Asian ambiguous-width mode. Leading Unicode Prepend characters
+     * are skipped when selecting the width base; its ordinary width and emoji
+     * presentation rules apply. Clusters with no base or a zero-width base occupy one cell.
      * The used prefix is copied into core-owned storage before returning; the caller
      * may immediately reuse the array. At most 32 codepoints are accepted, as defined by
      * [io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS].
@@ -134,11 +140,13 @@ public interface TerminalWriter {
      *
      * The caller owns segmentation and supplies the entire retained sequence, including
      * the previously published prefix. Core preserves the target's attributes, recalculates
-     * width, and adjusts its occupied span and following cursor. This does not insert a new
-     * cell or advance past a second grapheme. In-row width changes recompute the following
+     * width using [writeCluster]'s base-selection policy, and adjusts its occupied span
+     * and following cursor. This does not insert a new cell or advance past a second grapheme.
+     * In-row width changes recompute the following
      * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
      * not reversed. Narrowing blanks the released spacer; widening overwrites the next
-     * cell only if it fits inside the right margin, otherwise the cluster stays in one
+     * cell only if it fits before the write boundary (right margin, or page edge
+     * when outside it), otherwise the cluster stays in one
      * cell. Updates never shift cells, including in insert mode. A write rejected by
      * geometry or disabled autowrap clears the target; invalid input leaves it unchanged.
      * If no remembered printable target remains, valid input is ignored.
@@ -162,7 +170,8 @@ public interface TerminalWriter {
      * Executes a line feed (LF, `0x0A`).
      *
      * Moves the cursor down one row without resetting the column. Scrolls the
-     * active scroll region up if the cursor is on the bottom margin.
+     * active scroll region up if the cursor is on the bottom margin and within
+     * the horizontal margins. Otherwise movement stops at the page edge.
      */
     public fun newLine()
 
@@ -170,15 +179,16 @@ public interface TerminalWriter {
      * Executes Reverse Index (RI, `ESC M`).
      *
      * Moves the cursor up one row without changing the column. Scrolls the
-     * active scroll region down if the cursor is on the top margin.
+     * active scroll region down if the cursor is on the top margin and within
+     * the horizontal margins. Otherwise movement stops at the page edge.
      */
     public fun reverseLineFeed()
 
     /**
      * Executes a carriage return (CR, `0x0D`).
      *
-     * Moves the cursor to the active left boundary on the current row. With
-     * DECLRMM off that is column 0; with DECLRMM on it is the left margin.
+     * Moves to the effective left margin on the current row, or to column 0
+     * when DECOM is reset and the cursor is already left of that margin.
      */
     public fun carriageReturn()
 
@@ -203,7 +213,8 @@ public interface TerminalWriter {
      *
      * [left] and [right] are 1-based inclusive columns per the DECSLRM
      * convention. The request is ignored unless DECLRMM is active. Degenerate
-     * ranges are ignored. A successful margin change homes the cursor.
+     * ranges are ignored. A successful change homes to the effective left/top
+     * margins with DECOM set, or to page position `(0, 0)` with DECOM reset.
      *
      * @param left Left margin column (1-based, inclusive).
      * @param right Right margin column (1-based, inclusive).
@@ -255,7 +266,7 @@ public interface TerminalWriter {
      * region (IL, `CSI n L`).
      *
      * Lines shifted past the bottom margin are discarded. Ignored when the
-     * cursor is outside the active scroll region. Ordinary image placements
+     * cursor is outside either axis of the active scroll region. Ordinary image placements
      * retain their position and clipping independently of the edited text.
      *
      * @param count Number of blank lines to insert. Non-positive values are ignored.
@@ -267,7 +278,7 @@ public interface TerminalWriter {
      * region (DL, `CSI n M`).
      *
      * Blank lines are exposed at the bottom margin. Ignored when the cursor is
-     * outside the active scroll region. Ordinary image placements retain their
+     * outside either axis of the active scroll region. Ordinary image placements retain their
      * position and clipping independently of the edited text.
      *
      * @param count Number of lines to delete. Non-positive values are ignored.

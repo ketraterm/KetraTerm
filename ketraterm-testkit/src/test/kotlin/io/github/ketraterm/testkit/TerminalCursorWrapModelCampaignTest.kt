@@ -60,7 +60,7 @@ class TerminalCursorWrapModelCampaignTest {
         val setup =
             initialRows.flatMapIndexed { index, text ->
                 listOf(Operation.CursorPosition(index + 1, 1)) + text.map { Operation.Print(it.toString(), 1) }
-            } + Operation.SetHorizontalMargins(2, 5)
+            } + listOf(Operation.SetHorizontalMargins(2, 5), Operation.CursorPosition(1, 2))
         val up = listOf("aEFGH1", "bIJKL2", "cMNOP3", "d    4")
         val down = listOf("a    1", "bABCD2", "cEFGH3", "dIJKL4")
         val cases =
@@ -91,6 +91,105 @@ class TerminalCursorWrapModelCampaignTest {
             scenario.operations.forEach(model::apply)
             assertEquals(7, model.retainedRows.size)
             verify(scenario)
+        }
+    }
+
+    @Test
+    fun `page relative addressing writes outside margins and wraps back to the left margin`() {
+        val scenario =
+            Scenario(
+                BASE_SEED,
+                8,
+                3,
+                listOf(
+                    Operation.SetHorizontalMargins(3, 6),
+                    Operation.Print("L", 1),
+                    Operation.CursorPosition(1, 8),
+                    Operation.Print("R", 1),
+                    Operation.Print("W", 1),
+                ),
+            )
+        val model = CursorWrapModel(8, 3, MAX_HISTORY)
+        scenario.operations.forEach(model::apply)
+        assertEquals(3, model.column)
+        assertEquals(1, model.row)
+        assertEquals(
+            listOf("L      R", "  W     ", "        "),
+            model.retainedRows.map { line -> line.cells.joinToString("") { it ?: " " } },
+        )
+        for (end in 1..scenario.operations.size) verify(scenario.copy(operations = scenario.operations.take(end)))
+    }
+
+    @Test
+    fun `relative movement approaches margins from either side without trapping outside cursors`() {
+        val cases =
+            listOf(
+                Triple(1, Operation.CursorForward(99), 5),
+                Triple(8, Operation.CursorForward(99), 7),
+                Triple(8, Operation.CursorBackward(99), 2),
+                Triple(1, Operation.CursorBackward(99), 0),
+                Triple(8, Operation.Backspace, 6),
+                Triple(1, Operation.Backspace, 0),
+                Triple(8, Operation.CarriageReturn, 2),
+                Triple(1, Operation.CarriageReturn, 0),
+            )
+        for ((start, movement, expected) in cases) {
+            val scenario =
+                Scenario(
+                    BASE_SEED,
+                    8,
+                    3,
+                    listOf(Operation.SetHorizontalMargins(3, 6), Operation.CursorPosition(1, start), movement),
+                )
+            val model = CursorWrapModel(8, 3, MAX_HISTORY)
+            scenario.operations.forEach(model::apply)
+            assertEquals(expected, model.column, "$start then $movement")
+            assertEquals(0, model.row)
+            verify(scenario)
+        }
+    }
+
+    @Test
+    fun `origin transitions select margin relative or page relative home and addressing`() {
+        val setup = listOf(Operation.SetHorizontalMargins(3, 6), Operation.SetVerticalMargins(2, 3))
+        val cases =
+            listOf(
+                Triple(emptyList(), 0, 0),
+                Triple(listOf(Operation.SetOriginMode(true)), 2, 1),
+                Triple(listOf(Operation.SetOriginMode(true), Operation.CursorPosition(99, 99)), 5, 2),
+                Triple(listOf(Operation.CursorPosition(99, 99)), 7, 3),
+                Triple(listOf(Operation.SetOriginMode(true), Operation.SetOriginMode(false)), 0, 0),
+            )
+        for ((operations, column, row) in cases) {
+            val scenario = Scenario(BASE_SEED, 8, 4, setup + operations)
+            val model = CursorWrapModel(8, 4, MAX_HISTORY)
+            scenario.operations.forEach(model::apply)
+            assertEquals(column, model.column, "$operations")
+            assertEquals(row, model.row, "$operations")
+            verify(scenario)
+        }
+    }
+
+    @Test
+    fun `linefeed reverse index and line edits preserve rows outside horizontal margins`() {
+        val text = listOf("aABCD1", "bEFGH2", "cIJKL3", "dMNOP4")
+        val setup =
+            text.flatMapIndexed { index, line ->
+                listOf(Operation.CursorPosition(index + 1, 1)) + line.map { Operation.Print(it.toString(), 1) }
+            } + Operation.SetHorizontalMargins(2, 5)
+        for (column in listOf(1, 6)) {
+            for ((row, operation) in listOf(
+                1 to Operation.ReverseIndex,
+                4 to Operation.LineFeed,
+                2 to Operation.InsertLines(2),
+                2 to Operation.DeleteLines(2),
+            )) {
+                val scenario = Scenario(BASE_SEED, 6, 4, setup + listOf(Operation.CursorPosition(row, column), operation))
+                val model = CursorWrapModel(6, 4, MAX_HISTORY)
+                scenario.operations.forEach(model::apply)
+                assertEquals(text, model.retainedRows.map { line -> line.cells.joinToString("") { it ?: " " } }, "$column then $operation")
+                verify(scenario)
+            }
         }
     }
 
@@ -339,7 +438,7 @@ class TerminalCursorWrapModelCampaignTest {
             when (operation) {
                 is Operation.Print -> print(operation.text, operation.width)
                 Operation.CarriageReturn -> {
-                    column = if (horizontalMargins) leftMargin else 0
+                    column = if (originMode || column >= leftMargin) leftMargin else 0
                     pendingWrap = false
                 }
                 Operation.LineFeed -> {
@@ -348,7 +447,7 @@ class TerminalCursorWrapModelCampaignTest {
                     lineFeed()
                 }
                 Operation.Backspace -> {
-                    val minimum = if (horizontalMargins && column in leftMargin..rightMargin) leftMargin else 0
+                    val minimum = if (column >= leftMargin) leftMargin else 0
                     column = (column - 1).coerceAtLeast(minimum)
                     pendingWrap = false
                 }
@@ -359,19 +458,19 @@ class TerminalCursorWrapModelCampaignTest {
                         } else {
                             (operation.row - 1).coerceIn(0, rows - 1)
                         }
-                    val minimum = if (horizontalMargins) leftMargin else 0
-                    val maximum = if (horizontalMargins) rightMargin else columns - 1
-                    val addressed = (if (originMode && horizontalMargins) leftMargin else 0) + operation.column - 1
+                    val minimum = if (originMode) leftMargin else 0
+                    val maximum = if (originMode) rightMargin else columns - 1
+                    val addressed = minimum + operation.column - 1
                     column = addressed.coerceIn(minimum, maximum)
                     pendingWrap = false
                 }
                 is Operation.CursorForward -> {
-                    val maximum = if (horizontalMargins && column in leftMargin..rightMargin) rightMargin else columns - 1
+                    val maximum = if (column <= rightMargin) rightMargin else columns - 1
                     column = (column + operation.count).coerceAtMost(maximum)
                     pendingWrap = false
                 }
                 is Operation.CursorBackward -> {
-                    val minimum = if (horizontalMargins && column in leftMargin..rightMargin) leftMargin else 0
+                    val minimum = if (column >= leftMargin) leftMargin else 0
                     column = (column - operation.count).coerceAtLeast(minimum)
                     pendingWrap = false
                 }
@@ -390,7 +489,11 @@ class TerminalCursorWrapModelCampaignTest {
                 }
                 Operation.ReverseIndex -> {
                     pendingWrap = false
-                    if (row == scrollTop) scrollDownRegion(1) else row = (row - 1).coerceAtLeast(0)
+                    if (row == scrollTop && column in leftMargin..rightMargin) {
+                        scrollDownRegion(1)
+                    } else {
+                        row = (row - 1).coerceAtLeast(0)
+                    }
                 }
                 is Operation.InsertLines -> {
                     pendingWrap = false
@@ -427,7 +530,7 @@ class TerminalCursorWrapModelCampaignTest {
 
         private fun home() {
             row = if (originMode) scrollTop else 0
-            column = if (horizontalMargins) leftMargin else 0
+            column = if (originMode) leftMargin else 0
             pendingWrap = false
         }
 
@@ -435,27 +538,29 @@ class TerminalCursorWrapModelCampaignTest {
             text: String,
             cellWidth: Int,
         ) {
-            if (horizontalMargins && column !in leftMargin..rightMargin) return
+            var rightBoundary = if (column <= rightMargin) rightMargin else columns - 1
             if (pendingWrap) {
                 screen[row].wrapped = true
                 column = leftMargin
                 lineFeed()
                 pendingWrap = false
+                rightBoundary = rightMargin
             }
-            if (cellWidth == 2 && column >= rightMargin) {
+            if (cellWidth == 2 && column >= rightBoundary) {
                 if (!autoWrap) return
                 clearOccupant(screen[row], column)
                 screen[row].wrapped = true
                 column = leftMargin
                 lineFeed()
+                rightBoundary = rightMargin
             }
             clearOccupant(screen[row], column)
             if (cellWidth == 2) clearOccupant(screen[row], column + 1)
             screen[row].cells[column] = text
             if (cellWidth == 2) screen[row].cells[column + 1] = WIDE_TRAILING
             column += cellWidth
-            if (column > rightMargin) {
-                column = rightMargin
+            if (column > rightBoundary) {
+                column = rightBoundary
                 pendingWrap = autoWrap
             }
         }
@@ -479,7 +584,7 @@ class TerminalCursorWrapModelCampaignTest {
         }
 
         private fun lineFeed() {
-            if (row == scrollBottom) {
+            if (row == scrollBottom && column in leftMargin..rightMargin) {
                 scrollUpRegion(1)
             } else if (row < rows - 1) {
                 row++
@@ -487,7 +592,7 @@ class TerminalCursorWrapModelCampaignTest {
         }
 
         private fun insertLines(count: Int) {
-            if (row !in scrollTop..scrollBottom) return
+            if (row !in scrollTop..scrollBottom || column !in leftMargin..rightMargin) return
             val amount = count.coerceAtMost(scrollBottom - row + 1)
             if (horizontalMargins) {
                 for (target in scrollBottom downTo row + amount) {
@@ -514,7 +619,7 @@ class TerminalCursorWrapModelCampaignTest {
         }
 
         private fun deleteLines(count: Int) {
-            if (row !in scrollTop..scrollBottom) return
+            if (row !in scrollTop..scrollBottom || column !in leftMargin..rightMargin) return
             val amount = count.coerceAtMost(scrollBottom - row + 1)
             if (horizontalMargins) {
                 for (target in row..scrollBottom - amount) {

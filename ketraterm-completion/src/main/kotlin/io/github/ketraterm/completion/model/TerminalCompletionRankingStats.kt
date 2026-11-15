@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
+import io.github.ketraterm.completion.internal.requireValidTerminalCompletionLearningContext
 
 /**
  * Aggregated ranking evidence for one opaque exact-command identity.
@@ -26,8 +27,8 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * exact case-sensitive command, including trailing whitespace.
  *
  * @property identityDigest constant-length URL-safe digest of the exact command.
- * @property profileId optional host profile id associated with the evidence.
- * @property workingDirectoryUri optional working-directory URI associated with the evidence.
+ * @property profileId nonempty host profile id, or null when absent.
+ * @property workingDirectoryUri nonempty working-directory URI, or null when absent.
  * @property useCount number of observed command executions.
  * @property successCount number of successful executions.
  * @property failureCount number of unsuccessful executions. This is observational and does not penalize ranking.
@@ -36,7 +37,8 @@ import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
  * @property lastUsedEpochMillis newest execution or acceptance timestamp represented by this row;
  * dismissal does not renew usage recency.
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
- * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
+ * negative, successful executions exceed total executions, [lastUsedEpochMillis] is negative,
+ * or context metadata is empty or contains malformed UTF-16.
  */
 @ExperimentalTerminalCompletionApi
 public data class TerminalCompletionRankingStats
@@ -54,6 +56,7 @@ public data class TerminalCompletionRankingStats
     ) {
         init {
             requireValidTerminalCompletionRankingDigest(identityDigest)
+            requireValidTerminalCompletionLearningContext(profileId, workingDirectoryUri)
             require(useCount >= 0) { "useCount must be >= 0, was $useCount" }
             require(successCount >= 0) { "successCount must be >= 0, was $successCount" }
             require(successCount <= useCount) { "successCount must be <= useCount, was $successCount > $useCount" }

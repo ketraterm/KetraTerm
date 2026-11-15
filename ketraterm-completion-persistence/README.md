@@ -27,7 +27,7 @@ Memory updates are immediate; a worker in the supplied coroutine scope performs
 file I/O on `Dispatchers.IO` by default.
 
 The host owns the scope, path, enablement, and diagnostics. Use
-`currentFileName()` for the format-specific filename, and keep one coordinator
+`currentFileName()` for the stable filename, and keep one coordinator
 per store and one writer per file. See [storage locations, format, and privacy](../docs/reference/storage.md)
 for the product storage contract.
 

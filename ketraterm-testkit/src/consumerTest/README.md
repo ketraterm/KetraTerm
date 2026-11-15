@@ -101,11 +101,11 @@ in root `publicationChecks`, rather than testkit's ordinary `test` task or
 ./gradlew :ketraterm-testkit:compiledClientUpgradeTest
 ```
 
-Eleven tracked `baseline/*.jar` clients run against the current staged runtime
+Thirteen tracked `baseline/*.jar` clients run against the current staged runtime
 publications in both metadata modes and with the current Kotlin runtime and
-Kotlin 2.4.0. This produces 44 successful-client cases. Two additional controls
-require `NoClassDefFoundError` when the parser artifact is removed and
-`NoSuchMethodError` when a used factory method is absent.
+Kotlin 2.4.0. This produces 52 successful-client cases. Inventory checks require
+a retained JAR and provenance for every source consumer. Class- and method-removal
+controls verify linkage failures for parser, workspace, and completion persistence.
 
 Runtime resolution does not compile client sources. Child JVMs load the retained
 client jars plus current library publications, without testkit classes or current
@@ -120,6 +120,11 @@ inline render leases, callback failure and buffer recycling, completion Flow,
 clipboard replies, and optional host composition. They cover representative
 executed boundaries; ABI snapshots check declarations separately. Passing these
 cases does not establish compatibility with every earlier 0.x release.
+
+Workspace and completion-persistence clients were compiled against Maven Central
+`0.5.0` artifacts; their provenance records that release and repository. They
+exercise Java/Kotlin constructors, defaults and copies, listener defaults, and
+persistence recording, feedback, hydration, reset, and shutdown.
 
 ### Updating a retained baseline
 
@@ -136,6 +141,16 @@ revision, source and dependency hashes, compiler, and JDK target/toolchain.
 `-PcompiledClientBaselineRevision=<base-revision>` overrides the default HEAD
 basis; hashes still identify the actual inputs, including reviewed uncommitted
 changes.
+
+To record only selected clients against an immutable Maven Central release:
+
+```text
+./gradlew :ketraterm-testkit:recordCompiledClientBaseline "-PcompiledClientBaselineModules=workspace,completion-persistence" "-PcompiledClientBaselineVersion=0.5.0"
+```
+
+Unselected baseline files are preserved. Without a release version, recording
+uses current staged publications and marks its basis as `reviewed-working-tree`.
+Released artifacts are marked `published-release`; their hashes remain recorded.
 
 Review client sources, jars, provenance, and ABI changes together. Run formatting,
 `publishedConsumerTest`, and the owning modules' `checkKotlinAbi` tasks before

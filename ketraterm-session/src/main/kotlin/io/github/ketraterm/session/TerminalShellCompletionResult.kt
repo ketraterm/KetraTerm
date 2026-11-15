@@ -20,7 +20,8 @@ public enum class TerminalShellCompletionKind { COMMAND, OPTION, FILE, DIRECTORY
 
 /**
  * One native candidate. [replacementText] is already escaped by the shell.
- * [displayText] and [description] are presentation only.
+ * [displayText] and [description] are untrusted presentation text; consumers must
+ * sanitize controls for their display context while preserving supported formatting.
  * [aliasExpansion] is a literal shell alias definition for a command inventory entry;
  * null means not an alias, while empty means an empty or unavailable definition.
  * Consumers must never execute this metadata.
@@ -38,7 +39,8 @@ public data class TerminalShellCompletionCandidate
 /**
  * Native shell completion for one exact command buffer and UTF-16 cursor.
  * Replacement bounds are inclusive at the start and exclusive at the end.
- * The producer must validate bounds, Unicode, text sizes, and candidate controls before publication.
+ * The producer must validate bounds, Unicode, text sizes, and controls in edit/context
+ * fields before publication. Candidate display text and descriptions remain presentation data.
  * [candidates] is copied at construction and cannot be mutated.
  * [externalCommandName] identifies the resolved application after following aliases, or is null
  * for shell commands, functions, scripts, unresolved invocations, or command-name completion.

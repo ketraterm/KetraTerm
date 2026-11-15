@@ -106,6 +106,8 @@ public interface TerminalRenderFrameReader {
      * @param startAbsoluteRow inclusive first requested absolute row.
      * @param endAbsoluteRow inclusive last requested absolute row.
      * @param consumer receiver that copies any render data it needs.
+     * @throws IllegalArgumentException if the range or source geometry is invalid,
+     * or the default implementation's resolved viewport exceeds [Int.MAX_VALUE] rows.
      */
     public fun readRenderFrameForAbsoluteRange(
         startAbsoluteRow: Long,
@@ -120,13 +122,16 @@ public interface TerminalRenderFrameReader {
         var scrollbackOffset = 0
         var viewportRows = 1
         readRenderFrame { frame ->
+            frame.requireValidGeometry()
             val liveTopAbsoluteRow = frame.discardedCount + frame.historySize
-            val retainedLastAbsoluteRow = liveTopAbsoluteRow + frame.rows - 1L
+            val retainedLastAbsoluteRow = liveTopAbsoluteRow + minOf(frame.rows - 1L, Long.MAX_VALUE - liveTopAbsoluteRow)
             val resolvedStart = startAbsoluteRow.coerceIn(frame.discardedCount, retainedLastAbsoluteRow)
             val resolvedEnd = endAbsoluteRow.coerceIn(resolvedStart, retainedLastAbsoluteRow)
             scrollbackOffset = (liveTopAbsoluteRow - resolvedStart).coerceAtLeast(0L).toInt()
             val frameTopAbsoluteRow = liveTopAbsoluteRow - scrollbackOffset
-            viewportRows = (resolvedEnd - frameTopAbsoluteRow + 1L).toInt()
+            val resolvedRows = resolvedEnd - frameTopAbsoluteRow + 1L
+            require(resolvedRows <= Int.MAX_VALUE) { "resolved viewport row count overflows Int" }
+            viewportRows = resolvedRows.toInt()
         }
         readRenderFrame(scrollbackOffset, viewportRows, consumer)
     }

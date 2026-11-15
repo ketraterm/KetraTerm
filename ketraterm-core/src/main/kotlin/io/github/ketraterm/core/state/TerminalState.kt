@@ -144,7 +144,6 @@ internal class TerminalState(
         graphics.invalidateTransfer()
         primaryCursorShape = cursorShape
         primaryCursorBlinking = modes.isCursorBlinking
-        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         if (clearBeforeEnter) {
             graphics.clear(true, data = true)
             altBuffer.clearGrid(pen.blankAttr, pen.blankExtendedAttr, dimensions.height)
@@ -170,7 +169,6 @@ internal class TerminalState(
     fun exitAltScreen() {
         if (!isAltScreenActive) return
         graphics.invalidateTransfer()
-        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         activeBuffer = primaryBuffer
         modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
         cursorShape = primaryCursorShape
@@ -193,6 +191,11 @@ internal class TerminalState(
         get() = if (modes.isLeftRightMarginMode) activeBuffer.leftMargin else 0
     val effectiveRightMargin: Int
         get() = if (modes.isLeftRightMarginMode) activeBuffer.rightMargin else dimensions.width - 1
+
+    /** A margin limits movement toward it, but never pulls an outside cursor back inside. */
+    fun cursorLeftBoundary(column: Int): Int = if (column < effectiveLeftMargin) 0 else effectiveLeftMargin
+
+    fun cursorRightBoundary(column: Int): Int = if (column > effectiveRightMargin) dimensions.width - 1 else effectiveRightMargin
 
     val isFullViewportScroll: Boolean
         get() = activeBuffer.isFullViewportScroll(dimensions.height)

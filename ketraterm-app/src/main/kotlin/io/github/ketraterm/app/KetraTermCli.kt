@@ -17,12 +17,11 @@ package io.github.ketraterm.app
 
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.nio.file.attribute.PosixFileAttributeView
-import java.nio.file.attribute.PosixFilePermissions
+import java.io.IOException
+import java.nio.file.*
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.attribute.*
+import java.util.*
 
 /**
  * Installs the standalone companion CLI and supplies its local launch environment.
@@ -31,21 +30,58 @@ import java.nio.file.attribute.PosixFilePermissions
  * launch-error handler before advertising the helper directory. WSL profiles are
  * left untouched: native helper and configuration paths are not guest paths.
  * Explicit [TerminalProfile.shellEnvironment] overrides remain authoritative.
+ * Default helpers live in a private temporary directory until JVM exit;
+ * preparation replaces a missing or replaced directory with a fresh private location.
  */
 internal class KetraTermCli(
     private val configPath: Path,
-    private val directory: Path = Path.of(System.getProperty("java.io.tmpdir"), "ketraterm-standalone", "cli", "v1"),
+    directory: Path? = null,
     private val windows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
 ) {
+    private val privateDirectory = directory == null
+    private val configuredDirectory = directory
+    private var ownedDirectory: OwnedDirectory? = null
+
+    private data class OwnedDirectory(
+        val path: Path,
+        val fileKey: Any?,
+        val creationTime: FileTime,
+    )
+
+    @Synchronized
+    private fun prepareDirectory(): Path {
+        configuredDirectory?.let { return Files.createDirectories(it) }
+        ownedDirectory?.let { owned ->
+            val attributes =
+                try {
+                    Files.readAttributes(owned.path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+                } catch (_: NoSuchFileException) {
+                    null
+                }
+            // Creation time also detects replacement on providers without file keys, including Windows.
+            if (attributes?.isDirectory == true &&
+                attributes.fileKey() == owned.fileKey &&
+                attributes.creationTime() == owned.creationTime
+            ) {
+                return owned.path
+            }
+        }
+        // Do not recreate the old path: another process may have claimed it.
+        val path = createPrivateDirectory()
+        val attributes = Files.readAttributes(path, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+        ownedDirectory = OwnedDirectory(path, attributes.fileKey(), attributes.creationTime())
+        return path
+    }
+
     fun prepare(
         profile: TerminalProfile,
         inheritedEnvironment: Map<String, String> = System.getenv(),
     ): TerminalProfile {
         if (profile.kind == TerminalProfileKind.WSL || profile.kind == TerminalProfileKind.UBUNTU) return profile
 
-        Files.createDirectories(directory)
-        install("ketra", executable = true)
-        install("ketra.bat", executable = false)
+        val directory = prepareDirectory()
+        install(directory, "ketra", executable = true)
+        install(directory, "ketra.bat", executable = false)
 
         val environment = profile.environment.toMutableMap()
 
@@ -82,12 +118,14 @@ internal class KetraTermCli(
     }
 
     private fun install(
+        directory: Path,
         name: String,
         executable: Boolean,
     ) {
         val content = checkNotNull(scripts[name])
         val target = directory.resolve(name)
-        if (Files.exists(target) && Files.readString(target) == content) {
+        if (privateDirectory) target.toFile().deleteOnExit()
+        if (Files.isRegularFile(target, NOFOLLOW_LINKS) && Files.readString(target) == content) {
             if (executable) makeExecutable(target)
             return
         }
@@ -112,6 +150,33 @@ internal class KetraTermCli(
     }
 
     private companion object {
+        private fun createPrivateDirectory(): Path {
+            val fileSystem = FileSystems.getDefault()
+            val permissions: FileAttribute<*> =
+                when {
+                    "posix" in fileSystem.supportedFileAttributeViews() ->
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))
+                    "acl" in fileSystem.supportedFileAttributeViews() -> {
+                        val user = fileSystem.userPrincipalLookupService.lookupPrincipalByName(System.getProperty("user.name"))
+                        val entry =
+                            AclEntry
+                                .newBuilder()
+                                .setType(AclEntryType.ALLOW)
+                                .setPrincipal(user)
+                                .setPermissions(EnumSet.allOf(AclEntryPermission::class.java))
+                                .setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT)
+                                .build()
+                        object : FileAttribute<List<AclEntry>> {
+                            override fun name(): String = "acl:acl"
+
+                            override fun value(): List<AclEntry> = listOf(entry)
+                        }
+                    }
+                    else -> throw IOException("Filesystem cannot create private CLI helper directories")
+                }
+            return Files.createTempDirectory("ketraterm-cli-", permissions).also { it.toFile().deleteOnExit() }
+        }
+
         val scripts =
             listOf("ketra", "ketra.bat").associateWith { name ->
                 checkNotNull(KetraTermCli::class.java.getResourceAsStream("/io/github/ketraterm/app/cli/$name")) {

@@ -22,6 +22,7 @@ package io.github.ketraterm.transport
  *
  * @param offset the starting index in the byte array.
  * @param length the number of bytes to validate.
+ * @throws IllegalArgumentException if [offset] or [length] is negative or the slice exceeds this array.
  */
 @Suppress("NOTHING_TO_INLINE")
 public inline fun ByteArray.checkBounds(

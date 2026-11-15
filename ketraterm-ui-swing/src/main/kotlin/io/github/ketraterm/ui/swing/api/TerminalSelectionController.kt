@@ -58,6 +58,7 @@ internal class TerminalSelectionController(
     private val host: TerminalSelectionHost,
 ) {
     private val selectionTextExtractor = TerminalSelectionTextExtractor()
+    private val selectionTextReader = TerminalSelectionTextReader()
     private var viewportSelection: CellSelection? = null
     private var rangeSnapshot: TerminalSelectionRange? = null
     private var notifiedRange: TerminalSelectionRange? = null
@@ -426,30 +427,24 @@ internal class TerminalSelectionController(
         val anchorAbsRow = selectionAnchorAbsoluteRow ?: return null
         val caretAbsRow = selectionCaretAbsoluteRow ?: return null
 
-        val startAbsRow = minOf(anchorAbsRow, caretAbsRow)
-        val endAbsRow = maxOf(anchorAbsRow, caretAbsRow)
-        var text: String? = null
-        reader.readRenderFrameForAbsoluteRange(startAbsRow, endAbsRow) { frame ->
-            if (buffer != null &&
-                (buffer != frame.activeBuffer || historyGeneration != frame.historyContentGeneration || columns != frame.columns)
-            ) {
-                clearSelection(notify = false)
-                return@readRenderFrameForAbsoluteRange
+        val text =
+            selectionTextReader.read(
+                reader,
+                anchorAbsRow,
+                selectionAnchorColumn,
+                caretAbsRow,
+                selectionCaretColumn,
+                selectionIsBlock,
+            ) { frame ->
+                if (buffer != null &&
+                    (buffer != frame.activeBuffer || historyGeneration != frame.historyContentGeneration || columns != frame.columns)
+                ) {
+                    clearSelection(notify = false)
+                    false
+                } else {
+                    true
+                }
             }
-            val frameTopAbsRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-            val frameLastAbsRow = frameTopAbsRow + frame.rows - 1L
-            if (endAbsRow < frameTopAbsRow || startAbsRow > frameLastAbsRow) return@readRenderFrameForAbsoluteRange
-
-            val tempCache = TerminalRenderCache(frame.columns, frame.rows)
-            tempCache.accept(frame)
-            val relativeSelection = getViewportSelection(tempCache) ?: return@readRenderFrameForAbsoluteRange
-            text =
-                selectionTextExtractor.selectedText(
-                    cache = tempCache,
-                    selection = relativeSelection,
-                    joinSoftWrappedRows = !selectionIsBlock,
-                )
-        }
         publishChange()
         return text
     }

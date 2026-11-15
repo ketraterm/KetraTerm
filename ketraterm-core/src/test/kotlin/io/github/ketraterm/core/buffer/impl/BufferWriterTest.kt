@@ -31,6 +31,21 @@ import org.junit.jupiter.params.provider.CsvSource
 
 class BufferWriterTest {
     @Test
+    fun `direct repeated writes remain caller controlled beyond the wire REP limit`() {
+        val terminal = TerminalBuffers.create(7, 1, maxHistory = 0)
+        terminal.writeRepeatedCluster(intArrayOf('A'.code), 1, 65_536)
+
+        assertEquals("AA", terminal.getLineAsString(0))
+        assertEquals(2, terminal.cursorCol)
+        assertEquals(0, terminal.cursorRow)
+        assertEquals(0, terminal.historySize)
+        terminal.readRenderFrame { frame ->
+            assertEquals(9_362L, frame.discardedCount)
+            assertFalse(frame.cursorPendingWrap)
+        }
+    }
+
+    @Test
     fun `repeated scalar writes preserve wide occupants pen attributes and deferred wrap`() {
         val terminal = TerminalBuffers.create(6, 2)
         terminal.writeText("界xy界")

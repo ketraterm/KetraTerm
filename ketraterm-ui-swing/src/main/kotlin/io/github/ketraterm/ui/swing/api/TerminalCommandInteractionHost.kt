@@ -24,15 +24,12 @@ import io.github.ketraterm.session.TerminalSession
 internal interface TerminalCommandInteractionHost {
     val session: TerminalSession?
     val renderCache: TerminalRenderCache
-    val searchCache: TerminalRenderCache
 
     fun cellAt(
         x: Int,
         y: Int,
         cache: TerminalRenderCache,
     ): Long
-
-    fun visibleGridRows(): Int
 
     fun commandNavigationAnchorRow(): Int
 

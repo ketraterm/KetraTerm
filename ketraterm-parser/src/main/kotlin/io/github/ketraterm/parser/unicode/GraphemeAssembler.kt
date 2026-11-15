@@ -23,7 +23,7 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
  * Allocation-free grapheme assembly boundary.
  *
  * The assembler owns cluster buffering only. Unicode properties come from [UnicodeClass] and break decisions
- * from [GraphemeSegmenter], while terminal grid width remains owned by :terminal-core.
+ * from [GraphemeSegmenter], while terminal grid width remains owned by :ketraterm-core.
  * Only the bounded prefix is retained and published. Discarded continuations still advance
  * segmentation context so capacity exhaustion never introduces a grapheme boundary.
  */

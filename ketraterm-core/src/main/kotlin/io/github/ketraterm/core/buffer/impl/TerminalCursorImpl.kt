@@ -28,6 +28,10 @@ internal class TerminalCursorImpl(
         row: Int,
     ) = cursorEngine.setCursor(col, row)
 
+    override fun positionCursorColumn(col: Int) = cursorEngine.setCursorColumn(col)
+
+    override fun positionCursorRow(row: Int) = cursorEngine.setCursorRow(row)
+
     override fun cursorUp(n: Int) = cursorEngine.cursorUp(n)
 
     override fun cursorDown(n: Int) = cursorEngine.cursorDown(n)

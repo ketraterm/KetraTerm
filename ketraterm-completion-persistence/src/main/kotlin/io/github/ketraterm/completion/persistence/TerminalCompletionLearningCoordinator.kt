@@ -18,7 +18,6 @@ package io.github.ketraterm.completion.persistence
 import io.github.ketraterm.completion.api.ExperimentalTerminalCompletionApi
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
-import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.nio.file.Path
@@ -79,10 +78,46 @@ public class TerminalCompletionLearningCoordinator
             ioDispatcher: CoroutineDispatcher,
             onPersistenceLoadFailure: (Throwable) -> Unit,
         ) : this(
+            learningStore,
+            coroutineScope,
+            persistencePath,
+            persistenceEnabled,
+            ioDispatcher,
+            onPersistenceLoadFailure,
+            previousPersistencePath = null,
+        )
+
+        /**
+         * Creates an owner that can relocate learning from one previous product-owned path.
+         *
+         * The current destination takes precedence, followed by its legacy versioned sibling.
+         * Otherwise, a valid previous file (including its legacy sibling) is moved
+         * without replacement during hydration on [ioDispatcher]. Rejected or unreadable files
+         * block ordinary writes and remain available for recovery. Explicit reset also clears
+         * distinct previous files, including when persistence is disabled.
+         *
+         * @param learningStore bounded in-memory learning used immediately by completion ranking.
+         * @param coroutineScope caller-owned lifecycle scope for the persistence worker.
+         * @param persistencePath fixed current snapshot path owned by the product.
+         * @param persistenceEnabled whether the snapshot may initially be read and written.
+         * @param ioDispatcher dispatcher used for blocking snapshot file access and relocation.
+         * @param onPersistenceLoadFailure invoked once when loading or relocation fails.
+         * @param previousPersistencePath previous snapshot path, or null for no relocation; an identical path is ignored.
+         */
+        public constructor(
+            learningStore: TerminalCompletionLearningStore,
+            coroutineScope: CoroutineScope,
+            persistencePath: Path,
+            persistenceEnabled: Boolean,
+            ioDispatcher: CoroutineDispatcher,
+            onPersistenceLoadFailure: (Throwable) -> Unit,
+            previousPersistencePath: Path?,
+        ) : this(
             learningStore = learningStore,
             fileStore =
                 CompletionLearningFileStore(
                     path = persistencePath.toAbsolutePath().normalize(),
+                    previousPath = previousPersistencePath,
                 ),
             coroutineScope = coroutineScope,
             persistenceEnabled = persistenceEnabled,
@@ -124,6 +159,7 @@ public class TerminalCompletionLearningCoordinator
          * @param profileId optional host profile identifier.
          * @param workingDirectoryUri optional working-directory URI captured for the command.
          * @param usedAtEpochMillis non-negative completion timestamp.
+         * @throws IllegalArgumentException if a recordable event has empty or malformed UTF-16 context metadata; use null when absent.
          */
         public fun recordCommandResult(
             commandLine: String,
@@ -155,6 +191,7 @@ public class TerminalCompletionLearningCoordinator
          * @param profileId optional host profile identifier.
          * @param workingDirectoryUri optional working-directory URI captured for the event.
          * @param feedbackAtEpochMillis non-negative feedback timestamp.
+         * @throws IllegalArgumentException if a recordable event has empty or malformed UTF-16 context metadata; use null when absent.
          */
         public fun recordSuggestionFeedback(
             commandLine: String,
@@ -381,7 +418,7 @@ public class TerminalCompletionLearningCoordinator
                 }
             val failure =
                 try {
-                    withContext(ioDispatcher) { fileStore.persist(TerminalCompletionLearningSnapshot.EMPTY) }
+                    withContext(ioDispatcher) { fileStore.reset() }
                     null
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -426,10 +463,11 @@ public class TerminalCompletionLearningCoordinator
             private const val DEFAULT_CHECKPOINT_INTERVAL_MILLIS = 30_000L
 
             /**
-             * Returns the versioned filename used for persisted learning.
+             * Returns the stable filename used for persisted learning.
              *
              * Hosts choose the parent directory while this module owns the
-             * file-format identity.
+             * filename and the versioned file header. Legacy versioned filenames are
+             * recognized automatically when loading or resetting this standard path.
              *
              * @return current completion-learning filename.
              */

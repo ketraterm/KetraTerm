@@ -69,6 +69,9 @@ public object TerminalCompletionSourceEnvironment {
         } catch (_: InvalidPathException) {
             return null
         }
-        return directory?.let { request.copy(workingDirectoryUri = it.toUri().toString()) } ?: request
+        val resolvedDirectory = directory ?: return request
+        val uri = resolvedDirectory.toUri().toString()
+        if (TerminalLocalFileUriResolver.resolve(uri) == null) return null
+        return request.copy(workingDirectoryUri = uri)
     }
 }

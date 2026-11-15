@@ -17,8 +17,18 @@ package consumer;
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore;
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator;
+import java.nio.file.Path;
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.Dispatchers;
 
 public final class JavaConsumer {
+    public static TerminalCompletionLearningCoordinator createCoordinator(
+            TerminalCompletionLearningStore store, CoroutineScope scope, Path path, boolean enabled) {
+        return new TerminalCompletionLearningCoordinator(store, scope, path, enabled, Dispatchers.getIO(), failure -> {
+            throw new AssertionError(failure);
+        });
+    }
+
     public static void verify() {
         if (!TerminalCompletionLearningCoordinator.currentFileName().endsWith(".tsv")) {
             throw new AssertionError("Versioned snapshot filename");

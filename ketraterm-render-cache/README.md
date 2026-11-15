@@ -71,8 +71,12 @@ for readers when no non-front buffer is available for writing.
 Retired publisher buffers release image references once their last reader leaves,
 while keeping primitive storage available for reuse.
 
-`hasFrame` is false initially, after `reset`, and after an incomplete copy. Reset
-clears source data and metadata while retaining dimensions and storage capacity.
+`hasFrame` is false initially, after `reset`, and after an incomplete copy, including
+a reader that throws after its callback. A publisher retains its previous completed
+frame. Custom geometry is validated before row access, and `rowOffset`/`clusterText`
+reject coordinates outside logical dimensions, including unused reserved rows.
+
+Reset clears source data and metadata while retaining dimensions and storage capacity.
 Reader-based updates detect replacement readers and force a complete copy;
 direct `accept(frame)` callers must reset when changing sources. Replacing the
 content behind the same reader also requires an explicit reset.

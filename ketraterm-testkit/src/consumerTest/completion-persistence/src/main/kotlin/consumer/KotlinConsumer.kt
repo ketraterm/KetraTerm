@@ -18,6 +18,7 @@
 package consumer
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
@@ -29,9 +30,23 @@ fun main() =
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         try {
             val original = TerminalCompletionLearningStore()
-            val writer = TerminalCompletionLearningCoordinator(original, this, path, true) { throw AssertionError(it) }
+            val writer = JavaConsumer.createCoordinator(original, this, path, true)
             try {
                 writer.recordCommandResult("git status", true, "bash", directory.toUri().toString(), 1L)
+                writer.recordSuggestionFeedback(
+                    "git status",
+                    TerminalCompletionFeedbackKind.ACCEPTED,
+                    "bash",
+                    directory.toUri().toString(),
+                    2L,
+                )
+                check(
+                    original
+                        .snapshot()
+                        .rankingStats
+                        .single()
+                        .acceptedCount == 1,
+                )
             } finally {
                 writer.closeAndFlush()
             }

@@ -3,7 +3,7 @@
 JMH measurements for parser, core, input, session, render-cache, completion, and
 Swing behavior. This is a development module, not a consumer library.
 
-The [shell inventory guide](results/shell-command-inventory/README.md) explains how
+The [shell inventory guide](tools/shell-command-inventory/README.md) explains how
 to measure snapshot construction, lookups, and native shell discovery.
 
 ## Build and run

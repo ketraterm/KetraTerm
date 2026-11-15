@@ -16,7 +16,7 @@
 package io.github.ketraterm.app.config
 
 /**
- * Lightweight and robust parser for section-based TOML configuration files.
+ * Parser for the app's section-based TOML subset, with string values confined to one physical line.
  */
 internal object TomlParser {
     /**
@@ -28,7 +28,7 @@ internal object TomlParser {
         var currentSection = ""
 
         content.lineSequence().forEach { line ->
-            val trimmed = line.trim()
+            val trimmed = line.trim(' ', '\t')
             if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) {
                 return@forEach
             }
@@ -42,9 +42,8 @@ internal object TomlParser {
                 val equalsIdx = trimmed.indexOf('=')
                 if (equalsIdx != -1) {
                     val key = trimmed.substring(0, equalsIdx).trim()
-                    val rawValue = trimmed.substring(equalsIdx + 1).trim()
-                    val valueWithoutComments = stripComment(rawValue)
-                    val finalValue = stripQuotes(valueWithoutComments)
+                    val rawValue = trimmed.substring(equalsIdx + 1).trimStart(' ', '\t')
+                    val finalValue = parseValue(rawValue)
                     if (key.isNotEmpty()) {
                         result.getOrPut(currentSection) { LinkedHashMap() }[key] = finalValue
                     }
@@ -56,46 +55,42 @@ internal object TomlParser {
         return result
     }
 
-    private fun stripComment(value: String): String {
-        if (value.startsWith("'''") || value.startsWith("\"\"\"")) {
-            val end = value.indexOf(value.substring(0, 3), startIndex = 3)
-            require(end >= 0) { "Unterminated literal string" }
-            return value.substring(0, end + 3)
-        }
-        var inDoubleQuotes = false
-        var inSingleQuotes = false
-        val sb = StringBuilder()
-        var i = 0
-        while (i < value.length) {
-            val char = value[i]
-            if (char == '"' && !inSingleQuotes) {
-                inDoubleQuotes = !inDoubleQuotes
-            } else if (char == '\'' && !inDoubleQuotes) {
-                inSingleQuotes = !inSingleQuotes
-            } else if (char == '#' && !inDoubleQuotes && !inSingleQuotes) {
-                break
-            }
-            sb.append(char)
-            i++
-        }
-        return sb.toString().trim()
-    }
+    private fun parseValue(value: String): String {
+        val quote = value.firstOrNull()
+        if (quote != '"' && quote != '\'') return value.substringBefore('#').trimEnd(' ', '\t')
 
-    private fun stripQuotes(value: String): String {
-        if (value.startsWith("'''") && value.endsWith("'''") && value.length >= 6) {
-            return value.substring(3, value.length - 3)
-        }
-        if (value.startsWith("\"\"\"") && value.endsWith("\"\"\"") && value.length >= 6) {
-            return decodeBasicString(value.substring(3, value.length - 3))
-        }
-        if (value.length >= 2) {
-            if ((value.startsWith("\"") && value.endsWith("\"")) ||
-                (value.startsWith("'") && value.endsWith("'"))
-            ) {
-                return value.substring(1, value.length - 1)
+        val delimiterLength = if (value.startsWith(quote.toString().repeat(3))) 3 else 1
+        val decoded = StringBuilder()
+        var index = delimiterLength
+        while (index < value.length) {
+            val character = value[index++]
+            if (character == '\\' && quote == '"') {
+                index = decodeEscape(value, index, decoded)
+                continue
             }
+            if (character == quote) {
+                var quotes = 1
+                if (delimiterLength == 3) {
+                    while (index < value.length && value[index] == quote) {
+                        quotes++
+                        index++
+                    }
+                }
+                if (quotes < delimiterLength) {
+                    repeat(quotes) { decoded.append(quote) }
+                    continue
+                }
+                // Triple delimiters permit one or two content quotes immediately before closing.
+                require(quotes <= delimiterLength + 2) { "Too many quotes at end of string" }
+                repeat(quotes - delimiterLength) { decoded.append(quote) }
+                while (index < value.length && (value[index] == ' ' || value[index] == '\t')) index++
+                require(index == value.length || value[index] == '#') { "Unexpected text after string" }
+                return decoded.toString()
+            }
+            require(character == '\t' || character >= ' ' && character != '\u007F') { "Unescaped control character in string" }
+            decoded.append(character)
         }
-        return value
+        throw IllegalArgumentException("Unterminated string")
     }
 
     /** Encodes a value on one physical TOML line, preserving controls and significant whitespace. */
@@ -119,33 +114,39 @@ internal object TomlParser {
         }
     }
 
-    private fun decodeBasicString(value: String): String =
-        buildString {
-            var index = 0
-            while (index < value.length) {
-                val character = value[index++]
-                if (character != '\\') {
-                    append(character)
-                    continue
+    private fun decodeEscape(
+        value: String,
+        startIndex: Int,
+        decoded: StringBuilder,
+    ): Int {
+        require(startIndex < value.length) { "Incomplete string escape" }
+        var index = startIndex
+        when (val escape = value[index++]) {
+            '\\', '"' -> decoded.append(escape)
+            'n' -> decoded.append('\n')
+            'r' -> decoded.append('\r')
+            't' -> decoded.append('\t')
+            'b' -> decoded.append('\b')
+            'f' -> decoded.append('\u000C')
+            'u', 'U' -> {
+                val digits = if (escape == 'u') 4 else 8
+                require(value.length - index >= digits) { "Incomplete Unicode escape" }
+                var codepoint = 0L
+                repeat(digits) {
+                    val digit =
+                        when (val character = value[index++]) {
+                            in '0'..'9' -> character - '0'
+                            in 'a'..'f' -> character - 'a' + 10
+                            in 'A'..'F' -> character - 'A' + 10
+                            else -> throw IllegalArgumentException("Invalid Unicode escape")
+                        }
+                    codepoint = codepoint * 16 + digit
                 }
-                require(index < value.length) { "Incomplete string escape" }
-                when (val escape = value[index++]) {
-                    '\\', '"' -> append(escape)
-                    'n' -> append('\n')
-                    'r' -> append('\r')
-                    't' -> append('\t')
-                    'b' -> append('\b')
-                    'f' -> append('\u000C')
-                    'u', 'U' -> {
-                        val digits = if (escape == 'u') 4 else 8
-                        require(index + digits <= value.length) { "Incomplete Unicode escape" }
-                        val codepoint = value.substring(index, index + digits).toIntOrNull(16)
-                        require(codepoint != null && codepoint in 0..0x10FFFF && codepoint !in 0xD800..0xDFFF) { "Invalid Unicode escape" }
-                        appendCodePoint(codepoint)
-                        index += digits
-                    }
-                    else -> throw IllegalArgumentException("Unsupported string escape")
-                }
+                require(codepoint <= 0x10FFFF && codepoint !in 0xD800..0xDFFF) { "Invalid Unicode escape" }
+                decoded.appendCodePoint(codepoint.toInt())
             }
+            else -> throw IllegalArgumentException("Unsupported string escape")
         }
+        return index
+    }
 }

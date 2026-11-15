@@ -402,7 +402,7 @@ public class TerminalSession private constructor(
      * Updates are conflated state, not an event log; consumers own collection.
      * No shell integration or render subscription is required.
      *
-     * Title permission authorizes these presentation hints. Explicit hide, RIS,
+     * [HostPolicy.progressPolicy] authorizes these presentation hints. Explicit hide, RIS,
      * progress-permission revocation, and session closure clear them. Active progress
      * expires after five minutes without an accepted report, including when no
      * one collects this flow; identical reports renew that timeout. The timeout
@@ -1320,6 +1320,7 @@ public class TerminalSession private constructor(
                         }
                     val (scrollbackOffset, historySize) = anchor
                     coreResizeCompleted = true
+                    runtime.shellIntegration?.outputProcessed()
                     var resizedViewport: TerminalViewportResizeResult? = null
                     renderReader.readRenderFrame { frame ->
                         resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
@@ -2012,18 +2013,15 @@ public class TerminalSession private constructor(
             val offset = unpackScrollbackOffset(request)
             val rows = unpackViewportRows(request)
 
-            val modeSnapshot = terminal.getModeSnapshot()
-            if (modeSnapshot.isSynchronizedOutput) {
-                scheduleSynchronizedOutputTimeout()
-                return
-            }
-
-            cancelSynchronizedOutputTimeout()
-
             val context = currentCoroutineContext()
             try {
                 synchronized(mutationLock) {
                     if (isSessionClosed()) return
+                    if (terminal.getModeSnapshot().isSynchronizedOutput) {
+                        scheduleSynchronizedOutputTimeout()
+                        return
+                    }
+                    cancelSynchronizedOutputTimeout()
                     runtime.publisher.updateAndPublish(this, offset, rows)
                     publishedGeneration = generation
                     context.ensureActive()

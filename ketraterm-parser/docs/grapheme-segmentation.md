@@ -92,8 +92,9 @@ UTF-8 recovery continue through their normal paths.
 Only retained text reaches core and contributes to width, rendering, and copied
 text. A base plus 40 combining marks retains the base and first 31 marks; the
 remaining marks create no additional cells. A discarded variation selector
-cannot change the retained prefix's width. This factory policy imposes no new
-32-codepoint restriction on direct core cluster writes.
+cannot change the retained prefix's width. Direct core cluster writes reject
+more than 32 codepoints before mutation; see the
+[core contract](../../ketraterm-core/docs/terminal-core-contract.md#printable-ingress).
 
 ## Charset save/restore ownership
 

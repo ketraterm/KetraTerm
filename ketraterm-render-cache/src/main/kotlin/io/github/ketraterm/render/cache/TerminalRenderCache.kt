@@ -448,10 +448,12 @@ public class TerminalRenderCache(
         viewportRows: Int,
     ) {
         prepareForRead(reader)
-        if (viewportRows > 0) {
-            reader.readRenderFrame(scrollbackOffset, viewportRows, this)
-        } else {
-            reader.readRenderFrame(scrollbackOffset, this)
+        readFrame {
+            if (viewportRows > 0) {
+                reader.readRenderFrame(scrollbackOffset, viewportRows, this)
+            } else {
+                reader.readRenderFrame(scrollbackOffset, this)
+            }
         }
     }
 
@@ -468,7 +470,20 @@ public class TerminalRenderCache(
         endAbsoluteRow: Long,
     ) {
         prepareForRead(reader)
-        reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, this)
+        readFrame { reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, this) }
+    }
+
+    private inline fun readFrame(read: () -> Unit) {
+        var completed = false
+        try {
+            read()
+            completed = true
+        } finally {
+            if (!completed) {
+                hasFrame = false
+                images.clear()
+            }
+        }
     }
 
     /**
@@ -593,12 +608,14 @@ public class TerminalRenderCache(
      * is available; they qualify row generations by reader identity automatically.
      *
      * @param frame the short-lived render frame snapshot to copy from.
+     * @throws IllegalArgumentException if the frame geometry or required storage capacity is invalid.
      */
     override fun accept(frame: TerminalRenderFrame) {
         images.clear()
         val previouslyHadFrame = hasFrame
         hasFrame = false
         shapeChangedOnLastUpdate = false
+        frame.requireValidGeometry()
 
         if (columns != frame.columns || rows != frame.rows) {
             if (columns != frame.columns || frame.rows > storageRows) {
@@ -897,11 +914,13 @@ public class TerminalRenderCache(
      * @param row zero-based row index.
      * @param column zero-based column index.
      * @return the string representing the grapheme cluster, or null if no cluster exists.
+     * @throws IllegalArgumentException if [row] or [column] is outside the logical frame dimensions.
      */
     public fun clusterText(
         row: Int,
         column: Int,
     ): String? {
+        require(column in 0 until columns) { "column must be within cache columns, was $column" }
         val ref = clusterRefs[rowOffset(row) + column]
         if (ref == NO_CLUSTER_REF) return null
         return String(clusterCodepoints, clusterOffset(ref), clusterLength(ref))
@@ -912,8 +931,12 @@ public class TerminalRenderCache(
      *
      * @param row zero-based row index.
      * @return the flat index pointing to the start of the row.
+     * @throws IllegalArgumentException if [row] is outside the logical frame dimensions.
      */
-    public fun rowOffset(row: Int): Int = row * columns
+    public fun rowOffset(row: Int): Int {
+        require(row in 0 until rows) { "row must be within cache rows, was $row" }
+        return row * columns
+    }
 
     /**
      * Returns the codepoint offset encoded in [ref].

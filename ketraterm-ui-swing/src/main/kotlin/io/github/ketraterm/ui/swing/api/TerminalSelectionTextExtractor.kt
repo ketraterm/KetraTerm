@@ -26,21 +26,34 @@ import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
  * Rectangular selections project their visual interval independently on each row.
  */
 internal class TerminalSelectionTextExtractor {
+    private val bidiLayout by lazy(LazyThreadSafetyMode.NONE) { TerminalBidiLayout() }
+
     fun selectedText(
         cache: TerminalRenderCache,
         selection: CellSelection,
         joinSoftWrappedRows: Boolean = false,
     ): String {
         if (selection.isEmpty) return ""
-
-        // A copy operation may own a temporary history snapshot; do not retain it afterward.
-        val bidiLayout = if (selection.isBlock) TerminalBidiLayout() else null
         val result = StringBuilder()
+        appendSelectedText(result, cache, selection, joinSoftWrappedRows)
+        return result.toString()
+    }
+
+    /** Appends a bounded batch without allocating an intermediate string. */
+    fun appendSelectedText(
+        result: StringBuilder,
+        cache: TerminalRenderCache,
+        selection: CellSelection,
+        joinSoftWrappedRows: Boolean,
+    ) {
+        if (selection.isEmpty) return
+
+        val layout = if (selection.isBlock) bidiLayout.also { it.reset() } else null
         var row = selection.startRow.coerceAtLeast(0)
         val lastRow = selection.endRow.coerceAtMost(cache.rows - 1)
         var hasPreviousSelectedRow = false
         while (row <= lastRow) {
-            val bidi = bidiLayout?.row(cache, row)
+            val bidi = layout?.row(cache, row)
             val range = selection.packedColumnRange(row, cache, bidi)
             // Linear selections can include a row boundary without selecting a cell on one side.
             if (!selection.isBlock || range != CellSelection.NO_RANGE) {
@@ -66,7 +79,6 @@ internal class TerminalSelectionTextExtractor {
             }
             row++
         }
-        return result.toString()
     }
 
     fun wordSelectionAt(

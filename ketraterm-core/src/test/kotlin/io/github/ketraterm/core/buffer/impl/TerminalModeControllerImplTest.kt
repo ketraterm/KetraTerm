@@ -26,8 +26,40 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalModeControllerImplTest {
+    @ParameterizedTest(name = "cursor presentation invalidation with blinkingMode={0}")
+    @ValueSource(booleans = [false, true])
+    fun `cursor presentation modes invalidate only on transitions`(blinkingMode: Boolean) {
+        val state = TerminalState(4, 3, 2)
+        val controller = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
+        val setMode = if (blinkingMode) controller::setCursorBlinking else controller::setCursorVisible
+        var previous = true
+        for (enabled in booleanArrayOf(true, false, false, true, true)) {
+            val frameGeneration = state.frameGeneration
+            val cursorGeneration = state.cursorGeneration
+            val contentGeneration = state.contentGeneration
+            val structureGeneration = state.structureGeneration
+
+            setMode(enabled)
+
+            assertEquals(enabled, if (blinkingMode) state.modes.isCursorBlinking else state.modes.isCursorVisible)
+            assertTrue(if (blinkingMode) state.modes.isCursorVisible else state.modes.isCursorBlinking)
+            if (enabled == previous) {
+                assertEquals(frameGeneration, state.frameGeneration)
+                assertEquals(cursorGeneration, state.cursorGeneration)
+            } else {
+                assertNotEquals(frameGeneration, state.frameGeneration)
+                assertNotEquals(cursorGeneration, state.cursorGeneration)
+            }
+            assertEquals(contentGeneration, state.contentGeneration)
+            assertEquals(structureGeneration, state.structureGeneration)
+            previous = enabled
+        }
+    }
+
     @Test
     fun `unchanged and unsupported palette controls preserve palette and render generation`() {
         val terminal = DefaultTerminalBuffer(4, 3)
@@ -498,12 +530,12 @@ class TerminalModeControllerImplTest {
         assertEquals(8, state.modes.kittyKeyboardFlags)
         assertEquals(8, state.activeBuffer.kittyKeyboardFlags)
 
-        // Pop on primary exhausts its stack.
+        // Pop on primary restores the baseline established by set.
         modeController.popKittyKeyboardFlags(1)
-        assertEquals(0, state.modes.kittyKeyboardFlags)
-        assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
 
-        // Repeated empty pops stay reset.
+        // Removing the baseline empties the stack.
         modeController.popKittyKeyboardFlags(1)
         assertEquals(0, state.modes.kittyKeyboardFlags)
         assertEquals(0, state.activeBuffer.kittyKeyboardFlags)

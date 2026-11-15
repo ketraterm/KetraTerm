@@ -57,7 +57,8 @@ truthfully rather than inventing lifecycle information.
 Modifier masks contain only `TerminalModifiers` bits. Combine them with bitwise
 OR. They are not wire parameters: xterm modifiers map Shift/Alt/Ctrl and a merged
 Super/Hyper/Meta bit to a one-based value; lock bits are omitted. Kitty parameters
-retain all eight modifier bits and add one.
+retain all eight modifier bits and add one. Lock state does not modify legacy
+key routing; NumLock still selects numeric keypad output.
 
 Mouse cell coordinates must be non-negative. Pixel coordinates accept `-1` for
 missing data or a non-negative value. Press requires a concrete non-wheel button;

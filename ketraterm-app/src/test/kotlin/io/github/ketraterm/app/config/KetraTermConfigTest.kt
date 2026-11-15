@@ -33,6 +33,66 @@ import kotlin.test.*
 
 class KetraTermConfigTest {
     @Test
+    fun `hand edited basic strings decode and survive canonical save and restart`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        Files.writeString(
+            file,
+            """
+            [shell]
+            path = "C:\\tools\\pwsh.exe" # an escaped Windows path
+            start_directory = "C:\\Users\\Jos\u00E9\\\U0001F600\\"
+            startup_command = "echo \"#ready\"" # keep the quoted hash
+            [font]
+            family = "\u0046ira Code"
+            """.trimIndent(),
+        )
+        val manager = KetraTermConfigManager(file)
+        val loaded = manager.load()
+        assertEquals("C:\\tools\\pwsh.exe", loaded.shellPath)
+        assertEquals("C:\\Users\\José\\😀\\", loaded.startDirectory)
+        assertEquals("echo \"#ready\"", loaded.startupCommand)
+        assertEquals("Fira Code", loaded.fontFamily)
+        assertFalse(Files.exists(directory.resolve("config.toml.broken")))
+
+        manager.save(loaded)
+        assertEquals(loaded, KetraTermConfigManager(file).load())
+        assertFalse(Files.exists(directory.resolve("config.toml.broken")))
+    }
+
+    @Test
+    fun `malformed quoted strings preserve the original file and recover with denied permissions`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val backup = directory.resolve("config.toml.broken")
+        val manager = KetraTermConfigManager(file)
+        val recovery =
+            KetraTermConfig(
+                clipboardRead = TerminalClipboardPermission.DENY,
+                clipboardWrite = TerminalClipboardPermission.DENY,
+                titlePermission = TerminalTitlePermission.DENY,
+            )
+        for (raw in listOf("\"C:\\tools\\pwsh.exe\"", "\"\\uD800\"", "\"unterminated", "'''value''' trailing")) {
+            val original =
+                """
+                [shell]
+                path = $raw
+                [security]
+                clipboard_write = 'allow'
+                clipboard_read = 'allow'
+                title_permission = 'allow'
+                """.trimIndent()
+            Files.writeString(file, original)
+
+            assertEquals(recovery, manager.load())
+            assertEquals(original, Files.readString(backup))
+            assertEquals(recovery, KetraTermConfigManager(file).load())
+        }
+    }
+
+    @Test
     fun `automatic suggestion mode defaults safely and survives configuration persistence`(
         @TempDir directory: Path,
     ) {
@@ -403,49 +463,6 @@ class KetraTermConfigTest {
         val parsed = TomlParser.parse(toml)
         assertEquals("#ff0000", parsed["theme"]?.get("color"))
         assertEquals("This is a #comment text inside quotes", parsed["theme"]?.get("description"))
-    }
-
-    @Test
-    fun `test KetraTermConfigManager path resolution`() {
-        val previousPath = System.getProperty("ketraterm.config.path")
-        try {
-            System.setProperty("ketraterm.config.path", "/custom/sys/path.toml")
-            assertEquals(Path.of("/custom/sys/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11"))
-            System.clearProperty("ketraterm.config.path")
-
-            // Env override
-            val env = mapOf("KetraTerm_CONFIG_PATH" to "/custom/env/path.toml")
-            assertEquals(Path.of("/custom/env/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = env))
-
-            // Windows resolution
-            val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
-            val winPath = KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
-            assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "KetraTerm", "config.toml"), winPath)
-
-            // Mac resolution
-            // An inherited KetraTerm_CONFIG_PATH must not override this simulated OS default.
-            val macPath = KetraTermConfigManager.getDefaultPath(osName = "macOS Big Sur", env = emptyMap(), userHome = "/Users/username")
-            assertEquals(Path.of("/Users/username/Library/Application Support/KetraTerm/config.toml"), macPath)
-
-            // Linux resolution
-            val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
-            val linuxPath = KetraTermConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
-            assertEquals(Path.of("/home/username/.custom_config/ketraterm/config.toml"), linuxPath)
-
-            val linuxFallbackPath =
-                KetraTermConfigManager.getDefaultPath(
-                    osName = "Linux",
-                    env = emptyMap(),
-                    userHome = "/home/username",
-                )
-            assertEquals(Path.of("/home/username/.config/ketraterm/config.toml"), linuxFallbackPath)
-        } finally {
-            if (previousPath == null) {
-                System.clearProperty("ketraterm.config.path")
-            } else {
-                System.setProperty("ketraterm.config.path", previousPath)
-            }
-        }
     }
 
     @Test

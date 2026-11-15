@@ -143,13 +143,14 @@ public class TerminalRenderRowSnapshot private constructor(
          *
          * @param frame source whose owner keeps it stable throughout this call.
          * @param row zero-based physical row in [frame], exposed as row zero in the result.
-         * @throws IllegalArgumentException if [row] is outside the frame.
+         * @throws IllegalArgumentException if the frame geometry is invalid or [row] is outside the frame.
          */
         @JvmStatic
         public fun copyOf(
             frame: TerminalRenderFrame,
             row: Int,
         ): TerminalRenderRowSnapshot {
+            frame.requireValidGeometry()
             require(row in 0 until frame.rows)
             val sourceRow = row
             val slice =

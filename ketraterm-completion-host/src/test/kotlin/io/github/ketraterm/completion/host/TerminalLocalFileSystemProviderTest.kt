@@ -15,18 +15,129 @@
  */
 package io.github.ketraterm.completion.host
 
-import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
-import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.api.*
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
+import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
+import kotlin.test.*
 
 class TerminalLocalFileSystemProviderTest {
+    @TempDir
+    lateinit var directory: Path
+
+    @Test
+    fun `POSIX quoted tilde completion reads the literal directory while bare tilde reads home`() {
+        val home = Files.createDirectory(directory.resolve("home"))
+        val project = Files.createDirectory(directory.resolve("project"))
+        Files.createDirectory(home.resolve("HomeDocuments"))
+        Files.createDirectory(Files.createDirectory(project.resolve("~")).resolve("LiteralDocuments"))
+        runTest {
+            val provider =
+                TerminalLocalFileSystemProvider(
+                    resolver = TerminalCompletionPathResolver(homeDirectory = home),
+                    scanner =
+                        TerminalBoundedDirectoryScanner(
+                            ioDispatcher = StandardTestDispatcher(testScheduler),
+                            scanBudgetNanos = Long.MAX_VALUE,
+                        ),
+                )
+            val source = TerminalCompletionSources.path(provider)
+            for ((line, expected) in listOf(
+                "cd ~/" to "~/HomeDocuments/",
+                "cd '~/" to "'~/LiteralDocuments/'",
+                "cd \"~/" to "\"~/LiteralDocuments/\"",
+                "cd \\~/" to "\\~/LiteralDocuments/",
+                "cd '~'/" to "'~/LiteralDocuments/'",
+            )) {
+                val request =
+                    TerminalCompletionRequest(
+                        line,
+                        line.length,
+                        workingDirectoryUri = project.toUri().toString(),
+                        shellCapabilities = TerminalShellCapabilities.POSIX,
+                    )
+                val candidate = source.complete(request, TerminalCompletionContext.resolve(request), 10).single()
+                assertEquals(expected, candidate.replacementText, line)
+                assertEquals(3, candidate.replacementStartOffset, line)
+                assertEquals(line.length, candidate.replacementEndOffset, line)
+            }
+        }
+    }
+
+    @Test
+    fun `local URI resolution preserves local paths and rejects non-path components`() {
+        val directory = Path.of("local directory").toAbsolutePath().normalize()
+        val uri = directory.toUri().toString()
+        assertEquals(directory, TerminalLocalFileUriResolver.resolve(uri))
+        val localhost = java.net.URI("file", "localhost", java.net.URI(uri).path, null).toString()
+        assertEquals(directory, TerminalLocalFileUriResolver.resolve(localhost))
+        for (invalid in listOf("$uri?query", "$uri#fragment", "file://remote.example/share/path", "ssh://host/path", "file:relative")) {
+            assertNull(TerminalLocalFileUriResolver.resolve(invalid), invalid)
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    fun `network roots in Windows directory metadata never reach the scanner`() =
+        runTest {
+            var scans = 0
+            val provider =
+                TerminalLocalFileSystemProvider(
+                    scanner =
+                        TerminalDirectoryScanner { _, _ ->
+                            scans++
+                            emptyList()
+                        },
+                )
+            val uris =
+                listOf(
+                    "file:////server/share/path",
+                    "file://localhost//server/share/path",
+                    "file:///%2Fserver/share/path",
+                    "file://localhost/%2fserver/share/path",
+                    "file:///%5C%5Cserver/share/path",
+                    "file:////%3F/UNC/server/share/path",
+                )
+            for (uri in uris) {
+                assertNull(TerminalLocalFileUriResolver.resolve(uri), uri)
+                assertEquals(emptyList(), provider.listDirectory(TerminalDirectoryListingRequest(uri, "", "")), uri)
+            }
+            assertEquals(0, scans)
+        }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    fun `explicit UNC prefixes remain available with local Windows metadata`() =
+        runTest {
+            val scans = mutableListOf<Path>()
+            val provider =
+                TerminalLocalFileSystemProvider(
+                    scanner =
+                        TerminalDirectoryScanner {
+                                path,
+                                _,
+                            ->
+                            scans.add(path)
+                            listOf(TerminalFileEntry("child", false))
+                        },
+                )
+            val localUri =
+                Path
+                    .of("local-directory")
+                    .toAbsolutePath()
+                    .toUri()
+                    .toString()
+            val entries = provider.listDirectory(TerminalDirectoryListingRequest(localUri, "//server/share/", ""))
+            assertEquals(listOf(TerminalFileEntry("child", false)), entries)
+            assertEquals(listOf(Path.of("//server/share/")), scans)
+        }
+
     @Test
     fun `resolves and scans each request directly`() =
         runTest {
