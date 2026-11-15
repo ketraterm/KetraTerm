@@ -75,7 +75,7 @@ public class SwingTerminalContextMenuRequest internal constructor(
     /**
      * Copies the current terminal selection to the host clipboard.
      *
-     * @return `true` when text was copied.
+     * @return `true` when an asynchronous selection copy was accepted.
      */
     public fun copySelection(): Boolean = terminal.copySelectionToClipboard()
 

@@ -197,13 +197,24 @@ for completion and lifetime details.
 
 ### Selection and cell coordinates
 
-`selectedText()` reads the complete retained selection on the EDT without
-clipboard access. It includes offscreen and closed-session content, joins soft
+`selectedTextAsync()` reads the complete retained selection on a worker without
+clipboard access; call it from a coroutine. It includes offscreen and closed-session content, joins soft
 wraps for linear selections, and preserves block-selection row breaks. It reads
 current content rather than frozen selection text. `null` means unavailable;
 an empty string can represent selected blanks removed by trimming. Extraction
 returns `null` if content or layout changes during copying, rather than mixing
-revisions. Clipboard copy uses the same extraction. Use `createSelectionRange`,
+revisions. Selection changes reject pending results; binding termination or caller
+cancellation stops extraction at bounded checkpoints. `commandOutputTextAsync(recordId)`
+provides the same worker execution for retained command output. The synchronous
+`selectedText()` and `commandOutputText(recordId)` queries remain available on the
+EDT, but can block for large ranges.
+
+`copySelectionToClipboard()` and `copyCommandOutputToClipboard(recordId)` return
+whether a request was accepted. They extract on a worker and deliver through the
+host clipboard service on the EDT. A newer copy supersedes unfinished copy work;
+obsolete selections and bindings cannot deliver results. Asynchronous copy failures
+are logged. Use the suspendable text queries when the host needs completion or
+failure handling. Use `createSelectionRange`,
 `setSelection`, and
 `clearSelection` for host-controlled ranges; see the
 [selection contract](docs/swing-repaint-optimization.md#2-selection-drag-matrix--text-extraction).

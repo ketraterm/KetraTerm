@@ -285,6 +285,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun clearSearch ()V
 	public final fun clearSelection ()V
 	public final fun commandOutputText (I)Ljava/lang/String;
+	public final fun commandOutputTextAsync (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun commandRecordAt (II)I
 	public final fun copyCellBounds (IILjava/awt/Rectangle;)Z
 	public final fun copyCellPositionAt (IILjava/awt/Point;)Z
@@ -354,6 +355,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun selectNextSearchResult ()V
 	public final fun selectPreviousSearchResult ()V
 	public final fun selectedText ()Ljava/lang/String;
+	public final fun selectedTextAsync (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun setHostPolicy$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V

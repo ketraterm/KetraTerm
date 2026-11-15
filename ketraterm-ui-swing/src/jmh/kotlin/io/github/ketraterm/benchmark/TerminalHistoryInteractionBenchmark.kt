@@ -22,10 +22,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
-import io.github.ketraterm.ui.swing.api.TerminalCommandInteractionController
-import io.github.ketraterm.ui.swing.api.TerminalCommandInteractionHost
-import io.github.ketraterm.ui.swing.api.TerminalSelectionController
-import io.github.ketraterm.ui.swing.api.TerminalSelectionHost
+import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.openjdk.jmh.annotations.*
@@ -53,6 +50,8 @@ open class TerminalHistoryInteractionBenchmark {
     private lateinit var commands: TerminalCommandInteractionController
     private lateinit var linear: TerminalSelectionController
     private lateinit var block: TerminalSelectionController
+    private lateinit var linearRead: TerminalTextRead
+    private lateinit var blockRead: TerminalTextRead
     private var recordId = 0
 
     @Setup
@@ -77,6 +76,8 @@ open class TerminalHistoryInteractionBenchmark {
         commands = TerminalCommandInteractionController(commandHost())
         linear = selection(false)
         block = selection(true)
+        linearRead = checkNotNull(linear.captureTextRead(session))
+        blockRead = checkNotNull(block.captureTextRead(session))
         check(commands.revealCommand(recordId))
         check(commands.selectCommandOutput(recordId))
         check(commands.commandOutputText(recordId) == List(12) { line }.joinToString("\n"))
@@ -172,6 +173,11 @@ open class TerminalHistoryInteractionBenchmark {
     @Benchmark fun copyLinear(): String? = linear.getSelectedText(session)
 
     @Benchmark fun copyBlock(): String? = block.getSelectedText(session)
+
+    /** Worker extraction including request-owned scratch; excludes dispatch and clipboard I/O. */
+    @Benchmark fun extractCapturedLinear(): String? = linearRead {}
+
+    @Benchmark fun extractCapturedBlock(): String? = blockRead {}
 
     @TearDown fun close() = session.close()
 

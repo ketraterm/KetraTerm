@@ -941,10 +941,12 @@ internal class TabManager(
         pane: TerminalPane,
         commandRecordId: Int,
     ) {
-        val output = pane.terminal.commandOutputText(commandRecordId) ?: return
         val chooser = JFileChooser().apply { selectedFile = java.io.File(appMessages.text("export.defaultFileName")) }
         if (chooser.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) return
-        commandOutputExporter.export(chooser.selectedFile.toPath(), output) { exception ->
+        commandOutputExporter.export(
+            chooser.selectedFile.toPath(),
+            { pane.terminal.commandOutputTextAsync(commandRecordId) },
+        ) { exception ->
             SwingMessageDialogs.show(
                 frame,
                 SwingDialogRequest(

@@ -20,8 +20,11 @@ There is no PTY, application, or IntelliJ dependency.
 
 Session render publication is copied into an EDT-owned cache. Painting and hit
 testing share visual geometry; routine painting does not read a live session
-frame. Search, selection extraction, and discovery may take synchronized source
-reads. Background search and hyperlink workers publish results through binding
+frame. Search, text extraction, and discovery may take synchronized source
+reads. Copy actions and suspendable selection/command queries perform extraction
+on a serialized worker with bounded cancellation checks; clipboard delivery stays
+on the EDT. Explicit synchronous text queries retain their EDT contract.
+Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly. Hyperlink source
 validation also runs on the worker; publication checks the copied viewport revision.
 

@@ -307,7 +307,9 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     fun copyAllText(): String? =
         onEdt {
             terminal.selectAll()
-            if (terminal.copySelectionToClipboard()) copiedText?.trimEnd() else null
+            if (!terminal.copySelectionToClipboard()) return@onEdt null
+            worker.scheduler.runCurrent()
+            copiedText?.trimEnd()
         }
 
     fun observation(): Observation =

@@ -188,6 +188,7 @@ class SwingTerminalCommandNavigationTest {
                 assertTrue(fixture.component.copyCommandTextToClipboard(commandId))
                 assertEquals("host command", fixture.clipboard)
                 assertTrue(fixture.component.copyCommandOutputToClipboard(commandId))
+                fixture.flush()
                 assertEquals("row6        row7", fixture.clipboard)
                 fixture.component.scrollToPreviousCommand()
                 fixture.flush()
@@ -597,6 +598,7 @@ class SwingTerminalCommandNavigationTest {
 
                 val exported = component.commandOutputText(secondCommandId)
                 assertTrue(component.copyCommandOutputToClipboard(secondCommandId))
+                mutationDispatcher.scheduler.runCurrent()
                 assertAll(
                     { assertEquals("working dir is project", exported) },
                     { assertEquals("working dir is project", clipboardText) },

@@ -88,6 +88,11 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Rendering and interaction
 
+- Swing selection and command-output copy actions extract text on workers and return
+  request acceptance. New suspendable `selectedTextAsync()` and `commandOutputTextAsync()`
+  queries support host workflows without blocking the EDT. Superseded copies and obsolete
+  bindings cannot deliver text; synchronous text queries remain available.
+
 - Render copies reject invalid custom-frame geometry and out-of-range coordinates
   consistently. Failed reader callbacks leave mutable copies invalid while preserving
   the publisher's previous completed frame.

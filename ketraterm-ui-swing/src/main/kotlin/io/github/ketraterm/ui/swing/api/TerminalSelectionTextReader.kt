@@ -19,6 +19,9 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 
+/** Captured source work with worker-owned scratch and bounded cancellation checkpoints. */
+internal typealias TerminalTextRead = (checkCancelled: () -> Unit) -> String?
+
 /** Bounded text copying under source leases; bidi and string construction run after each lease. */
 internal class TerminalSelectionTextReader {
     private val copy = TerminalTextRangeCopy()
@@ -35,8 +38,10 @@ internal class TerminalSelectionTextReader {
         caretColumn: Int,
         isBlock: Boolean = false,
         expectedContentGeneration: Long? = null,
+        checkCancelled: () -> Unit = {},
         validateLayout: (TerminalRenderFrame) -> Boolean = { true },
     ): String? {
+        checkCancelled()
         val forward = anchorAbsoluteRow < caretAbsoluteRow || anchorAbsoluteRow == caretAbsoluteRow && anchorColumn <= caretColumn
         val requestedStart = minOf(anchorAbsoluteRow, caretAbsoluteRow)
         val requestedEnd = maxOf(anchorAbsoluteRow, caretAbsoluteRow)
@@ -82,7 +87,7 @@ internal class TerminalSelectionTextReader {
         var next = first
         var previousWrapped = false
         while (next <= last) {
-            if (!copy.read(reader, next, last) ||
+            if (!copy.read(reader, next, last, checkCancelled) ||
                 copy.firstAbsoluteRow != next ||
                 copy.columns != columns ||
                 copy.contentGeneration != generation ||
@@ -110,6 +115,7 @@ internal class TerminalSelectionTextReader {
             if (copy.lastAbsoluteRow == last) break
             next = copy.lastAbsoluteRow + 1L
         }
+        checkCancelled()
         return result.toString()
     }
 

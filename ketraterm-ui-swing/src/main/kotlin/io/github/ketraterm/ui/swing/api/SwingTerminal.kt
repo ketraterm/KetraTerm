@@ -40,6 +40,8 @@ import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
@@ -161,6 +163,9 @@ public class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private val mutationFailureHandler: (Throwable?) -> Unit = ::reportSessionMutationFailure
         private val sessionMutations = SessionMutationQueue(componentScope, mutationDispatcher, uiCoroutineDispatcher)
+        private val textExtractionDispatcher = searchDispatcher
+        private val textExtractionMutex = Mutex()
+        private var copyJob: Job? = null
         private var bindingJob: Job? = null
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
@@ -1290,8 +1295,8 @@ public class SwingTerminal
          * Returns all currently retained output for [recordId].
          *
          * Soft-wrapped rows are joined while hard row boundaries become
-         * newlines. This explicit EDT-only query may allocate in proportion to
-         * the retained output and is never used while painting.
+         * newlines. This synchronous EDT-only query may allocate in proportion to
+         * the retained output. Prefer [commandOutputTextAsync] for UI workflows.
          *
          * @param recordId retained command record id.
          * @return command output, or `null` when unavailable or called off the EDT.
@@ -1302,15 +1307,30 @@ public class SwingTerminal
         }
 
         /**
+         * Reads retained command output off the EDT. May be called from any coroutine.
+         * Returns null when unavailable, changed during extraction, or the binding was replaced.
+         * Caller cancellation or an ended binding stops extraction between bounded batches.
+         * Cancellation and failures propagate to the caller.
+         */
+        public suspend fun commandOutputTextAsync(recordId: Int): String? =
+            withContext(uiCoroutineDispatcher) {
+                if (disposed || session == null) return@withContext null
+                val read = commandInteractionController.captureTextRead(recordId) ?: return@withContext null
+                extractText(read)
+            }
+
+        /**
          * Copies all retained output for [recordId] through the host clipboard service.
          *
          * @param recordId retained command record id.
-         * @return `true` when retained output was copied; `false` when unavailable or called off the EDT.
+         * Extraction runs on a worker; clipboard delivery runs on the EDT. A newer copy request
+         * supersedes an unfinished copy. Unbinding or disposal prevents delivery.
+         * @return `true` when the request was accepted; `false` when unavailable or called off the EDT.
          */
         public fun copyCommandOutputToClipboard(recordId: Int): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            val text = commandInteractionController.commandOutputText(recordId) ?: return false
-            hostServices.clipboardHandler.copyText(text)
+            if (!SwingUtilities.isEventDispatchThread() || disposed || session == null) return false
+            val read = commandInteractionController.captureTextRead(recordId) ?: return false
+            startCopy { extractText(read) }
             return true
         }
 
@@ -1323,8 +1343,7 @@ public class SwingTerminal
         public fun copyCommandTextToClipboard(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val text = session?.shellIntegrationState?.commandText(recordId) ?: return false
-            hostServices.clipboardHandler.copyText(text)
-            return true
+            return copyTextToClipboard(text)
         }
 
         override fun addNotify() {
@@ -2037,7 +2056,8 @@ public class SwingTerminal
          * A nonempty selection may return an empty string when only trimmed blanks remain.
          * Unbound and disposed components return null.
          *
-         * Uses the same extraction as [copySelectionToClipboard] without accessing the
+         * This synchronous query may allocate in proportion to the selection. Prefer
+         * [selectedTextAsync] for UI workflows. Uses the same extraction as [copySelectionToClipboard] without accessing the
          * clipboard, scrolling, focusing, or sending input. Eviction may clip selection;
          * invalidated layouts or buffer changes clear it. Resulting selection changes
          * notify listeners outside the frame lease. The returned string may be retained.
@@ -2051,6 +2071,55 @@ public class SwingTerminal
             if (disposed) return null
             val boundSession = session ?: return null
             return selectionController.getSelectedText(boundSession)
+        }
+
+        /**
+         * Reads the captured selection off the EDT, including retained offscreen rows.
+         * May be called from any coroutine. Returns null if selection, layout, or binding becomes
+         * obsolete, or content changes during extraction. Wide cells, bidi block selection and
+         * soft wrapping follow [selectedText]. Caller cancellation or an ended binding stops
+         * work between bounded batches; cancellation and failures propagate to the caller.
+         */
+        public suspend fun selectedTextAsync(): String? =
+            withContext(uiCoroutineDispatcher) {
+                if (disposed) return@withContext null
+                val bound = session ?: return@withContext null
+                val range = selectionController.currentRange() ?: return@withContext null
+                val read = selectionController.captureTextRead(bound) ?: return@withContext null
+                val text = extractText(read)
+                text.takeIf { selectionController.currentRange() === range }
+            }
+
+        /** Called on the EDT; the worker receives only a captured read and cancellation check. */
+        private suspend fun extractText(read: TerminalTextRead): String? {
+            val identity = bindingIdentity
+            val text =
+                withContext(textExtractionDispatcher) {
+                    textExtractionMutex.withLock {
+                        val context = currentCoroutineContext()
+                        read {
+                            context.ensureActive()
+                            if (!identity.get()) throw CancellationException("Terminal binding ended during text extraction")
+                        }
+                    }
+                }
+            return text.takeIf { !disposed && bindingIdentity === identity && identity.get() }
+        }
+
+        private fun startCopy(read: suspend () -> String?) {
+            copyJob?.cancel()
+            copyJob =
+                componentScope.launch {
+                    try {
+                        val text = read() ?: return@launch
+                        ensureActive()
+                        hostServices.clipboardHandler.copyText(text)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal copy failed", failure)
+                    }
+                }
         }
 
         /**
@@ -3187,9 +3256,11 @@ public class SwingTerminal
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
-         * Off-EDT callers wait for the EDT to read selection and copy text.
+         * Extraction runs on a worker; clipboard delivery runs on the EDT. Off-EDT callers
+         * wait only for request admission. A newer copy supersedes an unfinished copy.
+         * Selection changes, unbinding and disposal prevent stale delivery.
          *
-         * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
+         * @return `true` if a selection copy was accepted, `false` otherwise.
          */
         public fun copySelectionToClipboard(): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) {
@@ -3197,8 +3268,8 @@ public class SwingTerminal
                 SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
                 return copied
             }
-            val text = selectedText() ?: return false
-            hostServices.clipboardHandler.copyText(text)
+            if (disposed || session == null || selectionController.currentRange() == null) return false
+            startCopy { selectedTextAsync() }
             return true
         }
 
@@ -3216,6 +3287,8 @@ public class SwingTerminal
         public fun copyTextToClipboard(text: String): Boolean {
             check(SwingUtilities.isEventDispatchThread()) { "Clipboard writes require the EDT" }
             if (disposed || session == null) return false
+            copyJob?.cancel()
+            copyJob = null
             hostServices.clipboardHandler.copyText(text)
             return true
         }
@@ -4050,6 +4123,8 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            copyJob?.cancel()
+            copyJob = null
             promptAnalysis.reset()
             promptProjection = null
             stickyCommandHeader.reset()
@@ -4292,7 +4367,8 @@ public class SwingTerminal
                 if (renderCache.activeBuffer == TerminalRenderBufferKind.PRIMARY &&
                     (
                         settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
-                            settings.stickyCommandHeadersEnabled && stickyCommandHeader.promptLineId != 0L
+                            settings.stickyCommandHeadersEnabled &&
+                            stickyCommandHeader.promptLineId != 0L
                     )
                 ) {
                     promptAnalysis.request(promptAnalysisRequest(it))

@@ -28,6 +28,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Keyboard, selection, and navigation
 
+- Large selection copies and command-output exports extract text off the UI thread.
+  Cancelling export before choosing a destination avoids extraction; unavailable output
+  leaves an existing destination untouched.
+
 - Added temporary font zoom and reset for each pane, Windows Ctrl+Shift+C/V clipboard shortcuts,
   and window-scoped tab and pane shortcuts.
 - History paging keeps one row of context. Shift+Home/End jumps to oldest history or live output.

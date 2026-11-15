@@ -408,6 +408,14 @@ fun main() =
                 }
                 check(firstCell() == URL[0].code)
                 onEdt {
+                    check(terminal.setSelection(checkNotNull(terminal.createSelectionRange(0, 0L, URL.length, 0L))))
+                }
+                withTimeout(20_000) {
+                    check(terminal.selectedTextAsync() == URL)
+                    check(terminal.commandOutputTextAsync(0) == null)
+                }
+                onEdt { terminal.clearSelection() }
+                onEdt {
                     JavaConsumer.verifySelection(terminal)
                     val range = checkNotNull(terminal.createSelectionRange(1, 0L, 4, 0L, isBlock = true))
                     check(terminal.setSelection(range))

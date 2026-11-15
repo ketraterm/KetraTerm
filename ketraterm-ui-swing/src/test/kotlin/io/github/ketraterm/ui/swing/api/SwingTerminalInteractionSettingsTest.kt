@@ -674,6 +674,7 @@ class SwingTerminalInteractionSettingsTest {
             dispatcher.scheduler.runCurrent()
             assertTrue(view.selectAll())
             assertTrue(view.copySelectionToClipboard())
+            dispatcher.scheduler.runCurrent()
             assertEquals("hello", clipboardText.trimEnd())
         }
 
@@ -695,6 +696,7 @@ class SwingTerminalInteractionSettingsTest {
             view.mouseListeners.forEach { it.mousePressed(press) }
             val release = event(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, x = view.width - 1)
             view.mouseListeners.forEach { it.mouseReleased(release) }
+            dispatcher.scheduler.runCurrent()
             assertEquals(1, copies)
             assertEquals("hello", clipboardText)
         }
@@ -1665,6 +1667,7 @@ class SwingTerminalInteractionSettingsTest {
             view.clearSelection()
             assertEquals(0, copies)
             click(MouseEvent.BUTTON1, clicks = 2)
+            dispatcher.scheduler.runCurrent()
             assertEquals("hello", clipboardText)
             assertEquals(1, copies)
             if (closed) {
@@ -1689,15 +1692,18 @@ class SwingTerminalInteractionSettingsTest {
         }
 
     @Test
-    fun `copy failure ends the gesture and propagates to the host`() =
+    fun `asynchronous copy failure ends the gesture and permits later copies`() =
         fixture {
             val failure = IllegalStateException("clipboard unavailable")
             onCopy = { throw failure }
-            assertSame(failure, assertThrows(IllegalStateException::class.java) { click(MouseEvent.BUTTON1, clicks = 2) })
+            click(MouseEvent.BUTTON1, clicks = 2)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, copies)
             onCopy = {}
             release(MouseEvent.BUTTON1)
             assertEquals(1, copies)
             click(MouseEvent.BUTTON1, clicks = 2)
+            dispatcher.scheduler.runCurrent()
             assertEquals(2, copies)
         }
 
@@ -1729,6 +1735,7 @@ class SwingTerminalInteractionSettingsTest {
             val drag = event(MouseEvent.MOUSE_DRAGGED, MouseEvent.BUTTON1, modifiers = InputEvent.BUTTON1_DOWN_MASK, x = endX)
             view.mouseMotionListeners.forEach { it.mouseDragged(drag) }
             release(MouseEvent.BUTTON1)
+            dispatcher.scheduler.runCurrent()
             assertEquals("defg", clipboardText)
         }
 

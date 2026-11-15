@@ -491,6 +491,7 @@ class SwingTerminalPromptDividerTest {
                 assertEquals(h, bounds.y)
                 assertTrue(f.component.selectAll())
                 assertTrue(f.component.copySelectionToClipboard())
+                f.flush()
                 assertEquals(">one\n>two\n>three", f.clipboard.trimEnd())
                 f.component.scrollFromScrollbar(0, true)
                 f.flush()

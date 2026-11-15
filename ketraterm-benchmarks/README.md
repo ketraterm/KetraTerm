@@ -73,6 +73,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Sticky prompt overlay updates and painting | `StickyCommandHeaderBenchmark`; hidden/ASCII/Unicode cases, warmed fractional updates, cached raster painting, and separate command-transition preparation. |
 | Prompt decoration software painting | `TerminalPromptDecorationBenchmark`; warmed default/custom colors with identical alpha values. Includes Java2D antialiasing/compositing allocation, excluding fixture construction. |
 | Prompt indexing across retained history | `TerminalPromptIndexBenchmark`; unchanged frames, ordinary cell output, detached projections, and retained-anchor scans over real buffers. Excludes EDT dispatch and concurrent session lock contention; ordinary output includes the cell overwrite and carriage return. |
+| Retained text extraction | `TerminalHistoryInteractionBenchmark`; command output, linear selections, and bidi block selections over retained history. `extractCapturedLinear` and `extractCapturedBlock` include worker-owned scratch allocation, excluding coroutine dispatch and clipboard or file I/O. |
 | Font preparation and cache misses | `TerminalFontPreparationBenchmark`; ASCII, repeated negative resolution, distinct private-use scalars, settings construction, and Windows emoji preparation. Installed fonts are environment-dependent. Emoji reload includes font parsing with a warm OS cache; it is not a first-paint measurement. Run the emoji methods on Windows. |
 
 Read the selected fixture before interpreting a result. Isolated parsing uses a
