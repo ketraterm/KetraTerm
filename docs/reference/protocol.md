@@ -122,16 +122,15 @@ monotonic time and needs no collector. The five-minute limit is KetraTerm produc
 policy, not a protocol requirement. Reallowing permission does not restore stale
 progress; an application must send a new report.
 
-Both products replace the shell icon with a thin progress ring while progress is
+The standalone app replaces the shell icon with a thin progress ring while progress is
 active. Normal, error and warning states use accent, red and amber arcs filled
 according to the percentage; indeterminate work uses a rotating arc. Tab names
 remain unchanged. Localized tooltips/accessibility text retain the numeric/status
-information, and the selected session's window/tool-window title retains status.
-Hidden progress restores the shell icon. Both products always enable progress independently of
+information, and the selected session's window title retains status.
+Hidden progress restores the shell icon. The standalone app enables progress independently of
 the existing title permission. Library embedders control progress separately
 through `HostPolicy.progressPolicy`.
-Standalone additionally uses per-window taskbar state/value APIs where supported;
-IntelliJ retains ownership of the IDE's global taskbar. A standalone split tab
+Standalone additionally uses per-window taskbar state/value APIs where supported. A split tab
 uses its active pane, following the existing title-selection convention. Queued
 UI refreshes are bounded and read the latest retained state at delivery, so a
 late callback cannot restore cleared progress.
@@ -442,7 +441,7 @@ ANSI and DEC namespaces are independent.
 
 Mode 3 reports the last DECCOLM selection, not measured window width. Mode 1048
 is an action and reports unsupported. Standalone declares supported bell actions;
-IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
+embedding hosts choose their own report capabilities. Requests accept one mode parameter; malformed, overflowing,
 cancelled, or incomplete requests receive no reply. Queries do not mutate state.
 See the [mode reference](../../ketraterm-protocol/docs/protocol-modes.md) for names.
 

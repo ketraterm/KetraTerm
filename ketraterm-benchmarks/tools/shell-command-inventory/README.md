@@ -28,8 +28,8 @@ The [Python harness](profile-discovery.py) measures shell-local publication,
 executable discovery, and alias refresh in fresh shell processes:
 
 ```text
-python ketraterm-benchmarks/results/shell-command-inventory/profile-discovery.py --shell zsh --wsl Ubuntu --repeat 3
-python ketraterm-benchmarks/results/shell-command-inventory/profile-discovery.py --shell bash --executable "C:/Program Files/Git/bin/bash.exe" --repeat 3
+python ketraterm-benchmarks/tools/shell-command-inventory/profile-discovery.py --shell zsh --wsl Ubuntu --repeat 3
+python ketraterm-benchmarks/tools/shell-command-inventory/profile-discovery.py --shell bash --executable "C:/Program Files/Git/bin/bash.exe" --repeat 3
 ```
 
 Use `--count 10000` to create a synthetic executable directory before timing;

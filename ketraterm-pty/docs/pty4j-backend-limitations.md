@@ -43,7 +43,7 @@ repair missing ioctl data.
 
 ## Windows graphics cursor desynchronization
 
-The pinned pty4j bundle used in the native reproduction contains ConPTY and
+The pinned pty4j bundle contains ConPTY and
 OpenConsole **1.24.2607.10001**. This backend forwards Kitty graphics APC strings
 without accounting for their cursor movement in its own console model.
 KetraTerm advances its cursor according to Kitty semantics, while PowerShell's
@@ -58,31 +58,13 @@ The installed Windows Terminal application's version does not replace pty4j's
 bundled native backend. Falling back to the operating system's ConPTY is not
 evidence that the fix is present there.
 
-The controlled native reproduction used PowerShell 7.6.5 on Windows x86-64
-build 10.0.26300.0, 8x20-pixel cells, a 160x80 PNG displayed at 20 columns,
-an 80x30 grid widened to 140x30, and an
-explicit `Console.SetCursorPosition` before writing `TYPED`. Phase handshakes
-kept the child alive until output was consumed. Coordinates below are zero-based:
-
-| Phase | Bundled 1.24: console / KetraTerm cursor row | Fixed 1.25: console / KetraTerm cursor row |
-| --- | --- | --- |
-| Image followed by `PS> ` | 3 / 6 | 6 / 6 |
-| After widening | 2 / 5 | 5 / 5 |
-| After absolute cursor positioning and `TYPED` | 2 / 2; prompt remains on row 5 | 5 / 5; text follows the prompt |
-
-The comparison changed only the native backend, using Microsoft's stable
-[ConPTY 1.25.260930003 package](https://www.nuget.org/packages/Microsoft.Windows.Console.ConPTY/1.25.260930003).
-The downloaded package's SHA-256 was
-`02b07b349af66d801159bdf9e440d4a1ce78bb951f37fc8609731665afdae7ee`.
-Its matching `conpty.dll` and `OpenConsole.exe` were tested together through
-pty4j's `pty4j.preferred.native.folder` override, with the other required pty4j
-helpers present. These test binaries are not shipped by KetraTerm. The deferred
-upstream change must update the backend pair, rather than changing Kitty cursor
-semantics or parsing graphics in the PTY transport.
+The deferred upstream change must update the matching `conpty.dll` and
+`OpenConsole.exe` pair, rather than changing Kitty cursor semantics or parsing
+graphics in the PTY transport.
 
 Cursor synchronization is not graphics-aware screen-buffer storage: the upstream
 fix does not make ConPTY understand image pixels or guarantee complete buffer
-consistency for every application. The table records the scenario actually tested.
+consistency for every application.
 
 ## Distinguish terminal policy from backend limitations
 

@@ -1,15 +1,15 @@
 # Feature map
 
-KetraTerm provides a shared terminal engine, Kotlin/Java embedding libraries,
-a standalone desktop app, and an IntelliJ plugin. The catalogs below describe
+This repository provides a shared terminal engine, Kotlin/Java embedding libraries,
+and a standalone desktop app. The catalogs below describe
 implemented capabilities and their host-specific limits.
 
 | Feature set | What it covers |
 | --- | --- |
 | [Terminal emulation](features/terminal.md) | Screen operations, Unicode, colors, input protocols, host commands, and queries. |
 | [Shell support](features/shells.md) | Automatic discovery, prompt hooks, working directories, bounded completed-command output, startup commands, and completion dialects. |
-| [Desktop and IDE](features/desktop.md) | Rendering, selection, search, links, tabs, settings, command-finished alerts, application progress rings, and product integration. |
-| [Completion — experimental](features/completion.md) | Availability, built-in commands, PowerShell completion, Bash/zsh command discovery and literal alias arguments, local/IDE Git references and remotes, Git modes and refspec edits, argument contexts and display hints, matching, and learning. |
+| [Desktop](features/desktop.md) | Rendering, selection, search, links, tabs, settings, command-finished alerts, application progress rings, and standalone product integration. |
+| [Completion — experimental](features/completion.md) | Availability, built-in commands, PowerShell completion, Bash/zsh command discovery and literal alias arguments, local Git references and remotes, Git modes and refspec edits, argument contexts and display hints, matching, and learning. |
 | [Library embedding](features/embedding.md) | Headless sessions, custom transports, rendering, host services, and extension points. |
 
 Start with [library setup](../README.md#using-the-libraries), the

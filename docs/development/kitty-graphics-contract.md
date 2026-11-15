@@ -390,10 +390,10 @@ The following entry paths share this requirement:
 | `SwingTerminal.bindOnEdt`, `reloadSettingsOnEdt`, `applySettingsToSession` | Apply captured theme, width-policy and cursor-default updates off the EDT; initial binding is included. Keep component settings/metrics on the EDT. |
 | `SwingTerminal.resizeSessionToVisibleGridOnEdt` | Move both `tryUpdateViewportPixels` and `tryResizeViewport` admission off the EDT. Capture geometry/viewport anchors first; install resize results and selection changes on the EDT. |
 | `TerminalWindowResizeController.request` fallback | Route through the bound view's ordered geometry work after capturing the visible size on the EDT. Window resizing itself stays on the EDT. |
-| Standalone `TerminalPane.reloadSettings`, IDE `KetraTermTerminalPane.reloadSettings`, and `TerminalWorkspace.applySettings` | Move session policy/settings effects to their owning host's work path. Preserve order with view settings; moving only `terminal.reloadSettings` does not cover the subsequent `setHostPolicy`. |
+| `TerminalPane.reloadSettings` and `TerminalWorkspace.applySettings` | Move session policy/settings effects to their owning host's work path. Preserve order with view settings; moving only `terminal.reloadSettings` does not cover the subsequent `setHostPolicy`. |
 | `SwingTerminal` window-state listeners and `updateMinimizedStateFromAncestor` | Capture minimization on the EDT and admit `setWindowMinimized` off it, including binding-time synchronization. |
 | Embedded `TerminalSession.clearBuffer` calls | Perform local clear off the EDT and report its result on completion. `SwingTerminal.clearScreen` sends Ctrl+L through ordinary input admission and remains outside the gate. |
-| Tab/project/window closure, pending-tab/startup cleanup, and `IntellijClipboardSession` disposal | Detach UI on the EDT; run session/workspace cleanup under a product lifetime owner off it. Cover `TabManager`, `KetraTermProjectTerminalService` and indirect `TerminalWorkspace.closeTab`/`close` calls. Cleanup must survive cancellation of the disposed view. Startup/connector delivery also stays off the EDT. |
+| Tab/window closure and pending-tab/startup cleanup | Detach UI on the EDT; run session/workspace cleanup under a product lifetime owner off it. Cover `TabManager` and indirect `TerminalWorkspace.closeTab`/`close` calls. Cleanup must survive cancellation of the disposed view. Startup/connector delivery also stays off the EDT. |
 
 Use the existing binding/product work owners with an explicit non-EDT dispatcher.
 Keep pending work bounded and preserve accepted mutation order per session; launching
@@ -435,7 +435,7 @@ exact APC metadata/chunks and decoded input pixels independently of production
 parsing. Decoder-boundary tests pin native PNG sample behavior. Neither is a
 graphics conformance test for KetraTerm.
 
-Subsequent implementation tests must assert exact queries/quiet replies, command
+Implementation tests cover exact queries/quiet replies, command
 ordering, transfer recovery, invalid/oversized data, unsigned IDs, identity reuse,
 placement geometry, all deletion selectors, scroll/margin/resize behavior, screen
 lifecycle, pinned-frame stability, failed-copy cleanup and frozen presentation.

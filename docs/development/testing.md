@@ -20,7 +20,7 @@ current JVM for deterministic isolation does not by itself require an external-t
 
 The tags describe execution requirements; unit versus integration describes the
 behavioral boundary. Tests integrating several modules through fakes still run in
-`test`. Existing dedicated publication, consumer, differential, and IDE-plugin
+`test`. Existing dedicated publication, consumer, and differential
 tasks retain their own toolchains and validation contracts.
 
 ```shell

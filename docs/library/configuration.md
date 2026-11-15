@@ -14,7 +14,7 @@ and persistence belong to the embedding application.
 | Terminal-originated actions and replies | Session `HostPolicy`. |
 | Shell process and environment | PTY options or the host's connector. |
 | Shell metadata | A selected built-in or host-owned producer. |
-| Settings files and application defaults | The standalone or IDE product. |
+| Settings files and application defaults | The embedding application. |
 
 Binding/reloading a Swing view also applies its palette, width, cursor, and paste
 settings to the session. Launch settings affect new sessions. See
@@ -108,7 +108,7 @@ for interaction/presentation APIs.
 The shipped message catalogs are English. `SwingHostMessages`,
 `SwingTerminalMessages`, and `TerminalCompletionMessages` accept a locale,
 partial resource overrides, or host message lookup. Missing keys fall back to
-English. IntelliJ uses its platform message system.
+English. Hosts may supply their own message system.
 
 Message patterns use JDK `MessageFormat`; formatted literal apostrophes must
 be doubled. Components capture their message provider at construction, so

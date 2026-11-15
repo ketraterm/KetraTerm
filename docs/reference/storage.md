@@ -1,7 +1,7 @@
 # Persistent storage
 
-The standalone app owns its configuration files. IntelliJ uses IDE-managed
-application/project settings. Library embedders choose their own persistence.
+The standalone app owns its configuration files. Library embedders choose their
+own configuration and persistence locations.
 
 ## Locations
 
@@ -12,8 +12,6 @@ application/project settings. Library embedders choose their own persistence.
 | Standalone completion learning — Windows | `%LOCALAPPDATA%\KetraTerm\command-completion-learning.tsv`; without `LOCALAPPDATA`, use `~/AppData/Local/KetraTerm/`. |
 | Standalone completion learning — macOS | `~/Library/Application Support/KetraTerm/command-completion-learning.tsv`. |
 | Standalone completion learning — Linux and other platforms | `$XDG_STATE_HOME/ketraterm/command-completion-learning.tsv`; default `~/.local/state/ketraterm/`. |
-| IntelliJ completion learning | The IDE system directory under `ketraterm/`; the filename follows the plugin's persistence-library version. |
-| IntelliJ tab state | Project workspace storage; see [tab restoration](../features/desktop.md#product-integration). |
 
 Raw terminal output is not saved automatically. Explicit output export is a
 separate user action.
@@ -27,8 +25,8 @@ to older evidence. Reset clears all known previous locations.
 
 ## Completion learning
 
-Saved learning is **opt-in** and requires completion to be enabled. Both products
-provide a persistence setting; standalone also supports
+Saved learning is **opt-in** and requires completion to be enabled. The standalone
+app provides a persistence setting and supports
 `suggestion_learning_persistence_enabled` under `[behavior]`.
 
 With persistence disabled, startup does not load the saved file and new activity
@@ -39,11 +37,11 @@ Use **Reset learned suggestions...** in settings to clear learned commands and
 ranking preferences from memory and disk, even when suggestions or persistence
 are disabled. The action asks for confirmation and reports success after saved
 data is cleared. Errors allow retry, and closing settings does not cancel the
-reset. The file keeps an empty format header, and a distinct previous location is
-cleared too. Shell history and terminal output
-are unaffected; later activity can be learned according to the current settings.
+reset. The file keeps an empty format header and previous learning files are
+removed. Shell history and terminal output are unaffected; later activity can be
+learned according to the current settings.
 
-Learning is saved periodically and at shutdown. Products allow up to 500 ms for
+Learning is saved periodically and at shutdown. The standalone app allows up to 500 ms for
 the final write, so the latest activity may be lost if saving cannot finish.
 Integrators should follow the [persistence lifecycle contract](../../ketraterm-completion-persistence/README.md#lifecycle-and-failures).
 
