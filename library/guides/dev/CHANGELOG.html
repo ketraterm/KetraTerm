@@ -115,6 +115,9 @@ in both filesystem lookup and inserted text, while bare <code>~/</code> continue
 </ul>
 <h3 id="rendering-and-interaction">Rendering and interaction</h3>
 <ul>
+<li><p>Repeated previous-command navigation moves to earlier commands after reaching
+the current command&#39;s prompt, rather than remaining at the same prompt.</p>
+</li>
 <li><p>Swing selection and command-output copy actions extract text on workers and return
 request acceptance. New suspendable <code>selectedTextAsync()</code> and <code>commandOutputTextAsync()</code>
 queries support host workflows without blocking the EDT. Superseded copies and obsolete
@@ -995,7 +998,7 @@ cmd.exe.</p>
 <li><p>Configurable typography, default colors, palettes, and scrollback capacity.</p>
 </li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/8b49bcf0b63a815342dd5a112d5eb90e782ba081/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
