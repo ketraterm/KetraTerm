@@ -19,15 +19,15 @@ import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.swing.SwingUtilities
-import kotlin.coroutines.resume
 
 /**
  * Cancellable read consent owned by one terminal pane. All operations belong to
  * the EDT. The product presents its standard dialog and returns a handle that
  * closes it. No clipboard content is passed to the dialog.
  *
- * Cancellation, expiry and pane disposal close the dialog. Blocking persists
- * for this pane's lifetime, including later requests admitted with Allow.
+ * Cancellation and expiry clean up on the EDT, including for callers using other
+ * coroutine dispatchers. Dismissal and pane disposal close the dialog before returning.
+ * Blocking persists for this pane's lifetime, including later requests admitted with Allow.
  * @param showDialog opens product UI, delivers a decision on the EDT, and returns its disposal handle.
  * @param messages host message bundle; choices keep their stable decision indices.
  */
@@ -58,7 +58,14 @@ public class SwingClipboardReadPrompt(
             }
     }
 
-    private var pending: CancellableContinuation<Boolean>? = null
+    private class PendingRequest(
+        val continuation: CancellableContinuation<Boolean>,
+    ) {
+        var dialog: AutoCloseable? = null
+        var finished = false
+    }
+
+    private var pending: PendingRequest? = null
     private var blocked = false
     private var closed = false
 
@@ -73,11 +80,13 @@ public class SwingClipboardReadPrompt(
     public suspend fun request(message: String): Boolean {
         check(SwingUtilities.isEventDispatchThread())
         if (isBlocked || pending != null) return false
-        var dialog: AutoCloseable? = null
+        var request: PendingRequest? = null
         try {
             return suspendCancellableCoroutine { continuation ->
-                pending = continuation
-                dialog =
+                val current = PendingRequest(continuation)
+                request = current
+                pending = current
+                val dialog =
                     showDialog(
                         SwingDialogRequest(
                             messages.message("clipboard.title"),
@@ -88,24 +97,34 @@ public class SwingClipboardReadPrompt(
                         ),
                     ) { option ->
                         check(SwingUtilities.isEventDispatchThread())
-                        if (pending === continuation && continuation.isActive) {
+                        if (pending === current && continuation.isActive) {
                             val decision = Decision.entries.getOrNull(option ?: -1) ?: Decision.DENY
                             if (decision == Decision.BLOCK) blocked = true
-                            continuation.resume(decision == Decision.ALLOW_ONCE)
+                            decide(current, decision == Decision.ALLOW_ONCE)
                         }
                     }
+                // Presenters may decide or dispose the pane before returning their handle.
+                if (current.finished) dialog.close() else current.dialog = dialog
             }
         } finally {
-            pending = null
-            dialog?.close()
+            request?.let { current ->
+                if (SwingUtilities.isEventDispatchThread()) {
+                    finish(current)
+                } else {
+                    // Cleanup must complete even when the requesting coroutine is cancelled.
+                    suspendCancellableCoroutine { cleanup ->
+                        SwingUtilities.invokeLater { cleanup.resumeWith(runCatching { finish(current) }) }
+                    }
+                }
+            }
         }
     }
 
     /** Denies a pending request, returning whether terminal Escape was consumed. */
     public fun dismiss(): Boolean {
         check(SwingUtilities.isEventDispatchThread())
-        val continuation = pending ?: return false
-        if (continuation.isActive) continuation.resume(false)
+        val request = pending ?: return false
+        decide(request, false)
         return true
     }
 
@@ -113,6 +132,37 @@ public class SwingClipboardReadPrompt(
     override fun close() {
         check(SwingUtilities.isEventDispatchThread())
         closed = true
-        pending?.cancel(CancellationException("Terminal pane closed"))
+        val request = pending ?: return
+        try {
+            finish(request)
+        } finally {
+            request.continuation.cancel(CancellationException("Terminal pane closed"))
+        }
+    }
+
+    private fun decide(
+        request: PendingRequest,
+        allowed: Boolean,
+    ) {
+        val result =
+            runCatching {
+                finish(request)
+                allowed
+            }
+        if (request.continuation.isActive) {
+            request.continuation.resumeWith(result)
+        } else {
+            result.getOrThrow()
+        }
+    }
+
+    private fun finish(request: PendingRequest) {
+        check(SwingUtilities.isEventDispatchThread())
+        if (request.finished) return
+        request.finished = true
+        if (pending === request) pending = null
+        val dialog = request.dialog
+        request.dialog = null
+        dialog?.close()
     }
 }
