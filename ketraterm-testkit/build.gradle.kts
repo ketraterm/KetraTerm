@@ -23,7 +23,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.23.0")
     implementation(project(":ketraterm-core"))
     implementation(project(":ketraterm-host"))
     implementation(project(":ketraterm-parser"))
