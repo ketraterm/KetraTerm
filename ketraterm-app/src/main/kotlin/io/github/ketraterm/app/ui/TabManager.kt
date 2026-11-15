@@ -1232,7 +1232,7 @@ internal class TabManager(
             color: String?,
         ) {
             SwingUtilities.invokeLater {
-                updateTabColor(tab.id, color)
+                updateTabColor(tab.id, tab.color)
             }
         }
 

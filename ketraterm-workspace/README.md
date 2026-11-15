@@ -167,7 +167,9 @@ For title updates queued to a UI thread, read `tab.title` when the queued work
 runs and check that the tab still exists. Its precedence is custom title,
 application title, foreground process, directory, then profile name. Set
 `customTitle`, `color`, or `showForegroundProcessName` for per-tab presentation;
-color strings are interpreted by the host.
+color strings are interpreted by the host. Color reads and replacements are atomic;
+changed values notify the listener on the setter's thread. For queued color updates,
+read `tab.color` at delivery time and check that the tab still exists.
 
 ### Clipboard read routing
 

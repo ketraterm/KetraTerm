@@ -33,14 +33,13 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.*
+import java.awt.image.BufferedImage
 import java.lang.reflect.Proxy
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
 import javax.swing.JPanel
@@ -48,9 +47,41 @@ import javax.swing.SwingUtilities
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Drives actual OSC bytes through session/workspace while native progress publication is recorded. */
+/** Exercises workspace-driven tab and window presentation, including OSC progress and host color changes. */
 @Tag("desktop")
-class TabManagerProgressDesktopTest {
+class TabManagerPresentationDesktopTest {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = ["#12ab34"])
+    fun `delayed color notifications preserve the latest color or reset`(
+        latestColor: String?,
+        @TempDir directory: Path,
+    ) {
+        Fixture(directory).use { fixture ->
+            val pane = fixture.open()
+            val uncolored = fixture.tabPixels()
+            pane.tab.color = "#ab1234"
+            val older = fixture.colorChanges.remove()
+            pane.tab.color = latestColor
+            fixture.colorChanges.remove().run()
+            val expected = fixture.tabPixels()
+            if (latestColor == null) {
+                assertTrue(uncolored.contentEquals(expected), "Reset removes the color stripe")
+            } else {
+                assertTrue(expected.any { it == Color.decode(latestColor).rgb }, "The current color is painted")
+            }
+
+            older.run()
+            assertTrue(expected.contentEquals(fixture.tabPixels()), "An older notification must not restore an older color")
+
+            onEdt { fixture.manager.closePane(pane) }
+            val closed = fixture.tabPixels()
+            pane.tab.color = "#1234ab"
+            fixture.colorChanges.remove().run()
+            assertTrue(closed.contentEquals(fixture.tabPixels()), "A late color change must not restore a closed tab")
+        }
+    }
+
     @Test
     fun `application progress decorates tab and window and survives title changes until clear`(
         @TempDir directory: Path,
@@ -194,6 +225,7 @@ class TabManagerProgressDesktopTest {
                 }
             }
         private val expectation = AtomicReference<Expectation?>()
+        val colorChanges = LinkedBlockingQueue<Runnable>()
         val bar = onEdt { TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }) }
         private val content = onEdt { JPanel(CardLayout()) }
         val frame =
@@ -230,6 +262,13 @@ class TabManagerProgressDesktopTest {
                         workspaceFactory = { listener ->
                             val recording =
                                 object : TerminalWorkspaceListener by listener {
+                                    override fun colorChanged(
+                                        tab: TerminalWorkspaceTab,
+                                        color: String?,
+                                    ) {
+                                        colorChanges.add(Runnable { listener.colorChanged(tab, color) })
+                                    }
+
                                     override fun progressChanged(
                                         tab: TerminalWorkspaceTab,
                                         progress: TerminalProgress,
@@ -292,6 +331,19 @@ class TabManagerProgressDesktopTest {
         }
 
         fun focus(component: Component) = focusManager.focus(component)
+
+        fun tabPixels(): IntArray =
+            onEdt {
+                bar.setSize(600, 40)
+                val image = BufferedImage(bar.width, bar.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    bar.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+            }
 
         fun report(
             tab: TerminalWorkspaceTab,
