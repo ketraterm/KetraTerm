@@ -18,6 +18,8 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Pane-owned review of explicit user paste; OSC clipboard access uses its separate permissions. */
 internal class TerminalPasteClipboard(
@@ -30,9 +32,24 @@ internal class TerminalPasteClipboard(
 
     override fun readPrimarySelectionText(): String? = read(clipboard::readPrimarySelectionText)
 
+    override suspend fun readTextAsync(): String? = readAsync(clipboard::readTextAsync)
+
+    override suspend fun readPrimarySelectionTextAsync(): String? = readAsync(clipboard::readPrimarySelectionTextAsync)
+
+    private suspend fun readAsync(load: suspend () -> String?): String? {
+        if (prompting) return null
+        val text = load() ?: return null
+        currentCoroutineContext().ensureActive()
+        return review(text)
+    }
+
     private fun read(load: () -> String?): String? {
         if (prompting) return null
         val text = load() ?: return null
+        return review(text)
+    }
+
+    private fun review(text: String): String? {
         if (text.none { it != '\t' && (it.isISOControl() || it == '\u2028' || it == '\u2029') }) return text
         prompting = true
         try {

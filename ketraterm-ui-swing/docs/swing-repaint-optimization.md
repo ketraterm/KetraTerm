@@ -129,7 +129,7 @@ clear invalidated selection; resulting listener notifications occur outside the
 frame lease. `selectedTextAsync()` captures selection on the EDT and performs
 the same extraction on a worker, rejecting an obsolete selection on return.
 Clipboard copy actions use this worker path and return request acceptance;
-clipboard delivery remains on the EDT. `commandOutputTextAsync(recordId)` also
+host suspend clipboard callbacks start on the EDT and native system access runs on a worker. `commandOutputTextAsync(recordId)` also
 moves command row resolution off the EDT. See the [selection API](../README.md#selection-and-cell-coordinates).
 
 Extraction returns `null` if content or layout changes during copying, rather

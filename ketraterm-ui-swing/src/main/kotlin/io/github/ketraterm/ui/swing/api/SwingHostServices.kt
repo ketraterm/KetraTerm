@@ -113,7 +113,7 @@ public fun interface SwingTerminalHostKeyHandler {
  * gesture; Shift temporarily overrides reporting unless XTSHIFTESCAPE requests capture.
  * @property middleClickPasteHandler optional host-owned local middle-button paste hook.
  * A supplied hook owns clipboard access and deferred completion; null uses the configured
- * clipboard handler synchronously. Other paste actions are unaffected.
+ * clipboard handler's suspend read operation. Other paste actions are unaffected.
  * @property fontResolver custom host font resolver policy.
  */
 public class SwingHostServices private constructor(

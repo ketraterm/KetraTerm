@@ -166,6 +166,8 @@ public class SwingTerminal
         private val textExtractionDispatcher = searchDispatcher
         private val textExtractionMutex = Mutex()
         private var copyJob: Job? = null
+        private var pasteJob: Job? = null
+        private var hyperlinkJob: Job? = null
         private var bindingJob: Job? = null
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
@@ -1323,8 +1325,10 @@ public class SwingTerminal
          * Copies all retained output for [recordId] through the host clipboard service.
          *
          * @param recordId retained command record id.
-         * Extraction runs on a worker; clipboard delivery runs on the EDT. A newer copy request
-         * supersedes an unfinished copy. Unbinding or disposal prevents delivery.
+         * Extraction runs on a worker; the clipboard's suspend operation starts on the EDT and
+         * the system service performs native access on a worker. A newer copy request
+         * supersedes an unfinished copy. Unbinding or disposal cancels pending work;
+         * a native write already entered cannot be undone.
          * @return `true` when the request was accepted; `false` when unavailable or called off the EDT.
          */
         public fun copyCommandOutputToClipboard(recordId: Int): Boolean {
@@ -1338,7 +1342,7 @@ public class SwingTerminal
          * Copies captured command text for [recordId] through the host clipboard service.
          *
          * @param recordId retained command record id.
-         * @return `true` when command text was copied; `false` when unavailable or called off the EDT.
+         * @return `true` when a copy request was accepted; `false` when unavailable or called off the EDT.
          */
         public fun copyCommandTextToClipboard(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
@@ -1766,6 +1770,7 @@ public class SwingTerminal
                             launch {
                                 session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                     if (this@SwingTerminal.session === session) {
+                                        pasteJob?.cancel()
                                         suggestionScheduler?.stop()
                                         inlineSuggestionScheduler?.stop()
                                         cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
@@ -2106,18 +2111,31 @@ public class SwingTerminal
             return text.takeIf { !disposed && bindingIdentity === identity && identity.get() }
         }
 
-        private fun startCopy(read: suspend () -> String?) {
+        private fun startCopy(
+            selection: TerminalSelectionRange? = null,
+            read: suspend () -> String?,
+        ) {
             copyJob?.cancel()
             copyJob =
                 componentScope.launch {
+                    val request = coroutineContext.job
+                    val listener =
+                        selection?.let { expected ->
+                            TerminalSelectionListener { _, current ->
+                                if (current !== expected) request.cancel()
+                            }
+                        }
+                    listener?.let(selectionController::addListener)
                     try {
                         val text = read() ?: return@launch
                         ensureActive()
-                        hostServices.clipboardHandler.copyText(text)
+                        hostServices.clipboardHandler.copyTextAsync(text)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (failure: Exception) {
                         System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal copy failed", failure)
+                    } finally {
+                        listener?.let(selectionController::removeListener)
                     }
                 }
         }
@@ -3256,9 +3274,10 @@ public class SwingTerminal
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
-         * Extraction runs on a worker; clipboard delivery runs on the EDT. Off-EDT callers
+         * Extraction and system clipboard access run on workers. Host suspend callbacks start on the EDT. Off-EDT callers
          * wait only for request admission. A newer copy supersedes an unfinished copy.
-         * Selection changes, unbinding and disposal prevent stale delivery.
+         * Selection changes, unbinding and disposal cancel pending work;
+         * a native write already entered cannot be undone.
          *
          * @return `true` if a selection copy was accepted, `false` otherwise.
          */
@@ -3269,7 +3288,7 @@ public class SwingTerminal
                 return copied
             }
             if (disposed || session == null || selectionController.currentRange() == null) return false
-            startCopy { selectedTextAsync() }
+            startCopy(selectionController.currentRange()) { selectedTextAsync() }
             return true
         }
 
@@ -3281,27 +3300,26 @@ public class SwingTerminal
          * Call on the EDT; disposed and unbound components do not invoke the handler.
          *
          * @param text text to place on the host clipboard.
-         * @return `true` when a session is bound and the clipboard handler was invoked.
+         * @return `true` when the asynchronous write was accepted; failures are logged.
          * @throws IllegalStateException if called outside the EDT.
          */
         public fun copyTextToClipboard(text: String): Boolean {
             check(SwingUtilities.isEventDispatchThread()) { "Clipboard writes require the EDT" }
             if (disposed || session == null) return false
-            copyJob?.cancel()
-            copyJob = null
-            hostServices.clipboardHandler.copyText(text)
+            startCopy { text }
             return true
         }
 
         /**
          * Pastes text from the host clipboard into the active terminal session.
          *
-         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures;
-         * hosts reading the clipboard asynchronously can complete through [pasteText].
-         * Unbound and closed sessions do not read the clipboard.
+         * Call on the EDT. The clipboard's suspend operation starts there; the system service
+         * performs native access on a worker. A pending read rejects additional paste requests.
+         * Unbound and closed sessions do not read the clipboard. Unbind/dispose cancels pending
+         * work, and a closed or replaced binding never receives the result. Failures are logged.
          *
-         * @return `true` when nonempty clipboard text was admitted by the bound session,
-         *   `false` otherwise, including outside the EDT. Admission does not promise transport completion.
+         * @return `true` when an asynchronous paste request was accepted, not when input was delivered.
+         *   Empty/unavailable text and denied paste consent produce no input after acceptance.
          */
         public fun pasteClipboardText(): Boolean = pasteFromClipboardOnEdt(SwingPasteSource.CLIPBOARD)
 
@@ -3309,12 +3327,25 @@ public class SwingTerminal
             if (!SwingUtilities.isEventDispatchThread() || disposed) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val identity = bindingIdentity
-            val text =
-                when (source) {
-                    SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readText()
-                    SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionText()
-                } ?: return false
-            return pasteTextOnEdt(text, boundSession, identity)
+            // Repeated paste gestures do not build an unbounded queue behind a blocked native read.
+            if (pasteJob?.isActive == true) return false
+            pasteJob =
+                componentScope.launch {
+                    try {
+                        val text =
+                            when (source) {
+                                SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readTextAsync()
+                                SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionTextAsync()
+                            } ?: return@launch
+                        ensureActive()
+                        pasteTextOnEdt(text, boundSession, identity)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal paste failed", failure)
+                    }
+                }
+            return true
         }
 
         private fun handleMiddleClickPasteOnEdt(event: MouseEvent) {
@@ -3522,8 +3553,8 @@ public class SwingTerminal
             val openAction: () -> Boolean =
                 if (hyperlinkId > 0) {
                     if (uri == null) return null
-                    val handler = hostServices.hyperlinkHandler
-                    { handler.openHyperlink(uri) }
+                    val identity = bindingIdentity
+                    { bindingIdentity === identity && activateHyperlink(uri) }
                 } else {
                     val action = detected?.action ?: return null
                     val activate: () -> Boolean = {
@@ -3556,9 +3587,27 @@ public class SwingTerminal
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) {
                 val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
-                return hostServices.hyperlinkHandler.openHyperlink(uri)
+                return activateHyperlink(uri)
             }
             return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache, event)
+        }
+
+        private fun activateHyperlink(uri: String): Boolean {
+            if (disposed || session == null || hyperlinkJob?.isActive == true) return false
+            hyperlinkJob =
+                componentScope.launch {
+                    try {
+                        hostServices.hyperlinkHandler.openHyperlinkAsync(uri)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System
+                            .getLogger(
+                                SwingTerminal::class.java.name,
+                            ).log(System.Logger.Level.WARNING, "Terminal hyperlink activation failed", failure)
+                    }
+                }
+            return true
         }
 
         private fun cellAt(
@@ -4125,6 +4174,10 @@ public class SwingTerminal
         private fun resetRenderCaches() {
             copyJob?.cancel()
             copyJob = null
+            pasteJob?.cancel()
+            pasteJob = null
+            hyperlinkJob?.cancel()
+            hyperlinkJob = null
             promptAnalysis.reset()
             promptProjection = null
             stickyCommandHeader.reset()

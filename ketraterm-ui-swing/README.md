@@ -166,23 +166,26 @@ clipboard. For asynchronous clipboard access, capture the intended binding,
 perform the read in host-owned work, and verify that binding on the EDT before
 calling `pasteText`. The host must discard results from an obsolete binding.
 
-`pasteClipboardText()` reads the supplied clipboard handler synchronously on
-the EDT. Both paste methods use session policy and admission; `true` means
-admitted, not delivered. Empty text, an unavailable session, off-EDT calls,
-and rejected admission return `false`.
+`pasteClipboardText()` starts an asynchronous clipboard request on the EDT.
+The system service performs native reads on a worker. `true` means the request
+was accepted; empty text, denied consent, or a stale binding produces no input.
+An outstanding read, an unavailable session, or an off-EDT call returns `false`.
+`pasteText()` still returns session admission. Both paths preserve session paste
+policy and bracketed-paste handling; neither return value promises delivery.
 
 `copyOnSelection` copies a nonempty selection at local primary-button gesture
 completion. It defaults to `false` and uses the supplied clipboard handler.
 Application mouse reporting takes priority. Shift restores local interaction
 unless the application requests Shift capture through XTSHIFTESCAPE.
-Clipboard callbacks run on the EDT.
+Host suspend callbacks start on the EDT; the system clipboard implementation
+dispatches native access to a worker.
 
 ### Middle-button paste
 
 `middleClickPaste` defaults to `false`. When enabled, a local middle-button press
 uses `middleClickPasteSource`: `SwingPasteSource.CLIPBOARD` by default, or
 `PRIMARY_SELECTION` for native primary-selection text. The built-in path reads
-only that source synchronously on the EDT. An unavailable primary selection
+only that source through the suspend clipboard operation. An unavailable primary selection
 never falls back to the ordinary clipboard. Keyboard, menu, and programmatic
 clipboard paste still use the ordinary clipboard.
 
@@ -211,7 +214,8 @@ EDT, but can block for large ranges.
 
 `copySelectionToClipboard()` and `copyCommandOutputToClipboard(recordId)` return
 whether a request was accepted. They extract on a worker and deliver through the
-host clipboard service on the EDT. A newer copy supersedes unfinished copy work;
+host clipboard service's suspend operation, starting on the EDT. Native system
+reads and writes are serialized on workers. A newer copy supersedes unfinished copy work;
 obsolete selections and bindings cannot deliver results. Asynchronous copy failures
 are logged. Use the suspendable text queries when the host needs completion or
 failure handling. Use `createSelectionRange`,
@@ -586,7 +590,7 @@ painters or input controllers.
 
 | Service | Purpose |
 | --- | --- |
-| `clipboardHandler` | Synchronous text copy/read and optional primary-selection access |
+| `clipboardHandler` | Suspend copy/read and primary-selection operations; system access runs on workers |
 | `middleClickPasteHandler` | Host-owned local paste gesture, including deferred clipboard access |
 | `hyperlinkHandler` / `hyperlinkDetector` | OSC 8 navigation / discovery of links in retained text |
 | `fontResolver` | Host font fallback policy |
@@ -594,6 +598,21 @@ painters or input controllers.
 | `viewportListener` / `scrollbarOverlayEnabled` | External scrollbar integration or the built-in overlay |
 | `shellSuggestionKeymap` / `shellSuggestionViewFactory` | Suggestion action mapping and embedded presentation |
 | `uiDispatcher` | UI scheduling; component work must still run on the EDT |
+
+The built-in clipboard and browser services perform native operations on workers.
+`TerminalClipboardHandler`'s `copyTextAsync`, `readTextAsync`, and
+`readPrimarySelectionTextAsync`, and `TerminalHyperlinkHandler.openHyperlinkAsync`
+are called from component-owned EDT coroutines. Their default implementations call
+the existing synchronous methods on that same thread, preserving custom host
+prompts. Override the suspend methods to dispatch blocking host work, then resume
+on the EDT for consent. Direct synchronous service calls can still block.
+
+Unbinding or disposing cancels pending actions. Repeated paste/browser gestures
+are rejected while an operation is pending; a newer copy supersedes unfinished
+copy work. Queued native operations observe cancellation, and late reads cannot
+paste into another binding. An OS write or browser activation already started
+cannot be undone. System clipboard operations retain their serialization slot
+until native access actually returns, even after cancellation.
 
 Numeric-keypad events carry Num Lock state when AWT can report it, preserving
 numeric typing in application keypad mode. Unsupported or headless toolkits

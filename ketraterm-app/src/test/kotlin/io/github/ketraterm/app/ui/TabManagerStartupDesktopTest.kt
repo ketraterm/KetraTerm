@@ -64,6 +64,79 @@ import kotlin.test.*
 /** Uses real product panes and a controlled connector; the frame requires a graphical environment. */
 @Tag("desktop")
 class TabManagerStartupDesktopTest {
+    @ParameterizedTest
+    @CsvSource("tab,false", "tab,true", "split,false", "split,true")
+    fun `profile discovery is worker owned and shutdown prevents late launches`(
+        action: String,
+        cancel: Boolean,
+        @TempDir directory: Path,
+    ) {
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(cursorBlinkMillis = 0, smartSuggestionsEnabled = false))
+        val settings = KetraTermSettings(configManager)
+        val profile = TerminalProfile("test", "Test", listOf("test-shell"))
+        val entered = CompletableFuture<Unit>()
+        val release = CompletableFuture<Unit>()
+        val started = CompletableFuture<Unit>()
+        val created = AtomicInteger()
+        val closed = CompletableFuture<Unit>()
+        val frame = onEdt { JFrame() }
+        var manager: TabManager? = null
+        try {
+            manager =
+                onEdt {
+                    TabManager(
+                        frame,
+                        TabBar({}, {}, {}, { _, _ -> }, { _, _ -> }, { _, _ -> }),
+                        JPanel(CardLayout()),
+                        settings,
+                        defaultProfileProvider = {
+                            assertFalse(SwingUtilities.isEventDispatchThread())
+                            entered.complete(Unit)
+                            release.get(10, TimeUnit.SECONDS)
+                            profile
+                        },
+                        workspaceFactory = { listener ->
+                            workspace(listener) { options ->
+                                val index = created.incrementAndGet()
+                                idleSession(options, onStart = { if (index == (if (action == "split") 2 else 1)) started.complete(Unit) })
+                            }
+                        },
+                    )
+                }
+            if (action == "split") {
+                val initial = CompletableFuture<Boolean>()
+                onEdt { assertTrue(manager.openTab(profile, onComplete = initial::complete)) }
+                assertTrue(initial.get(10, TimeUnit.SECONDS))
+            }
+            onEdt {
+                if (action ==
+                    "split"
+                ) {
+                    manager.splitPane(requireNotNull(manager.selectedPane), true)
+                } else {
+                    assertTrue(manager.openDefaultTab())
+                }
+            }
+            entered.get(10, TimeUnit.SECONDS)
+            onEdt {
+                assertEquals(if (action == "split") 1 else 0, created.get())
+                if (cancel) manager.closeAllTabsWithoutConfirmation { it.fold(closed::complete, closed::completeExceptionally) }
+            }
+            release.complete(Unit)
+            if (cancel) {
+                closed.get(10, TimeUnit.SECONDS)
+                assertEquals(if (action == "split") 1 else 0, created.get())
+            } else {
+                started.get(10, TimeUnit.SECONDS)
+                assertEquals(if (action == "split") 2 else 1, created.get())
+            }
+        } finally {
+            release.complete(Unit)
+            close(manager, frame, closed)
+        }
+    }
+
     @Test
     fun `pane zoom is temporary and window shortcuts ignore other windows`(
         @TempDir directory: Path,

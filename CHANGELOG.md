@@ -92,6 +92,10 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
   request acceptance. New suspendable `selectedTextAsync()` and `commandOutputTextAsync()`
   queries support host workflows without blocking the EDT. Superseded copies and obsolete
   bindings cannot deliver text; synchronous text queries remain available.
+- System clipboard and browser services offer suspend operations that run native access on workers.
+  Built-in paste and explicit copy actions return request acceptance; pending paste results are
+  rejected after binding changes. Existing custom handlers keep their caller-thread callbacks
+  through default suspend methods and can override them to offload blocking work.
 
 - Render copies reject invalid custom-frame geometry and out-of-range coordinates
   consistently. Failed reader callbacks leave mutable copies invalid while preserving

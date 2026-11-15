@@ -45,6 +45,7 @@ import javax.swing.border.EmptyBorder
 internal class WindowFactory(
     private val settings: KetraTermSettings,
     private val profileRegistry: TerminalProfileRegistry,
+    private val availableProfiles: List<TerminalProfile>,
 ) {
     fun createWindow(): Window {
         val frame =
@@ -71,16 +72,15 @@ internal class WindowFactory(
         lateinit var tabManager: TabManager
         lateinit var tabBar: TabBar
 
-        val availableProfiles = profileRegistry.availableProfiles()
-
         // Builds a fresh configured profile from the current settings each time
         // a new default tab or split is opened. This means shell changes in the
         // Settings dialog take effect on the very next new tab without a restart.
         val defaultProfileProvider: () -> TerminalProfile = {
+            val config = settings.config
             profileRegistry.configuredProfile(
-                shellPath = settings.config.shellPath,
+                shellPath = config.shellPath,
                 workingDirectory =
-                    settings.config.startDirectory
+                    config.startDirectory
                         .takeIf { it.isNotBlank() }
                         ?.let { runCatching { Path.of(it) }.getOrNull() },
             )
@@ -90,8 +90,8 @@ internal class WindowFactory(
             TabBar(
                 onTabSelected = { id -> tabManager.onTabSelected(id) },
                 onTabClose = { id -> tabManager.closeTab(id) },
-                onNewTab = { tabManager.openTab(defaultProfileProvider()) },
-                onMenuClick = { x, y -> showDropdownMenu(frame, tabBar, x, y, availableProfiles, tabManager, defaultProfileProvider) },
+                onNewTab = { tabManager.openDefaultTab() },
+                onMenuClick = { x, y -> showDropdownMenu(frame, tabBar, x, y, availableProfiles, tabManager) },
                 onTabColorChanged = { id, color -> tabManager.onTabColorChanged(id, color) },
                 onTabRenameRequested = { id, newName -> tabManager.onTabRenameRequested(id, newName) },
             )
@@ -143,7 +143,6 @@ internal class WindowFactory(
         y: Int,
         profiles: List<TerminalProfile>,
         tabManager: TabManager,
-        defaultProfileProvider: () -> TerminalProfile,
     ) {
         val popup =
             JPopupMenu().apply {
@@ -162,7 +161,10 @@ internal class WindowFactory(
                         // whose workingDirectory is null (i.e. they carry no explicit
                         // directory preference). Profiles with a profile-level directory
                         // are left untouched.
-                        val configuredDirectory = defaultProfileProvider().workingDirectory
+                        val configuredDirectory =
+                            settings.config.startDirectory
+                                .takeIf(String::isNotBlank)
+                                ?.let { runCatching { Path.of(it) }.getOrNull() }
                         val effectiveProfile =
                             if (profile.workingDirectory == null && configuredDirectory != null) {
                                 profile.copy(workingDirectory = configuredDirectory)

@@ -24,9 +24,7 @@ import javax.swing.SwingUtilities
  * Starts the KetraTerm standalone terminal application.
  */
 fun main(args: Array<String>) {
-    SwingUtilities.invokeLater {
-        KetraTermApp.start(args.toList())
-    }
+    KetraTermApp.start(args.toList())
 }
 
 /** Packaged standalone version, shared by the About dialog and companion CLI. */
@@ -38,22 +36,15 @@ internal val appVersion: String by lazy {
 
 private object KetraTermApp {
     fun start(args: List<String>) {
-        KetraTermLookAndFeel.install()
-
         val settings =
             io.github.ketraterm.app.config
                 .KetraTermSettings()
-        io.github.ketraterm.app.ui.Chrome
-            .applyPalette(settings.current().palette)
         val profileRegistry =
             TerminalProfileRegistry(
                 commandPromptDisplayName = appMessages.text("profile.commandPrompt"),
                 defaultShellDisplayName = appMessages.text("profile.defaultShell"),
             )
-        val windowFactory =
-            io.github.ketraterm.app.ui
-                .WindowFactory(settings, profileRegistry)
-        val window = windowFactory.createWindow()
+        val availableProfiles = profileRegistry.availableProfiles()
 
         // The initial profile carries the CLI shell command when args are given,
         // or defaults to the first available profile. Either way, stamp the
@@ -79,6 +70,16 @@ private object KetraTermApp {
                     workingDirectory = initialWorkingDirectory,
                 )
             }
-        window.openInitialTab(initialProfile)
+        // Configuration and discovery run on the launcher thread, before entering Swing.
+        SwingUtilities.invokeLater {
+            KetraTermLookAndFeel.install()
+            io.github.ketraterm.app.ui.Chrome
+                .applyPalette(settings.current().palette)
+            val window =
+                io.github.ketraterm.app.ui
+                    .WindowFactory(settings, profileRegistry, availableProfiles)
+                    .createWindow()
+            window.openInitialTab(initialProfile)
+        }
     }
 }

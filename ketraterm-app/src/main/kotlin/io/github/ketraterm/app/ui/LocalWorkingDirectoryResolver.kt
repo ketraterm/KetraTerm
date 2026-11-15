@@ -56,7 +56,7 @@ internal object LocalWorkingDirectoryResolver {
             .lowercase(Locale.ROOT)
             .contains("windows")
 
-    private val localAuthorities: Set<String> =
+    private val localAuthorities: Set<String> by lazy {
         buildSet {
             add("localhost")
             add("127.0.0.1")
@@ -77,4 +77,5 @@ internal object LocalWorkingDirectoryResolver {
                 ?.lowercase(Locale.ROOT)
                 ?.let(::add)
         }
+    }
 }

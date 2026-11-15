@@ -41,6 +41,53 @@ import kotlin.time.Duration.Companion.seconds
 
 class SwingTerminalTextExtractionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["clear", "unbind", "dispose", "replace"])
+    fun `selection changes cancel a copy waiting for native clipboard admission`(transition: String) {
+        val entered = CompletableFuture<Unit>()
+        val released = CompletableDeferred<Unit>()
+        val finished = CompletableFuture<Unit>()
+        val copied = mutableListOf<String>()
+        val clipboard =
+            object : TerminalClipboardHandler {
+                override fun copyText(text: String) {
+                    copied += text
+                }
+
+                override fun readText(): String? = null
+
+                override suspend fun copyTextAsync(text: String) {
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    entered.complete(Unit)
+                    try {
+                        released.await()
+                        copyText(text)
+                    } finally {
+                        finished.complete(Unit)
+                    }
+                }
+            }
+        Fixture(clipboard = clipboard).use { fixture ->
+            try {
+                edtCall { assertTrue(fixture.view.copySelectionToClipboard()) }
+                entered.get(10, TimeUnit.SECONDS)
+                edtCall {
+                    when (transition) {
+                        "clear" -> fixture.view.clearSelection()
+                        "unbind" -> fixture.view.unbind()
+                        "dispose" -> fixture.view.dispose()
+                        "replace" -> assertTrue(fixture.view.setSelection(assertNotNull(fixture.view.createSelectionRange(0, 1, 4, 1))))
+                    }
+                }
+                finished.get(10, TimeUnit.SECONDS)
+                released.complete(Unit)
+                edtCall { assertTrue(copied.isEmpty()) }
+            } finally {
+                released.complete(Unit)
+            }
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource(
         "selection,deliver",
         "command,deliver",
@@ -133,6 +180,7 @@ class SwingTerminalTextExtractionTest {
 
     private class Fixture(
         private val block: Boolean = false,
+        clipboard: TerminalClipboardHandler? = null,
     ) : AutoCloseable {
         val worker = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         private val scheduler = StandardTestDispatcher()
@@ -207,7 +255,7 @@ class SwingTerminalTextExtractionTest {
                         SwingHostServices.create {
                             it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
                             it.clipboardHandler =
-                                object : TerminalClipboardHandler {
+                                clipboard ?: object : TerminalClipboardHandler {
                                     override fun copyText(text: String) {
                                         assertTrue(SwingUtilities.isEventDispatchThread())
                                         copies += text

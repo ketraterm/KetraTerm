@@ -1173,12 +1173,12 @@ class SwingTerminalInteractionSettingsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `paste reports rejection before session startup`(suppliedText: Boolean) =
+    fun `paste never submits input before session startup`(suppliedText: Boolean) =
         fixture(startSession = false) {
             var invalidations = 0
             view.addShellSuggestionInvalidationListener { invalidations++ }
 
-            assertFalse(paste(suppliedText))
+            assertEquals(!suppliedText, paste(suppliedText))
             assertEquals(1, invalidations)
             assertEquals(if (suppliedText) 0 else 1, reads)
             dispatcher.scheduler.runCurrent()
@@ -1204,12 +1204,12 @@ class SwingTerminalInteractionSettingsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `paste reports rejection when the bulk operation queue is full`(suppliedText: Boolean) =
+    fun `paste never submits input when the bulk operation queue is full`(suppliedText: Boolean) =
         fixture {
             repeat(16) {
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("queued")))
             }
-            assertFalse(paste(suppliedText))
+            assertEquals(!suppliedText, paste(suppliedText))
             assertEquals(if (suppliedText) 0 else 1, reads)
             assertTrue(session.isClosed)
             dispatcher.scheduler.runCurrent()
@@ -1272,10 +1272,10 @@ class SwingTerminalInteractionSettingsTest {
             assertFalse(view.pasteText(""))
             assertEquals(0, reads)
             clipboardText = ""
-            assertFalse(view.pasteClipboardText())
+            assertTrue(view.pasteClipboardText())
             clipboardAvailable = false
             clipboardText = "unavailable"
-            assertFalse(view.pasteClipboardText())
+            assertTrue(view.pasteClipboardText())
 
             assertEquals(0, invalidations)
             assertEquals(2, reads)
@@ -1305,7 +1305,7 @@ class SwingTerminalInteractionSettingsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `paste invalidation failures propagate without submitting input`(suppliedText: Boolean) =
+    fun `paste invalidation failures never submit input`(suppliedText: Boolean) =
         fixture {
             val failure = IllegalStateException("invalidation failed")
             var invalidations = 0
@@ -1316,7 +1316,11 @@ class SwingTerminalInteractionSettingsTest {
                 throw failure
             }
 
-            assertSame(failure, assertThrows(IllegalStateException::class.java) { paste(suppliedText) })
+            if (suppliedText) {
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { paste(true) })
+            } else {
+                assertTrue(paste(false))
+            }
             assertEquals(1, invalidations)
             assertEquals(if (suppliedText) 0 else 1, reads)
             dispatcher.scheduler.runCurrent()
@@ -1344,7 +1348,7 @@ class SwingTerminalInteractionSettingsTest {
                         }
                     }
 
-                    assertFalse(paste(suppliedText), "suppliedText=$suppliedText")
+                    assertEquals(!suppliedText, paste(suppliedText), "suppliedText=$suppliedText")
                     assertEquals(1, invalidations)
                     assertEquals(if (suppliedText) 0 else 1, reads)
                     dispatcher.scheduler.runCurrent()
@@ -1369,7 +1373,7 @@ class SwingTerminalInteractionSettingsTest {
                 view.addShellSuggestionInvalidationListener { invalidations++ }
                 onRead = { view.bind(replacement) }
 
-                assertFalse(view.pasteClipboardText())
+                assertTrue(view.pasteClipboardText())
                 assertEquals(1, reads)
                 assertEquals(0, invalidations)
                 dispatcher.scheduler.runCurrent()

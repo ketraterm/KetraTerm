@@ -46,6 +46,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     activation: SwingHyperlinkActivation = SwingHyperlinkActivation.DIRECT,
     private var osc8Presentation: SwingHyperlinkPresentation? = null,
     hostPolicy: HostPolicy = HostPolicy(),
+    hyperlinkHandler: TerminalHyperlinkHandler? = null,
 ) : AutoCloseable {
     private val worker = StandardTestDispatcher()
     private val uiTasks = LinkedBlockingQueue<Runnable>()
@@ -87,7 +88,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.uiDispatcher = { uiTasks.add(it) }
-                        draft.hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }
+                        draft.hyperlinkHandler = hyperlinkHandler ?: TerminalHyperlinkHandler { opened.add(it) }
                         draft.hyperlinkDetector = { request ->
                             check(!SwingUtilities.isEventDispatchThread())
                             detectorCalls.incrementAndGet()

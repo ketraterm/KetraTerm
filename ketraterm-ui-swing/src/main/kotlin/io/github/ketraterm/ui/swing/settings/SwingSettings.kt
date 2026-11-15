@@ -282,7 +282,7 @@ public class SwingSettings private constructor(
      * Copies a nonempty selection once when a local primary-button gesture completes.
      * Defaults to false and uses the supplied clipboard handler.
      * The gesture captures this value at press. Programmatic changes never trigger copying.
-     * Clipboard callbacks run on the EDT. Failures propagate after gesture cleanup.
+     * Host suspend callbacks start on the EDT; system access runs on a worker. Asynchronous failures are logged.
      */
     public val copyOnSelection: Boolean = builder.copyOnSelection
 
@@ -292,7 +292,8 @@ public class SwingSettings private constructor(
      * unless XTSHIFTESCAPE requests capture.
      * Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard.
      * Without a [io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler],
-     * clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access
+     * suspend clipboard callbacks start on the EDT; the system service reads on a worker and failures are logged.
+     * A supplied hook owns clipboard access
      * and may complete later. Changing this setting does not cancel requests already issued to a hook.
      */
     public val middleClickPaste: Boolean = builder.middleClickPaste

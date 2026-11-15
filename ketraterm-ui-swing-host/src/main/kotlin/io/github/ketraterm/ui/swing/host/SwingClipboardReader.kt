@@ -83,9 +83,9 @@ public class SwingClipboardReader(
                         'c', 's' -> {
                             if (clipboardTried) continue
                             clipboardTried = true
-                            clipboard.readText()
+                            clipboard.readTextAsync()
                         }
-                        'p' -> clipboard.readPrimarySelectionText()
+                        'p' -> clipboard.readPrimarySelectionTextAsync()
                         else -> continue
                     }
                 currentCoroutineContext().ensureActive()

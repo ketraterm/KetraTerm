@@ -31,8 +31,8 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.*
+import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
@@ -49,9 +49,11 @@ import javax.swing.border.EmptyBorder
 internal class SettingsDialog(
     parent: JFrame,
     private val settings: KetraTermSettings,
-    profileRegistry: TerminalProfileRegistry,
+    private val profileRegistry: TerminalProfileRegistry,
     private val resetCompletionLearning: () -> Deferred<Unit>,
+    private val profileDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : JDialog(parent, appMessages.text("settings.title"), true) {
+    private val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Swing.immediate)
     private var learningResetObserver: DisposableHandle? = null
     private val resetLearningButton =
         JButton(appMessages.text("settings.resetLearning")).apply {
@@ -125,7 +127,8 @@ internal class SettingsDialog(
         applySizing(this, width)
     }
 
-    private val availableProfiles = profileRegistry.availableProfiles()
+    private var availableProfiles = emptyList<TerminalProfile>()
+    private var refreshingProfiles = false
     private val matchedProfile = findProfile(settings.config.shellPath)
     private val isCustomShell = matchedProfile == null
 
@@ -341,6 +344,7 @@ internal class SettingsDialog(
         JCheckBox(appMessages.text("settings.allowTitle"), settings.config.titlePermission == TerminalTitlePermission.ALLOW)
 
     init {
+        refreshProfiles()
         size = Dimension(820, 600)
         setLocationRelativeTo(parent)
         layout = BorderLayout()
@@ -911,6 +915,31 @@ internal class SettingsDialog(
 
     private fun findProfile(shellPath: String): TerminalProfile? = availableProfiles.firstOrNull { it.command.firstOrNull() == shellPath }
 
+    private fun refreshProfiles() {
+        profileScope.launch {
+            try {
+                val discovered = withContext(profileDispatcher) { profileRegistry.availableProfiles() }
+                val selected = selectedShellPath()
+                refreshingProfiles = true
+                availableProfiles = discovered
+                shellPathCombo.removeAllItems()
+                discovered.forEach(shellPathCombo::addItem)
+                shellPathCombo.addItem(appMessages.text("settings.custom"))
+                selectShell(selected)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                System
+                    .getLogger(
+                        SettingsDialog::class.java.name,
+                    ).log(System.Logger.Level.WARNING, "Shell profile discovery failed", failure)
+            } finally {
+                refreshingProfiles = false
+                if (isActive) updateApplyButtonState()
+            }
+        }
+    }
+
     private fun selectShell(shellPath: String) {
         val profile = findProfile(shellPath)
         shellPathCombo.selectedItem = profile ?: appMessages.text("settings.custom")
@@ -1072,6 +1101,7 @@ internal class SettingsDialog(
 
     override fun dispose() {
         if (!saving) {
+            profileScope.cancel()
             learningResetObserver?.dispose()
             learningResetObserver = null
             super.dispose()
@@ -1079,6 +1109,7 @@ internal class SettingsDialog(
     }
 
     private fun updateApplyButtonState() {
+        if (refreshingProfiles) return
         val hasChanges = model.hasChanges(getUiState())
         applyButton.isEnabled = !saving && hasChanges
         if (hasChanges) {
@@ -1093,14 +1124,13 @@ internal class SettingsDialog(
         applyButton.repaint()
     }
 
-    private fun getUiState(): KetraTermConfig {
+    private fun selectedShellPath(): String {
         val selected = shellPathCombo.selectedItem
-        val nextShellPath =
-            if (selected is TerminalProfile) {
-                selected.command.firstOrNull() ?: ""
-            } else {
-                customShellField.text
-            }
+        return if (selected is TerminalProfile) selected.command.firstOrNull().orEmpty() else customShellField.text
+    }
+
+    private fun getUiState(): KetraTermConfig {
+        val nextShellPath = selectedShellPath()
         val current = settings.config
         val popupKeysChanged =
             popupAcceptKeys.shortcuts !=

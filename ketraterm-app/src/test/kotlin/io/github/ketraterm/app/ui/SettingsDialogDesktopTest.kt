@@ -27,10 +27,11 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAutomaticMode
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.*
 import java.awt.event.*
 import java.awt.image.BufferedImage
@@ -38,6 +39,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -50,6 +52,49 @@ import kotlin.test.assertTrue
 
 @Tag("desktop")
 class SettingsDialogDesktopTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `blocked profile discovery preserves edits and ignores disposed dialogs`(dispose: Boolean) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        val dispatcher = executor.asCoroutineDispatcher()
+        val registry =
+            TerminalProfileRegistry(osName = "Linux", environment = mapOf("PATH" to "/bin"), executableExists = {
+                assertFalse(SwingUtilities.isEventDispatchThread())
+                entered.countDown()
+                check(release.await(10, TimeUnit.SECONDS))
+                it.fileName.toString() == "bash"
+            })
+        try {
+            withDialog(profileRegistry = registry, shellPath = "original-shell", profileDispatcher = dispatcher) { _, dialog, _ ->
+                assertTrue(entered.await(10, TimeUnit.SECONDS))
+                val shell =
+                    onEdt {
+                        val field = components(dialog).filterIsInstance<JTextField>().single { it.text == "original-shell" }
+                        field.text = "typed-shell"
+                        if (dispose) dialog.dispose()
+                        field
+                    }
+                release.countDown()
+                executor.submit {}.get(10, TimeUnit.SECONDS)
+                onEdt {
+                    assertEquals("typed-shell", shell.text)
+                    val profiles = mutableListOf<io.github.ketraterm.workspace.TerminalProfile>()
+                    for (combo in components(dialog).filterIsInstance<JComboBox<*>>()) {
+                        for (index in 0 until combo.itemCount) {
+                            (combo.getItemAt(index) as? io.github.ketraterm.workspace.TerminalProfile)?.let(profiles::add)
+                        }
+                    }
+                    assertEquals(if (dispose) emptyList() else listOf("Bash"), profiles.map { it.displayName })
+                }
+            }
+        } finally {
+            release.countDown()
+            dispatcher.close()
+        }
+    }
+
     @Test
     fun `suggestions page contains only its controls and fits the standard dialog`() {
         withDialog(configure = {
@@ -404,7 +449,8 @@ class SettingsDialogDesktopTest {
                         frame,
                         settings,
                         TerminalProfileRegistry(executableExists = { false }),
-                    ) { error("Unexpected learning reset") }
+                        resetCompletionLearning = { error("Unexpected learning reset") },
+                    )
                 dialog.addWindowListener(
                     object : WindowAdapter() {
                         override fun windowClosed(event: WindowEvent) {
@@ -646,6 +692,7 @@ class SettingsDialogDesktopTest {
         fontFamily: String = KetraTermConfig.DEFAULT_FONT_FAMILY,
         resetLearning: () -> Deferred<Unit> = { error("Unexpected learning reset") },
         configure: (KetraTermConfig) -> KetraTermConfig = { it },
+        profileDispatcher: CoroutineDispatcher = Dispatchers.IO,
         block: (KetraTermSettings, SettingsDialog, CountDownLatch) -> Unit,
     ) {
         assumeFalse(GraphicsEnvironment.isHeadless())
@@ -673,7 +720,7 @@ class SettingsDialogDesktopTest {
         val (frame, dialog) =
             onEdt {
                 val frame = JFrame()
-                val dialog = SettingsDialog(frame, settings, profileRegistry, resetLearning)
+                val dialog = SettingsDialog(frame, settings, profileRegistry, resetLearning, profileDispatcher)
                 dialog.addWindowListener(
                     object : WindowAdapter() {
                         override fun windowClosed(event: WindowEvent) {

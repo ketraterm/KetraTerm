@@ -226,7 +226,9 @@ lasts for the pane's lifetime.
 Use one `SwingClipboardReader` per window. Call its suspending `read` on the EDT
 with the requesting pane's prompt, message, and clipboard handler, after earlier
 posted clipboard writes. It enforces admitted permission and reads native
-clipboard data on its I/O dispatcher. Busy prompts are denied; a busy native
+clipboard data through the handler's suspend operations on its I/O dispatcher.
+The system handler serializes these reads with earlier asynchronous writes.
+Busy prompts are denied; a busy native
 read is unavailable. Only one native read runs across reader instances, and a
 cancelled blocking call keeps that slot until it returns. The session owns the
 request deadline, permission revocation, and response serialization.

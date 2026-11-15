@@ -233,7 +233,7 @@ internal data class KetraTermConfig(
         val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
 
         val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()
-        val DEFAULT_SHELL_PATH: String get() = defaultShellPath()
+        val DEFAULT_SHELL_PATH: String by lazy { defaultShellPath() }
         val DEFAULT_START_DIRECTORY: String get() = System.getProperty("user.home") ?: ""
 
         // Limits

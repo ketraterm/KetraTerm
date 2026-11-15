@@ -25,15 +25,85 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.*
+import kotlinx.coroutines.swing.Swing
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import javax.swing.SwingUtilities
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 class TerminalPasteClipboardTest {
+    @ParameterizedTest
+    @CsvSource("false,approve", "true,approve", "false,deny", "true,cancel")
+    fun `native reads precede EDT consent and cancellation prevents late prompts`(
+        primary: Boolean,
+        decision: String,
+    ) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val worker = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        val scope = CoroutineScope(Job() + Dispatchers.Swing.immediate)
+        var prompts = 0
+        val source =
+            object : TerminalClipboardHandler {
+                override fun copyText(text: String) = error("Unexpected write")
+
+                override fun readText(): String = error("Synchronous read must not be used")
+
+                override suspend fun readTextAsync(): String {
+                    assertFalse(primary)
+                    return load()
+                }
+
+                override suspend fun readPrimarySelectionTextAsync(): String {
+                    assertTrue(primary)
+                    return load()
+                }
+
+                private suspend fun load(): String =
+                    withContext(worker) {
+                        assertFalse(SwingUtilities.isEventDispatchThread())
+                        entered.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                        "unsafe\ntext"
+                    }
+            }
+        val clipboard =
+            TerminalPasteClipboard(source) {
+                assertTrue(SwingUtilities.isEventDispatchThread())
+                prompts++
+                decision == "approve"
+            }
+        try {
+            val result = onEdt { scope.async { if (primary) clipboard.readPrimarySelectionTextAsync() else clipboard.readTextAsync() } }
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            onEdt {
+                assertEquals(0, prompts)
+                if (decision == "cancel") result.cancel()
+            }
+            release.countDown()
+            runBlocking {
+                withTimeout(10.seconds) {
+                    if (decision == "cancel") {
+                        result.join()
+                        assertTrue(result.isCancelled)
+                    } else {
+                        assertEquals(if (decision == "approve") "unsafe\ntext" else null, result.await())
+                    }
+                }
+            }
+            onEdt { assertEquals(if (decision == "cancel") 0 else 1, prompts) }
+        } finally {
+            release.countDown()
+            scope.cancel()
+            worker.close()
+        }
+    }
+
     @Test
     fun `ordinary text including tabs pastes without a prompt`() {
         val source = Clipboard("git status\t工程 😀")
@@ -173,7 +243,7 @@ class TerminalPasteClipboardTest {
                     terminal.bind(session, bound::complete)
                 }
                 assertNull(bound.get(10, TimeUnit.SECONDS))
-                onEdt { assertEquals(decision == "approve", terminal.pasteClipboardText()) }
+                onEdt { assertTrue(terminal.pasteClipboardText()) }
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("barrier")))
                 assertEquals(if (decision == "approve") "unsafe\ntextbarrier" else "barrier", received.get(10, TimeUnit.SECONDS))
             } finally {

@@ -182,7 +182,7 @@ internal class TabManager(
                         when (keyCode) {
                             KeyEvent.VK_T -> {
                                 if (!isShiftPressed) {
-                                    openTab(defaultProfileProvider())
+                                    openDefaultTab()
                                     return@KeyEventDispatcher true
                                 }
                             }
@@ -210,7 +210,7 @@ internal class TabManager(
                     if (isCtrlPressed && isShiftPressed && !hasAlt) {
                         when (keyCode) {
                             KeyEvent.VK_T -> {
-                                openTab(defaultProfileProvider())
+                                openDefaultTab()
                                 return@KeyEventDispatcher true
                             }
                             KeyEvent.VK_W -> {
@@ -296,14 +296,16 @@ internal class TabManager(
         onComplete: (Boolean) -> Unit = {},
     ): Boolean =
         startTab(
-            profile,
+            { profile },
             beforeStart = beforeStart,
             onComplete = onComplete,
-        ) { workspaceTab, onBound -> installTab(workspaceTab, profile, onBound) }
+        ) { workspaceTab, onBound -> installTab(workspaceTab, onBound) }
+
+    /** Resolves the configured shell on the workspace startup worker. */
+    fun openDefaultTab(): Boolean = startTab(defaultProfileProvider, install = ::installTab)
 
     private fun installTab(
         workspaceTab: TerminalWorkspaceTab,
-        profile: TerminalProfile,
         onBound: (Throwable?) -> Unit,
     ) {
         val createdPane = createTerminalPane(workspaceTab, onBound)
@@ -322,14 +324,14 @@ internal class TabManager(
         tabContainers[tabId] = container
 
         tabContentPanel.add(container, tabId)
-        tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = profile.kind))
+        tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = workspaceTab.profile.kind))
         showPane(tabId)
         updateFrameTitle()
         createdPane.requestFocus()
     }
 
     private fun startTab(
-        profile: TerminalProfile,
+        profile: () -> TerminalProfile,
         isCurrent: () -> Boolean = { true },
         beforeStart: ((Throwable?) -> Unit) -> Unit = { complete -> complete(null) },
         onComplete: (Boolean) -> Unit = {},
@@ -352,6 +354,7 @@ internal class TabManager(
             }
         var publishedTab: TerminalWorkspaceTab? = null
         var installedPane: TerminalPane? = null
+        var resolvedProfile: TerminalProfile? = null
 
         // A removed pane means intentional cancellation, whereas failed installation still needs an error.
         fun startupIsCurrent(): Boolean = isCurrent() && (installedPane?.let { it in panes } ?: true)
@@ -359,7 +362,10 @@ internal class TabManager(
             workspace.openTabAsync(
                 profile = {
                     check(!shutdownStarted.get()) { "Terminal startup was cancelled" }
-                    val prepared = cli.prepare(profile).let { it.copy(startupCommand = it.startupCommand ?: startupCommand) }
+                    val selectedProfile = profile()
+                    resolvedProfile = selectedProfile
+                    check(!shutdownStarted.get()) { "Terminal startup was cancelled" }
+                    val prepared = cli.prepare(selectedProfile).let { it.copy(startupCommand = it.startupCommand ?: startupCommand) }
                     publishStartingTab = { tab ->
                         val ready = CompletableFuture<Unit>()
 
@@ -453,12 +459,12 @@ internal class TabManager(
                     val failure = result.exceptionOrNull()
                     if (failure != null) {
                         publishedTab?.let { tab -> panes.firstOrNull { it.tab === tab }?.let(::closePane) }
-                        showStartError(profile, failure)
+                        showStartError(resolvedProfile, failure)
                     }
                     onComplete(failure == null)
                 }
             }
-        if (!accepted) showStartError(profile, IllegalStateException("Terminal startup queue is full or shutting down"))
+        if (!accepted) showStartError(null, IllegalStateException("Terminal startup queue is full or shutting down"))
         return accepted
     }
 
@@ -661,8 +667,7 @@ internal class TabManager(
         isVertical: Boolean,
     ) {
         val tabId = tabBar.selectedId() ?: return
-        val profile = defaultProfileProvider()
-        startTab(profile, isCurrent = { tabRoots[tabId]?.findPane(pane.tab.id) === pane }) { workspaceTab, onBound ->
+        startTab(defaultProfileProvider, isCurrent = { tabRoots[tabId]?.findPane(pane.tab.id) === pane }) { workspaceTab, onBound ->
             installSplit(tabId, pane, isVertical, workspaceTab, onBound)
         }
     }
@@ -768,7 +773,7 @@ internal class TabManager(
                 return
             }
             if (openReplacementWhenLastPane && tabRoots.isEmpty()) {
-                openTab(defaultProfileProvider())
+                openDefaultTab()
             }
             return
         }
@@ -896,16 +901,14 @@ internal class TabManager(
         }
         menu.addSeparator()
 
-        val workingDirectory = LocalWorkingDirectoryResolver.resolve(pane.tab.currentWorkingDirectoryUri)
+        val directoryUri = pane.tab.currentWorkingDirectoryUri
         val openHereItem =
-            JMenuItem(appMessages.text("menu.openTerminalHere")).apply {
-                isEnabled = workingDirectory != null
-                toolTipText = if (workingDirectory == null) appMessages.text("menu.noDirectory") else null
-                addActionListener {
-                    val directory = workingDirectory ?: return@addActionListener
-                    openTab(pane.tab.profile.copy(workingDirectory = directory))
-                }
-            }
+            LocalDirectoryMenuItem(
+                menu,
+                directoryUri,
+                isCurrent = { !shutdownStarted.get() && pane in panes && pane.tab.currentWorkingDirectoryUri == directoryUri },
+                open = { directory -> openTab(pane.tab.profile.copy(workingDirectory = directory)) },
+            )
         menu.add(openHereItem)
         menu.addSeparator()
 
@@ -1108,13 +1111,13 @@ internal class TabManager(
     }
 
     private fun showStartError(
-        profile: TerminalProfile,
+        profile: TerminalProfile?,
         exception: Throwable,
     ) {
         SwingMessageDialogs.show(
             frame,
             SwingDialogRequest(
-                appMessages.text("startup.errorTitle", profile.displayName),
+                appMessages.text("startup.errorTitle", profile?.displayName ?: appMessages.text("profile.defaultShell")),
                 exception.message ?: exception.javaClass.name,
                 SwingDialogRequest.Severity.ERROR,
                 options = listOf(appMessages.text("button.ok")),
