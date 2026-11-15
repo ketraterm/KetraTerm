@@ -16,22 +16,83 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellIntegration
-import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.*
 import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.testkit.MockConnector
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StandaloneSuggestionFixtureTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `exit confirms the editor after cancelling suggestions`(replyBeforeExit: Boolean) =
+        runTest {
+            val connector = MockConnector()
+            var completion: TerminalShellCompletionChannel? = null
+            val integration =
+                TerminalShellIntegrationFactory { context ->
+                    completion = context.shellCompletion
+                    OscShellIntegration.create(context)
+                }
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(100, 24),
+                    connector,
+                    shellIntegration = integration,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
+                ).use { session ->
+                    session.start()
+                    connector.feedFromHost("\u001b]133;A\u0007PS> \u001b]133;B\u0007git status".encodeToByteArray())
+                    runCurrent()
+                    val channel = assertNotNull(completion)
+                    channel.ready(
+                        "epoch",
+                        requestInput = { listOf(TerminalKeyEvent.text("query$it")) },
+                        confirmationInput = { listOf(TerminalKeyEvent.text("confirm$it")) },
+                    )
+                    val original = assertNotNull(session.captureCommandEdit())
+                    val query = async { session.requestShellCompletions(original) }
+                    runCurrent()
+                    assertEquals("query1", connector.writtenBytes.toString(Charsets.UTF_8))
+                    query.cancelAndJoin()
+
+                    fun retireCancelledQuery() {
+                        channel.respond("epoch", 1, null)
+                        connector.feedFromHost("\u001b]633;completion metadata\u0007".encodeToByteArray())
+                    }
+                    if (replyBeforeExit) {
+                        retireCancelledQuery()
+                        runCurrent()
+                    }
+                    val exit = async { StandaloneSuggestionFixture.submitExit(session) }
+                    runCurrent()
+                    if (!replyBeforeExit) {
+                        assertFalse(exit.isCompleted)
+                        assertEquals("query1", connector.writtenBytes.toString(Charsets.UTF_8))
+                        retireCancelledQuery()
+                        runCurrent()
+                    }
+                    assertEquals("query1confirm2", connector.writtenBytes.toString(Charsets.UTF_8))
+                    assertFalse(exit.isCompleted, "Exit must await native proof rather than bypass conditional admission")
+
+                    channel.respond("epoch", 2, TerminalShellCompletionResult("git status", 10, 10, 10, emptyList()))
+                    connector.feedFromHost("\u001b]633;completion metadata\u0007".encodeToByteArray())
+                    runCurrent()
+                    assertTrue(exit.isCompleted)
+                    exit.await()
+                    assertEquals("query1confirm2" + "\u007f".repeat(10) + "exit\r", connector.writtenBytes.toString(Charsets.UTF_8))
+                }
+        }
+
     @Test
     fun `line wait resumes when a cursor report drains after the final prompt frame`() =
         runTest {
