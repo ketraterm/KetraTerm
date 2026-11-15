@@ -17,8 +17,6 @@ package io.github.ketraterm.ui.swing.viewport
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
-import io.github.ketraterm.session.TerminalShellIntegrationView
 import io.github.ketraterm.ui.swing.api.TerminalViewportListener
 import io.github.ketraterm.ui.swing.api.TerminalViewportState
 import io.github.ketraterm.ui.swing.render.PromptDividerLayout
@@ -52,16 +50,16 @@ internal class SwingViewportController(
             if (!value) finishScroll()
         }
 
-    private val dividerLayout = PromptDividerLayout()
+    private var dividerLayout = PromptDividerLayout()
     private var dividersEnabled = false
     private var resizeAnchorRow = Long.MIN_VALUE
     private var resizeAnchorLineId = 0L
+    val promptAnchorLineId: Long get() = resizeAnchorLineId
     val promptDividers: PromptDividerLayout? get() = if (dividersEnabled) dividerLayout else null
 
     /** Reconciles presentation history without changing the terminal grid or copying cell content. */
     fun updatePromptDividers(
-        reader: TerminalRenderFrameReader,
-        state: TerminalShellIntegrationView,
+        layout: PromptDividerLayout?,
         enabled: Boolean,
         visibleRows: Int,
         sourceHistorySize: Int,
@@ -69,6 +67,7 @@ internal class SwingViewportController(
         scrollOnOutput: Boolean,
         retainedOutput: Boolean,
     ) {
+        if (enabled && layout == null) return
         val oldLayout = promptDividers
         val oldOffset = preciseOffset
         val oldRenderOffset = requestedOffset
@@ -78,7 +77,7 @@ internal class SwingViewportController(
         val inRow = if (anchorRow == null) 0.0 else topSlot - oldLayout.rowBoundary(anchorRow)
         dividersEnabled = enabled
         if (enabled) {
-            dividerLayout.updateFrom(reader, state, visibleRows, retainedOutput, resizeAnchorLineId)
+            dividerLayout = checkNotNull(layout)
             // Reflow can advance the live top without new output. Apply the pending resize
             // anchor before resuming ordinary output-following on subsequent updates.
             val outputAdvanced = resizeAnchorRow == Long.MIN_VALUE && oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
@@ -114,7 +113,7 @@ internal class SwingViewportController(
                     (oldLayout.discardedCount + presentationHistory - anchorRow).coerceIn(0, presentationHistory.toLong()).toInt()
                 }
             scrollModel.anchorAfterResize(offset, presentationHistory, oldLayout.discardedCount)
-            dividerLayout.reset()
+            dividerLayout = PromptDividerLayout()
         }
         resizeAnchorRow = Long.MIN_VALUE
         resizeAnchorLineId = 0
@@ -168,7 +167,7 @@ internal class SwingViewportController(
         dividersEnabled = false
         resizeAnchorRow = Long.MIN_VALUE
         resizeAnchorLineId = 0
-        dividerLayout.reset()
+        dividerLayout = PromptDividerLayout()
     }
 
     /** Accumulates precise device input into whole-row destinations. */

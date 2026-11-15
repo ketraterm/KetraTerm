@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -25,16 +26,63 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.lang.Runnable
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoverySchedulingTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["scan", "validation"])
+    fun `blocked source work leaves EDT responsive and reset discards its result`(phase: String) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        Fixture().use { fixture ->
+            Executors.newSingleThreadExecutor().use { executor ->
+                try {
+                    fixture.show(URL)
+                    fixture.drainUi()
+                    if (phase == "scan") {
+                        fixture.completeAnalysis()
+                        fixture.onEdt { fixture.controller.reset() }
+                        fixture.worker.runCurrent()
+                        fixture.drainUi()
+                        fixture.show(URL)
+                        fixture.drainUi()
+                    } else {
+                        fixture.worker.runCurrent() // Complete detection; validation is the next worker phase.
+                        fixture.drainUi()
+                    }
+                    fixture.beforeSourceRead = {
+                        assertFalse(SwingUtilities.isEventDispatchThread(), "Live source reads must stay on the worker")
+                        entered.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                    }
+                    val work = executor.submit { fixture.worker.runCurrent() }
+                    assertTrue(entered.await(10, TimeUnit.SECONDS))
+                    val heartbeat =
+                        FutureTask {
+                            fixture.controller.reset()
+                            assertFalse(fixture.openAt(0))
+                        }
+                    SwingUtilities.invokeLater(heartbeat)
+                    heartbeat.get(10, TimeUnit.SECONDS)
+                    release.countDown()
+                    work.get(10, TimeUnit.SECONDS)
+                    fixture.drainUi()
+                    fixture.onEdt { assertFalse(fixture.openAt(0), "Obsolete source work cannot restore an action") }
+                    fixture.beforeSourceRead = { assertFalse(SwingUtilities.isEventDispatchThread()) }
+                    fixture.show(URL)
+                    fixture.completeAnalysis()
+                    fixture.onEdt { assertTrue(fixture.openAt(0)) }
+                } finally {
+                    release.countDown()
+                }
+            }
+        }
+    }
+
     @Test
     fun `absent source is inactive and unbinding cancels detection and retires actions`() {
         val gate = CompletableDeferred<Unit>()
@@ -745,6 +793,8 @@ class TerminalHyperlinkDiscoverySchedulingTest {
                         val invocation = invocations.incrementAndGet()
                         if (invocation == 1) {
                             entered.countDown()
+                            // Deliberately block the dedicated executor to model a synchronous detector during reset.
+                            @Suppress("BlockingMethodInNonBlockingContext")
                             assertTrue(release.await(3, TimeUnit.SECONDS), "Test did not release the original detector")
                         }
                         assertEquals("$URL\n", request.lineText(0))
@@ -972,6 +1022,24 @@ class TerminalHyperlinkDiscoverySchedulingTest {
     ) : AutoCloseable {
         val cache = TerminalRenderCache(COLUMNS, 1)
         private val source = TerminalHyperlinkTestSource(cache)
+
+        @Volatile var beforeSourceRead: () -> Unit = { assertFalse(SwingUtilities.isEventDispatchThread()) }
+        private val reader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    beforeSourceRead()
+                    source.readRenderFrame(consumer)
+                }
+
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    beforeSourceRead()
+                    source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+                }
+            }
         val uiDispatcher = StandardTestDispatcher()
         val worker = QueuedDispatcher()
         val opened = ArrayList<String>()
@@ -990,7 +1058,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         private val host =
             object : TerminalHyperlinkDiscoveryHost {
                 override val renderCache = cache
-                override val hyperlinkSource get() = source.takeIf { sourceBound }
+                override val hyperlinkSource get() = reader.takeIf { sourceBound }
                 override val hyperlinkDetector =
                     object : SwingHyperlinkDetector by delegate {
                         override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =

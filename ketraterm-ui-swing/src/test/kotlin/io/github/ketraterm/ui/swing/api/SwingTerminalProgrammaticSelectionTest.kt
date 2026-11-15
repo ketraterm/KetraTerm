@@ -59,6 +59,7 @@ class SwingTerminalProgrammaticSelectionTest {
             assertEquals(0, connector.writes)
 
             assertTrue(view.copySelectionToClipboard())
+            dispatcher.scheduler.runCurrent()
             assertEquals("irst\nseco", clipboardText)
             assertEquals(1, clipboardCopies)
             assertEquals(0, clipboardReads)
@@ -586,6 +587,7 @@ class SwingTerminalProgrammaticSelectionTest {
         fun copiedText(): String {
             val selectedText = requireNotNull(view.selectedText())
             assertTrue(view.copySelectionToClipboard())
+            dispatcher.scheduler.runCurrent()
             assertEquals(selectedText, clipboardText)
             return clipboardText
         }

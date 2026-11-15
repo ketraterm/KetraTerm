@@ -207,8 +207,9 @@ internal class TerminalPane private constructor(
                             SwingHostServices.create { draft ->
                                 draft.clipboardHandler =
                                     TerminalPasteClipboard(TerminalClipboardHandler.SYSTEM) { request ->
-                                        val parent = paneRef[0]?.terminal ?: return@TerminalPasteClipboard false
-                                        SwingMessageDialogs.show(parent, request) == 0
+                                        val pane = paneRef[0] ?: return@TerminalPasteClipboard false
+                                        if (pane.tab.session.isClosed) return@TerminalPasteClipboard false
+                                        SwingMessageDialogs.show(pane.terminal, request) == 0
                                     }
                                 draft.shellSuggestionKeymap = { event -> settings.config.suggestionKeyBindings.popupAction(event) }
                                 draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }

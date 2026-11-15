@@ -17,15 +17,43 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalRenderBuffer
-import io.github.ketraterm.render.api.*
+import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.junit.jupiter.api.Test
 import java.awt.Rectangle
-import kotlin.test.*
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PromptDividerLayoutTest {
+    @Test
+    fun `retained prompt lookup reuses positions and does not rescan an absent identity on output`() {
+        val buffer = TerminalBuffers.create(8, 3, maxHistory = 100)
+        val prompt = lineId(buffer, 0)
+        buffer.writeText(">")
+        repeat(50) { buffer.newLine() }
+        val state = TerminalShellIntegrationState()
+        val reader = CountingReader(buffer)
+        val layout = PromptDividerLayout()
+        layout.updateFrom(reader, state, 3, retainedLineId = prompt)
+        assertEquals(prompt, layout.retainedPromptLineId)
+        reader.lineReads = 0
+        buffer.writeText("a")
+        layout.updateFrom(reader, state, 3, retainedLineId = prompt)
+        assertEquals(1, reader.lineReads, "A retained position needs one identity check")
+        val missing = Long.MAX_VALUE
+        layout.updateFrom(reader, state, 3, retainedLineId = missing)
+        assertEquals(0L, layout.retainedPromptLineId)
+        reader.lineReads = 0
+        buffer.writeText("b")
+        layout.updateFrom(reader, state, 3, retainedLineId = missing)
+        assertEquals(0, reader.lineReads, "Ordinary output cannot recreate a missing line identity")
+    }
+
     @Test
     fun `cursor and command lifecycle updates reuse resolved prompt positions`() {
         val buffer = TerminalBuffers.create(8, 3)

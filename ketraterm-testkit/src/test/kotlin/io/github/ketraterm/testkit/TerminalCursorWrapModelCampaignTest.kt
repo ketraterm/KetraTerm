@@ -194,6 +194,52 @@ class TerminalCursorWrapModelCampaignTest {
     }
 
     @Test
+    fun `wrapping outside horizontal margins checks scrolling before returning to the left margin`() {
+        val initialRows = listOf("aAB1", "bCD2", "cEF3", "dGH4", "eIJ5", "fKL6")
+        val setup =
+            initialRows.flatMapIndexed { index, text ->
+                listOf(Operation.CursorPosition(index + 1, 1)) + text.map { Operation.Print(it.toString(), 1) }
+            } + Operation.SetHorizontalMargins(2, 3)
+        for (bottom in listOf(5, 6)) {
+            for (wide in listOf(false, true)) {
+                val prints = if (wide) listOf(Operation.Print("😀", 2)) else listOf(Operation.Print("X", 1), Operation.Print("Y", 1))
+                val scenario =
+                    Scenario(
+                        BASE_SEED + 18_811,
+                        4,
+                        6,
+                        setup + listOf(Operation.SetVerticalMargins(1, bottom), Operation.CursorPosition(bottom, 4)) + prints,
+                    )
+                val model = CursorWrapModel(4, 6, MAX_HISTORY)
+                scenario.operations.forEach(model::apply)
+                val expected = initialRows.map { text -> text.map(Char::toString).toMutableList() }
+                expected[bottom - 1][3] = if (wide) " " else "X"
+                val destination = minOf(bottom, 5)
+                expected[destination][1] = if (wide) "😀" else "Y"
+                if (wide) expected[destination][2] = WIDE_TRAILING
+                val context = "bottom=$bottom, wide=$wide"
+                assertEquals(expected, model.retainedRows.map { line -> line.cells.map { it ?: " " } }, context)
+                assertEquals(List(6) { it == bottom - 1 }, model.retainedRows.map { it.wrapped }, context)
+                assertEquals(destination, model.row, context)
+                assertEquals(2, model.column, context)
+                verify(scenario)
+
+                val bytes = scenario.operations.joinToString("") { it.bytes }.encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    verify(
+                        scenario,
+                        listOf(
+                            TerminalReplayEvent.Input(bytes.copyOfRange(0, split)),
+                            TerminalReplayEvent.Input(bytes.copyOfRange(split, bytes.size)),
+                        ),
+                    )
+                }
+                verify(scenario, TerminalReplayTranscript.bytewise(bytes).events)
+            }
+        }
+    }
+
+    @Test
     fun `generated operation streams agree with independent cursor wrap model`() {
         assumeTrue(System.getProperty("ketraterm.cursorWrap.required") == "true") {
             "run a generated cursor/wrap Gradle profile"
@@ -217,13 +263,16 @@ class TerminalCursorWrapModelCampaignTest {
 
     private fun fails(scenario: Scenario): Boolean = runCatching { verify(scenario) }.isFailure
 
-    private fun verify(scenario: Scenario) {
+    private fun verify(
+        scenario: Scenario,
+        events: List<TerminalReplayEvent> = scenario.operations.map { TerminalReplayEvent.Input.utf8(it.bytes) },
+    ) {
         val model = CursorWrapModel(scenario.columns, scenario.rows, MAX_HISTORY)
         scenario.operations.forEach(model::apply)
         val snapshot =
             TerminalConformanceHarness(scenario.columns, scenario.rows, MAX_HISTORY).replay(
                 TerminalReplayTranscript(
-                    scenario.operations.map { TerminalReplayEvent.Input.utf8(it.bytes) } + TerminalReplayEvent.EndOfInput,
+                    events + TerminalReplayEvent.EndOfInput,
                 ),
             )
         check(snapshot.cursor.column == model.column && snapshot.cursor.row == model.row) {
@@ -539,10 +588,11 @@ class TerminalCursorWrapModelCampaignTest {
             cellWidth: Int,
         ) {
             var rightBoundary = if (column <= rightMargin) rightMargin else columns - 1
+            // Scrolling eligibility belongs to the source column, before wrapping returns left.
             if (pendingWrap) {
                 screen[row].wrapped = true
-                column = leftMargin
                 lineFeed()
+                column = leftMargin
                 pendingWrap = false
                 rightBoundary = rightMargin
             }
@@ -550,8 +600,8 @@ class TerminalCursorWrapModelCampaignTest {
                 if (!autoWrap) return
                 clearOccupant(screen[row], column)
                 screen[row].wrapped = true
-                column = leftMargin
                 lineFeed()
+                column = leftMargin
                 rightBoundary = rightMargin
             }
             clearOccupant(screen[row], column)

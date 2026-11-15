@@ -41,6 +41,52 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalSearchBarTest {
     @Test
+    fun constructionRequiresEdtBeforeResolvingHostMessages() {
+        lateinit var terminal: SwingTerminal
+        SwingUtilities.invokeAndWait { terminal = SwingTerminal() }
+        try {
+            var messageCalls = 0
+            val messages =
+                SwingHostMessages { _, _ ->
+                    messageCalls++
+                    error("Must not resolve UI messages off the EDT")
+                }
+            assertFailsWith<IllegalStateException> { SwingTerminalSearchBar(terminal, messages) }
+            assertEquals(0, messageCalls)
+        } finally {
+            SwingUtilities.invokeAndWait { terminal.dispose() }
+        }
+    }
+
+    @Test
+    fun offEdtOpenRefreshAndCloseAreQueuedOnEdt() {
+        lateinit var terminal: SwingTerminal
+        lateinit var searchBar: SwingTerminalSearchBar
+        SwingUtilities.invokeAndWait {
+            terminal = SwingTerminal()
+            searchBar = SwingTerminalSearchBar(terminal)
+        }
+        try {
+            searchBar.open()
+            searchBar.refreshColors()
+            SwingUtilities.invokeAndWait {
+                assertTrue(searchBar.isOpen())
+                terminal.search("query")
+            }
+            searchBar.close()
+            SwingUtilities.invokeAndWait {
+                assertFalse(searchBar.isOpen())
+                assertEquals("", terminal.currentSearchState().query)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                searchBar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
     fun callbackFailureShowsFailedStatusAndRecoversWithoutClosingOrLosingFutureObservations() {
         for (key in listOf("search.matchCounter", "search.counterToolTip")) {
             lateinit var fixture: RecoveryFixture
@@ -758,18 +804,22 @@ class SwingTerminalSearchBarTest {
 
     @Test
     fun openAndCloseToggleHostSearchChrome() {
-        val terminal = SwingTerminal()
-        val searchBar = SwingTerminalSearchBar(terminal)
-
         SwingUtilities.invokeAndWait {
-            assertFalse(searchBar.isOpen())
+            val terminal = SwingTerminal()
+            val searchBar = SwingTerminalSearchBar(terminal)
+            try {
+                assertFalse(searchBar.isOpen())
 
-            searchBar.open()
-            assertTrue(searchBar.isOpen())
+                searchBar.open()
+                assertTrue(searchBar.isOpen())
 
-            searchBar.close()
-            assertFalse(searchBar.isOpen())
-            assertEquals("", terminal.currentSearchState().query)
+                searchBar.close()
+                assertFalse(searchBar.isOpen())
+                assertEquals("", terminal.currentSearchState().query)
+            } finally {
+                searchBar.close()
+                terminal.dispose()
+            }
         }
     }
 

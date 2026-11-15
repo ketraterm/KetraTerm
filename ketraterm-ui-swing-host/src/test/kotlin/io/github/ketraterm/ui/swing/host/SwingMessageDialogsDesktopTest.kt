@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt.Decision
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Tag
 import java.awt.Component
@@ -31,6 +33,35 @@ import kotlin.test.*
 
 @Tag("desktop")
 class SwingMessageDialogsDesktopTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `consent dismissal and pane disposal release the native dialog synchronously`() {
+        for (closePane in listOf(false, true)) {
+            withOwner { owner ->
+                val dispatcher = StandardTestDispatcher()
+                val scope = CoroutineScope(SupervisorJob() + dispatcher)
+                val prompt =
+                    SwingClipboardReadPrompt { request, decide ->
+                        SwingMessageDialogs.showModeless(owner, request, decide)
+                    }
+                try {
+                    val pending = scope.async(start = CoroutineStart.UNDISPATCHED) { prompt.request("Clipboard consent") }
+                    val dialog = owner.ownedWindows.filterIsInstance<JDialog>().single { it.isVisible }
+                    if (closePane) prompt.close() else assertTrue(prompt.dismiss())
+                    assertFalse(dialog.isVisible)
+                    assertFalse(dialog.isDisplayable)
+                    assertFalse(prompt.dismiss())
+                    dispatcher.scheduler.runCurrent()
+                    if (closePane) assertTrue(pending.isCancelled) else assertFalse(pending.getCompleted())
+                } finally {
+                    prompt.close()
+                    scope.cancel()
+                    dispatcher.scheduler.runCurrent()
+                }
+            }
+        }
+    }
+
     @Test
     fun `owner cleanup completes before an EDT assertion failure reaches the caller`() {
         assumeFalse(GraphicsEnvironment.isHeadless())

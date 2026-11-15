@@ -75,14 +75,14 @@ public class SwingTerminalContextMenuRequest internal constructor(
     /**
      * Copies the current terminal selection to the host clipboard.
      *
-     * @return `true` when text was copied.
+     * @return `true` when an asynchronous selection copy was accepted.
      */
     public fun copySelection(): Boolean = terminal.copySelectionToClipboard()
 
     /**
      * Pastes host clipboard text into the terminal session.
      *
-     * @return `true` when the bound session admitted the paste request.
+     * @return `true` when the asynchronous clipboard request was accepted.
      */
     public fun pasteClipboard(): Boolean = terminal.pasteClipboardText()
 
@@ -123,14 +123,14 @@ public class SwingTerminalContextHyperlink internal constructor(
     /**
      * Opens the hyperlink target.
      *
-     * @return `true` when activation was handled.
+     * @return `true` when activation was accepted. System browser activation completes asynchronously.
      */
     public fun open(): Boolean = openAction()
 
     /**
      * Copies [uri] to the host clipboard when a resolved URI is available.
      *
-     * @return `true` when a URI was copied.
+     * @return `true` when a URI copy request was accepted.
      */
     public fun copyUri(): Boolean = copyUriAction()
 }

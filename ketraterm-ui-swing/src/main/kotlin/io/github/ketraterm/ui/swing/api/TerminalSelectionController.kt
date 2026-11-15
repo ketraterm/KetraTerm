@@ -423,6 +423,28 @@ internal class TerminalSelectionController(
         return CellSelection(anchorColumn, anchorRow, caretColumn, caretRow, selectionIsBlock).also { viewportSelection = it }
     }
 
+    /** Captures only values; the returned read owns its scratch and never accesses controller state. */
+    fun captureTextRead(reader: io.github.ketraterm.render.api.TerminalRenderFrameReader): TerminalTextRead? {
+        val range = currentRange() ?: return null
+        val expectedHistory = historyGeneration
+        val expectedColumns = columns
+        return { checkCancelled ->
+            TerminalSelectionTextReader().read(
+                reader,
+                range.anchorAbsoluteRow,
+                range.anchorColumn,
+                range.caretAbsoluteRow,
+                range.caretColumn,
+                range.isBlock,
+                checkCancelled = checkCancelled,
+            ) { frame ->
+                frame.activeBuffer == range.buffer &&
+                    frame.historyContentGeneration == expectedHistory &&
+                    frame.columns == expectedColumns
+            }
+        }
+    }
+
     fun getSelectedText(reader: io.github.ketraterm.render.api.TerminalRenderFrameReader): String? {
         val anchorAbsRow = selectionAnchorAbsoluteRow ?: return null
         val caretAbsRow = selectionCaretAbsoluteRow ?: return null

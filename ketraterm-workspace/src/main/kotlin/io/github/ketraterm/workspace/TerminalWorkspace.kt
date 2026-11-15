@@ -37,6 +37,7 @@ import java.net.URISyntaxException
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Host-neutral workspace that owns local terminal tabs and sessions.
@@ -815,6 +816,7 @@ public class TerminalWorkspaceTab internal constructor(
     showForegroundProcessName: Boolean = true,
 ) {
     private val titleLock = Any()
+    private val customColor = AtomicReference<String?>()
     private val mutableProcessTitleEnabled = MutableStateFlow(showForegroundProcessName)
     internal val processTitleEnabled = mutableProcessTitleEnabled.asStateFlow()
     private var foregroundProcessTitle: String? = null
@@ -909,13 +911,13 @@ public class TerminalWorkspaceTab internal constructor(
 
     /**
      * Optional custom color representation for this tab (e.g. hex string "#3b82f6").
+     * Reads and replacements are atomic. Changed values notify the listener synchronously
+     * on the calling thread, outside workspace and tab locks.
      */
-    public var color: String? = null
+    public var color: String?
+        get() = customColor.get()
         set(value) {
-            if (field != value) {
-                field = value
-                onColorChanged(this, value)
-            }
+            if (customColor.getAndSet(value) != value) onColorChanged(this, value)
         }
 
     // All title sources share this lock; listeners run outside it to allow host re-entry.
@@ -1030,6 +1032,10 @@ public interface TerminalWorkspaceListener {
 
     /**
      * Called when a tab color changes.
+     *
+     * Called on the setter's thread after storing the new value, without holding tab or
+     * workspace locks. Concurrent or reentrant updates can overtake delivery; queued UI
+     * work should read [TerminalWorkspaceTab.color] again and check that the tab still exists.
      *
      * @param tab tab whose color changed.
      * @param color new color representation (e.g. hex string) or null if reset.

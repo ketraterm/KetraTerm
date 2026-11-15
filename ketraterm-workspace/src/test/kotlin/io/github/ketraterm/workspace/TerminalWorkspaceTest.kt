@@ -47,11 +47,114 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertAll
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
+    @Test
+    fun `tab color publishes changed values on the setter thread and suppresses equal values`() {
+        testSession().use { session ->
+            val changes = ArrayList<String?>()
+            val caller = Thread.currentThread()
+            val tab =
+                TerminalWorkspaceTab(
+                    id = "color",
+                    profile = TerminalProfile("p", "Profile", listOf("mock-shell")),
+                    title = "Profile",
+                    session = session,
+                    onColorChanged = { changed, color ->
+                        assertSame(caller, Thread.currentThread())
+                        assertEquals(color, changed.color)
+                        changes += color
+                    },
+                    onTitleChanged = { _, _ -> },
+                    onCurrentWorkingDirectoryChanged = { _, _ -> },
+                )
+            assertNull(tab.color)
+            tab.color = null
+            tab.color = "#123456"
+            tab.color = "#123456".toCharArray().concatToString()
+            tab.color = "#abcdef"
+            tab.color = null
+            tab.color = null
+            assertEquals(listOf("#123456", "#abcdef", null), changes)
+            assertNull(tab.color)
+        }
+    }
+
+    @Test
+    fun `concurrent equal color replacements publish one change`() {
+        testSession().use { session ->
+            val changes = CopyOnWriteArrayList<String?>()
+            val tab =
+                TerminalWorkspaceTab(
+                    id = "color",
+                    profile = TerminalProfile("p", "Profile", listOf("mock-shell")),
+                    title = "Profile",
+                    session = session,
+                    onColorChanged = { _, color -> changes += color },
+                    onTitleChanged = { _, _ -> },
+                    onCurrentWorkingDirectoryChanged = { _, _ -> },
+                )
+            Executors.newFixedThreadPool(2).use { workers ->
+                val ready = CountDownLatch(2)
+                val start = CountDownLatch(1)
+                val writes =
+                    List(2) {
+                        workers.submit {
+                            ready.countDown()
+                            assertTrue(start.await(10, TimeUnit.SECONDS))
+                            tab.color = "#123456"
+                        }
+                    }
+                try {
+                    assertTrue(ready.await(10, TimeUnit.SECONDS))
+                } finally {
+                    start.countDown()
+                }
+                writes.forEach { it.get(10, TimeUnit.SECONDS) }
+            }
+            assertEquals("#123456", tab.color)
+            assertEquals(listOf<String?>("#123456"), changes.toList())
+        }
+    }
+
+    @Test
+    fun `color callback can wait for another thread to read and replace the color`() {
+        testSession().use { session ->
+            Executors.newSingleThreadExecutor().use { worker ->
+                val changes = ArrayList<String?>()
+                val tab =
+                    TerminalWorkspaceTab(
+                        id = "color",
+                        profile = TerminalProfile("p", "Profile", listOf("mock-shell")),
+                        title = "Profile",
+                        session = session,
+                        onColorChanged = { changed, color ->
+                            changes += color
+                            if (color == "#123456") {
+                                worker
+                                    .submit {
+                                        assertEquals("#123456", changed.color)
+                                        changed.color = null
+                                    }.get(10, TimeUnit.SECONDS)
+                            }
+                        },
+                        onTitleChanged = { _, _ -> },
+                        onCurrentWorkingDirectoryChanged = { _, _ -> },
+                    )
+                tab.color = "#123456"
+                assertNull(tab.color)
+                assertEquals(listOf("#123456", null), changes)
+            }
+        }
+    }
+
     @Test
     fun `workspace options reject retained row capacity overflow before opening a session`() {
         val original = TerminalWorkspaceOpenOptions()

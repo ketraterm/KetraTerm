@@ -30,20 +30,27 @@ internal class CommandOutputExporter(
     /** Call on the EDT; failures are delivered there while this owner remains open. */
     fun export(
         path: Path,
-        text: String,
+        readText: suspend () -> String?,
         onFailure: (Exception) -> Unit,
     ): Job =
         scope.launch {
             val failure =
-                runInterruptible(ioDispatcher) {
-                    try {
-                        write(path, text)
-                        null
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        failure
+                try {
+                    val text = readText() ?: return@launch
+                    runInterruptible(ioDispatcher) {
+                        try {
+                            write(path, text)
+                            null
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            failure
+                        }
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    failure
                 }
             ensureActive()
             if (failure != null) onFailure(failure)

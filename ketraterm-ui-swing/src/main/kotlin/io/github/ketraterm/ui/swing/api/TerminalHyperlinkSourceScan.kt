@@ -40,7 +40,7 @@ internal class TerminalHyperlinkSourceScan(
         reader: TerminalRenderFrameReader,
         lines: List<TerminalHyperlinkLineSnapshot>,
         historyGeneration: Long,
-    ): Validation? {
+    ): BooleanArray? {
         try {
             val firstLine = lines.first()
             val context = currentCoroutineContext()
@@ -79,16 +79,18 @@ internal class TerminalHyperlinkSourceScan(
                 }
                 validLines[index] = sameText
             }
-            return Validation(generation, validLines)
+            reader.readRenderFrame { frame ->
+                valid = frame.contentGeneration == generation &&
+                    frame.historyContentGeneration == historyGeneration &&
+                    frame.activeBuffer == firstLine.activeBuffer &&
+                    frame.columns == firstLine.columns
+            }
+            if (!valid) return null
+            return validLines
         } finally {
             copy.cache.reset()
         }
     }
-
-    internal class Validation(
-        val contentGeneration: Long,
-        val validLines: BooleanArray,
-    )
 
     /**
      * Reads newly admitted history and changed live rows in batches. A soft-wrapped line is never

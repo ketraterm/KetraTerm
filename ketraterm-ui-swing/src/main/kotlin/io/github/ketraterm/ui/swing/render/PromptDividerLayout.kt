@@ -22,7 +22,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * EDT-owned sparse prompt index and projection between terminal rows and visual row slots.
+ * Single-owner sparse prompt index and projection between terminal rows and visual row slots.
  * Each divider occupies one slot. Only prompt identities and absolute positions are retained;
  * cell content stays in the render cache. Ordinary output scans the live grid and newly admitted
  * history, while history replacement/reflow rebuilds the index. Animation never reads the source.
@@ -43,8 +43,14 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
     private var count = 0
     private var dividerCount = 0
     private var revision = Long.MIN_VALUE
-    private var historyGeneration = Long.MIN_VALUE
-    private var contentGeneration = Long.MIN_VALUE
+    var historyGeneration = Long.MIN_VALUE
+        private set
+    var contentGeneration = Long.MIN_VALUE
+        private set
+    private var retainedLineId = 0L
+    private var retainedLineRow = NO_ROW
+    var retainedPromptLineId = 0L
+        private set
     private var source: TerminalRenderFrameReader? = null
     private var cursorRow = 0
     private var viewportRows = 1
@@ -75,6 +81,7 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
         viewportRows: Int,
         retainedOutput: Boolean = false,
         anchorLineId: Long = 0,
+        retainedLineId: Long = 0,
     ) {
         require(viewportRows > 0)
         if (source !== reader) reset()
@@ -82,6 +89,8 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
         this.viewportRows = viewportRows
         this.retainedOutput = retainedOutput
         this.anchorLineId = anchorLineId
+        if (this.retainedLineId != retainedLineId) retainedLineRow = NO_ROW
+        this.retainedLineId = retainedLineId
         resolvedAnchorRow = NO_ROW
         val nextRevision = state.revision.value
         promptsChanged = false
@@ -91,6 +100,23 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
         }
         reader.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE, consumer)
     }
+
+    /** Detached projection; subsequent worker updates cannot mutate the published rows. */
+    fun snapshot(): PromptDividerLayout =
+        PromptDividerLayout().also {
+            it.dividerRows = dividerRows.copyOf(dividerCount)
+            it.dividerCount = dividerCount
+            it.discardedCount = discardedCount
+            it.liveTop = liveTop
+            it.liveOrigin = liveOrigin
+            it.visualDiscardedCount = visualDiscardedCount
+            it.retainedBottom = retainedBottom
+            it.gridRows = gridRows
+            it.resolvedAnchorRow = resolvedAnchorRow
+            it.retainedPromptLineId = retainedPromptLineId
+            it.contentGeneration = contentGeneration
+            it.historyGeneration = historyGeneration
+        }
 
     fun reset() {
         source = null
@@ -104,6 +130,8 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
         liveTop = 0
         liveOrigin = 0
         retainedBottom = 0
+        retainedLineRow = NO_ROW
+        retainedPromptLineId = 0L
     }
 
     /** Visual boundary before a row's optional divider, relative to retained history. */
@@ -186,6 +214,23 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
         val firstRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
         val nextLiveTop = frame.discardedCount + frame.historySize
         val historyReplaced = historyGeneration != frame.historyContentGeneration || frame.discardedCount < discardedCount
+        retainedPromptLineId = 0L
+        if (historyReplaced) retainedLineRow = NO_ROW
+        if (retainedLineId != 0L) {
+            val row = retainedLineRow - firstRow
+            if (row >= 0 && row < frame.rows && frame.lineId(row.toInt()) == retainedLineId) {
+                retainedPromptLineId = retainedLineId
+            } else if (retainedLineRow == NO_ROW || retainedLineRow >= frame.discardedCount) {
+                for (index in 0 until frame.rows) {
+                    if (frame.lineId(index) == retainedLineId) {
+                        retainedLineRow = firstRow + index
+                        retainedPromptLineId = retainedLineId
+                        break
+                    }
+                }
+                if (retainedPromptLineId == 0L) retainedLineRow = MISSING_ROW
+            }
+        }
         if (historyReplaced) {
             visualDiscardedCount = frame.discardedCount
         } else {
@@ -285,5 +330,6 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
 
     private companion object {
         const val NO_ROW = Long.MIN_VALUE
+        const val MISSING_ROW = Long.MIN_VALUE + 1
     }
 }

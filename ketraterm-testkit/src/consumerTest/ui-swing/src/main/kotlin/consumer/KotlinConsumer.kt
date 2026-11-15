@@ -46,6 +46,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingShellSuggestionStyle
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingInlineShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
@@ -156,6 +157,19 @@ fun requestInline(
 
 fun main() =
     runBlocking {
+        var clipboardText: String? = null
+        val clipboard =
+            object : TerminalClipboardHandler {
+                override fun copyText(text: String) {
+                    clipboardText = text
+                }
+
+                override fun readText(): String? = clipboardText
+            }
+        clipboard.copyTextAsync("consumer λ")
+        check(clipboard.readTextAsync() == "consumer λ")
+        check(clipboard.readPrimarySelectionTextAsync() == null)
+        check(!TerminalHyperlinkHandler.NONE.openHyperlinkAsync("https://example.test/"))
         check(SwingSettings().alternateScreenWheelToArrowEnabled)
         check(SwingSettings().smoothScrolling)
         val interactionSettings =
@@ -407,6 +421,14 @@ fun main() =
                     error("Published frame missing")
                 }
                 check(firstCell() == URL[0].code)
+                onEdt {
+                    check(terminal.setSelection(checkNotNull(terminal.createSelectionRange(0, 0L, URL.length, 0L))))
+                }
+                withTimeout(20_000) {
+                    check(terminal.selectedTextAsync() == URL)
+                    check(terminal.commandOutputTextAsync(0) == null)
+                }
+                onEdt { terminal.clearSelection() }
                 onEdt {
                     JavaConsumer.verifySelection(terminal)
                     val range = checkNotNull(terminal.createSelectionRange(1, 0L, 4, 0L, isBlock = true))

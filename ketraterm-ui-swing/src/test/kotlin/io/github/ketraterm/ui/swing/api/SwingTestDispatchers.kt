@@ -15,7 +15,15 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import java.util.concurrent.FutureTask
 import javax.swing.SwingUtilities
+
+internal fun <T> edtCall(action: () -> T): T {
+    if (SwingUtilities.isEventDispatchThread()) return action()
+    val task = FutureTask(action)
+    SwingUtilities.invokeAndWait(task)
+    return task.get()
+}
 
 /** Installs controlled worker results inline when a test advances its scheduler on the EDT. */
 internal val CONTROLLED_SWING_UI_DISPATCHER =

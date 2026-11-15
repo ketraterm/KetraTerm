@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -31,10 +28,64 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
+import kotlin.time.Duration.Companion.milliseconds
 
 class CommandOutputExporterTest {
     @TempDir
     lateinit var directory: Path
+
+    @Test
+    fun `unavailable extraction preserves an existing destination`() {
+        val destination = directory.resolve("existing.txt")
+        Files.writeString(destination, "previous export")
+        val failures = mutableListOf<Exception>()
+        CommandOutputExporter().use { exporter ->
+            lateinit var job: Job
+            SwingUtilities.invokeAndWait { job = exporter.export(destination, { null }, failures::add) }
+            runBlocking { withTimeout(10_000.milliseconds) { job.join() } }
+            assertEquals("previous export", Files.readString(destination))
+            assertTrue(failures.isEmpty())
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `export awaits worker extraction without blocking EDT and cancellation prevents writing`(cancel: Boolean) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val destination = directory.resolve("extracted.txt")
+        val failures = mutableListOf<Exception>()
+        val exporter = CommandOutputExporter()
+        lateinit var job: Job
+        try {
+            SwingUtilities.invokeAndWait {
+                job =
+                    exporter.export(destination, {
+                        runInterruptible(Dispatchers.IO) {
+                            assertFalse(SwingUtilities.isEventDispatchThread())
+                            entered.countDown()
+                            check(release.await(10, TimeUnit.SECONDS))
+                            "retained λ 🚀\n"
+                        }
+                    }, failures::add)
+            }
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            val heartbeat =
+                java.util.concurrent.FutureTask {
+                    assertFalse(job.isCompleted)
+                    if (cancel) exporter.close()
+                }
+            SwingUtilities.invokeLater(heartbeat)
+            heartbeat.get(10, TimeUnit.SECONDS)
+            release.countDown()
+            runBlocking { withTimeout(10_000.milliseconds) { job.join() } }
+            if (cancel) assertFalse(Files.exists(destination)) else assertEquals("retained λ 🚀\n", Files.readString(destination))
+            assertTrue(failures.isEmpty())
+        } finally {
+            release.countDown()
+            exporter.close()
+        }
+    }
 
     @Test
     fun `blocked writer leaves EDT available and writes captured unicode output`() {
@@ -53,12 +104,12 @@ class CommandOutputExporterTest {
             })
         lateinit var job: Job
         try {
-            SwingUtilities.invokeAndWait { job = exporter.export(destination, text, failures::add) }
+            SwingUtilities.invokeAndWait { job = exporter.export(destination, { text }, failures::add) }
             assertTrue(entered.await(10, TimeUnit.SECONDS), "writer did not enter")
             assertFalse(writerOnEdt.get())
             SwingUtilities.invokeAndWait { assertFalse(job.isCompleted) }
             release.countDown()
-            runBlocking { withTimeout(10_000) { job.join() } }
+            runBlocking { withTimeout(10_000.milliseconds) { job.join() } }
             assertEquals(text, Files.readString(destination))
             assertTrue(failures.isEmpty())
         } finally {
@@ -77,12 +128,12 @@ class CommandOutputExporterTest {
         try {
             SwingUtilities.invokeAndWait {
                 job =
-                    exporter.export(directory.resolve("output.txt"), "text") {
+                    exporter.export(directory.resolve("output.txt"), { "text" }) {
                         assertTrue(SwingUtilities.isEventDispatchThread())
                         failures += it
                     }
             }
-            runBlocking { withTimeout(10_000) { job.join() } }
+            runBlocking { withTimeout(10_000.milliseconds) { job.join() } }
             if (cancel) assertTrue(failures.isEmpty()) else assertSame(failure, failures.single())
         } finally {
             exporter.close()
@@ -110,16 +161,16 @@ class CommandOutputExporterTest {
             })
         lateinit var job: Job
         try {
-            SwingUtilities.invokeAndWait { job = exporter.export(directory.resolve("output.txt"), "text", failures::add) }
+            SwingUtilities.invokeAndWait { job = exporter.export(directory.resolve("output.txt"), { "text" }, failures::add) }
             assertTrue(entered.await(10, TimeUnit.SECONDS), "writer did not enter")
             SwingUtilities.invokeAndWait {
                 exporter.close()
                 assertTrue(job.isCancelled)
             }
             release.countDown()
-            runBlocking { withTimeout(10_000) { job.join() } }
+            runBlocking { withTimeout(10_000.milliseconds) { job.join() } }
             SwingUtilities.invokeAndWait {
-                val rejected = exporter.export(directory.resolve("later.txt"), "later", failures::add)
+                val rejected = exporter.export(directory.resolve("later.txt"), { "later" }, failures::add)
                 assertTrue(rejected.isCancelled)
             }
             assertTrue(failures.isEmpty())

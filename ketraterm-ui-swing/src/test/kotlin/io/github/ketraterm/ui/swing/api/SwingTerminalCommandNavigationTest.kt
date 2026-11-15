@@ -188,6 +188,7 @@ class SwingTerminalCommandNavigationTest {
                 assertTrue(fixture.component.copyCommandTextToClipboard(commandId))
                 assertEquals("host command", fixture.clipboard)
                 assertTrue(fixture.component.copyCommandOutputToClipboard(commandId))
+                fixture.flush()
                 assertEquals("row6        row7", fixture.clipboard)
                 fixture.component.scrollToPreviousCommand()
                 fixture.flush()
@@ -597,6 +598,7 @@ class SwingTerminalCommandNavigationTest {
 
                 val exported = component.commandOutputText(secondCommandId)
                 assertTrue(component.copyCommandOutputToClipboard(secondCommandId))
+                mutationDispatcher.scheduler.runCurrent()
                 assertAll(
                     { assertEquals("working dir is project", exported) },
                     { assertEquals("working dir is project", clipboardText) },
@@ -801,15 +803,17 @@ class SwingTerminalCommandNavigationTest {
         settingsProvider: SwingSettingsProvider,
         hostServices: SwingHostServices = SwingHostServices(),
     ): SwingTerminal =
-        SwingTerminal(
-            settingsProvider = settingsProvider,
-            hostServices =
-                hostServices.copy { draft ->
-                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
-                },
-            searchDispatcher = mutationDispatcher,
-            mutationDispatcher = mutationDispatcher,
-        ).also(components::add)
+        edtCall {
+            SwingTerminal(
+                settingsProvider = settingsProvider,
+                hostServices =
+                    hostServices.copy { draft ->
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                searchDispatcher = mutationDispatcher,
+                mutationDispatcher = mutationDispatcher,
+            ).also(components::add)
+        }
 
     private fun commandSession(
         renderReader: TerminalRenderFrameReader,

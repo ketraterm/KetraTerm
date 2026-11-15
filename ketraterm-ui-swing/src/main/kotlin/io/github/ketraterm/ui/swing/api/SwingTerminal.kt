@@ -40,6 +40,8 @@ import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
@@ -80,6 +82,8 @@ import kotlin.math.floor
  * Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application
  * cursor visibility and viewport clipping. Focus never changes the session's cursor style.
  *
+ * Construct on the EDT. Other operations follow their individual threading contracts.
+ *
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
@@ -101,6 +105,10 @@ public class SwingTerminal
             settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
             hostServices: SwingHostServices = SwingHostServices(),
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
+
+        init {
+            check(SwingUtilities.isEventDispatchThread()) { "Terminal construction requires the EDT" }
+        }
 
         private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
@@ -155,6 +163,11 @@ public class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private val mutationFailureHandler: (Throwable?) -> Unit = ::reportSessionMutationFailure
         private val sessionMutations = SessionMutationQueue(componentScope, mutationDispatcher, uiCoroutineDispatcher)
+        private val textExtractionDispatcher = searchDispatcher
+        private val textExtractionMutex = Mutex()
+        private var copyJob: Job? = null
+        private var pasteJob: Job? = null
+        private var hyperlinkJob: Job? = null
         private var bindingJob: Job? = null
         private var suggestionScope: CoroutineScope? = null
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
@@ -249,6 +262,18 @@ public class SwingTerminal
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
         private val stickyCommandHeader = StickyCommandHeader(chrome, hostServices.fontResolver)
+        private var promptProjection: PromptDividerLayout? = null
+        private val promptRetained: (Long) -> Boolean = { it != 0L && promptProjection?.retainedPromptLineId == it }
+        private val promptAnalysis =
+            PromptDecorationAnalysis(componentScope, searchDispatcher) {
+                val bound = session
+                if (!disposed && bound != null && renderCache.hasFrame && !isResizePublicationPending()) {
+                    refreshShellIntegrationDecorations(bound)
+                    if (renderCache.scrollbackOffset != viewportController.requestedOffset) requestRenderFromSession(bound)
+                    publishViewportState(renderCache.historySize)
+                    renderFrameController.repaintFrame(forceFullRepaint = true)
+                }
+            }
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
         private var hyperlinkCursor: Cursor = DEFAULT_CURSOR
         private val terminalMouseListener =
@@ -1272,8 +1297,8 @@ public class SwingTerminal
          * Returns all currently retained output for [recordId].
          *
          * Soft-wrapped rows are joined while hard row boundaries become
-         * newlines. This explicit EDT-only query may allocate in proportion to
-         * the retained output and is never used while painting.
+         * newlines. This synchronous EDT-only query may allocate in proportion to
+         * the retained output. Prefer [commandOutputTextAsync] for UI workflows.
          *
          * @param recordId retained command record id.
          * @return command output, or `null` when unavailable or called off the EDT.
@@ -1284,15 +1309,32 @@ public class SwingTerminal
         }
 
         /**
+         * Reads retained command output off the EDT. May be called from any coroutine.
+         * Returns null when unavailable, changed during extraction, or the binding was replaced.
+         * Caller cancellation or an ended binding stops extraction between bounded batches.
+         * Cancellation and failures propagate to the caller.
+         */
+        public suspend fun commandOutputTextAsync(recordId: Int): String? =
+            withContext(uiCoroutineDispatcher) {
+                if (disposed || session == null) return@withContext null
+                val read = commandInteractionController.captureTextRead(recordId) ?: return@withContext null
+                extractText(read)
+            }
+
+        /**
          * Copies all retained output for [recordId] through the host clipboard service.
          *
          * @param recordId retained command record id.
-         * @return `true` when retained output was copied; `false` when unavailable or called off the EDT.
+         * Extraction runs on a worker; the clipboard's suspend operation starts on the EDT and
+         * the system service performs native access on a worker. A newer copy request
+         * supersedes an unfinished copy. Unbinding or disposal cancels pending work;
+         * a native write already entered cannot be undone.
+         * @return `true` when the request was accepted; `false` when unavailable or called off the EDT.
          */
         public fun copyCommandOutputToClipboard(recordId: Int): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            val text = commandInteractionController.commandOutputText(recordId) ?: return false
-            hostServices.clipboardHandler.copyText(text)
+            if (!SwingUtilities.isEventDispatchThread() || disposed || session == null) return false
+            val read = commandInteractionController.captureTextRead(recordId) ?: return false
+            startCopy { extractText(read) }
             return true
         }
 
@@ -1300,13 +1342,12 @@ public class SwingTerminal
          * Copies captured command text for [recordId] through the host clipboard service.
          *
          * @param recordId retained command record id.
-         * @return `true` when command text was copied; `false` when unavailable or called off the EDT.
+         * @return `true` when a copy request was accepted; `false` when unavailable or called off the EDT.
          */
         public fun copyCommandTextToClipboard(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val text = session?.shellIntegrationState?.commandText(recordId) ?: return false
-            hostServices.clipboardHandler.copyText(text)
-            return true
+            return copyTextToClipboard(text)
         }
 
         override fun addNotify() {
@@ -1729,6 +1770,7 @@ public class SwingTerminal
                             launch {
                                 session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                     if (this@SwingTerminal.session === session) {
+                                        pasteJob?.cancel()
                                         suggestionScheduler?.stop()
                                         inlineSuggestionScheduler?.stop()
                                         cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
@@ -2019,7 +2061,8 @@ public class SwingTerminal
          * A nonempty selection may return an empty string when only trimmed blanks remain.
          * Unbound and disposed components return null.
          *
-         * Uses the same extraction as [copySelectionToClipboard] without accessing the
+         * This synchronous query may allocate in proportion to the selection. Prefer
+         * [selectedTextAsync] for UI workflows. Uses the same extraction as [copySelectionToClipboard] without accessing the
          * clipboard, scrolling, focusing, or sending input. Eviction may clip selection;
          * invalidated layouts or buffer changes clear it. Resulting selection changes
          * notify listeners outside the frame lease. The returned string may be retained.
@@ -2033,6 +2076,68 @@ public class SwingTerminal
             if (disposed) return null
             val boundSession = session ?: return null
             return selectionController.getSelectedText(boundSession)
+        }
+
+        /**
+         * Reads the captured selection off the EDT, including retained offscreen rows.
+         * May be called from any coroutine. Returns null if selection, layout, or binding becomes
+         * obsolete, or content changes during extraction. Wide cells, bidi block selection and
+         * soft wrapping follow [selectedText]. Caller cancellation or an ended binding stops
+         * work between bounded batches; cancellation and failures propagate to the caller.
+         */
+        public suspend fun selectedTextAsync(): String? =
+            withContext(uiCoroutineDispatcher) {
+                if (disposed) return@withContext null
+                val bound = session ?: return@withContext null
+                val range = selectionController.currentRange() ?: return@withContext null
+                val read = selectionController.captureTextRead(bound) ?: return@withContext null
+                val text = extractText(read)
+                text.takeIf { selectionController.currentRange() === range }
+            }
+
+        /** Called on the EDT; the worker receives only a captured read and cancellation check. */
+        private suspend fun extractText(read: TerminalTextRead): String? {
+            val identity = bindingIdentity
+            val text =
+                withContext(textExtractionDispatcher) {
+                    textExtractionMutex.withLock {
+                        val context = currentCoroutineContext()
+                        read {
+                            context.ensureActive()
+                            if (!identity.get()) throw CancellationException("Terminal binding ended during text extraction")
+                        }
+                    }
+                }
+            return text.takeIf { !disposed && bindingIdentity === identity && identity.get() }
+        }
+
+        private fun startCopy(
+            selection: TerminalSelectionRange? = null,
+            read: suspend () -> String?,
+        ) {
+            copyJob?.cancel()
+            copyJob =
+                componentScope.launch {
+                    val request = coroutineContext.job
+                    val listener =
+                        selection?.let { expected ->
+                            TerminalSelectionListener { _, current ->
+                                if (current !== expected) request.cancel()
+                            }
+                        }
+                    listener?.let(selectionController::addListener)
+                    try {
+                        val text = read() ?: return@launch
+                        ensureActive()
+                        hostServices.clipboardHandler.copyTextAsync(text)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal copy failed", failure)
+                    } finally {
+                        listener?.let(selectionController::removeListener)
+                    }
+                }
         }
 
         /**
@@ -3169,9 +3274,12 @@ public class SwingTerminal
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
-         * Off-EDT callers wait for the EDT to read selection and copy text.
+         * Extraction and system clipboard access run on workers. Host suspend callbacks start on the EDT. Off-EDT callers
+         * wait only for request admission. A newer copy supersedes an unfinished copy.
+         * Selection changes, unbinding and disposal cancel pending work;
+         * a native write already entered cannot be undone.
          *
-         * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
+         * @return `true` if a selection copy was accepted, `false` otherwise.
          */
         public fun copySelectionToClipboard(): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) {
@@ -3179,8 +3287,8 @@ public class SwingTerminal
                 SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
                 return copied
             }
-            val text = selectedText() ?: return false
-            hostServices.clipboardHandler.copyText(text)
+            if (disposed || session == null || selectionController.currentRange() == null) return false
+            startCopy(selectionController.currentRange()) { selectedTextAsync() }
             return true
         }
 
@@ -3189,25 +3297,29 @@ public class SwingTerminal
          *
          * This is intended for host-owned workflows where policy has already
          * allowed a non-selection clipboard write, such as OSC 52 handling.
+         * Call on the EDT; disposed and unbound components do not invoke the handler.
          *
          * @param text text to place on the host clipboard.
-         * @return `true` when a session is bound and the clipboard handler was invoked.
+         * @return `true` when the asynchronous write was accepted; failures are logged.
+         * @throws IllegalStateException if called outside the EDT.
          */
         public fun copyTextToClipboard(text: String): Boolean {
-            if (session == null) return false
-            hostServices.clipboardHandler.copyText(text)
+            check(SwingUtilities.isEventDispatchThread()) { "Clipboard writes require the EDT" }
+            if (disposed || session == null) return false
+            startCopy { text }
             return true
         }
 
         /**
          * Pastes text from the host clipboard into the active terminal session.
          *
-         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures;
-         * hosts reading the clipboard asynchronously can complete through [pasteText].
-         * Unbound and closed sessions do not read the clipboard.
+         * Call on the EDT. The clipboard's suspend operation starts there; the system service
+         * performs native access on a worker. A pending read rejects additional paste requests.
+         * Unbound and closed sessions do not read the clipboard. Unbind/dispose cancels pending
+         * work, and a closed or replaced binding never receives the result. Failures are logged.
          *
-         * @return `true` when nonempty clipboard text was admitted by the bound session,
-         *   `false` otherwise, including outside the EDT. Admission does not promise transport completion.
+         * @return `true` when an asynchronous paste request was accepted, not when input was delivered.
+         *   Empty/unavailable text and denied paste consent produce no input after acceptance.
          */
         public fun pasteClipboardText(): Boolean = pasteFromClipboardOnEdt(SwingPasteSource.CLIPBOARD)
 
@@ -3215,12 +3327,25 @@ public class SwingTerminal
             if (!SwingUtilities.isEventDispatchThread() || disposed) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val identity = bindingIdentity
-            val text =
-                when (source) {
-                    SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readText()
-                    SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionText()
-                } ?: return false
-            return pasteTextOnEdt(text, boundSession, identity)
+            // Repeated paste gestures do not build an unbounded queue behind a blocked native read.
+            if (pasteJob?.isActive == true) return false
+            pasteJob =
+                componentScope.launch {
+                    try {
+                        val text =
+                            when (source) {
+                                SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readTextAsync()
+                                SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionTextAsync()
+                            } ?: return@launch
+                        ensureActive()
+                        pasteTextOnEdt(text, boundSession, identity)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System.getLogger(SwingTerminal::class.java.name).log(System.Logger.Level.WARNING, "Terminal paste failed", failure)
+                    }
+                }
+            return true
         }
 
         private fun handleMiddleClickPasteOnEdt(event: MouseEvent) {
@@ -3428,8 +3553,8 @@ public class SwingTerminal
             val openAction: () -> Boolean =
                 if (hyperlinkId > 0) {
                     if (uri == null) return null
-                    val handler = hostServices.hyperlinkHandler
-                    { handler.openHyperlink(uri) }
+                    val identity = bindingIdentity
+                    { bindingIdentity === identity && activateHyperlink(uri) }
                 } else {
                     val action = detected?.action ?: return null
                     val activate: () -> Boolean = {
@@ -3462,9 +3587,27 @@ public class SwingTerminal
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) {
                 val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
-                return hostServices.hyperlinkHandler.openHyperlink(uri)
+                return activateHyperlink(uri)
             }
             return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache, event)
+        }
+
+        private fun activateHyperlink(uri: String): Boolean {
+            if (disposed || session == null || hyperlinkJob?.isActive == true) return false
+            hyperlinkJob =
+                componentScope.launch {
+                    try {
+                        hostServices.hyperlinkHandler.openHyperlinkAsync(uri)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        System
+                            .getLogger(
+                                SwingTerminal::class.java.name,
+                            ).log(System.Logger.Level.WARNING, "Terminal hyperlink activation failed", failure)
+                    }
+                }
+            return true
         }
 
         private fun cellAt(
@@ -3784,6 +3927,7 @@ public class SwingTerminal
          * Both dimensions must be positive. The complete size must fit the integer pixel range.
          *
          * @throws IllegalArgumentException if a dimension or the complete size is out of range.
+         * @throws IllegalStateException if called outside the EDT.
          * @param columns requested number of terminal columns.
          * @param rows requested number of terminal rows.
          * @param activeBuffer screen whose chrome insets should be included.
@@ -3794,11 +3938,13 @@ public class SwingTerminal
             columns: Int,
             rows: Int,
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
-        ): Dimension =
-            Dimension(
+        ): Dimension {
+            check(SwingUtilities.isEventDispatchThread()) { "Preferred grid sizing requires the EDT" }
+            return Dimension(
                 gridPixelExtent(columns, metrics.cellWidth, chrome.horizontalInset(settings, activeBuffer)),
                 gridPixelExtent(rows, metrics.cellHeight, chrome.verticalInset(settings, activeBuffer)),
             )
+        }
 
         private fun resizeSessionToVisibleGridOnEdt(
             publishWhenUnchanged: Boolean = true,
@@ -4026,6 +4172,14 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            copyJob?.cancel()
+            copyJob = null
+            pasteJob?.cancel()
+            pasteJob = null
+            hyperlinkJob?.cancel()
+            hyperlinkJob = null
+            promptAnalysis.reset()
+            promptProjection = null
             stickyCommandHeader.reset()
             painter.clearImages()
             renderCache.reset()
@@ -4139,6 +4293,9 @@ public class SwingTerminal
         private fun requestRenderFromSession(session: TerminalSession) {
             synchronized(resizePublicationLock) {
                 if (resizeResultPending) return
+                // A reflow can clamp the old presentation offset. Wait for its new projection
+                // instead of repeatedly requesting an offset the source cannot publish.
+                if (renderCache.hasFrame && viewportController.promptDividers != null && promptProjection == null) return
                 if (session.state.value is TerminalSessionState.Closed) {
                     refreshRenderCacheFromSession(session)
                     refreshShellIntegrationDecorations(session)
@@ -4198,12 +4355,12 @@ public class SwingTerminal
         }
 
         private fun updatePromptDividers(session: TerminalSession): Boolean {
+            promptProjection = promptAnalysis.projection(promptAnalysisRequest(session))
             val previousRange = viewportController.promptDividers?.scrollRange
             val previousOrigin = viewportController.promptDividers?.liveOrigin
             val previousOffset = viewportController.preciseOffset
             viewportController.updatePromptDividers(
-                reader = session,
-                state = session.shellIntegrationState,
+                layout = promptProjection,
                 enabled =
                     settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
                         renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE,
@@ -4256,12 +4413,38 @@ public class SwingTerminal
                         width,
                         height,
                         graphicsConfiguration,
-                        it,
+                        promptRetained,
                     )
                 } ?: false
+            session?.let {
+                if (renderCache.activeBuffer == TerminalRenderBufferKind.PRIMARY &&
+                    (
+                        settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                            settings.stickyCommandHeadersEnabled &&
+                            stickyCommandHeader.promptLineId != 0L
+                    )
+                ) {
+                    promptAnalysis.request(promptAnalysisRequest(it))
+                } else {
+                    promptAnalysis.reset()
+                }
+            }
             refreshHyperlinkHover()
             return chromeChanged or layoutChanged or originChanged or headerChanged
         }
+
+        private fun promptAnalysisRequest(session: TerminalSession): PromptDecorationAnalysis.Request =
+            PromptDecorationAnalysis.Request(
+                reader = session,
+                state = session.shellIntegrationState,
+                contentGeneration = renderCache.contentGeneration,
+                historyGeneration = renderCache.historyContentGeneration,
+                revision = session.shellIntegrationState.revision.value,
+                visibleRows = visibleGridRows(),
+                retainedOutput = session.state.value is TerminalSessionState.Closed,
+                anchorLineId = viewportController.promptAnchorLineId,
+                promptLineId = stickyCommandHeader.promptLineId,
+            )
 
         private fun selectionPointerY(
             x: Int,

@@ -173,12 +173,14 @@ class SwingTerminalShellSuggestionTest {
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
         hostServices: SwingHostServices = SwingHostServices(),
     ): SwingTerminal =
-        SwingTerminal(
-            settingsProvider,
-            hostServices,
-            searchDispatcher = Dispatchers.Default,
-            mutationDispatcher = mutationDispatcher,
-        )
+        edtCall {
+            SwingTerminal(
+                settingsProvider,
+                hostServices,
+                searchDispatcher = Dispatchers.Default,
+                mutationDispatcher = mutationDispatcher,
+            )
+        }
 
     @Test
     fun `request captured while hiding an older view supersedes the outer begin`() {

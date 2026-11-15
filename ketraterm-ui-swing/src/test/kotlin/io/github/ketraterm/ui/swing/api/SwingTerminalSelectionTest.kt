@@ -149,6 +149,7 @@ class SwingTerminalSelectionTest {
             if (!block) component.mouseListeners.forEach { it.mouseReleased(released) }
             assertEquals(block, component.currentSelection()?.isBlock)
             assertTrue(component.copySelectionToClipboard())
+            mutationDispatcher.scheduler.runCurrent()
             assertEquals("abcdefgh", clipboard.copied.get())
 
             if (fontSize != null) {
@@ -184,6 +185,7 @@ class SwingTerminalSelectionTest {
             } else {
                 assertNotNull(component.currentSelection(), "A no-op resize must preserve selection")
                 assertTrue(component.copySelectionToClipboard())
+                mutationDispatcher.scheduler.runCurrent()
                 assertEquals("abcdefgh", clipboard.copied.get())
             }
             component.mouseListeners.forEach { it.mouseReleased(released) }
@@ -268,15 +270,17 @@ class SwingTerminalSelectionTest {
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
         hostServices: SwingHostServices = SwingHostServices(),
     ): SwingTerminal =
-        SwingTerminal(
-            settingsProvider = settingsProvider,
-            hostServices =
-                hostServices.copy { draft ->
-                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
-                },
-            searchDispatcher = mutationDispatcher,
-            mutationDispatcher = mutationDispatcher,
-        ).also(components::add)
+        edtCall {
+            SwingTerminal(
+                settingsProvider = settingsProvider,
+                hostServices =
+                    hostServices.copy { draft ->
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                searchDispatcher = mutationDispatcher,
+                mutationDispatcher = mutationDispatcher,
+            ).also(components::add)
+        }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -819,6 +823,7 @@ class SwingTerminalSelectionTest {
                     assertEquals(CellSelection.packRange(0, 1), selection.packedColumnRange(row, 3))
                 }
                 assertTrue(component.copySelectionToClipboard())
+                mutationDispatcher.scheduler.runCurrent()
                 assertEquals("A\nג", clipboard.copied.get())
 
                 val selected = componentPixels(component)
@@ -932,6 +937,7 @@ class SwingTerminalSelectionTest {
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
             assertTrue(component.copySelectionToClipboard())
+            mutationDispatcher.scheduler.runCurrent()
         }
 
         assertEquals("hello", clipboard.copied.get())
@@ -987,6 +993,7 @@ class SwingTerminalSelectionTest {
                 mutationDispatcher.scheduler.runCurrent()
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
+                mutationDispatcher.scheduler.runCurrent()
                 assertTrue(component.pasteClipboardText())
                 assertAll(
                     { assertEquals("echo test\ndone", clipboardText) },
@@ -1047,6 +1054,7 @@ class SwingTerminalSelectionTest {
 
                 assertEquals(CellSelection(1, 0, 4, 1, isBlock = block), component.currentSelection())
                 assertTrue(component.copySelectionToClipboard())
+                mutationDispatcher.scheduler.runCurrent()
                 assertEquals(if (block) "bcd\nghi" else "bcdefghi", clipboard.copied.get())
             }
         } finally {
@@ -1092,6 +1100,7 @@ class SwingTerminalSelectionTest {
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
+            mutationDispatcher.scheduler.runCurrent()
         }
 
         assertEquals("hi", clipboard.copied.get())
@@ -1125,6 +1134,7 @@ class SwingTerminalSelectionTest {
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
+            mutationDispatcher.scheduler.runCurrent()
         }
 
         assertEquals("", clipboard.copied.get())

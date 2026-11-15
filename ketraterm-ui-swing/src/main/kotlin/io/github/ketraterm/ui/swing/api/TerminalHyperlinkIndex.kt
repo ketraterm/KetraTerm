@@ -16,7 +16,6 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import java.util.*
 
@@ -117,11 +116,10 @@ internal class TerminalHyperlinkIndex {
 
     /**
      * A visible wrapped prefix may depend on live rows outside the viewport. On content changes,
-     * inspect only those previously live row stamps in bounded locked reads; mutate the index
-     * after unlocking. Complete text reconstruction stays on the worker.
+     * withhold actions whose previously live dependencies are not in the copied viewport.
+     * The source worker will validate/rebuild them without borrowing a live frame on the EDT.
      */
     fun invalidateUnobservedEdits(
-        reader: TerminalRenderFrameReader,
         cache: TerminalRenderCache,
         previousLiveTop: Long,
     ) {
@@ -137,36 +135,9 @@ internal class TerminalHyperlinkIndex {
             val snapshot = line.snapshot
             row = snapshot.lastAbsoluteRow + 1L
             if (!line.sourceCurrent || line.links.isEmpty()) continue
-            var next = maxOf(snapshot.firstAbsoluteRow, previousLiveTop, cache.discardedCount)
-            var valid = true
-            while (valid && next <= snapshot.lastAbsoluteRow) {
-                if (next in top until end) {
-                    next = end
-                    continue
-                }
-                val last = minOf(snapshot.lastAbsoluteRow, next + ANALYSIS_LINES - 1L, if (next < top) top - 1L else Long.MAX_VALUE)
-                valid = false
-                reader.readRenderFrameForAbsoluteRange(next, last) { frame ->
-                    val first = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-                    valid =
-                        frame.historyContentGeneration == cache.historyContentGeneration &&
-                        first <= next &&
-                        first + frame.rows > last
-                    if (valid) {
-                        for (absolute in next..last) {
-                            if (!snapshot.matchesSourceRow(frame, (absolute - first).toInt(), absolute)) {
-                                valid = false
-                                break
-                            }
-                        }
-                    }
-                }
-                next = last + 1L
-            }
-            if (!valid) {
-                release(line)
+            val firstMutableRow = maxOf(snapshot.firstAbsoluteRow, previousLiveTop, cache.discardedCount)
+            if (firstMutableRow <= snapshot.lastAbsoluteRow && (firstMutableRow < top || snapshot.lastAbsoluteRow >= end)) {
                 line.sourceCurrent = false
-                line.independentComplete = false
                 invalidateSourceScan()
                 restartOrdered()
                 invalidateDependencies(snapshot.firstAbsoluteRow, snapshot.lastAbsoluteRow)
@@ -325,7 +296,10 @@ internal class TerminalHyperlinkIndex {
                     it.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow &&
                     it.snapshot.firstLineId == snapshot.firstLineId
             }
-        if (previous?.snapshot === snapshot) return
+        if (previous?.snapshot === snapshot) {
+            previous.sourceCurrent = true
+            return
+        }
         val line = Line(snapshot)
         if (previous != null) {
             val sameText = previous.snapshot.text == snapshot.text
@@ -622,7 +596,7 @@ internal class TerminalHyperlinkIndex {
     fun hyperlinkFor(
         id: Int,
         cache: TerminalRenderCache,
-    ): SwingHyperlink? = if (id < 0 && matches(cache)) actions.get(id) else null
+    ): SwingHyperlink? = if (id < 0 && matches(cache) && ids.indexOf(id) in 0 until rows * columns) actions.get(id) else null
 
     fun writeOverlay(
         cache: TerminalRenderCache,
@@ -638,7 +612,7 @@ internal class TerminalHyperlinkIndex {
         var row = 0
         while (row < rows) {
             val line = lineAt(top + row)
-            if (line == null) {
+            if (line == null || !line.sourceCurrent) {
                 row++
                 continue
             }

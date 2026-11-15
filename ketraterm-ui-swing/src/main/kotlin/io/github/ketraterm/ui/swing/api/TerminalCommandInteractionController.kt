@@ -29,11 +29,9 @@ internal class TerminalCommandInteractionController(
 ) {
     private val commandOutputRangeScratch = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
     private val commandBlockRangeScratch = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS)
-    private val textReader = TerminalSelectionTextReader()
     private var rangeStart = NO_COMMAND_ABSOLUTE_ROW
     private var rangeEnd = NO_COMMAND_ABSOLUTE_ROW
     private var rangeColumns = 0
-    private var rangeContentGeneration = 0L
 
     fun scrollToCommand(previous: Boolean): Boolean {
         val boundSession = host.session ?: return false
@@ -123,17 +121,42 @@ internal class TerminalCommandInteractionController(
         return true
     }
 
-    fun commandOutputText(recordId: Int): String? {
+    fun commandOutputText(recordId: Int): String? = captureTextRead(recordId)?.invoke {}
+
+    /** Captures command identities on the EDT; resolves rows and extracts text on the caller's worker. */
+    fun captureTextRead(recordId: Int): TerminalTextRead? {
         val boundSession = host.session ?: return null
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
-        val shellState = boundSession.shellIntegrationState
-        if (!shellState.copyCommandOutputRange(recordId, commandOutputRangeScratch)) return null
-
+        if (!boundSession.shellIntegrationState.copyCommandOutputRange(recordId, commandOutputRangeScratch)) return null
         val startLineId = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.START_LINE_ID_INDEX]
         val endLineId = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.END_LINE_ID_INDEX]
         val includeStart = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.START_INCLUSIVE_INDEX] != 0L
-        if (!resolveRange(boundSession, startLineId, endLineId, includeStart)) return null
-        return textReader.read(boundSession, rangeStart, 0, rangeEnd, rangeColumns, expectedContentGeneration = rangeContentGeneration)
+        return { checkCancelled ->
+            checkCancelled()
+            var start = NO_COMMAND_ABSOLUTE_ROW
+            var end = NO_COMMAND_ABSOLUTE_ROW
+            var columns = 0
+            var content = 0L
+            boundSession.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE) { frame ->
+                start = firstCommandOutputAbsoluteRow(frame, startLineId, endLineId, includeStart, checkCancelled)
+                end = lastLineAbsoluteRow(frame, startLineId, endLineId, checkCancelled)
+                columns = frame.columns
+                content = frame.contentGeneration
+            }
+            if (start == NO_COMMAND_ABSOLUTE_ROW || end < start) {
+                null
+            } else {
+                TerminalSelectionTextReader().read(
+                    boundSession,
+                    start,
+                    0,
+                    end,
+                    columns,
+                    expectedContentGeneration = content,
+                    checkCancelled = checkCancelled,
+                )
+            }
+        }
     }
 
     private fun currentCommandNavigationLineId(): Long? {
@@ -157,86 +180,95 @@ internal class TerminalCommandInteractionController(
             rangeStart = firstCommandOutputAbsoluteRow(frame, startLineId, endLineId, includeStart)
             rangeEnd = lastLineAbsoluteRow(frame, startLineId, endLineId)
             rangeColumns = frame.columns
-            rangeContentGeneration = frame.contentGeneration
         }
         return rangeStart != NO_COMMAND_ABSOLUTE_ROW && rangeEnd != NO_COMMAND_ABSOLUTE_ROW && rangeEnd >= rangeStart
     }
 
-    private fun absoluteRowForLineId(
-        frame: TerminalRenderFrame,
-        lineId: Long,
-        last: Boolean = false,
-    ): Long {
-        val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-        var row = if (last) frame.rows - 1 else 0
-        while (row in 0 until frame.rows) {
-            if (frame.lineId(row) == lineId) return firstAbsoluteRow + row
-            row += if (last) -1 else 1
-        }
-        return NO_COMMAND_ABSOLUTE_ROW
-    }
-
-    private fun firstCommandOutputAbsoluteRow(
-        frame: TerminalRenderFrame,
-        startLineId: Long,
-        endLineId: Long,
-        includeStart: Boolean,
-    ): Long {
-        val start = absoluteRowForLineId(frame, startLineId, last = !includeStart)
-        val end = absoluteRowForLineId(frame, endLineId, last = true)
-        if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
-            val first = start + if (includeStart) 0 else 1
-            return if (first <= end) first else NO_COMMAND_ABSOLUTE_ROW
-        }
-        if (!hasMonotonicLineIds(frame)) return NO_COMMAND_ABSOLUTE_ROW
-        val firstLineId = minOf(startLineId, endLineId)
-        val lastLineId = maxOf(startLineId, endLineId)
-        val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-        var row = 0
-        while (row < frame.rows) {
-            val lineId = frame.lineId(row)
-            if (lineId in firstLineId..lastLineId && (includeStart || lineId != startLineId)) {
-                return firstAbsoluteRow + row
-            }
-            row++
-        }
-        return NO_COMMAND_ABSOLUTE_ROW
-    }
-
-    private fun lastLineAbsoluteRow(
-        frame: TerminalRenderFrame,
-        startLineId: Long,
-        endLineId: Long,
-    ): Long {
-        val start = absoluteRowForLineId(frame, startLineId)
-        val end = absoluteRowForLineId(frame, endLineId, last = true)
-        if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
-            return if (start <= end) end else NO_COMMAND_ABSOLUTE_ROW
-        }
-        if (!hasMonotonicLineIds(frame)) return NO_COMMAND_ABSOLUTE_ROW
-        val firstLineId = minOf(startLineId, endLineId)
-        val lastLineId = maxOf(startLineId, endLineId)
-        val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-        var row = frame.rows - 1
-        while (row >= 0) {
-            val lineId = frame.lineId(row)
-            if (lineId in firstLineId..lastLineId) return firstAbsoluteRow + row
-            row--
-        }
-        return NO_COMMAND_ABSOLUTE_ROW
-    }
-
-    private fun hasMonotonicLineIds(frame: TerminalRenderFrame): Boolean {
-        var previous = 0L
-        for (row in 0 until frame.rows) {
-            val id = frame.lineId(row)
-            if (id <= 0 || id < previous) return false
-            previous = id
-        }
-        return true
-    }
-
     private companion object {
+        private fun absoluteRowForLineId(
+            frame: TerminalRenderFrame,
+            lineId: Long,
+            last: Boolean = false,
+            checkCancelled: () -> Unit = {},
+        ): Long {
+            val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+            var row = if (last) frame.rows - 1 else 0
+            while (row in 0 until frame.rows) {
+                if (row and 255 == 0) checkCancelled()
+                if (frame.lineId(row) == lineId) return firstAbsoluteRow + row
+                row += if (last) -1 else 1
+            }
+            return NO_COMMAND_ABSOLUTE_ROW
+        }
+
+        private fun firstCommandOutputAbsoluteRow(
+            frame: TerminalRenderFrame,
+            startLineId: Long,
+            endLineId: Long,
+            includeStart: Boolean,
+            checkCancelled: () -> Unit = {},
+        ): Long {
+            val start = absoluteRowForLineId(frame, startLineId, last = !includeStart, checkCancelled = checkCancelled)
+            val end = absoluteRowForLineId(frame, endLineId, last = true, checkCancelled = checkCancelled)
+            if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
+                val first = start + if (includeStart) 0 else 1
+                return if (first <= end) first else NO_COMMAND_ABSOLUTE_ROW
+            }
+            if (!hasMonotonicLineIds(frame, checkCancelled)) return NO_COMMAND_ABSOLUTE_ROW
+            val firstLineId = minOf(startLineId, endLineId)
+            val lastLineId = maxOf(startLineId, endLineId)
+            val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+            var row = 0
+            while (row < frame.rows) {
+                if (row and 255 == 0) checkCancelled()
+                val lineId = frame.lineId(row)
+                if (lineId in firstLineId..lastLineId && (includeStart || lineId != startLineId)) {
+                    return firstAbsoluteRow + row
+                }
+                row++
+            }
+            return NO_COMMAND_ABSOLUTE_ROW
+        }
+
+        private fun lastLineAbsoluteRow(
+            frame: TerminalRenderFrame,
+            startLineId: Long,
+            endLineId: Long,
+            checkCancelled: () -> Unit = {},
+        ): Long {
+            val start = absoluteRowForLineId(frame, startLineId, checkCancelled = checkCancelled)
+            val end = absoluteRowForLineId(frame, endLineId, last = true, checkCancelled = checkCancelled)
+            if (start != NO_COMMAND_ABSOLUTE_ROW && end != NO_COMMAND_ABSOLUTE_ROW) {
+                return if (start <= end) end else NO_COMMAND_ABSOLUTE_ROW
+            }
+            if (!hasMonotonicLineIds(frame, checkCancelled)) return NO_COMMAND_ABSOLUTE_ROW
+            val firstLineId = minOf(startLineId, endLineId)
+            val lastLineId = maxOf(startLineId, endLineId)
+            val firstAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+            var row = frame.rows - 1
+            while (row >= 0) {
+                if (row and 255 == 0) checkCancelled()
+                val lineId = frame.lineId(row)
+                if (lineId in firstLineId..lastLineId) return firstAbsoluteRow + row
+                row--
+            }
+            return NO_COMMAND_ABSOLUTE_ROW
+        }
+
+        private fun hasMonotonicLineIds(
+            frame: TerminalRenderFrame,
+            checkCancelled: () -> Unit,
+        ): Boolean {
+            var previous = 0L
+            for (row in 0 until frame.rows) {
+                if (row and 255 == 0) checkCancelled()
+                val id = frame.lineId(row)
+                if (id <= 0 || id < previous) return false
+                previous = id
+            }
+            return true
+        }
+
         private const val NO_COMMAND_ABSOLUTE_ROW = Long.MIN_VALUE
         private const val NO_LINE_ID = 0L
 

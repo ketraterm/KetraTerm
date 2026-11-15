@@ -285,6 +285,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun clearSearch ()V
 	public final fun clearSelection ()V
 	public final fun commandOutputText (I)Ljava/lang/String;
+	public final fun commandOutputTextAsync (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun commandRecordAt (II)I
 	public final fun copyCellBounds (IILjava/awt/Rectangle;)Z
 	public final fun copyCellPositionAt (IILjava/awt/Point;)Z
@@ -354,6 +355,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun selectNextSearchResult ()V
 	public final fun selectPreviousSearchResult ()V
 	public final fun selectedText ()Ljava/lang/String;
+	public final fun selectedTextAsync (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
 	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun setHostPolicy$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
@@ -887,15 +889,21 @@ public abstract interface class io/github/ketraterm/ui/swing/settings/TerminalCl
 	public static final field Companion Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler$Companion;
 	public static final field SYSTEM Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
 	public abstract fun copyText (Ljava/lang/String;)V
+	public fun copyTextAsync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readPrimarySelectionText ()Ljava/lang/String;
+	public fun readPrimarySelectionTextAsync (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun readText ()Ljava/lang/String;
+	public fun readTextAsync (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/ketraterm/ui/swing/settings/TerminalClipboardHandler$Companion {
 }
 
 public final class io/github/ketraterm/ui/swing/settings/TerminalClipboardHandler$DefaultImpls {
+	public static fun copyTextAsync (Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun readPrimarySelectionText (Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;)Ljava/lang/String;
+	public static fun readPrimarySelectionTextAsync (Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun readTextAsync (Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class io/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler {
@@ -903,9 +911,14 @@ public abstract interface class io/github/ketraterm/ui/swing/settings/TerminalHy
 	public static final field NONE Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
 	public static final field SYSTEM Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
 	public abstract fun openHyperlink (Ljava/lang/String;)Z
+	public fun openHyperlinkAsync (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler$Companion {
+}
+
+public final class io/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler$DefaultImpls {
+	public static fun openHyperlinkAsync (Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/ketraterm/ui/swing/settings/TerminalTheme : java/lang/Enum {

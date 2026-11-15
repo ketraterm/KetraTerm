@@ -126,7 +126,11 @@ wraps; block selection preserves row breaks. Missing selection returns `null`,
 while a nonempty range of trimmed blanks may return an empty string. It includes
 offscreen rows and closed-session output. Extraction may clip evicted rows or
 clear invalidated selection; resulting listener notifications occur outside the
-frame lease. Clipboard copying shares this extraction.
+frame lease. `selectedTextAsync()` captures selection on the EDT and performs
+the same extraction on a worker, rejecting an obsolete selection on return.
+Clipboard copy actions use this worker path and return request acceptance;
+host suspend clipboard callbacks start on the EDT and native system access runs on a worker. `commandOutputTextAsync(recordId)` also
+moves command row resolution off the EDT. See the [selection API](../README.md#selection-and-cell-coordinates).
 
 Extraction returns `null` if content or layout changes during copying, rather
 than combining text from different revisions. Ordinary edits preserve the range

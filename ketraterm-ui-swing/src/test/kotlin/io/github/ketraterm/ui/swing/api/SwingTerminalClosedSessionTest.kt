@@ -144,7 +144,16 @@ class SwingTerminalClosedSessionTest {
                 it.shellIntegrationDecorationGutterWidth = 0
             }
         edt {
-            val component = SwingTerminal({ settings }, SwingHostServices.create { it.clipboardHandler = clipboard })
+            val component =
+                SwingTerminal(
+                    { settings },
+                    SwingHostServices.create {
+                        it.clipboardHandler = clipboard
+                        it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
             try {
                 component.size = component.preferredGridSize(6, 1, buffer)
                 component.bind(session)
@@ -168,19 +177,23 @@ class SwingTerminalClosedSessionTest {
 
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
                 resize(component, 4, 2, buffer)
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
                 assertFalse(component.copyCellBounds(8, 0, Rectangle()), "narrow views clip columns")
 
                 settings = settings.copy { it.columnSpacing = columnSpacing }
                 component.reloadSettings()
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
                 settings = settings.copy { it.font = it.font.deriveFont(24f) }
                 component.reloadSettings()
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
                 resize(component, 12, 8, buffer)
                 assertEquals(0, component.viewportState().historySize)
@@ -195,6 +208,7 @@ class SwingTerminalClosedSessionTest {
                 )
                 assertEquals(Point(8, 0), cellPosition)
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
 
                 val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
@@ -210,6 +224,7 @@ class SwingTerminalClosedSessionTest {
                 component.bind(session)
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
+                dispatcher.scheduler.runCurrent()
                 assertEquals(expected, clipboard.text.trimEnd())
             } finally {
                 component.dispose()
@@ -293,6 +308,7 @@ class SwingTerminalClosedSessionTest {
             )
         component.mouseListeners.forEach { it.mouseReleased(release) }
         assertTrue(component.copySelectionToClipboard())
+        dispatcher.scheduler.runCurrent()
         assertEquals(expected, clipboard.text)
     }
 

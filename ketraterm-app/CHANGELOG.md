@@ -28,6 +28,12 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Keyboard, selection, and navigation
 
+- Large selection copies and command-output exports extract text off the UI thread.
+  Cancelling export before choosing a destination avoids extraction; unavailable output
+  leaves an existing destination untouched.
+- Native clipboard access and browser activation run off the UI thread. Paste review stays
+  on the UI thread, and closing or replacing the originating pane discards pending paste results.
+
 - Added temporary font zoom and reset for each pane, Windows Ctrl+Shift+C/V clipboard shortcuts,
   and window-scoped tab and pane shortcuts.
 - History paging keeps one row of context. Shift+Home/End jumps to oldest history or live output.
@@ -36,6 +42,8 @@ Released versions: [0.5.0](#050---2026-11-09) · [0.4.0](#040---2026-10-31) ·
 
 ### Startup and session recovery
 
+- Configuration loads before UI construction. Shell discovery for tabs, splits,
+  and settings runs on workers; directory-aware menus resolve paths without blocking the UI.
 - Hand-edited TOML basic strings decode escapes correctly, including quoted `#`
   characters and Windows paths. Malformed strings use configuration recovery.
 - New configurations use 100 × 28 cells and 10,000 scrollback lines. The initial window fits the
