@@ -75,6 +75,59 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `scrolling after an insertion keeps spatial order without rereading old history`() {
+        val terminal = TerminalBuffers.create(12, 8, maxHistory = 20_000)
+        repeat(1_250) { terminal.scrollUp(8) }
+        terminal.readRenderFrame { assertEquals(10_000, it.historySize) }
+        var rangeRows = 0
+        var identityReads = 0
+        val reader =
+            object : TerminalRenderFrameReader by terminal {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    terminal.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
+                        rangeRows += frame.rows
+                        consumer.accept(
+                            object : TerminalRenderFrame by frame {
+                                override fun lineId(row: Int): Long {
+                                    identityReads++
+                                    return frame.lineId(row)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        val state = TerminalShellIntegrationState()
+        state.updateLineOrder(reader)
+        terminal.positionCursor(0, 2)
+        terminal.insertLines(1)
+        val anchors = LongArray(4)
+        terminal.readRenderFrame { frame -> for (row in anchors.indices) anchors[row] = frame.lineId(row) }
+        state.recordCommandStart(anchors[1], includeLine = true)
+        state.recordCommandFinished(anchors[3], exitCode = 0)
+        val record = state.latestCommandRecordId()
+        state.updateLineOrder(reader)
+        rangeRows = 0
+        identityReads = 0
+
+        repeat(3) {
+            terminal.scrollUp(1)
+            state.updateLineOrder(reader)
+        }
+
+        val range = LongArray(3)
+        assertTrue(state.copyCommandOutputRange(record, range))
+        assertContentEquals(longArrayOf(anchors[1], anchors[3], 1), range)
+        assertEquals(record, state.commandOutputRecordIdAtLine(anchors[2]))
+        assertEquals(3 * (8 + 2), rangeRows)
+        assertTrue(identityReads <= 3 * 8 * 8, "ordinary scrolling read $identityReads identities")
+    }
+
+    @Test
     fun `ordinary scrolling inspects only the affected suffix after warming a large history`() {
         val terminal = TerminalBuffers.create(12, 8, maxHistory = 20_000)
         repeat(1_250) { terminal.scrollUp(8) }
