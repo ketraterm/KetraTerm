@@ -22,7 +22,13 @@ Session render publication is copied into an EDT-owned cache. Painting and hit
 testing share visual geometry; routine painting does not read a live session
 frame. Search, selection extraction, and discovery may take synchronized source
 reads. Background search and hyperlink workers publish results through binding
-and revision checks; they never access Swing state directly.
+and revision checks; they never access Swing state directly. Hyperlink source
+validation also runs on the worker; publication checks the copied viewport revision.
+
+`PromptDecorationAnalysis` serializes and coalesces prompt indexing and sticky
+header retention checks on a worker. The EDT consumes detached projections matched
+to the frame and shell metadata revision. Reflow anchors stay pending until the
+matching projection arrives; superseded bindings cannot publish their results.
 
 `InlineShellSuggestion` checks copied live cells for collisions and clips its
 detached suffix cache. `InlineShellSuggestionController` independently owns managed

@@ -437,7 +437,7 @@ class StickyCommandHeaderTest {
                 360,
                 22,
                 configuration,
-                fixture.retainedFrame,
+                { id -> (0 until fixture.retainedFrame.rows).any { fixture.retainedFrame.lineId(it) == id } },
             )
             val clipped = paint()
             val x = (200 * scale).toInt()
@@ -521,7 +521,13 @@ class StickyCommandHeaderTest {
                     360,
                     60,
                     null,
-                    source,
+                    { id ->
+                        var retained = false
+                        source.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE) { frame ->
+                            retained = (0 until frame.rows).any { frame.lineId(it) == id }
+                        }
+                        retained
+                    },
                 )
             }
             refresh()
@@ -561,17 +567,16 @@ class StickyCommandHeaderTest {
         }
 
     @Test
-    fun `fractional scrolling reuses prompt retention checks`() =
+    fun `fractional scrolling preserves the header until prompt retention changes`() =
         onEdt {
             val fixture = Fixture()
             fixture.update()
-            val reads = fixture.retainedLineReads
-            assertTrue(reads > 0)
+            val record = fixture.header.recordId
             for (tick in 1..30) {
                 fixture.geometry.updateContentOrigin(-tick / 100.0)
                 fixture.update()
             }
-            assertEquals(reads, fixture.retainedLineReads)
+            assertEquals(record, fixture.header.recordId)
             fixture.install(retainedFirstLine = 2)
             fixture.update()
             assertFalse(fixture.header.visible)
@@ -666,7 +671,10 @@ class StickyCommandHeaderTest {
         fun update(
             width: Int = 360,
             configuration: GraphicsConfiguration? = null,
-        ): Boolean = header.update(view, cache, geometry, settings, METRICS, width, 60, configuration, retainedFrame)
+        ): Boolean =
+            header.update(view, cache, geometry, settings, METRICS, width, 60, configuration) { id ->
+                (0 until retainedFrame.rows).any { retainedFrame.lineId(it) == id }
+            }
     }
 
     private class ScaledConfiguration(

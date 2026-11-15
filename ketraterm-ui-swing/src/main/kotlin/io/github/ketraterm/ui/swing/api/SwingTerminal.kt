@@ -255,6 +255,18 @@ public class SwingTerminal
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
         private val stickyCommandHeader = StickyCommandHeader(chrome, hostServices.fontResolver)
+        private var promptProjection: PromptDividerLayout? = null
+        private val promptRetained: (Long) -> Boolean = { it != 0L && promptProjection?.retainedPromptLineId == it }
+        private val promptAnalysis =
+            PromptDecorationAnalysis(componentScope, searchDispatcher) {
+                val bound = session
+                if (!disposed && bound != null && renderCache.hasFrame && !isResizePublicationPending()) {
+                    refreshShellIntegrationDecorations(bound)
+                    if (renderCache.scrollbackOffset != viewportController.requestedOffset) requestRenderFromSession(bound)
+                    publishViewportState(renderCache.historySize)
+                    renderFrameController.repaintFrame(forceFullRepaint = true)
+                }
+            }
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
         private var hyperlinkCursor: Cursor = DEFAULT_CURSOR
         private val terminalMouseListener =
@@ -4038,6 +4050,8 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            promptAnalysis.reset()
+            promptProjection = null
             stickyCommandHeader.reset()
             painter.clearImages()
             renderCache.reset()
@@ -4151,6 +4165,9 @@ public class SwingTerminal
         private fun requestRenderFromSession(session: TerminalSession) {
             synchronized(resizePublicationLock) {
                 if (resizeResultPending) return
+                // A reflow can clamp the old presentation offset. Wait for its new projection
+                // instead of repeatedly requesting an offset the source cannot publish.
+                if (renderCache.hasFrame && viewportController.promptDividers != null && promptProjection == null) return
                 if (session.state.value is TerminalSessionState.Closed) {
                     refreshRenderCacheFromSession(session)
                     refreshShellIntegrationDecorations(session)
@@ -4210,12 +4227,12 @@ public class SwingTerminal
         }
 
         private fun updatePromptDividers(session: TerminalSession): Boolean {
+            promptProjection = promptAnalysis.projection(promptAnalysisRequest(session))
             val previousRange = viewportController.promptDividers?.scrollRange
             val previousOrigin = viewportController.promptDividers?.liveOrigin
             val previousOffset = viewportController.preciseOffset
             viewportController.updatePromptDividers(
-                reader = session,
-                state = session.shellIntegrationState,
+                layout = promptProjection,
                 enabled =
                     settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
                         renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE,
@@ -4268,12 +4285,37 @@ public class SwingTerminal
                         width,
                         height,
                         graphicsConfiguration,
-                        it,
+                        promptRetained,
                     )
                 } ?: false
+            session?.let {
+                if (renderCache.activeBuffer == TerminalRenderBufferKind.PRIMARY &&
+                    (
+                        settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                            settings.stickyCommandHeadersEnabled && stickyCommandHeader.promptLineId != 0L
+                    )
+                ) {
+                    promptAnalysis.request(promptAnalysisRequest(it))
+                } else {
+                    promptAnalysis.reset()
+                }
+            }
             refreshHyperlinkHover()
             return chromeChanged or layoutChanged or originChanged or headerChanged
         }
+
+        private fun promptAnalysisRequest(session: TerminalSession): PromptDecorationAnalysis.Request =
+            PromptDecorationAnalysis.Request(
+                reader = session,
+                state = session.shellIntegrationState,
+                contentGeneration = renderCache.contentGeneration,
+                historyGeneration = renderCache.historyContentGeneration,
+                revision = session.shellIntegrationState.revision.value,
+                visibleRows = visibleGridRows(),
+                retainedOutput = session.state.value is TerminalSessionState.Closed,
+                anchorLineId = viewportController.promptAnchorLineId,
+                promptLineId = stickyCommandHeader.promptLineId,
+            )
 
         private fun selectionPointerY(
             x: Int,

@@ -18,8 +18,6 @@ package io.github.ketraterm.ui.swing.render
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderFrame
-import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderRowSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationView
@@ -51,13 +49,7 @@ internal class StickyCommandHeader(
     private var uncoveredRecordId = 0
     private var selectedRecordId = 0
     private var prompt: TerminalRenderRowSnapshot? = null
-    private var checkedReader: TerminalRenderFrameReader? = null
-    private var checkedPrompt: TerminalRenderRowSnapshot? = null
-    private var checkedContentGeneration = Long.MIN_VALUE
-    private var promptAbsoluteRow = -1L
-    private var promptHistoryGeneration = Long.MIN_VALUE
-    private var promptRetained = false
-    private val retentionConsumer = TerminalRenderFrameConsumer(::checkPromptRetention)
+    val promptLineId: Long get() = prompt?.lineId(0) ?: 0L
     private var raster: BufferedImage? = null
     private var rasterPrompt: TerminalRenderRowSnapshot? = null
     private var rasterPalette: TerminalColorPalette? = null
@@ -96,7 +88,7 @@ internal class StickyCommandHeader(
         width: Int,
         height: Int,
         graphicsConfiguration: GraphicsConfiguration?,
-        reader: TerminalRenderFrameReader,
+        isPromptRetained: (Long) -> Boolean,
     ): Boolean {
         if (source !== state) {
             source = state
@@ -104,8 +96,6 @@ internal class StickyCommandHeader(
             queriedRevision = Long.MIN_VALUE
             selectedRecordId = 0
             prompt = null
-            checkedReader = null
-            checkedPrompt = null
         }
         val top = chrome.top(settings, cache.activeBuffer)
         val left = settings.padding.left
@@ -144,15 +134,7 @@ internal class StickyCommandHeader(
         }
         val capturedPrompt = prompt
         if (selectedRecordId == 0 || capturedPrompt == null) return hide()
-        if (checkedReader !== reader || checkedPrompt !== capturedPrompt || checkedContentGeneration != cache.contentGeneration) {
-            if (checkedReader !== reader || checkedPrompt !== capturedPrompt) promptAbsoluteRow = -1L
-            checkedReader = reader
-            checkedPrompt = capturedPrompt
-            checkedContentGeneration = cache.contentGeneration
-            promptRetained = false
-            reader.readRenderFrameForAbsoluteRange(0, Long.MAX_VALUE, retentionConsumer)
-        }
-        if (!promptRetained) return hide()
+        if (!isPromptRetained(promptLineId)) return hide()
 
         // Keep context only when some of its output remains below the opaque overlay.
         val uncoveredRow = geometry.rowAt(floor(metrics.cellHeight - geometry.contentOriginY).toInt())
@@ -290,10 +272,6 @@ internal class StickyCommandHeader(
         queriedRevision = Long.MIN_VALUE
         selectedRecordId = 0
         prompt = null
-        checkedReader = null
-        checkedPrompt = null
-        promptAbsoluteRow = -1L
-        promptRetained = false
         promptCache.reset()
         promptPainter.clearImages()
         raster?.flush()
@@ -304,30 +282,6 @@ internal class StickyCommandHeader(
         rasterMetrics = null
         pressedButtons = 0
         pressedSource = null
-    }
-
-    private fun checkPromptRetention(frame: TerminalRenderFrame) {
-        if (frame.activeBuffer != TerminalRenderBufferKind.PRIMARY) return
-        val lineId = checkedPrompt?.lineId(0) ?: return
-        if (lineId <= 0) return
-        if (promptHistoryGeneration != frame.historyContentGeneration) {
-            promptAbsoluteRow = -1L
-            promptHistoryGeneration = frame.historyContentGeneration
-        }
-        val first = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-        val row = promptAbsoluteRow - first
-        if (row >= 0 && row < frame.rows && frame.lineId(row.toInt()) == lineId) {
-            promptRetained = true
-            return
-        }
-        if (promptAbsoluteRow >= 0 && promptAbsoluteRow < frame.discardedCount) return
-        for (index in 0 until frame.rows) {
-            if (frame.lineId(index) == lineId) {
-                promptAbsoluteRow = first + index
-                promptRetained = true
-                return
-            }
-        }
     }
 
     private fun hide(): Boolean {

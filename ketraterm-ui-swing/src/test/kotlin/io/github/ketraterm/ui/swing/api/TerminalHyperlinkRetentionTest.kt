@@ -116,9 +116,12 @@ class TerminalHyperlinkRetentionTest {
             fixture.terminal.positionCursor(0, 3)
             fixture.terminal.writeText("changed")
             fixture.showAbsolute(11)
-            assertEquals(id, fixture.idAt(0))
+            assertEquals(0, fixture.idAt(0), "A clipped live dependency must be validated before activation")
+            assertFalse(fixture.resolvable(id))
+            val detections = fixture.detected.count { it == "$url\n" }
             fixture.settle()
             assertEquals(id, fixture.idAt(0))
+            assertEquals(detections, fixture.detected.count { it == "$url\n" }, "Unchanged text must reuse its prepared action")
             assertTrue(fixture.openAt(0))
             assertEquals(url, fixture.opened.last())
         }
@@ -434,7 +437,8 @@ class TerminalHyperlinkRetentionTest {
             repeat(3) { fixture.output("next") }
             fixture.showAbsolute(2)
             assertEquals(2L, fixture.cache.discardedCount)
-            assertEquals(id, fixture.idAt(0))
+            assertEquals(0, fixture.idAt(0), "The surviving wrapped dependency is validated on the worker")
+            assertFalse(fixture.resolvable(id))
             fixture.settle()
             assertEquals(id, fixture.idAt(0), "An unchanged retained suffix must keep its full prepared occurrence")
             assertTrue(fixture.openAt(0))
@@ -611,7 +615,7 @@ class TerminalHyperlinkRetentionTest {
             val lineIds = fixture.copy.cache.lineIds
 
             val validated = assertNotNull(fixture.scanner.validate(fixture.reader, scanned.lines, fixture.history))
-            assertTrue(validated.validLines.single())
+            assertTrue(validated.single())
             fixture.assertReleased()
             assertSame(words, fixture.copy.cache.codeWords)
             assertSame(attributes, fixture.copy.cache.attrWords)

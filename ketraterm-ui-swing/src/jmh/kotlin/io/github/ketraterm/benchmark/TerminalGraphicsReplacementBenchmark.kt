@@ -32,10 +32,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Allocation-permitted raw RGBA replacement, publication and Swing raster preparation.
- * Each invocation transmits new pixels under the same image ID, replaces its placement,
+ * [replaceAndPrepare] transmits new pixels under the same image ID, replaces its placement,
  * copies the published frame and builds a new raster. Upload bytes and Base64 encoding
  * are prepared once; parsing, staging growth, canonical pixels, pressure eviction and
- * raster construction remain measured. PNG/zlib decoding and painting are excluded.
+ * raster construction remain measured. [prepareRaster] isolates raster construction from
+ * already published pixels. PNG/zlib decoding and painting are excluded from both methods.
  *
  * @property side source image width and height in pixels.
  */
@@ -83,6 +84,14 @@ open class TerminalGraphicsReplacementBenchmark {
         next = next xor 1
         publisher.updateAndPublish(terminal)
         publisher.readCurrent { cache.updateFrom(it) }
+        rasters.prepare(cache.images)
+        return rasters.image(0)
+    }
+
+    /** Measures a raster cache miss for already published pixels, excluding upload and publication. */
+    @Benchmark
+    fun prepareRaster(): BufferedImage {
+        rasters.clear()
         rasters.prepare(cache.images)
         return rasters.image(0)
     }

@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.*
 import java.awt.event.MouseEvent
+import kotlin.time.Duration.Companion.milliseconds
 
 internal interface TerminalHyperlinkDiscoveryHost {
     val renderCache: TerminalRenderCache
@@ -145,7 +146,7 @@ internal class TerminalHyperlinkDiscoveryController(
             val changes = detector.configurationChanges
             configurationJob = scope.launch { changes.collect { scheduleForFrame() } }
         }
-        if (changed && previousLiveTop >= 0L) index.invalidateUnobservedEdits(source, cache, previousLiveTop)
+        if (changed && previousLiveTop >= 0L) index.invalidateUnobservedEdits(cache, previousLiveTop)
         previousLiveTop = cache.discardedCount + cache.historySize
         if (projectionChanged || changed) {
             if (index.writeOverlay(cache, repaintSpan)) host.hyperlinksChanged()
@@ -355,27 +356,19 @@ internal class TerminalHyperlinkDiscoveryController(
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
                     if (lane === independent) validationLines = index.independentValidationLines(lines)
                     val validSources: BooleanArray
-                    val validation =
+                    val observedContent = cache.contentGeneration
+                    val validLines =
                         withContext(analysisDispatcher) {
                             scanner.validate(requestSource, validationLines, history)
                         }
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
-                    var current = false
-                    requestSource.readRenderFrame { frame ->
-                        current = validation != null &&
-                            frame.contentGeneration == validation.contentGeneration &&
-                            frame.historyContentGeneration == history &&
-                            frame.activeBuffer == sourceBuffer &&
-                            frame.columns == sourceColumns
-                    }
-                    if (!current) {
+                    if (validLines == null || cache.contentGeneration != observedContent) {
                         index.invalidateSource(validationLines)
                         publishOverlay()
                         priorityTop = -1L
                         recover = true
                         return@launch
                     }
-                    val validLines = checkNotNull(validation).validLines
                     if (lane === ordered && validLines.any { !it }) {
                         index.invalidateSource(validationLines, validLines)
                         publishOverlay()
@@ -483,7 +476,7 @@ internal class TerminalHyperlinkDiscoveryController(
         val waitMillis = RECOVERY_DELAYS[lane.recoveryAttempt++]
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
-                delay(waitMillis)
+                delay(waitMillis.milliseconds)
                 lane.recoveryJob = null
                 startAnalysis()
             }

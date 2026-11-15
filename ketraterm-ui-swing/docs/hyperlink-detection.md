@@ -77,6 +77,9 @@ Binding-owned discovery retains occurrences and successful empty analysis across
 scrolling. Frame preparation projects prepared links into visible cells rather
 than calling providers. Changed dependencies invalidate activation before
 rediscovery; reflow and source replacement invalidate the affected source state.
+When a potentially changed dependency extends outside the copied viewport, its
+links remain unavailable until background source validation completes. Unchanged
+retained text preserves its occurrence identity and complete destination.
 Temporary hiding preserves discovery. Unbinding or disposal cancels it and
 releases retained results.
 
