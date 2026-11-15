@@ -39,7 +39,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 </tr>
 <tr>
 <td>Scrolling and margins</td>
-<td>Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion.</td>
+<td>Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. DECOM reset permits page addressing outside margins; DECOM set uses margin-relative addressing. See the <a href="../../ketraterm-core/docs/terminal-core-contract.html#cursor-contract">core cursor contract</a>.</td>
 </tr>
 <tr>
 <td>Cell editing</td>
@@ -51,7 +51,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 </tr>
 <tr>
 <td>Repeat character</td>
-<td>REP (<code>CSI Ps b</code>) repeats the preceding retained grapheme with the current pen and ordinary write semantics. See the <a href="../reference/protocol.html#repeat-character">protocol contract</a>.</td>
+<td>REP (<code>CSI Ps b</code>) repeats the preceding retained grapheme with the current pen and ordinary write semantics, subject to a per-command resource limit. See the <a href="../reference/protocol.html#repeat-character">protocol contract</a>.</td>
 </tr>
 <tr>
 <td>Reverse wrap</td>
@@ -87,7 +87,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 </tr>
 <tr>
 <td>Unicode</td>
-<td>UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. Mode 2027 reports grapheme processing as permanently enabled; see <a href="../reference/protocol.html#mode-status-reports">mode status</a>.</td>
+<td>UTF-8 decoding, grapheme segmentation using Unicode 17 property tables, combining marks, wide characters, and emoji sequences. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#2-grapheme-segmentation-unicode-uax-29">segmentation coverage</a>. Mode 2027 reports grapheme processing as permanently enabled; see <a href="../reference/protocol.html#mode-status-reports">mode status</a>.</td>
 </tr>
 <tr>
 <td>Stream handling</td>
@@ -170,7 +170,7 @@ placement can depend on input chunk boundaries. See the
 </tr>
 <tr>
 <td>Kitty keyboard</td>
-<td>Progressive flag negotiation and encoding; available flags depend on host input metadata.</td>
+<td>Progressive flag negotiation and encoding, with screen-local stacks that restore set baselines; available flags depend on host input metadata. <a href="../../ketraterm-core/docs/terminal-core-contract.html#mode-state-contract">Stack contract</a>.</td>
 </tr>
 <tr>
 <td>Paste</td>
@@ -255,7 +255,7 @@ defines event and encoding behavior.</p>
 </tr>
 <tr>
 <td>Kitty graphics</td>
-<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
+<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
 </tr>
 <tr>
 <td>Custom OSC</td>
@@ -272,7 +272,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

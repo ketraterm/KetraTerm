@@ -131,6 +131,9 @@ while a nonempty range of trimmed blanks may return an empty string. It includes
 offscreen rows and closed-session output. Extraction may clip evicted rows or
 clear invalidated selection; resulting listener notifications occur outside the
 frame lease. Clipboard copying shares this extraction.</p>
+<p>Extraction returns <code>null</code> if content or layout changes during copying, rather
+than combining text from different revisions. Ordinary edits preserve the range
+for a later attempt.</p>
 <p><code>TerminalSelectionRange</code> uses absolute physical rows and half-open cell edges.
 It describes a region, not frozen text. Scrolling preserves it; reflow, history
 replacement, rebinding, and observed buffer changes invalidate its context.
@@ -183,7 +186,7 @@ release and selection-drag lifetime, with tracked releases using the last valid
 terminal coordinates. No terminal row geometry is changed.</p>
 <p>See the <a href="../../ketraterm-benchmarks/README.html#sticky-command-headers">sticky command header benchmarks</a>
 for workload boundaries and commands to measure overlay updates and Java2D painting.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-ui-swing/docs/swing-repaint-optimization.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/docs/swing-repaint-optimization.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

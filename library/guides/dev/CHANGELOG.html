@@ -32,12 +32,47 @@ Product changes are recorded in the <a href="https://ketraterm.github.io/KetraTe
 <h2 id="unreleased">[Unreleased]</h2>
 <h3 id="headless-runtime">Headless runtime</h3>
 <ul>
-<li>The complete headless pipeline, including PNG graphics decoding, now runs without AWT or
+<li><p>Select cluster width and emoji presentation from the base after leading Unicode
+Prepend characters, preserving wide CJK and emoji allocation.</p>
+</li>
+<li><p>Use DEC page-relative addressing with origin mode reset, including outside
+horizontal margins. Single-axis cursor positioning preserves the other axis;
+line insertion and deletion ignore cursors outside the scrolling region.</p>
+</li>
+<li><p>Clip DEC rectangle coordinates after overflow-safe origin rebasing, keeping
+editing operations and checksum queries on the same geometry policy.</p>
+</li>
+<li><p>Kitty text-mode keys emit text only on press and repeat; release reports remain
+available for enhanced keys and report-all mode. Associated-text reports support
+long text commits without truncation and omit text on release reports.</p>
+</li>
+<li><p>Kitty keyboard stacks restore a baseline established by setting flags after a
+nested push/pop. Their 32-entry limit includes the active entry.</p>
+</li>
+<li><p>Legacy and Kitty text-key routing ignore CapsLock and NumLock modifiers, retaining NumLock&#39;s
+numeric keypad behavior and Kitty lock metadata.</p>
+</li>
+<li><p>Cap wire REP commands at 65,535 additional copies before sink dispatch, preventing
+a single extreme count from triggering billions of synchronous grid mutations.</p>
+</li>
+<li><p>The complete headless pipeline, including PNG graphics decoding, now runs without AWT or
 <code>java.desktop</code>. PNG output uses immutable ARGB pixels; Gradle and Maven consumer checks enforce
-desktop independence.</li>
+desktop independence.</p>
+</li>
 </ul>
 <h3 id="completion-and-shell-integration">Completion and shell integration</h3>
 <ul>
+<li><p>Learning persistence uses the stable <code>command-completion-learning.tsv</code> filename with
+schema versioning in its header. Existing versioned files and an optional previous
+location migrate on first enable; current files take precedence and reset clears old locations.</p>
+</li>
+<li><p>Learning rejects empty or malformed UTF-16 profile and directory metadata before changing
+retained state. Use <code>null</code> for absent context.</p>
+</li>
+<li><p>Local completion rejects Windows network roots hidden in working-directory URIs,
+including encoded separators, and rejects URI queries and fragments. Explicitly
+typed UNC paths remain available with local directory metadata.</p>
+</li>
 <li><p>Added experimental caller-controlled inline suggestions with independent providers, guarded
 acceptance, and configurable keymaps. Popup and inline automation have separate configurable
 delays; manual requests work with automation disabled and take priority over automatic refreshes.</p>
@@ -70,11 +105,26 @@ bindings and exact text/cursor validation.</p>
 </li>
 <li><p>Added <code>TerminalSession.commandOutputText</code> for bounded headless extraction of a completed command’s
 retained output tail. Results preserve graphemes and logical line breaks, distinguishing caller
-truncation from missing history. Custom producers can implement the optional contract.</p>
+truncation from missing history. Command ranges follow retained row order through insertion,
+deletion, scrolling, and reflow; anchors lost to destructive edits remain unknown.
+Custom producers can implement the optional contract.</p>
+</li>
+<li><p>POSIX path completion preserves quoted and escaped tildes as literal directories
+in both filesystem lookup and inserted text, while bare <code>~/</code> continues to expand home.</p>
 </li>
 </ul>
 <h3 id="rendering-and-interaction">Rendering and interaction</h3>
 <ul>
+<li><p>Render copies reject invalid custom-frame geometry and out-of-range coordinates
+consistently. Failed reader callbacks leave mutable copies invalid while preserving
+the publisher&#39;s previous completed frame.</p>
+</li>
+<li><p>Search chrome recovers after host message callback failures and restarts cancelled
+observation when reopened.</p>
+</li>
+<li><p>Swing tracks repeat and release for extended function and system keys, and clears
+pending keyboard state on focus loss and session binding changes.</p>
+</li>
 <li><p>Swing word selection keeps wide characters intact and does not absorb adjacent paths when clicking
 whitespace or delimiters. Double- and triple-click drags extend by whole words or rows while
 preserving the initial selection when direction changes.</p>
@@ -88,6 +138,8 @@ unsupported schemes before contacting the desktop.</p>
 </ul>
 <h3 id="session-and-pty">Session and PTY</h3>
 <ul>
+<li><p>Synchronized output remains deferred when mode changes race with render publication.</p>
+</li>
 <li><p>PTY options and workspace launch profiles preserve empty arguments after the executable, including
 through configuration copies.</p>
 </li>
@@ -933,7 +985,7 @@ cmd.exe.</p>
 <li><p>Configurable typography, default colors, palettes, and scrollback capacity.</p>
 </li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -97,7 +97,8 @@ truthfully rather than inventing lifecycle information.</p>
 <p>Modifier masks contain only <code>TerminalModifiers</code> bits. Combine them with bitwise
 OR. They are not wire parameters: xterm modifiers map Shift/Alt/Ctrl and a merged
 Super/Hyper/Meta bit to a one-based value; lock bits are omitted. Kitty parameters
-retain all eight modifier bits and add one.</p>
+retain all eight modifier bits and add one. Lock state does not modify legacy
+key routing; NumLock still selects numeric keypad output.</p>
 <p>Mouse cell coordinates must be non-negative. Pixel coordinates accept <code>-1</code> for
 missing data or a non-negative value. Press requires a concrete non-wheel button;
 wheel events require a wheel direction. Motion and release may use <code>NONE</code>, but
@@ -393,7 +394,7 @@ discard. Close clears retained payload storage; subsequent writes throw
 <code>IllegalStateException</code>. Closing must not race a writer. This cleanup cannot
 erase JVM strings or platform clipboard data. Session owns authorization,
 deadlines, and transport commitment; input does not read the clipboard.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

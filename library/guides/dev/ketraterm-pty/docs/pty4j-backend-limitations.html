@@ -55,11 +55,11 @@ resizing the outer ConPTY does not supply guest <code>TIOCGWINSZ</code> pixel fi
 <p>KetraTerm&#39;s in-band text-area and cell-size queries already work when the view
 supplies geometry. Yazi can use these queries. The tested <code>kitten icat</code> instead
 reads native PTY dimensions and needs
-<a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/tools/kitty-graphics/README.md#interactive-icat-on-a-pty-without-pixel-dimensions">explicit dimensions</a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/tools/kitty-graphics/README.md#interactive-icat-on-a-pty-without-pixel-dimensions">explicit dimensions</a>
 when native pixels are unavailable. Image decoding or renderer changes cannot
 repair missing ioctl data.</p>
 <h2 id="windows-graphics-cursor-desynchronization">Windows graphics cursor desynchronization</h2>
-<p>The pinned pty4j bundle used in the native reproduction contains ConPTY and
+<p>The pinned pty4j bundle contains ConPTY and
 OpenConsole <strong>1.24.2607.10001</strong>. This backend forwards Kitty graphics APC strings
 without accounting for their cursor movement in its own console model.
 KetraTerm advances its cursor according to Kitty semantics, while PowerShell&#39;s
@@ -72,47 +72,12 @@ cursor position after unknown sequences and was serviced in ConPTY 1.25.
 The installed Windows Terminal application&#39;s version does not replace pty4j&#39;s
 bundled native backend. Falling back to the operating system&#39;s ConPTY is not
 evidence that the fix is present there.</p>
-<p>The controlled native reproduction used PowerShell 7.6.5 on Windows x86-64
-build 10.0.26300.0, 8x20-pixel cells, a 160x80 PNG displayed at 20 columns,
-an 80x30 grid widened to 140x30, and an
-explicit <code>Console.SetCursorPosition</code> before writing <code>TYPED</code>. Phase handshakes
-kept the child alive until output was consumed. Coordinates below are zero-based:</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Bundled 1.24: console / KetraTerm cursor row</th>
-<th>Fixed 1.25: console / KetraTerm cursor row</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Image followed by <code>PS&gt; </code></td>
-<td>3 / 6</td>
-<td>6 / 6</td>
-</tr>
-<tr>
-<td>After widening</td>
-<td>2 / 5</td>
-<td>5 / 5</td>
-</tr>
-<tr>
-<td>After absolute cursor positioning and <code>TYPED</code></td>
-<td>2 / 2; prompt remains on row 5</td>
-<td>5 / 5; text follows the prompt</td>
-</tr>
-</tbody></table></div>
-<p>The comparison changed only the native backend, using Microsoft&#39;s stable
-<a href="https://www.nuget.org/packages/Microsoft.Windows.Console.ConPTY/1.25.260930003">ConPTY 1.25.260930003 package</a>.
-The downloaded package&#39;s SHA-256 was
-<code>02b07b349af66d801159bdf9e440d4a1ce78bb951f37fc8609731665afdae7ee</code>.
-Its matching <code>conpty.dll</code> and <code>OpenConsole.exe</code> were tested together through
-pty4j&#39;s <code>pty4j.preferred.native.folder</code> override, with the other required pty4j
-helpers present. These test binaries are not shipped by KetraTerm. The deferred
-upstream change must update the backend pair, rather than changing Kitty cursor
-semantics or parsing graphics in the PTY transport.</p>
+<p>The deferred upstream change must update the matching <code>conpty.dll</code> and
+<code>OpenConsole.exe</code> pair, rather than changing Kitty cursor semantics or parsing
+graphics in the PTY transport.</p>
 <p>Cursor synchronization is not graphics-aware screen-buffer storage: the upstream
 fix does not make ConPTY understand image pixels or guarantee complete buffer
-consistency for every application. The table records the scenario actually tested.</p>
+consistency for every application.</p>
 <h2 id="distinguish-terminal-policy-from-backend-limitations">Distinguish terminal policy from backend limitations</h2>
 <p>Ordinary Kitty images keep physical cell anchors on width reflow, while text
 rewraps. Collapsing a wrapped command can move a later prompt toward or under an
@@ -122,7 +87,7 @@ image. This is distinct from input jumping away from the prompt; see the pinned
 heuristic, and applications inside WSL or SSH are not inspected. This is an
 <a href="pty4j-process-lifecycle.html#2-windows-conpty-considerations">adapter metadata constraint</a>,
 not an image-protocol defect.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-pty/docs/pty4j-backend-limitations.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-pty/docs/pty4j-backend-limitations.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

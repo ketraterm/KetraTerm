@@ -47,8 +47,8 @@ fixed legacy sequences are shared with the input encoder through protocol vocabu
 <p><code>TerminalState</code> holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active <code>ScreenBuffer</code>. Each screen owns its cursor,
 margins, saved cursor, Kitty keyboard stack, <code>HistoryRing</code>, and self-contained rows with lazy cluster payload storage.
-Rows hold primitive cell arrays and handles into their own screen&#39;s cluster
-store. The alternate screen has no history.</p>
+Rows hold primitive cell arrays and handles into their own cluster payloads.
+The alternate screen has no history.</p>
 <p><code>CoreTerminalRenderFrame</code> translates this storage into public render encodings.
 The borrowed frame is callback-scoped and non-reentrant. Core adds no
 synchronization; direct callers serialize access, while <code>ketraterm-session</code> owns
@@ -71,7 +71,7 @@ frames expose immutable resources and borrowed placement metadata through
 The <a href="docs/terminal-core-contract.html#image-state">core contract</a> defines serialized
 access and lifecycle; the <a href="../ketraterm-render-api/docs/render-frame-lifecycle.html#critical-lifespan-rule">render contract</a>
 defines the resource lifetime exception.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

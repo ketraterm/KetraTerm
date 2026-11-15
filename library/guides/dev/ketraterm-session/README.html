@@ -224,6 +224,11 @@ fun createHostSession(
 )
 </code></pre>
 <p>Use a distinct projection per session and publish metadata in output order.
+The host factory refreshes <code>TerminalShellIntegrationState</code> line ordering after
+output and resize. Custom producers using this model with render line IDs must
+call <code>updateLineOrder(context)</code> from <code>outputProcessed</code>, under session mutation
+serialization. Stable identities are not row numbers; unavailable anchors after
+row rearrangement produce unknown ranges.
 <code>commandDurationMillis(recordId)</code> reports monotonic elapsed time for explicitly
 completed commands, independently of metadata wall-clock timestamps. Capture it
 in a command-finished listener before later bounded eviction. Custom shell views
@@ -276,7 +281,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -43,7 +43,7 @@ the completion engine and record commands and feedback through the coordinator.
 Memory updates are immediate; a worker in the supplied coroutine scope performs
 file I/O on <code>Dispatchers.IO</code> by default.</p>
 <p>The host owns the scope, path, enablement, and diagnostics. Use
-<code>currentFileName()</code> for the format-specific filename, and keep one coordinator
+<code>currentFileName()</code> for the stable filename, and keep one coordinator
 per store and one writer per file. See <a href="../docs/reference/storage.html">storage locations, format, and privacy</a>
 for the product storage contract.</p>
 <h2 id="lifecycle-and-failures">Lifecycle and failures</h2>
@@ -84,7 +84,7 @@ bound its shutdown wait and cancel the worker&#39;s scope if that budget expires
 Blocking filesystem calls may still finish after coroutine cancellation.</p>
 <p>For components and write ordering, see <a href="Module.html">Module.md</a>. Replay eligibility
 and host filtering are defined by the <a href="../ketraterm-completion/docs/completion-architecture.html#learning-and-privacy">learning contract</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-completion-persistence/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-completion-persistence/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

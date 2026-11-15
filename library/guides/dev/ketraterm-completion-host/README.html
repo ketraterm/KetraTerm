@@ -76,7 +76,10 @@ characters: POSIX filesystems preserve them; Windows resolution rejects them.
 Shell parsing and quoting stay in the completion engine.</p>
 <p><code>TerminalLocalFileUriResolver</code> accepts <code>file:</code> working-directory URIs with an
 empty authority or <code>localhost</code>. Unsupported schemes, remote authorities, and
-malformed paths produce no local result. Resolution is lexical and performs no
+malformed paths produce no local result. Queries and fragments are rejected,
+as are Windows network roots hidden in decoded URI paths. Explicit UNC argument
+prefixes remain supported with local working-directory metadata.
+Resolution is lexical and performs no
 filesystem access; normalization does not confine access to a workspace or
 resolve symbolic links. A host with remote filesystems or restricted access
 should provide its own <code>TerminalFileSystemProvider</code> from the completion API.</p>
@@ -103,7 +106,7 @@ projection for an already bounded collection; it does not limit collection size.
 <li><a href="../ketraterm-completion/docs/completion-architecture.html#evaluation-and-failure-behavior">Completion evaluation and failure behavior</a></li>
 <li><a href="../ketraterm-ui-swing-host/README.html">Swing completion bridge</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-completion-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-completion-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

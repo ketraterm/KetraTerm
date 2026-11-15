@@ -189,15 +189,17 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
 clipboard access. It includes offscreen and closed-session content, joins soft
 wraps for linear selections, and preserves block-selection row breaks. It reads
 current content rather than frozen selection text. <code>null</code> means unavailable;
-an empty string can represent selected blanks removed by trimming. Clipboard
-copy uses the same extraction. Use <code>createSelectionRange</code>, <code>setSelection</code>, and
+an empty string can represent selected blanks removed by trimming. Extraction
+returns <code>null</code> if content or layout changes during copying, rather than mixing
+revisions. Clipboard copy uses the same extraction. Use <code>createSelectionRange</code>,
+<code>setSelection</code>, and
 <code>clearSelection</code> for host-controlled ranges; see the
 <a href="docs/swing-repaint-optimization.html#2-selection-drag-matrix--text-extraction">selection contract</a>.</p>
 <p><code>copyCellPositionAt(x, y, destination)</code> maps component-local pixels to a
@@ -640,7 +642,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

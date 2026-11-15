@@ -63,7 +63,7 @@ and persistence belong to the embedding application.</p>
 </tr>
 <tr>
 <td>Settings files and application defaults</td>
-<td>The standalone or IDE product.</td>
+<td>The embedding application.</td>
 </tr>
 </tbody></table></div>
 <p>Binding/reloading a Swing view also applies its palette, width, cursor, and paste
@@ -200,7 +200,7 @@ for interaction/presentation APIs.</p>
 <p>The shipped message catalogs are English. <code>SwingHostMessages</code>,
 <code>SwingTerminalMessages</code>, and <code>TerminalCompletionMessages</code> accept a locale,
 partial resource overrides, or host message lookup. Missing keys fall back to
-English. IntelliJ uses its platform message system.</p>
+English. Hosts may supply their own message system.</p>
 <p>Message patterns use JDK <code>MessageFormat</code>; formatted literal apostrophes must
 be doubled. Components capture their message provider at construction, so
 recreate chrome to change that captured language.</p>
@@ -219,7 +219,7 @@ terminal data, source identity, ranking, or feedback routing. Localized command
 catalogs change descriptions while preserving command and option tokens.</p>
 <p>See <a href="../../ketraterm-ui-swing-host/README.html#localization-and-host-settings">host localization and settings</a>
 and <a href="../../ketraterm-completion/README.html#customize-the-engine">completion customization</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

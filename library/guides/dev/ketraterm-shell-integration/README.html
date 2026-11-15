@@ -101,7 +101,10 @@ the session&#39;s conditional-edit APIs when admitting asynchronous suggestions.
 The producer resolves the recorded primary-buffer range under session
 serialization and copies only a bounded tail. The result reports caller
 truncation separately from missing history; it never reads alternate-screen text
-as primary command output.</p>
+as primary command output.
+Ranges follow retained row order through line insertion and reflow. When a
+rearranged range loses an anchor, output is unknown rather than inferred from
+numeric line identities.</p>
 <h2 id="readiness-and-trust">Readiness and trust</h2>
 <p>With workspace PowerShell hooks and PSReadLine, this producer also decodes
 <a href="../docs/reference/protocol.html#private-powershell-completion-metadata">native completion metadata</a>.
@@ -133,7 +136,7 @@ defines notification, frame borrowing, and observation lifetime.</p>
 <p>Hosts using their own shell integration depend on <code>ketraterm-session</code> and supply
 <code>TerminalShellIntegrationFactory.host</code>. That selected model remains authoritative;
 OSC metadata does not supplement it. Such hosts do not need this module.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-shell-integration/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

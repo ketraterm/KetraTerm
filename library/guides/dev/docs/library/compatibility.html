@@ -70,8 +70,8 @@ bridges that already-compiled callers can reference. App, testkit, benchmarks,
 and IntelliJ product implementation APIs
 are outside the supported publication boundary.</p>
 <p>Kotlin 2.4 and JDK 25 are the minimum supported consumer versions. The build uses
-Kotlin 2.4.20, JVM target 25, and JVM default-method compatibility bridges.
-Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-only
+Kotlin 2.4.21, JVM target 25, and JVM default-method compatibility bridges.
+Consumer checks exercise Kotlin 2.4.0/2.4.21 and both Gradle metadata and POM-only
 resolution. A host replacing dependencies with a platform runtime must verify
 that runtime separately.</p>
 <p>The headless entry point and its complete runtime dependency closure operate
@@ -115,7 +115,7 @@ consumer fixtures compile and run independent Java/Kotlin clients; retained
 binaries test upgrades without recompilation. Deliberate linkage-failure controls
 check that the upgrade harness detects missing symbols.</p>
 <p><code>./gradlew publicationChecks</code> runs the library publication gates against a local
-repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
+repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
 explains individual checks and baseline refreshes. A deliberate development
 baseline refresh must record the break and migration; it cannot be presented as
 proof of compatibility with the earlier API or retained clients.</p>
@@ -150,7 +150,7 @@ fallback defaults.</p>
 new interfaces, with fixture sources, jar hashes, compiler/toolchain details,
 and staged dependency hashes in their provenance. Review sources, artifacts,
 provenance, and ABI snapshots together, then run the source-consumer and retained
-client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
+client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
 The refreshed baseline verifies subsequent upgrades of those recompiled clients;
 it does not establish binary compatibility with the pre-feature baseline or
 any earlier 0.x release.</p>
@@ -170,6 +170,10 @@ release history remains in the <a href="../../CHANGELOG.html">changelog</a>.</p>
 </tr>
 </thead>
 <tbody><tr>
+<td>Custom <code>TerminalCursor</code> implementations or compiled Kotlin delegates before single-axis positioning</td>
+<td>Implement <code>positionCursorColumn</code> and <code>positionCursorRow</code>, preserving the other axis and applying the same origin rules as <code>positionCursor</code>; recompile implementations/delegates. See the <a href="../../ketraterm-core/docs/terminal-core-contract.html#cursor-contract">cursor contract</a>.</td>
+</tr>
+<tr>
 <td>Custom parser/core implementations or compiled Kotlin delegates before REP</td>
 <td>Implement <code>writeRepeatedCluster(codepoints, length, count)</code> on <code>TerminalCommandSink</code> and <code>TerminalWriter</code>, and recompile implementations/delegates. The array is borrowed synchronously; apply the current pen and ordinary write semantics to each copy. See the <a href="../reference/protocol.html#repeat-character">REP contract</a>.</td>
 </tr>
@@ -235,12 +239,12 @@ release history remains in the <a href="../../CHANGELOG.html">changelog</a>.</p>
 </tr>
 <tr>
 <td>Workspace/persistence development artifacts</td>
-<td>Product-only modules; library hosts own these concerns.</td>
+<td>Published since 0.5.0 as <a href="../../ketraterm-workspace/README.html"><code>ketraterm-workspace</code></a> and <a href="../../ketraterm-completion-persistence/README.html"><code>ketraterm-completion-persistence</code></a>.</td>
 </tr>
 </tbody></table></div>
 <p>See <a href="configuration.html">configuration</a>, <a href="../../ketraterm-session/README.html#custom-assembly">session assembly</a>,
 and <a href="../../ketraterm-ui-swing/README.html">Swing APIs</a> for current usage.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

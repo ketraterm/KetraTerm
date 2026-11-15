@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span>carriage</span><wbr><span><span>Return</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="carriage-return.html"><span class="token function">carriageReturn</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Executes a carriage return (CR, <code class="lang-kotlin">0x0D</code>).</p><p class="paragraph">Moves the cursor to the active left boundary on the current row. With DECLRMM off that is column 0; with DECLRMM on it is the left margin.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="carriage-return.html"><span class="token function">carriageReturn</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><p class="paragraph">Executes a carriage return (CR, <code class="lang-kotlin">0x0D</code>).</p><p class="paragraph">Moves to the effective left margin on the current row, or to column 0 when DECOM is reset and the cursor is already left of that margin.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

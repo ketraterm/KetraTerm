@@ -29,8 +29,9 @@ For a capability overview, see <a href="../features/terminal.html">terminal feat
 <p>CSI collection has a shared limit of 32 semicolon/colon fields, including omitted
 fields. Opening field 33 rejects the entire command; no truncated SGR, mode,
 cursor, or query is dispatched. Numeric saturation is independent of this limit.
-CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
-state. Ordinary C0 handling continues during rejection.</p>
+CAN/SUB cancels, ESC starts a new sequence, and reset discards unfinished state.
+EOF ends a stream; reset the parser before reusing it for another stream.
+Ordinary C0 handling continues during rejection.</p>
 <h2 id="relative-cursor-aliases">Relative cursor aliases</h2>
 <p>Plain CSI movement aliases route to the existing cursor operations:</p>
 <div class="table-scroll"><table>
@@ -79,9 +80,13 @@ ignored. Cursor movement, erasure, SGR, and screen switches preserve the source;
 parser reset, RIS, and DECSTR clear it.</p>
 <p>Copies use the current pen and width policy, insert mode, margins, autowrap,
 and scrolling, as ordinary printable writes do. REP does not copy the original
-cell&#39;s attributes or read text back from the grid. Counts through <code>Int.MAX_VALUE</code>
-are accepted; work is proportional to generated output without a count-sized
-temporary buffer. Numeric overflow, extra fields, colon subparameters, private
+cell&#39;s attributes or read text back from the grid. Valid counts above 65,535 are
+capped to 65,535 additional copies per command before any sink is called. This
+resource limit bounds synchronous output amplification, including wide and
+clustered graphics. Each subsequent REP has its own limit; the source graphic
+is preserved. The direct core <code>writeRepeatedCluster</code> API remains caller-controlled
+and does not apply this wire-input limit. No count-sized temporary buffer is
+created. Numeric overflow, extra fields, colon subparameters, private
 markers, and intermediates reject REP. The shared <a href="#csi-parameters">CSI limits</a>
 and cancellation rules apply.</p>
 <h2 id="osc-encoding">OSC encoding</h2>
@@ -191,16 +196,15 @@ RIS, progress-permission revocation, or immediately when closure begins. Expiry 
 monotonic time and needs no collector. The five-minute limit is KetraTerm product
 policy, not a protocol requirement. Reallowing permission does not restore stale
 progress; an application must send a new report.</p>
-<p>Both products replace the shell icon with a thin progress ring while progress is
+<p>The standalone app replaces the shell icon with a thin progress ring while progress is
 active. Normal, error and warning states use accent, red and amber arcs filled
 according to the percentage; indeterminate work uses a rotating arc. Tab names
 remain unchanged. Localized tooltips/accessibility text retain the numeric/status
-information, and the selected session&#39;s window/tool-window title retains status.
-Hidden progress restores the shell icon. Both products always enable progress independently of
+information, and the selected session&#39;s window title retains status.
+Hidden progress restores the shell icon. The standalone app enables progress independently of
 the existing title permission. Library embedders control progress separately
 through <code>HostPolicy.progressPolicy</code>.
-Standalone additionally uses per-window taskbar state/value APIs where supported;
-IntelliJ retains ownership of the IDE&#39;s global taskbar. A standalone split tab
+Standalone additionally uses per-window taskbar state/value APIs where supported. A split tab
 uses its active pane, following the existing title-selection convention. Queued
 UI refreshes are bounded and read the latest retained state at delivery, so a
 late callback cannot restore cleared progress.</p>
@@ -548,9 +552,9 @@ Direct core callers enforce host permission themselves. Query handling neither
 executes advertised templates nor changes grid, cursor, modes, or attributes.</p>
 <p>Protocol references: <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm</a>,
 <a href="https://github.com/kovidgoyal/kitty/blob/master/kitty/terminfo.py">Kitty responder</a>.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-host/src/test/resources/xtgettcap/README.md">ncurses fixtures</a>
 verify template expansion and resulting terminal behavior without native test dependencies.
-The <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
+The <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-session/src/test/resources/xtgettcap/README.md">keyboard fixtures</a>
 pin Vim&#39;s query list and verify advertised values against actual input encoder output.</p>
 <h2 id="kitty-colors">Kitty colors</h2>
 <p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
@@ -660,7 +664,7 @@ ANSI and DEC namespaces are independent.</p>
 </tbody></table></div>
 <p>Mode 3 reports the last DECCOLM selection, not measured window width. Mode 1048
 is an action and reports unsupported. Standalone declares supported bell actions;
-IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
+embedding hosts choose their own report capabilities. Requests accept one mode parameter; malformed, overflowing,
 cancelled, or incomplete requests receive no reply. Queries do not mutate state.
 See the <a href="../../ketraterm-protocol/docs/protocol-modes.html">mode reference</a> for names.</p>
 <p><code>CSI ?2027$p</code> replies <code>CSI ?2027;3$y</code>: grapheme processing is always enabled.
@@ -896,7 +900,8 @@ original attributes. Core adjusts the following cursor and pending wrap.</p>
 <p>Publication commits grid effects. Later width changes do not relocate the
 cluster, reverse completed wraps/scrolls/insert shifts, or restore overwritten
 text. Narrowing frees a spacer as blank; widening consumes a neighboring cell
-when it fits. At the right margin, text remains in the single available cell.
+when it fits. At the right write boundary (the right margin, or the page edge
+when outside it), text remains in the single available cell.
 A rejected initial write has no continuation target.</p>
 <p>Whole-input and split-input placement can therefore differ at margins, over
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
@@ -921,7 +926,7 @@ Protection does not prevent this ordinary erase. The selective form <code>CSI ? 
 is unsupported and ignored. Colon subparameters and extra parameters on ED 22
 are rejected without erasing or admitting history.</p>
 <p>Reference: <a href="https://sw.kovidgoyal.net/kitty/misc-protocol/#an-escape-code-to-move-the-contents-of-the-screen-into-the-scrollback">Kitty&#39;s screen-to-scrollback extension</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

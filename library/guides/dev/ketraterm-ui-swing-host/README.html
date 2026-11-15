@@ -64,6 +64,9 @@ Call <code>close</code> when removing the pane; it cancels search observation an
 active highlights. Removing the bar from a displayable hierarchy also cancels
 its observation. <code>open</code>, <code>close</code>, and <code>refreshColors</code> enqueue work when called
 off the EDT; read <code>isOpen</code> and manipulate <code>component</code> on the EDT.</p>
+<p>Host message callback failures are logged through <code>System.Logger</code> and show failed
+status; later search updates retry. Cancellation stops observation, and <code>open()</code>
+can restart it.</p>
 <p>The bar installs no command shortcuts, including Enter, Shift+Enter, or Escape.
 Hosts invoke <code>performAction(SwingTerminalSearchAction)</code> on the EDT and bind those
 commands through their own action system. It returns <code>false</code> when search is closed.
@@ -74,10 +77,9 @@ normal Swing button behavior and remain available without command bindings.</p>
 <p>For a plain Swing host, map keystrokes on
 <code>searchBar.component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)</code>
 and install corresponding <code>AbstractAction</code>s in its <code>actionMap</code>, calling
-<code>searchBar.performAction(action)</code>. The standalone app owns its defaults; the
-IntelliJ plugin registers IDE actions so keymap remapping and multi-stroke shortcuts
-remain platform responsibilities. Keep search bindings scoped to the bar so they
-do not intercept terminal or unrelated editor input.</p>
+<code>searchBar.performAction(action)</code>. Hosts own defaults, keymap remapping, and
+multi-stroke shortcuts. Keep search bindings scoped to the bar so they
+do not intercept terminal or unrelated application input.</p>
 <h3 id="search-colors">Search colors</h3>
 <p>Use <code>SwingTerminalSearchColors.create</code>, <code>copy</code>, or a builder to supply an immutable
 palette through <code>refreshColors(colors)</code>. Updating colors preserves the query and
@@ -248,7 +250,7 @@ clipboard services and choose write-consent policy.</p>
 to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
 resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
 bundled English catalog. The selected locale is captured; static component
-labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
 defines keys and arguments. Message arguments are plain text, not markup.</p>
 <p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
 hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
@@ -267,7 +269,7 @@ work is present. The clock stops while the container is hidden; close it on the
 EDT at owner disposal to detach its listener. Hosts may omit animation, freeze
 phase for reduced motion, or provide their own timing and session observation.
 See the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/aafb53b47d9d60f457a5b60a07ce57836cc025fd/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
