@@ -6,6 +6,10 @@ on:
       revision:
         required: true
         type: string
+      snapshot:
+        description: Publish a development snapshot after local publication checks.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      RELEASE: "true"
+      RELEASE: ${{ inputs.snapshot && 'false' || 'true' }}
 
     steps:
       - name: Checkout Repository
@@ -37,10 +41,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Verify release artifacts and publish to Maven Central
+      - name: Install rendering test fonts
+        if: inputs.snapshot
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu-core
+
+      - name: Validate snapshot source and artifacts
+        if: inputs.snapshot
+        run: ./gradlew publicationChecks --no-daemon
+
+      - name: Validate native release version
+        if: ${{ !inputs.snapshot }}
+        run: ./gradlew :ketraterm-app:writeNativeVersion --no-daemon
+
+      - name: Verify artifacts and publish to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
-        run: ./gradlew :ketraterm-app:writeNativeVersion publishToMavenCentral --no-daemon
+        run: ./gradlew publishToMavenCentral --no-daemon

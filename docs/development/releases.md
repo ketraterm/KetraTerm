@@ -45,6 +45,23 @@ narrower `publicationArtifactChecks`: source validation is the release workflow'
 responsibility, while release-mode consumer and artifact checks run in the same
 Gradle invocation as publication. No ordinary JVM tests are repeated just to upload.
 
+## Publishing snapshots
+
+In GitHub Actions, select **Publish Maven Snapshot**, choose **Run workflow**,
+and select the branch to publish. The workflow publishes the selected commit
+using `VERSION` plus `-SNAPSHOT`, for example `0.5.1-SNAPSHOT`. Keep the suffix
+out of the `VERSION` file.
+
+Snapshot publication runs `publicationChecks` before uploading, covering formatting,
+public ABI, JVM tests, consumers, and artifact metadata. It uses the same Maven
+Central and signing secrets as releases. It does not create tags, change changelogs,
+publish application binaries, or create a GitHub release.
+
+Consumers must add the
+[Sonatype snapshot repository](https://central.sonatype.com/repository/maven-snapshots/)
+alongside Maven Central. The manual action becomes available once its workflow
+file is on the default branch; the selected branch must also contain the workflow.
+
 ## Writing changelog entries
 
 Keep library and embedding changes in the [library changelog](../../CHANGELOG.md),

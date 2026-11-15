@@ -1,0 +1,15 @@
+name: Publish Maven Snapshot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      revision: ${{ github.sha }}
+      snapshot: true
+    secrets: inherit
