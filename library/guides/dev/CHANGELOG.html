@@ -115,6 +115,16 @@ in both filesystem lookup and inserted text, while bare <code>~/</code> continue
 </ul>
 <h3 id="rendering-and-interaction">Rendering and interaction</h3>
 <ul>
+<li><p>Swing selection and command-output copy actions extract text on workers and return
+request acceptance. New suspendable <code>selectedTextAsync()</code> and <code>commandOutputTextAsync()</code>
+queries support host workflows without blocking the EDT. Superseded copies and obsolete
+bindings cannot deliver text; synchronous text queries remain available.</p>
+</li>
+<li><p>System clipboard and browser services offer suspend operations that run native access on workers.
+Built-in paste and explicit copy actions return request acceptance; pending paste results are
+rejected after binding changes. Existing custom handlers keep their caller-thread callbacks
+through default suspend methods and can override them to offload blocking work.</p>
+</li>
 <li><p>Render copies reject invalid custom-frame geometry and out-of-range coordinates
 consistently. Failed reader callbacks leave mutable copies invalid while preserving
 the publisher&#39;s previous completed frame.</p>
@@ -985,7 +995,7 @@ cmd.exe.</p>
 <li><p>Configurable typography, default colors, palettes, and scrollback capacity.</p>
 </li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

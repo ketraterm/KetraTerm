@@ -93,7 +93,7 @@ after tab publication. Callbacks can skip intermediate states. Dispatch UI work
 without waiting and read <code>tab.session.progress.value</code> again at delivery; do not
 retain a second authoritative progress state. Tab removal cancels observation.</p>
 <h2 id="profiles-and-launch-options">Profiles and launch options</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
 as a list, rather than split from a command string. The executable must be nonempty;
@@ -163,7 +163,9 @@ currently selected.</p>
 runs and check that the tab still exists. Its precedence is custom title,
 application title, foreground process, directory, then profile name. Set
 <code>customTitle</code>, <code>color</code>, or <code>showForegroundProcessName</code> for per-tab presentation;
-color strings are interpreted by the host.</p>
+color strings are interpreted by the host. Color reads and replacements are atomic;
+changed values notify the listener on the setter&#39;s thread. For queued color updates,
+read <code>tab.color</code> at delivery time and check that the tab still exists.</p>
 <h3 id="clipboard-read-routing">Clipboard read routing</h3>
 <p><code>readClipboard(tab, request)</code> is suspending and resolves the requesting tab
 independently of selection. It runs after <code>tabOpened</code> returns, on the session I/O
@@ -183,7 +185,7 @@ for reply and cancellation behavior.</p>
 <li><a href="https://ketraterm.github.io/KetraTerm/settings.html">Standalone profile persistence</a></li>
 <li><a href="../ketraterm-shell-integration/README.html">Shell metadata API</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

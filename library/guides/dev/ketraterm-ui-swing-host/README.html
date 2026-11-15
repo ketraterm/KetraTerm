@@ -230,12 +230,16 @@ optional saved learning.</p>
 <p><code>SwingClipboardReadPrompt</code> owns cancellable consent for one terminal pane.
 Construct it with a product dialog callback, or bridge
 <code>SwingMessageDialogs.showModeless</code>. Operations and decisions belong to the EDT;
-close the prompt there when disposing the pane. Denial, Escape, cancellation,
-and closure cannot approve a read. A block decision lasts for the pane&#39;s lifetime.</p>
+close the prompt there when disposing the pane. Dismissal and closure dispose
+the dialog before returning; coroutine cancellation cleans up on the EDT.
+Denial, Escape, cancellation, and closure cannot approve a read. A block decision
+lasts for the pane&#39;s lifetime.</p>
 <p>Use one <code>SwingClipboardReader</code> per window. Call its suspending <code>read</code> on the EDT
 with the requesting pane&#39;s prompt, message, and clipboard handler, after earlier
 posted clipboard writes. It enforces admitted permission and reads native
-clipboard data on its I/O dispatcher. Busy prompts are denied; a busy native
+clipboard data through the handler&#39;s suspend operations on its I/O dispatcher.
+The system handler serializes these reads with earlier asynchronous writes.
+Busy prompts are denied; a busy native
 read is unavailable. Only one native read runs across reader instances, and a
 cancelled blocking call keeps that slot until it returns. The session owns the
 request deadline, permission revocation, and response serialization.</p>
@@ -250,7 +254,7 @@ clipboard services and choose write-consent policy.</p>
 to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
 resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
 bundled English catalog. The selected locale is captured; static component
-labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
 defines keys and arguments. Message arguments are plain text, not markup.</p>
 <p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
 hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
@@ -269,7 +273,7 @@ work is present. The clock stops while the container is hidden; close it on the
 EDT at owner disposal to detach its listener. Hosts may omit animation, freeze
 phase for reduced motion, or provide their own timing and session observation.
 See the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

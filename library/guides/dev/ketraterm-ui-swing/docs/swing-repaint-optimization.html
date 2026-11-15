@@ -130,7 +130,11 @@ wraps; block selection preserves row breaks. Missing selection returns <code>nul
 while a nonempty range of trimmed blanks may return an empty string. It includes
 offscreen rows and closed-session output. Extraction may clip evicted rows or
 clear invalidated selection; resulting listener notifications occur outside the
-frame lease. Clipboard copying shares this extraction.</p>
+frame lease. <code>selectedTextAsync()</code> captures selection on the EDT and performs
+the same extraction on a worker, rejecting an obsolete selection on return.
+Clipboard copy actions use this worker path and return request acceptance;
+host suspend clipboard callbacks start on the EDT and native system access runs on a worker. <code>commandOutputTextAsync(recordId)</code> also
+moves command row resolution off the EDT. See the <a href="../README.html#selection-and-cell-coordinates">selection API</a>.</p>
 <p>Extraction returns <code>null</code> if content or layout changes during copying, rather
 than combining text from different revisions. Ordinary edits preserve the range
 for a later attempt.</p>
@@ -186,7 +190,7 @@ release and selection-drag lifetime, with tracked releases using the last valid
 terminal coordinates. No terminal row geometry is changed.</p>
 <p>See the <a href="../../ketraterm-benchmarks/README.html#sticky-command-headers">sticky command header benchmarks</a>
 for workload boundaries and commands to measure overlay updates and Java2D painting.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/docs/swing-repaint-optimization.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing/docs/swing-repaint-optimization.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

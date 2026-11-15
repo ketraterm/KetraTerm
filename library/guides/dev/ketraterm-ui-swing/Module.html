@@ -38,9 +38,18 @@ There is no PTY, application, or IntelliJ dependency.</p>
 <h2 id="data-flow-and-threading">Data flow and threading</h2>
 <p>Session render publication is copied into an EDT-owned cache. Painting and hit
 testing share visual geometry; routine painting does not read a live session
-frame. Search, selection extraction, and discovery may take synchronized source
-reads. Background search and hyperlink workers publish results through binding
-and revision checks; they never access Swing state directly.</p>
+frame. Search, text extraction, and discovery may take synchronized source
+reads. Copy actions and suspendable selection/command queries perform extraction
+on a serialized worker with bounded cancellation checks. Host suspend callbacks start
+on the EDT; system clipboard and browser operations run on I/O workers. Explicit
+synchronous text queries retain their EDT contract.
+Background search and hyperlink workers publish results through binding
+and revision checks; they never access Swing state directly. Hyperlink source
+validation also runs on the worker; publication checks the copied viewport revision.</p>
+<p><code>PromptDecorationAnalysis</code> serializes and coalesces prompt indexing and sticky
+header retention checks on a worker. The EDT consumes detached projections matched
+to the frame and shell metadata revision. Reflow anchors stay pending until the
+matching projection arrives; superseded bindings cannot publish their results.</p>
 <p><code>InlineShellSuggestion</code> checks copied live cells for collisions and clips its
 detached suffix cache. <code>InlineShellSuggestionController</code> independently owns managed
 inline interactions, provider collection, feedback, and
@@ -121,12 +130,12 @@ public consumption and ABI checks are described below.</p>
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
 <h2 id="consumer-and-abi-verification">Consumer and ABI verification</h2>
-<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
+<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
 <pre><code class="language-shell">./gradlew :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 </code></pre>
 <p>See the <a href="../docs/library/compatibility.html">compatibility contract</a> before updating ABI baselines.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

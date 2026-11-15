@@ -167,20 +167,23 @@ backtracking. Ordinary literal searches retain their streaming matcher.</p>
 clipboard. For asynchronous clipboard access, capture the intended binding,
 perform the read in host-owned work, and verify that binding on the EDT before
 calling <code>pasteText</code>. The host must discard results from an obsolete binding.</p>
-<p><code>pasteClipboardText()</code> reads the supplied clipboard handler synchronously on
-the EDT. Both paste methods use session policy and admission; <code>true</code> means
-admitted, not delivered. Empty text, an unavailable session, off-EDT calls,
-and rejected admission return <code>false</code>.</p>
+<p><code>pasteClipboardText()</code> starts an asynchronous clipboard request on the EDT.
+The system service performs native reads on a worker. <code>true</code> means the request
+was accepted; empty text, denied consent, or a stale binding produces no input.
+An outstanding read, an unavailable session, or an off-EDT call returns <code>false</code>.
+<code>pasteText()</code> still returns session admission. Both paths preserve session paste
+policy and bracketed-paste handling; neither return value promises delivery.</p>
 <p><code>copyOnSelection</code> copies a nonempty selection at local primary-button gesture
 completion. It defaults to <code>false</code> and uses the supplied clipboard handler.
 Application mouse reporting takes priority. Shift restores local interaction
 unless the application requests Shift capture through XTSHIFTESCAPE.
-Clipboard callbacks run on the EDT.</p>
+Host suspend callbacks start on the EDT; the system clipboard implementation
+dispatches native access to a worker.</p>
 <h3 id="middle-button-paste">Middle-button paste</h3>
 <p><code>middleClickPaste</code> defaults to <code>false</code>. When enabled, a local middle-button press
 uses <code>middleClickPasteSource</code>: <code>SwingPasteSource.CLIPBOARD</code> by default, or
 <code>PRIMARY_SELECTION</code> for native primary-selection text. The built-in path reads
-only that source synchronously on the EDT. An unavailable primary selection
+only that source through the suspend clipboard operation. An unavailable primary selection
 never falls back to the ordinary clipboard. Keyboard, menu, and programmatic
 clipboard paste still use the ordinary clipboard.</p>
 <p>For asynchronous or custom access, install
@@ -189,16 +192,27 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
-<p><code>selectedText()</code> reads the complete retained selection on the EDT without
-clipboard access. It includes offscreen and closed-session content, joins soft
+<p><code>selectedTextAsync()</code> reads the complete retained selection on a worker without
+clipboard access; call it from a coroutine. It includes offscreen and closed-session content, joins soft
 wraps for linear selections, and preserves block-selection row breaks. It reads
 current content rather than frozen selection text. <code>null</code> means unavailable;
 an empty string can represent selected blanks removed by trimming. Extraction
 returns <code>null</code> if content or layout changes during copying, rather than mixing
-revisions. Clipboard copy uses the same extraction. Use <code>createSelectionRange</code>,
+revisions. Selection changes reject pending results; binding termination or caller
+cancellation stops extraction at bounded checkpoints. <code>commandOutputTextAsync(recordId)</code>
+provides the same worker execution for retained command output. The synchronous
+<code>selectedText()</code> and <code>commandOutputText(recordId)</code> queries remain available on the
+EDT, but can block for large ranges.</p>
+<p><code>copySelectionToClipboard()</code> and <code>copyCommandOutputToClipboard(recordId)</code> return
+whether a request was accepted. They extract on a worker and deliver through the
+host clipboard service&#39;s suspend operation, starting on the EDT. Native system
+reads and writes are serialized on workers. A newer copy supersedes unfinished copy work;
+obsolete selections and bindings cannot deliver results. Asynchronous copy failures
+are logged. Use the suspendable text queries when the host needs completion or
+failure handling. Use <code>createSelectionRange</code>,
 <code>setSelection</code>, and
 <code>clearSelection</code> for host-controlled ranges; see the
 <a href="docs/swing-repaint-optimization.html#2-selection-drag-matrix--text-extraction">selection contract</a>.</p>
@@ -563,7 +577,7 @@ painters or input controllers.</p>
 </thead>
 <tbody><tr>
 <td><code>clipboardHandler</code></td>
-<td>Synchronous text copy/read and optional primary-selection access</td>
+<td>Suspend copy/read and primary-selection operations; system access runs on workers</td>
 </tr>
 <tr>
 <td><code>middleClickPasteHandler</code></td>
@@ -594,6 +608,19 @@ painters or input controllers.</p>
 <td>UI scheduling; component work must still run on the EDT</td>
 </tr>
 </tbody></table></div>
+<p>The built-in clipboard and browser services perform native operations on workers.
+<code>TerminalClipboardHandler</code>&#39;s <code>copyTextAsync</code>, <code>readTextAsync</code>, and
+<code>readPrimarySelectionTextAsync</code>, and <code>TerminalHyperlinkHandler.openHyperlinkAsync</code>
+are called from component-owned EDT coroutines. Their default implementations call
+the existing synchronous methods on that same thread, preserving custom host
+prompts. Override the suspend methods to dispatch blocking host work, then resume
+on the EDT for consent. Direct synchronous service calls can still block.</p>
+<p>Unbinding or disposing cancels pending actions. Repeated paste/browser gestures
+are rejected while an operation is pending; a newer copy supersedes unfinished
+copy work. Queued native operations observe cancellation, and late reads cannot
+paste into another binding. An OS write or browser activation already started
+cannot be undone. System clipboard operations retain their serialization slot
+until native access actually returns, even after cancellation.</p>
 <p>Numeric-keypad events carry Num Lock state when AWT can report it, preserving
 numeric typing in application keypad mode. Unsupported or headless toolkits
 retain existing keypad behavior without inferring lock state or repeatedly
@@ -642,7 +669,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/99ecef8fbc0dae3eaa057a4384d4ce3f97ee4b6a/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/a385ddf0dcd84407a82ea215bc52e163168a40d8/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
