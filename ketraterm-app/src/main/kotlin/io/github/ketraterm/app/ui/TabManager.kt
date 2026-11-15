@@ -380,8 +380,7 @@ internal class TabManager(
                                     // An unpacked host has only its configured launch geometry.
                                     completeStartup(failure)
                                 } else {
-                                    // New cards and splits can still await Swing validation.
-                                    // Size this pane before any connector can produce output.
+                                    // Establish child bounds before testing initial viewport eligibility.
                                     frame.validate()
                                     val terminal = pane.terminal
                                     synchronizeInitialViewport(
@@ -393,7 +392,12 @@ internal class TabManager(
                                                 terminal.width > 0 &&
                                                 terminal.height > 0
                                         },
-                                        resize = terminal::resizeSessionToVisibleGrid,
+                                        resize = { complete ->
+                                            // Queued window events can invalidate parent layout between attempts.
+                                            // Measure the child only after installing that layout.
+                                            frame.validate()
+                                            terminal.resizeSessionToVisibleGrid(complete)
+                                        },
                                         onComplete = ::completeStartup,
                                     )
                                 }
