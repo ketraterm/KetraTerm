@@ -80,6 +80,8 @@ import kotlin.math.floor
  * Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application
  * cursor visibility and viewport clipping. Focus never changes the session's cursor style.
  *
+ * Construct on the EDT. Other operations follow their individual threading contracts.
+ *
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
@@ -101,6 +103,10 @@ public class SwingTerminal
             settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
             hostServices: SwingHostServices = SwingHostServices(),
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
+
+        init {
+            check(SwingUtilities.isEventDispatchThread()) { "Terminal construction requires the EDT" }
+        }
 
         private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
@@ -3189,12 +3195,15 @@ public class SwingTerminal
          *
          * This is intended for host-owned workflows where policy has already
          * allowed a non-selection clipboard write, such as OSC 52 handling.
+         * Call on the EDT; disposed and unbound components do not invoke the handler.
          *
          * @param text text to place on the host clipboard.
          * @return `true` when a session is bound and the clipboard handler was invoked.
+         * @throws IllegalStateException if called outside the EDT.
          */
         public fun copyTextToClipboard(text: String): Boolean {
-            if (session == null) return false
+            check(SwingUtilities.isEventDispatchThread()) { "Clipboard writes require the EDT" }
+            if (disposed || session == null) return false
             hostServices.clipboardHandler.copyText(text)
             return true
         }
@@ -3784,6 +3793,7 @@ public class SwingTerminal
          * Both dimensions must be positive. The complete size must fit the integer pixel range.
          *
          * @throws IllegalArgumentException if a dimension or the complete size is out of range.
+         * @throws IllegalStateException if called outside the EDT.
          * @param columns requested number of terminal columns.
          * @param rows requested number of terminal rows.
          * @param activeBuffer screen whose chrome insets should be included.
@@ -3794,11 +3804,13 @@ public class SwingTerminal
             columns: Int,
             rows: Int,
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
-        ): Dimension =
-            Dimension(
+        ): Dimension {
+            check(SwingUtilities.isEventDispatchThread()) { "Preferred grid sizing requires the EDT" }
+            return Dimension(
                 gridPixelExtent(columns, metrics.cellWidth, chrome.horizontalInset(settings, activeBuffer)),
                 gridPixelExtent(rows, metrics.cellHeight, chrome.verticalInset(settings, activeBuffer)),
             )
+        }
 
         private fun resizeSessionToVisibleGridOnEdt(
             publishWhenUnchanged: Boolean = true,

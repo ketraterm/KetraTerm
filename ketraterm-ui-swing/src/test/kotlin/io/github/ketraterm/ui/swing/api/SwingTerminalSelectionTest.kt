@@ -268,15 +268,17 @@ class SwingTerminalSelectionTest {
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
         hostServices: SwingHostServices = SwingHostServices(),
     ): SwingTerminal =
-        SwingTerminal(
-            settingsProvider = settingsProvider,
-            hostServices =
-                hostServices.copy { draft ->
-                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
-                },
-            searchDispatcher = mutationDispatcher,
-            mutationDispatcher = mutationDispatcher,
-        ).also(components::add)
+        edtCall {
+            SwingTerminal(
+                settingsProvider = settingsProvider,
+                hostServices =
+                    hostServices.copy { draft ->
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                searchDispatcher = mutationDispatcher,
+                mutationDispatcher = mutationDispatcher,
+            ).also(components::add)
+        }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])

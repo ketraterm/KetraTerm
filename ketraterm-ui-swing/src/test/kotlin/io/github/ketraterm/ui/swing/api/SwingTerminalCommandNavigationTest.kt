@@ -801,15 +801,17 @@ class SwingTerminalCommandNavigationTest {
         settingsProvider: SwingSettingsProvider,
         hostServices: SwingHostServices = SwingHostServices(),
     ): SwingTerminal =
-        SwingTerminal(
-            settingsProvider = settingsProvider,
-            hostServices =
-                hostServices.copy { draft ->
-                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
-                },
-            searchDispatcher = mutationDispatcher,
-            mutationDispatcher = mutationDispatcher,
-        ).also(components::add)
+        edtCall {
+            SwingTerminal(
+                settingsProvider = settingsProvider,
+                hostServices =
+                    hostServices.copy { draft ->
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                searchDispatcher = mutationDispatcher,
+                mutationDispatcher = mutationDispatcher,
+            ).also(components::add)
+        }
 
     private fun commandSession(
         renderReader: TerminalRenderFrameReader,

@@ -64,6 +64,90 @@ import kotlin.concurrent.thread
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
     @Test
+    fun `off EDT construction fails before invoking host services`() {
+        var settingsReads = 0
+        var popupCreations = 0
+        assertThrows(IllegalStateException::class.java) {
+            SwingTerminal(
+                settingsProvider = {
+                    settingsReads++
+                    SwingSettings()
+                },
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.shellSuggestionViewFactory = {
+                            popupCreations++
+                            error("Must not create a popup off the EDT")
+                        }
+                    },
+            )
+        }
+        assertEquals(0, settingsReads)
+        assertEquals(0, popupCreations)
+    }
+
+    @Test
+    fun `preferred grid sizing rejects off EDT access and remains usable on EDT`() {
+        val component = controlledTerminal()
+        try {
+            val expected = edtCall { component.preferredGridSize(80, 24) }
+            assertThrows(IllegalStateException::class.java) { component.preferredGridSize(80, 24) }
+            edtCall { assertEquals(expected, component.preferredGridSize(80, 24)) }
+        } finally {
+            edtCall { component.dispose() }
+        }
+    }
+
+    @Test
+    fun `clipboard writes require EDT and a live component binding`() {
+        val copied = ArrayList<String>()
+        val component =
+            controlledTerminal(
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler =
+                            object : TerminalClipboardHandler {
+                                override fun copyText(text: String) {
+                                    assertTrue(SwingUtilities.isEventDispatchThread())
+                                    copied += text
+                                }
+
+                                override fun readText(): String = error("Unexpected clipboard read")
+                            }
+                    },
+            )
+        try {
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    NoOpConnector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    edtCall {
+                        assertFalse(component.copyTextToClipboard("unbound"))
+                        component.bind(session)
+                    }
+                    assertThrows(IllegalStateException::class.java) { component.copyTextToClipboard("off EDT") }
+                    edtCall {
+                        assertTrue(copied.isEmpty())
+                        assertTrue(component.copyTextToClipboard("exact text\n\uD83D\uDE80"))
+                        component.unbind()
+                        assertFalse(component.copyTextToClipboard("unbound again"))
+                        component.bind(session)
+                        component.dispose()
+                        assertFalse(component.copyTextToClipboard("disposed"))
+                        assertEquals(listOf("exact text\n\uD83D\uDE80"), copied)
+                    }
+                }
+        } finally {
+            edtCall { component.dispose() }
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
     fun `focus loss unbind and rebind discard incomplete keyboard input`() {
         val events = ArrayList<TerminalKeyEvent>()
         val session =
@@ -136,7 +220,7 @@ class SwingTerminalThreadingTest {
                         }
                     }
             }
-        return SwingTerminal(settingsProvider, services, searchDispatcher = dispatcher, mutationDispatcher = dispatcher)
+        return edtCall { SwingTerminal(settingsProvider, services, searchDispatcher = dispatcher, mutationDispatcher = dispatcher) }
     }
 
     @ParameterizedTest
@@ -1738,16 +1822,6 @@ class SwingTerminalThreadingTest {
             release.countDown()
             blocker.get(10, TimeUnit.SECONDS)
         }
-    }
-
-    private fun <T> edtCall(action: () -> T): T {
-        if (SwingUtilities.isEventDispatchThread()) return action()
-
-        val result = AtomicReference<T>()
-        SwingUtilities.invokeAndWait {
-            result.set(action())
-        }
-        return result.get()
     }
 
     private fun drainEdt() {

@@ -1172,26 +1172,23 @@ class SwingSettingsTest {
 
     @Test
     fun componentReportsVisibleGridFromFrozenMetrics() {
-        val component =
-            SwingTerminal(settingsProvider = {
-                SwingSettings.create { draft ->
-                    draft.columns = 10
-                    draft.rows = 4
-                }
-            })
-        val preferred = component.preferredSize
-        var visibleColumns = 0
-        var visibleRows = 0
-
         SwingUtilities.invokeAndWait {
-            component.size = preferred
-            val visible = component.visibleGridSize()
-            visibleColumns = visible.width
-            visibleRows = visible.height
+            val component =
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.columns = 10
+                        draft.rows = 4
+                    }
+                })
+            try {
+                component.size = component.preferredSize
+                val visible = component.visibleGridSize()
+                assertEquals(10, visible.width)
+                assertEquals(4, visible.height)
+            } finally {
+                component.dispose()
+            }
         }
-
-        assertEquals(10, visibleColumns)
-        assertEquals(4, visibleRows)
     }
 
     @Test

@@ -255,27 +255,32 @@ class SwingTerminalSearchTest {
         val reader = SearchFrameReader()
         val session = testSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
-                SwingSettings.create { draft ->
-                    draft.padding = SwingPadding(0, 0, 0, 0)
-                }
-            }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
+            edtCall {
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
+                }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
+            }
 
-        SwingUtilities.invokeAndWait {
-            component.size = component.preferredGridSize(12, 1)
-            component.bind(session)
-            searchDispatcher.scheduler.runCurrent()
-            component.search("needle")
-            searchDispatcher.scheduler.runCurrent()
-            component.clearSearch()
+        try {
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(12, 1)
+                component.bind(session)
+                searchDispatcher.scheduler.runCurrent()
+                component.search("needle")
+                searchDispatcher.scheduler.runCurrent()
+                component.clearSearch()
 
-            val state = component.currentSearchState()
-            assertEquals("", state.query)
-            assertEquals(0, state.resultCount)
-            assertEquals(-1, state.activeResultIndex)
+                val state = component.currentSearchState()
+                assertEquals("", state.query)
+                assertEquals(0, state.resultCount)
+                assertEquals(-1, state.activeResultIndex)
+            }
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
         }
-
-        session.close()
     }
 
     @Test
@@ -283,26 +288,31 @@ class SwingTerminalSearchTest {
         val reader = SearchFrameReader()
         val session = testSession(reader)
         val component =
-            SwingTerminal(settingsProvider = {
-                SwingSettings.create { draft ->
-                    draft.padding = SwingPadding(0, 0, 0, 0)
-                }
-            }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
+            edtCall {
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
+                }, hostServices = inlineEdtServices(), searchDispatcher = searchDispatcher, mutationDispatcher = searchDispatcher)
+            }
 
-        SwingUtilities.invokeAndWait {
-            component.size = component.preferredGridSize(12, 1)
-            component.bind(session)
-            searchDispatcher.scheduler.runCurrent()
-            component.search("needle")
-            searchDispatcher.scheduler.runCurrent()
+        try {
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(12, 1)
+                component.bind(session)
+                searchDispatcher.scheduler.runCurrent()
+                component.search("needle")
+                searchDispatcher.scheduler.runCurrent()
 
-            val state = component.currentSearchState()
-            assertEquals(1, state.resultCount)
-            assertEquals(0, state.activeResultIndex)
-            assertEquals(5, component.viewportState().renderOffset)
+                val state = component.currentSearchState()
+                assertEquals(1, state.resultCount)
+                assertEquals(0, state.activeResultIndex)
+                assertEquals(5, component.viewportState().renderOffset)
+            }
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
         }
-
-        session.close()
     }
 
     private fun inlineEdtServices(): SwingHostServices =

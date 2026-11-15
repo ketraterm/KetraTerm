@@ -35,6 +35,7 @@ import kotlin.coroutines.CoroutineContext
  * Swing focus traversal and button activation remain available.
  * Non-cancellation status-update failures are logged and shown as failed status;
  * observation continues with the next search state.
+ * Construct on the EDT; [open], [close], and [refreshColors] also accept calls from other threads.
  *
  * @param terminal terminal whose headless search API backs this bar.
  * @param messages host message bundle, read on the EDT outside painting. Static labels are captured at construction.
@@ -46,6 +47,10 @@ public class SwingTerminalSearchBar
     ) {
         /** Creates a search bar using the JVM display locale and bundled messages. */
         public constructor(terminal: SwingTerminal) : this(terminal, SwingHostMessages.forLocale())
+
+        init {
+            check(SwingUtilities.isEventDispatchThread()) { "Search bar construction requires the EDT" }
+        }
 
         private var colors = SwingTerminalSearchColors()
         private val placeholder = messages.message("search.placeholder")
@@ -248,7 +253,7 @@ public class SwingTerminalSearchBar
         }
 
         /**
-         * Returns whether the search bar is visible.
+         * Returns whether the search bar is visible. Call on the EDT.
          *
          * @return `true` when the bar is open.
          */

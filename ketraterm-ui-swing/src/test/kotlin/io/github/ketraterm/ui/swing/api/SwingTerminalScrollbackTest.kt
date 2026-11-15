@@ -92,18 +92,20 @@ class SwingTerminalScrollbackTest {
                     updates.add(state.scrollbackOffset)
                 }
             }
-        return SwingTerminal(
-            settingsProvider = settingsProvider,
-            hostServices =
-                hostServices.copy { draft ->
-                    draft.viewportListener = listener
-                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
-                },
-            searchDispatcher = dispatcher,
-            mutationDispatcher = dispatcher,
-        ).also {
-            components += it
-            viewportUpdates[it] = updates
+        return edtCall {
+            SwingTerminal(
+                settingsProvider = settingsProvider,
+                hostServices =
+                    hostServices.copy { draft ->
+                        draft.viewportListener = listener
+                        draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                    },
+                searchDispatcher = dispatcher,
+                mutationDispatcher = dispatcher,
+            ).also {
+                components += it
+                viewportUpdates[it] = updates
+            }
         }
     }
 
