@@ -343,6 +343,14 @@ fun main() =
                 val provider = SwingShellSuggestionProvider { flowOf(emptyList()) }
                 val componentFirst = createUnboundTerminalView().apply { setShellSuggestionProvider(provider) }
                 try {
+                    var reloadCompletions = 0
+                    componentFirst.reloadSettings { failure ->
+                        check(SwingUtilities.isEventDispatchThread())
+                        check(failure == null)
+                        reloadCompletions++
+                    }
+                    check(reloadCompletions == 1)
+                    componentFirst.reloadSettings()
                     check(componentFirst.hasShellSuggestionProvider)
                     componentFirst.bind(session)
                     componentFirst.unbind()
@@ -392,7 +400,16 @@ fun main() =
                                     pasteRequest = request
                                 }
                         },
-                    ).apply { size = preferredSize }
+                    ).apply {
+                        size = preferredSize
+                        val accessible: javax.accessibility.Accessible = this
+                        val context = accessible.accessibleContext
+                        check(context.accessibleRole == javax.accessibility.AccessibleRole.TEXT)
+                        check(context.accessibleText != null)
+                        check(context.accessibleEditableText == null)
+                        context.accessibleName = "Host terminal"
+                        check(accessibleContext.accessibleName == "Host terminal")
+                    }
                 }
             try {
                 val bound = CompletableDeferred<Unit>()

@@ -310,9 +310,11 @@ although its work is discarded; calls observing shutdown return `CLOSED`.
 
 Resize synchronously follows mutation serialization and may block in the
 connector. It has no queue position and is not a flush barrier: accepted input
-may be written after a later resize returns. Connector resize and disposal share
-a separate lock, so an entered resize must finish before disposal proceeds.
-Resize never takes the startup lifecycle lock while holding mutation.
+may be written after a later resize returns. Closure rejects later resize
+admissions. An admitted connector resize can overlap disposal. Connector cleanup
+starts without waiting for that resize; EOF and final publication still wait
+for admitted mutation to finish. Resize never takes the startup lifecycle lock
+while holding mutation.
 
 The geometry overload records grid and text-area pixel dimensions together
 under mutation serialization. Grid-only resize preserves pixels for an unchanged

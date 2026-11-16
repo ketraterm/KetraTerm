@@ -34,6 +34,326 @@ import kotlin.coroutines.CoroutineContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoverySchedulingTest {
     @ParameterizedTest
+    @ValueSource(strings = ["exception", "assertion", "cancellation"])
+    fun `reset releases configuration and actions after provider cleanup fails`(kind: String) {
+        val failure =
+            when (kind) {
+                "assertion" -> AssertionError("Provider cleanup failed")
+                "cancellation" -> CancellationException("Provider cleanup cancelled")
+                else -> IllegalStateException("Provider cleanup failed")
+            }
+        var failCleanup = false
+        var subscriptions = 0
+        var cancellations = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationChanges =
+                    kotlinx.coroutines.flow.flow<Unit> {
+                        subscriptions++
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            cancellations++
+                        }
+                    }
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =
+                    listOf(request.hyperlink(0, 0, URL.length, { true }))
+
+                override fun discardOrderedState() {
+                    if (failCleanup) throw failure
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            assertEquals(1, subscriptions)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+            failCleanup = true
+            try {
+                fixture.onEdt { assertSame(failure, assertThrows(Throwable::class.java) { fixture.controller.reset() }) }
+            } finally {
+                failCleanup = false
+            }
+            fixture.completeAnalysis()
+            assertEquals(1, cancellations)
+            fixture.onEdt { assertFalse(fixture.openAt(0)) }
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            assertEquals(2, subscriptions)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["exception", "assertion", "cancellation"])
+    fun `failed ordered cleanup retires an executing lane before a replacement binding starts`(kind: String) {
+        val failure =
+            when (kind) {
+                "assertion" -> AssertionError("Provider cleanup failed")
+                "cancellation" -> CancellationException("Provider cleanup cancelled")
+                else -> IllegalStateException("Provider cleanup failed")
+            }
+        val gate = CompletableDeferred<Unit>()
+        var calls = 0
+        var discards = 0
+        var failCleanup = false
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
+                    if (++calls == 1) withContext(NonCancellable) { gate.await() }
+                    return listOf(request.hyperlink(0, 0, URL.length, { true }))
+                }
+
+                override fun discardOrderedState() {
+                    discards++
+                    if (failCleanup) {
+                        failCleanup = false
+                        throw failure
+                    }
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            try {
+                fixture.show(URL)
+                fixture.completeAnalysis()
+                assertEquals(1, calls)
+                failCleanup = true
+                fixture.onEdt { fixture.controller.reset() }
+                fixture.show("$URL/next")
+                gate.complete(Unit)
+                repeat(3) { fixture.completeAnalysis() }
+                assertEquals(1, discards)
+                assertEquals(2, calls)
+                if (failure is CancellationException) {
+                    assertNull(fixture.failures.poll())
+                } else {
+                    assertSame(failure, fixture.failures.poll())
+                    assertTrue(failure.suppressed.single() is CancellationException)
+                }
+                fixture.onEdt { assertTrue(fixture.openAt(0)) }
+            } finally {
+                failCleanup = false
+                gate.complete(Unit)
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `failed cleanup after cancellation before dispatch releases the ordered lane`(error: Boolean) {
+        val failure = if (error) AssertionError("Provider cleanup failed") else IllegalStateException("Provider cleanup failed")
+        var failCleanup = false
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =
+                    listOf(request.hyperlink(0, 0, URL.length, { true }))
+
+                override fun discardOrderedState() {
+                    if (failCleanup) throw failure
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            fixture.onEdt { fixture.controller.reset() }
+            fixture.drainUi()
+            fixture.show(URL)
+            failCleanup = true
+            var synchronousFailure: Throwable? = null
+            try {
+                fixture.onEdt {
+                    try {
+                        fixture.controller.reset()
+                    } catch (next: Throwable) {
+                        synchronousFailure = next
+                    }
+                }
+                fixture.drainUi()
+            } finally {
+                failCleanup = false
+            }
+            val failures = fixture.failures.toList() + listOfNotNull(synchronousFailure)
+            assertTrue(failures.any { it === failure || it.cause === failure }, "The provider failure must remain observable")
+            assertTrue(failure.suppressed.single() is CancellationException)
+            fixture.failures.clear()
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @Test
+    fun `provider cleanup failure does not end configuration collection`() {
+        val changes = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        var generation = 0L
+        var calls = 0
+        var subscriptions = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationGeneration get() = generation
+                override val configurationChanges =
+                    kotlinx.coroutines.flow.flow {
+                        subscriptions++
+                        changes.collect { emit(it) }
+                    }
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
+                    calls++
+                    return listOf(request.hyperlink(0, 0, URL.length, { true }))
+                }
+
+                override fun discardOrderedState() {
+                    if (generation == 1L) throw IllegalStateException("Provider cleanup failed")
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            repeat(2) {
+                generation++
+                assertTrue(changes.tryEmit(Unit))
+                fixture.drainUi()
+                fixture.completeAnalysis()
+            }
+            assertEquals(3, calls)
+            assertEquals(1, subscriptions)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `provider cancellation and errors propagate after retiring its configuration`(cancelled: Boolean) {
+        val failure = if (cancelled) CancellationException("Provider cancelled") else AssertionError("Provider failed")
+        var failCleanup = false
+        var generation = 0L
+        var subscriptions = 0
+        var cancellations = 0
+        var calls = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationGeneration get() = generation
+                override val configurationChanges =
+                    kotlinx.coroutines.flow.flow<Unit> {
+                        subscriptions++
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            cancellations++
+                        }
+                    }
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
+                    calls++
+                    return listOf(request.hyperlink(0, 0, URL.length, { true }))
+                }
+
+                override fun discardOrderedState() {
+                    if (failCleanup) throw failure
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            failCleanup = true
+            try {
+                fixture.onEdt {
+                    generation++
+                    assertSame(failure, assertThrows(Throwable::class.java) { fixture.controller.scheduleForFrame() })
+                }
+            } finally {
+                failCleanup = false
+            }
+            fixture.drainUi()
+            assertEquals(1, cancellations)
+            fixture.onEdt { fixture.controller.reconcile() }
+            fixture.completeAnalysis()
+            assertEquals(2, calls)
+            assertEquals(2, subscriptions)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @Test
+    fun `idle provider replacement retires its subscription after cleanup fails`() {
+        var failCleanup = false
+        var cancelled = false
+        var replacementCalls = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationChanges =
+                    kotlinx.coroutines.flow.flow<Unit> {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            cancelled = true
+                        }
+                    }
+
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =
+                    listOf(request.hyperlink(0, 0, URL.length, { true }))
+
+                override fun discardOrderedState() {
+                    if (failCleanup) throw IllegalStateException("Provider cleanup failed")
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            failCleanup = true
+            fixture.replaceDetector { request ->
+                replacementCalls++
+                listOf(request.hyperlink(0, 0, URL.length, { true }))
+            }
+            fixture.completeAnalysis()
+            assertTrue(cancelled)
+            assertEquals(1, replacementCalls)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @Test
+    fun `provider cleanup cannot overwrite a reentrant replacement binding`() {
+        var onDiscard: () -> Unit = {}
+        val detector =
+            object : SwingHyperlinkDetector {
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> = emptyList()
+
+                override fun discardOrderedState() {
+                    val action = onDiscard
+                    onDiscard = {}
+                    action()
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.completeAnalysis()
+            var intermediateCalls = 0
+            var replacementCalls = 0
+            onDiscard = {
+                fixture.controller.reset()
+                fixture.replaceDetector { request ->
+                    replacementCalls++
+                    listOf(request.hyperlink(0, 0, URL.length, { true }))
+                }
+            }
+            fixture.replaceDetector {
+                intermediateCalls++
+                emptyList()
+            }
+            fixture.completeAnalysis()
+            assertEquals(0, intermediateCalls)
+            assertEquals(1, replacementCalls)
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["scan", "validation"])
     fun `blocked source work leaves EDT responsive and reset discards its result`(phase: String) {
         val entered = CountDownLatch(1)
@@ -1049,25 +1369,33 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         private var frameGeneration = 0L
         private val completedDetections = AtomicInteger()
         private var sourcePrepared = false
-        private val scope = CoroutineScope(SupervisorJob() + uiDispatcher)
+        val failures = ConcurrentLinkedQueue<Throwable>()
+        private val scope =
+            CoroutineScope(
+                SupervisorJob() + uiDispatcher + CoroutineExceptionHandler { _, failure -> failures.add(failure) },
+            )
         private val delegate =
             detector ?: SwingHyperlinkDetector { request ->
                 requests += List(request.lineCount) { request.lineText(it) }
                 findUrls(request, opened, validateUrlToken)
             }
+
+        private fun observed(detector: SwingHyperlinkDetector): SwingHyperlinkDetector =
+            object : SwingHyperlinkDetector by detector {
+                override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =
+                    try {
+                        detector.detect(request)
+                    } finally {
+                        completedDetections.incrementAndGet()
+                    }
+            }
+
+        private var currentDetector = observed(delegate)
         private val host =
             object : TerminalHyperlinkDiscoveryHost {
                 override val renderCache = cache
                 override val hyperlinkSource get() = reader.takeIf { sourceBound }
-                override val hyperlinkDetector =
-                    object : SwingHyperlinkDetector by delegate {
-                        override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> =
-                            try {
-                                delegate.detect(request)
-                            } finally {
-                                completedDetections.incrementAndGet()
-                            }
-                    }
+                override val hyperlinkDetector get() = currentDetector
 
                 override fun hyperlinksChanged() {
                     assertTrue(SwingUtilities.isEventDispatchThread())
@@ -1118,6 +1446,12 @@ class TerminalHyperlinkDiscoverySchedulingTest {
                 controller.reconcile()
             }
 
+        fun replaceDetector(detector: SwingHyperlinkDetector) =
+            onEdt {
+                currentDetector = observed(detector)
+                controller.scheduleForFrame()
+            }
+
         fun drainUi() = onEdt { uiDispatcher.scheduler.runCurrent() }
 
         fun completeAnalysis() {
@@ -1138,7 +1472,9 @@ class TerminalHyperlinkDiscoverySchedulingTest {
             assertEquals(before, completedDetections.get(), "Copying unchanged source must reuse its detector results")
         }
 
-        fun onEdt(action: () -> Unit) = SwingUtilities.invokeAndWait(action)
+        fun onEdt(action: () -> Unit) {
+            if (SwingUtilities.isEventDispatchThread()) action() else SwingUtilities.invokeAndWait(action)
+        }
 
         override fun close() {
             onEdt {
@@ -1147,6 +1483,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
             }
             worker.runCurrent()
             drainUi()
+            assertTrue(failures.isEmpty(), "Unexpected coroutine failures: $failures")
         }
     }
 

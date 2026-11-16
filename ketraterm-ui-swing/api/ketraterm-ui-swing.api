@@ -254,7 +254,7 @@ public abstract interface class io/github/ketraterm/ui/swing/api/SwingScrollbarS
 	public abstract fun scrollFromScrollbar (IZ)V
 }
 
-public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/JComponent, io/github/ketraterm/ui/swing/api/SwingScrollbarScroller {
+public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/JComponent, io/github/ketraterm/ui/swing/api/SwingScrollbarScroller, javax/accessibility/Accessible {
 	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;)V
 	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;)V
 	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -303,6 +303,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun dismissInlineShellSuggestion ()Z
 	public final fun dispose ()V
 	public fun doLayout ()V
+	public fun getAccessibleContext ()Ljavax/accessibility/AccessibleContext;
 	public final fun getHasShellSuggestionProvider ()Z
 	public final fun getInlineShellSuggestionPresentation ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getSearchState ()Lkotlinx/coroutines/flow/StateFlow;
@@ -322,6 +323,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public static synthetic fun presentShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;IIILjava/lang/Object;)V
 	public final fun refreshShellSuggestions ()V
 	public final fun reloadSettings ()V
+	public final fun reloadSettings (Lkotlin/jvm/functions/Function1;)V
 	public fun removeNotify ()V
 	public final fun removeSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun removeShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V

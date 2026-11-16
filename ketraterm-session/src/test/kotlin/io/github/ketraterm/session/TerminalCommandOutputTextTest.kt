@@ -89,7 +89,7 @@ class TerminalCommandOutputTextTest {
         }
 
     @Test
-    fun `host metadata alone does not fabricate command output`() =
+    fun `host without command records does not fabricate output`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             TerminalSession

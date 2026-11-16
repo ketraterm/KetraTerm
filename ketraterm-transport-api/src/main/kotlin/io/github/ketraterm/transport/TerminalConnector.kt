@@ -69,6 +69,9 @@ public interface TerminalConnector : AutoCloseable {
     /**
      * Resizes the remote terminal transport in character cells.
      *
+     * Must tolerate concurrent [close]. A call admitted before closure may enter
+     * after resources are released. Calls that observe closure must not access those resources.
+     *
      * @param columns new column width count.
      * @param rows new row height count.
      */
@@ -80,6 +83,10 @@ public interface TerminalConnector : AutoCloseable {
     /**
      * Requests local transport shutdown. Repeated calls are safe and do not
      * release resources or notify listeners more than once. May precede [start].
+     *
+     * Must tolerate concurrent startup, writes, and resizes. Begin transport shutdown
+     * without waiting for active writes or resizes. Resource release must not wait
+     * for a byte callback to return.
      */
     override fun close()
 }

@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -212,8 +211,7 @@ public class TerminalShellIntegrationState(
     private val lock = Any()
     private var explicitLineOrder = false
     private var orderedLineIds = LongArray(0)
-    private var sortedLineIds = LongArray(0)
-    private var linePositions = IntArray(0)
+    private val spatialOrder = TerminalShellLineOrder()
     private var orderedLineCount = 0
     private var orderedLineStartAbsoluteRow = 0L
     private var observedStructure = Long.MIN_VALUE
@@ -283,7 +281,7 @@ public class TerminalShellIntegrationState(
                 // Keep the previous identity snapshot until the affected suffix has been checked.
                 if (!capture && !explicitLineOrder && observedMetadataRevision != metadataRevision) capturePromptPredecessors(frame)
                 // Rows scrolled out during this batch can hide an insertion from the live viewport.
-                if (!explicitLineOrder && !layoutChanged && !rearranged) {
+                if (!layoutChanged && (explicitLineOrder || !rearranged)) {
                     scanStart = (observedVisibleStart - 1).coerceAtLeast(0)
                 }
                 observedHistoryLayout = frame.historyContentGeneration
@@ -311,38 +309,15 @@ public class TerminalShellIntegrationState(
                         capturePromptPredecessors(frame)
                         return@synchronized
                     }
-                    if (scanStart != 0L) {
+                    if (!explicitLineOrder && scanStart != 0L) {
                         requiresFullOrder = true
                         return@synchronized
                     }
                     explicitLineOrder = true
-                    if (orderedLineIds.size < frame.rows) {
-                        orderedLineIds = LongArray(frame.rows)
-                        sortedLineIds = LongArray(frame.rows)
-                        linePositions = IntArray(frame.rows)
-                    }
-                    orderedLineCount = 0
-                    for (row in 0 until frame.rows) {
-                        val id = frame.lineId(row)
-                        if (id <= 0) {
-                            orderedLineCount = 0
-                            return@synchronized
-                        }
-                        // Reflow can spread one logical identity over adjacent physical rows.
-                        if (orderedLineCount > 0 && orderedLineIds[orderedLineCount - 1] == id) continue
-                        orderedLineIds[orderedLineCount] = id
-                        sortedLineIds[orderedLineCount] = id
-                        orderedLineCount++
-                    }
-                    Arrays.sort(sortedLineIds, 0, orderedLineCount)
-                    for (row in 0 until orderedLineCount) {
-                        if (row > 0 && sortedLineIds[row] == sortedLineIds[row - 1]) {
-                            orderedLineCount = 0
-                            return@synchronized
-                        }
-                    }
-                    for (row in 0 until orderedLineCount) {
-                        linePositions[Arrays.binarySearch(sortedLineIds, 0, orderedLineCount, orderedLineIds[row])] = row
+                    if (scanStart == 0L) {
+                        spatialOrder.rebuild(frame)
+                    } else if (!spatialOrder.update(frame)) {
+                        requiresFullOrder = true
                     }
                 }
             }
@@ -366,9 +341,7 @@ public class TerminalShellIntegrationState(
     /** Records real neighbours even when increasing identities have gaps after deletion. */
     private fun capturePromptPredecessors(frame: TerminalRenderFrame) {
         if (orderedLineIds.size < frame.rows) {
-            orderedLineIds = LongArray(frame.rows)
-            sortedLineIds = LongArray(frame.rows)
-            linePositions = IntArray(frame.rows)
+            orderedLineIds = LongArray(maxOf(frame.rows, orderedLineIds.size * 2, 32))
         }
         orderedLineCount = frame.rows
         orderedLineStartAbsoluteRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
@@ -395,8 +368,7 @@ public class TerminalShellIntegrationState(
     private fun linePosition(id: Long): Long {
         if (id == NO_LINE_ID) return -1
         if (!explicitLineOrder) return id
-        val index = Arrays.binarySearch(sortedLineIds, 0, orderedLineCount, id)
-        return if (index < 0) -1 else linePositions[index].toLong()
+        return spatialOrder.position(id)
     }
 
     private fun lineBetween(
@@ -1397,7 +1369,7 @@ public class TerminalShellIntegrationState(
             i++
         }
         if (lastBlockPosition < 0) return NO_LINE_ID
-        return if (explicitLineOrder) orderedLineIds[lastBlockPosition.toInt()] else lastBlockPosition
+        return if (explicitLineOrder) spatialOrder.lineId(lastBlockPosition) else lastBlockPosition
     }
 
     private fun isCommandStartInclusive(index: Int): Boolean = flags[index] and FLAG_COMMAND_START_INCLUSIVE != 0
@@ -1418,6 +1390,7 @@ public class TerminalShellIntegrationState(
 
     private fun clearLocked() {
         explicitLineOrder = false
+        spatialOrder.clear()
         orderedLineCount = 0
         orderedLineStartAbsoluteRow = 0L
         observedStructure = Long.MIN_VALUE

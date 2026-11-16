@@ -64,6 +64,7 @@ internal object TerminalResizer {
      * The returned value is the updated scrollback offset for a user-controlled
      * viewport. A return value of zero means the viewport remains attached to
      * the live screen.
+     * An inactive cursor does not retain untouched trailing rows during background reflow.
      */
     fun resizeBuffer(
         buffer: ScreenBuffer,
@@ -73,6 +74,7 @@ internal object TerminalResizer {
         newHeight: Int,
         oldScrollbackOffset: Int = 0,
         lineIdProvider: () -> Long = ResizeFallbackLineIdProvider(),
+        preserveTrailingCursor: Boolean = true,
     ): Int {
         require(oldWidth >= MIN_WIDTH) { "oldWidth must be at least $MIN_WIDTH" }
         require(oldHeight > 0) { "oldHeight must be positive" }
@@ -170,7 +172,7 @@ internal object TerminalResizer {
             if (builder.cursorAbsoluteIndex == -1) return
 
             newAbsoluteCursorRow = newRing.discardedCount + newRing.size - 1
-            newCursorCol = 0
+            newCursorCol = builder.cursorAbsoluteIndex
             cursorPlaced = true
         }
 
@@ -342,11 +344,13 @@ internal object TerminalResizer {
             }
 
             /*
-             * Untouched trailing viewport rows are layout capacity. Explicit
-             * blank output remains durable content and participates in reflow.
+             * Untouched rows after the cursor are layout capacity. Keep blank rows
+             * through the cursor so preceding reflow cannot move it onto output.
+             * Bound this gap to the new height to avoid storing untouched blank history.
              */
             if (
                 i >= oldTrailingBlankStart &&
+                (!preserveTrailingCursor || i > absoluteOldCursorRow || i <= absoluteOldCursorRow - newHeight) &&
                 i < oldLiveScreenTop + oldHeight
             ) {
                 continue
@@ -379,7 +383,7 @@ internal object TerminalResizer {
                     i == absoluteOldViewportTopRow
 
             val readLength =
-                if (hasCursor && buffer.cursor.col > 0) {
+                if (hasCursor && buffer.cursor.col > 0 && i < oldTrailingBlankStart) {
                     maxOf(
                         dataLength,
                         buffer.cursor.col + 1,
@@ -419,7 +423,7 @@ internal object TerminalResizer {
              * Preserve markers for empty rows where no cell was appended.
              */
             if (hasCursor && readLength == 0) {
-                builder.cursorAbsoluteIndex = 0
+                builder.cursorAbsoluteIndex = buffer.cursor.col.coerceIn(0, newWidth - 1)
             }
 
             if (hasViewportTop && readLength == 0) {

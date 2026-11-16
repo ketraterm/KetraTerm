@@ -466,6 +466,8 @@ val compileClientBaseline =
     tasks.register<JavaExec>("compileClientBaseline") {
         group = "verification"
         description = "Intentionally recompiles and replaces the retained consumer baseline for review."
+        outputs.dir(consumerFixtureDirectory.map { it.dir("baseline") })
+        outputs.upToDateWhen { false }
         val releasedVersion = providers.gradleProperty("compiledClientBaselineVersion").orNull
         configureConsumerBuild("gradle", ":recordCompiledClientBaseline", releasedLibraryVersion = releasedVersion)
         args("-PbaselineBasis=${if (releasedVersion == null) "reviewed-working-tree" else "published-release"}")
@@ -497,3 +499,35 @@ tasks.register("publishedConsumerTest") {
     dependsOn(verifyPublishedConsumers, compiledClientUpgradeTest)
 }
 tasks.named("check") { dependsOn("publishedConsumerTest") }
+
+val verifyHostIntegrationExample =
+    tasks.register<JavaExec>("verifyHostIntegrationExample") {
+        group = "verification"
+        description = "Builds and tests the complete host example against staged Maven artifacts."
+        dependsOn(rootProject.tasks.named("prepareLibraryPublicationRepository"))
+        usesService(publishedConsumerFixture)
+        javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+        classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
+        mainClass.set("org.gradle.wrapper.GradleWrapperMain")
+        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        val repository =
+            rootProject.layout.buildDirectory
+                .dir("library-publication-repository")
+                .get()
+                .asFile
+                .toURI()
+        val compilerVersion =
+            org.jetbrains.kotlin.gradle.plugin
+                .getKotlinPluginVersion(logger)
+        args(
+            "--project-dir",
+            rootProject.file("ketraterm-examples/host-integration").absolutePath,
+            "--console=plain",
+            "--no-daemon",
+            "--max-workers=2",
+            "-PkotlinVersion=$compilerVersion",
+            "-PlibraryVersion=${project.version}",
+            "-PlibraryRepository=$repository",
+            "check",
+        )
+    }

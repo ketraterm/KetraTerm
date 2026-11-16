@@ -920,26 +920,27 @@ class SwingTerminalSuggestionContextTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `rebinding completes when inline close listeners throw`(cancelled: Boolean) =
+    fun `rebinding reports inline close failures once and permits retry`(cancelled: Boolean) =
         withInlineFixture { fixture, _, _ ->
             val view = fixture.terminal
             val failure = if (cancelled) CancellationException("close cancelled") else IllegalStateException("close failed")
             val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
             inline.addChangeListener { if (it.isClosed) throw failure }
-            var completed = false
-            assertSame(
-                failure,
-                assertFailsWith<RuntimeException> {
-                    view.bind(fixture.replacementSession) {
-                        assertNull(it)
-                        completed = true
-                    }
-                },
-            )
+            val failures = mutableListOf<Throwable?>()
+            view.bind(fixture.replacementSession) { failures.add(it) }
             fixture.mutationDispatcher.scheduler.runCurrent()
-            assertTrue(completed)
+            assertEquals(1, failures.size)
+            assertSame(failure, failures.single())
+            assertFalse(view.hasActiveRenderBinding)
             assertFalse(fixture.session.isClosed)
             assertFalse(fixture.replacementSession.isClosed)
+
+            val retried = mutableListOf<Throwable?>()
+            view.bind(fixture.replacementSession) { retried.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(listOf<Throwable?>(null), retried)
+            assertEquals(1, failures.size)
+            assertTrue(view.hasActiveRenderBinding)
         }
 
     @ParameterizedTest
@@ -956,12 +957,20 @@ class SwingTerminalSuggestionContextTest {
                     it.smartSuggestionsEnabled = false
                     it.font = it.font.deriveFont(it.font.size2D + 3f)
                 }
-            assertSame(failure, assertFailsWith<RuntimeException> { view.reloadSettings() })
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertSame(failure, failures.single())
             assertEquals(fixture.settings.font, view.font)
             assertNotEquals(previousSize, view.preferredSize)
             assertEquals(view.preferredGridSize(fixture.settings.columns, fixture.settings.rows), view.preferredSize)
             assertNull(view.beginInlineShellSuggestionInteraction())
-            view.reloadSettings()
+            val retried = mutableListOf<Throwable?>()
+            view.reloadSettings { retried.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(listOf<Throwable?>(null), retried)
+            assertEquals(1, failures.size)
             assertEquals(fixture.settings.font, view.font)
         }
 

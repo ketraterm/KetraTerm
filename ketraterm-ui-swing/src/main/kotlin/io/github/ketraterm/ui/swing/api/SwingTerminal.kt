@@ -22,11 +22,14 @@ import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalPointerShape
+import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.*
 import io.github.ketraterm.ui.swing.SessionMutationQueue
+import io.github.ketraterm.ui.swing.SessionSettingsState
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.preserveSwingFailure
@@ -44,12 +47,17 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.awt.*
 import java.awt.event.*
+import java.beans.PropertyChangeListener
 import java.lang.Runnable
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.accessibility.*
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+import javax.swing.text.AttributeSet
+import javax.swing.text.SimpleAttributeSet
+import javax.swing.text.StyleConstants
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -99,7 +107,8 @@ public class SwingTerminal
         private val suggestionDispatcher: CoroutineDispatcher? = null,
         mutationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) : JComponent(),
-        SwingScrollbarScroller {
+        SwingScrollbarScroller,
+        Accessible {
         @JvmOverloads
         public constructor(
             settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
@@ -108,6 +117,255 @@ public class SwingTerminal
 
         init {
             check(SwingUtilities.isEventDispatchThread()) { "Terminal construction requires the EDT" }
+        }
+
+        private var terminalAccessibility: AccessibleTerminal? = null
+
+        /**
+         * Returns the standard Swing accessibility context. Calls may originate outside the EDT.
+         *
+         * Accessible text describes the applied visible rows in logical order, including blank cells.
+         * Indices count UTF-16 units. Soft wraps join rows; hard boundaries add a newline.
+         * History outside the viewport, decorations, and suggestion overlays are excluded.
+         * Character bounds use the shared bidi geometry and include complete wide glyphs and clusters.
+         * Newlines have empty bounds. The caret is -1 when it is hidden or outside the viewport.
+         * Linear selection is clipped to this text. Rectangular selections have no contiguous text range.
+         * Text is read-only; terminal input continues through the session.
+         *
+         * Text calls marshal synchronously to the EDT. Notifications coalesce on the EDT after frame application.
+         * Intermediate frames need not produce separate events. Host names and descriptions remain host-owned.
+         * Session closure retains visible output. Unbinding and disposal clear accessible text.
+         * Accessibility creates no text snapshots until this context is requested.
+         */
+        override fun getAccessibleContext(): AccessibleContext =
+            accessibilityOnEdt {
+                terminalAccessibility ?: AccessibleTerminal().also {
+                    terminalAccessibility = it
+                    accessibleContext = it
+                }
+            }
+
+        private fun <T> accessibilityOnEdt(action: () -> T): T {
+            if (SwingUtilities.isEventDispatchThread()) return action()
+            var result: Result<T>? = null
+            try {
+                SwingUtilities.invokeAndWait { result = runCatching(action) }
+            } catch (failure: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw IllegalStateException("Interrupted while reading terminal accessibility", failure)
+            }
+            return checkNotNull(result).getOrThrow()
+        }
+
+        private inner class AccessibleTerminal :
+            AccessibleJComponent(),
+            AccessibleText {
+            private val defaultName = SwingTerminalMessages.forLocale().message("terminal.accessibleName")
+            private var snapshot: TerminalAccessibleSnapshot? = null
+            private var notified = TerminalAccessibleSnapshot.EMPTY
+            private val observers = HashMap<PropertyChangeListener, Int>()
+            private var frameSource = bindingIdentity
+            private var frameGeneration = renderCache.frameGeneration
+            private var frameColumns = renderCache.columns
+            private var frameRows = renderCache.rows
+            private var frameScrollbackOffset = renderCache.scrollbackOffset
+            private var revision = 0L
+            private var notificationPending = false
+            private val notification = Runnable { notifyChanges() }
+
+            override fun addPropertyChangeListener(listener: PropertyChangeListener?) =
+                accessibilityOnEdt {
+                    if (listener == null) return@accessibilityOnEdt
+                    if (observers.isEmpty()) notified = current()
+                    super.addPropertyChangeListener(listener)
+                    observers[listener] = (observers[listener] ?: 0) + 1
+                }
+
+            override fun removePropertyChangeListener(listener: PropertyChangeListener?) =
+                accessibilityOnEdt {
+                    if (listener == null) return@accessibilityOnEdt
+                    super.removePropertyChangeListener(listener)
+                    val count = observers[listener] ?: return@accessibilityOnEdt
+                    if (count == 1) observers.remove(listener) else observers[listener] = count - 1
+                    if (observers.isEmpty()) notified = TerminalAccessibleSnapshot.EMPTY
+                }
+
+            fun frameChanged() {
+                if (frameSource === bindingIdentity &&
+                    frameGeneration == renderCache.frameGeneration &&
+                    frameColumns == renderCache.columns &&
+                    frameRows == renderCache.rows &&
+                    frameScrollbackOffset == renderCache.scrollbackOffset
+                ) {
+                    return
+                }
+                frameSource = bindingIdentity
+                frameGeneration = renderCache.frameGeneration
+                frameColumns = renderCache.columns
+                frameRows = renderCache.rows
+                frameScrollbackOffset = renderCache.scrollbackOffset
+                invalidate()
+            }
+
+            override fun getAccessibleName(): String = accessibilityOnEdt { super.getAccessibleName() ?: defaultName }
+
+            override fun getAccessibleRole(): AccessibleRole = AccessibleRole.TEXT
+
+            override fun getAccessibleText(): AccessibleText = this
+
+            override fun getAccessibleStateSet(): AccessibleStateSet =
+                accessibilityOnEdt {
+                    super.getAccessibleStateSet().also { it.add(AccessibleState.MULTI_LINE) }
+                }
+
+            override fun getCharCount(): Int = accessibilityOnEdt { current().text.length }
+
+            override fun getCaretPosition(): Int = accessibilityOnEdt { current().caret }
+
+            override fun getSelectionStart(): Int = accessibilityOnEdt { current().selectionStart }
+
+            override fun getSelectionEnd(): Int = accessibilityOnEdt { current().selectionEnd }
+
+            override fun getSelectedText(): String? =
+                accessibilityOnEdt {
+                    val value = current()
+                    if (value.selectionStart < 0 || value.selectionStart == value.selectionEnd) {
+                        null
+                    } else {
+                        value.text.substring(value.selectionStart, value.selectionEnd)
+                    }
+                }
+
+            override fun getAtIndex(
+                part: Int,
+                index: Int,
+            ): String? =
+                accessibilityOnEdt {
+                    current().textAt(part, index, 0, this@SwingTerminal.locale)
+                }
+
+            override fun getBeforeIndex(
+                part: Int,
+                index: Int,
+            ): String? =
+                accessibilityOnEdt {
+                    current().textAt(part, index, -1, this@SwingTerminal.locale)
+                }
+
+            override fun getAfterIndex(
+                part: Int,
+                index: Int,
+            ): String? =
+                accessibilityOnEdt {
+                    current().textAt(part, index, 1, this@SwingTerminal.locale)
+                }
+
+            override fun getIndexAtPoint(point: Point?): Int =
+                accessibilityOnEdt {
+                    if (point == null) return@accessibilityOnEdt -1
+                    val value = current()
+                    val position = Point()
+                    if (!copyCellPositionAt(point.x, point.y, position)) -1 else value.indexAt(position.x, position.y)
+                }
+
+            override fun getCharacterBounds(index: Int): Rectangle =
+                accessibilityOnEdt {
+                    val cell = current().cellAt(index)
+                    val bounds = Rectangle()
+                    if (cell < 0) return@accessibilityOnEdt bounds
+                    val row = (cell ushr 32).toInt()
+                    val column = cell.toInt()
+                    copyCellBounds(column, row, bounds)
+                    if (renderCache.flags[renderCache.rowOffset(row) + column] and TerminalRenderCellFlags.WIDE_LEADING != 0) {
+                        val trailing = Rectangle()
+                        if (copyCellBounds(column + 1, row, trailing)) {
+                            if (bounds.isEmpty) bounds.bounds = trailing else bounds.add(trailing)
+                        }
+                    }
+                    bounds
+                }
+
+            override fun getCharacterAttribute(index: Int): AttributeSet? =
+                accessibilityOnEdt {
+                    val cell = current().cellAt(index)
+                    if (cell < 0) return@accessibilityOnEdt null
+                    val row = (cell ushr 32).toInt()
+                    val word = renderCache.attrWords[renderCache.rowOffset(row) + cell.toInt()]
+                    SimpleAttributeSet().also {
+                        StyleConstants.setFontFamily(it, settings.font.family)
+                        StyleConstants.setFontSize(it, settings.font.size)
+                        StyleConstants.setBold(it, TerminalRenderAttrs.isBold(word))
+                        StyleConstants.setItalic(it, TerminalRenderAttrs.isItalic(word))
+                        StyleConstants.setUnderline(it, TerminalRenderAttrs.underlineStyle(word) != 0)
+                        StyleConstants.setStrikeThrough(it, TerminalRenderAttrs.isStrikethrough(word))
+                    }
+                }
+
+            fun invalidate() {
+                snapshot = null
+                revision++
+                if (!notificationPending && observers.isNotEmpty()) {
+                    notificationPending = true
+                    SwingUtilities.invokeLater(notification)
+                }
+            }
+
+            private fun current(): TerminalAccessibleSnapshot {
+                snapshot?.let { return it }
+                if (disposed || session == null || !renderCache.hasFrame) {
+                    return TerminalAccessibleSnapshot.EMPTY.also { snapshot = it }
+                }
+                var firstRow = -1
+                var lastRow = -1
+                val bounds = Rectangle()
+                for (row in 0 until renderCache.rows) {
+                    val column = visualGeometry.bidiLayout.row(renderCache, row)?.logicalColumn(0) ?: 0
+                    if (copyCellBounds(column, row, bounds)) {
+                        if (firstRow < 0) firstRow = row
+                        lastRow = row
+                    }
+                }
+                val value =
+                    if (firstRow < 0) {
+                        TerminalAccessibleSnapshot.EMPTY
+                    } else {
+                        TerminalAccessibleSnapshot.capture(
+                            renderCache,
+                            firstRow,
+                            lastRow,
+                            selectionController.getViewportSelection(renderCache),
+                        )
+                    }
+                snapshot = value
+                return value
+            }
+
+            private fun notifyChanges() {
+                notificationPending = false
+                if (observers.isEmpty()) return
+                val value = current()
+                val previous = notified
+                notified = value
+                val deliveredRevision = revision
+                if (previous.text != value.text) {
+                    var firstChange = 0
+                    val limit = minOf(previous.text.length, value.text.length)
+                    while (firstChange < limit && previous.text[firstChange] == value.text[firstChange]) firstChange++
+                    firePropertyChange(ACCESSIBLE_TEXT_PROPERTY, null, firstChange)
+                }
+                if (revision != deliveredRevision) return
+                if (previous.caret != value.caret) firePropertyChange(ACCESSIBLE_CARET_PROPERTY, previous.caret, value.caret)
+                if (revision != deliveredRevision) return
+                if (previous.selectionStart != value.selectionStart ||
+                    previous.selectionEnd != value.selectionEnd ||
+                    previous.text != value.text &&
+                    value.selectionStart != value.selectionEnd
+                ) {
+                    firePropertyChange(ACCESSIBLE_SELECTION_PROPERTY, null, null)
+                }
+                if (revision != deliveredRevision) return
+                firePropertyChange(ACCESSIBLE_VISIBLE_DATA_PROPERTY, null, null)
+            }
         }
 
         private val chrome = SwingTerminalChrome()
@@ -134,8 +392,9 @@ public class SwingTerminal
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
 
-        // Queue acceptance may lag behind the component snapshot after a rejected reload.
-        private var acceptedSessionSettings: SwingSettings? = null
+        private var sessionSettings = SessionSettingsState()
+        private var settingsReloadRevision = 0L
+        private var settingsApplied = true
         private var metrics: SwingMetrics = buildMetrics(settings)
         private var terminalFocused: Boolean = false
         internal var cursorBlinkVisible: Boolean = true
@@ -928,6 +1187,7 @@ public class SwingTerminal
             focusTraversalKeysEnabled = false
             addFocusListener(inputController.focusListener)
             selectionController.addListener { _, current ->
+                terminalAccessibility?.invalidate()
                 if (current != null) clearInlineShellSuggestion()
                 updateInlineSuggestionEligibilityOnEdt()
             }
@@ -979,8 +1239,8 @@ public class SwingTerminal
          * @param session terminal session to display.
          * @param onComplete receives `null` after initial session settings and geometry
          * have applied, or their failure. Runs once on the EDT; rebinding or disposal
-         * before admission reports [CancellationException].
-         * @throws IllegalStateException if the bounded session mutation queue is full.
+         * before admission reports [CancellationException]. Queue rejection is also reported here.
+         * A setup failure removes the partial binding. Applied session settings are not restored.
          */
         @JvmOverloads
         public fun bind(
@@ -1027,26 +1287,26 @@ public class SwingTerminal
             }
         }
 
+        /** Applies changed settings and logs operational failures. See [reloadSettings] with a completion callback. */
+        public fun reloadSettings() {
+            reloadSettings(mutationFailureHandler)
+        }
+
         /**
          * Applies changed settings, rebuilding geometry only when its inputs change.
          *
-         * Changed session-affecting settings are applied to the bound session;
-         * unchanged palette and cursor settings preserve application-controlled values.
-         * Geometry changes may resize its grid and connector. Component settings
-         * take effect on the EDT; captured session changes are applied in order on
-         * a worker. After queue overflow, retrying the same snapshot submits the
-         * remaining session changes and geometry. Other calls dispatch asynchronously
-         * to the EDT.
+         * Calls from other threads dispatch asynchronously to the EDT. View settings
+         * take effect there; captured session settings and geometry run on an ordered worker.
+         * Unchanged host palette and cursor settings preserve application-controlled values.
+         * Retry after a failure to apply the remaining changes. Applied changes are not rolled back.
          *
-         * @throws IllegalStateException if the bounded session mutation queue is full.
+         * [onComplete] runs once on the EDT after setup and accepted session work finish.
+         * It receives null on success, or the setup, queue admission, or application failure.
+         * Rebinding, disposal, and superseded geometry report [CancellationException].
+         * An unbound view applies presentation settings only. Completion does not cover later component events.
          */
-        public fun reloadSettings() {
-            runOnEdt(
-                Runnable {
-                    if (disposed) return@Runnable
-                    reloadSettingsOnEdt()
-                },
-            )
+        public fun reloadSettings(onComplete: (Throwable?) -> Unit) {
+            runOnEdt { reloadSettingsOnEdt(onComplete) }
         }
 
         /**
@@ -1716,14 +1976,65 @@ public class SwingTerminal
         private fun bindOnEdt(
             session: TerminalSession,
             onComplete: (Throwable?) -> Unit,
+        ) {
+            val binding = AtomicBoolean(true)
+            var remaining = 3
+            var setupComplete = false
+            var setupFailed = false
+            var completed = false
+            var initializationFailure: Throwable? = null
+
+            fun completeIfReady() {
+                if (completed || !setupComplete) return
+                val current = bindingIdentity === binding && binding.get()
+                if (initializationFailure == null && !current) {
+                    initializationFailure = CancellationException("Terminal session binding replaced")
+                }
+                if (!setupFailed && current && remaining != 0) return
+                completed = true
+                if (setupFailed && bindingIdentity === binding) {
+                    try {
+                        unbindOnEdt()
+                    } catch (failure: Throwable) {
+                        initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                    }
+                }
+                onComplete(initializationFailure)
+            }
+
+            val initialized: (Throwable?) -> Unit = { failure ->
+                if (!completed) {
+                    if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                    remaining--
+                    completeIfReady()
+                }
+            }
+            try {
+                initializeBindingOnEdt(session, binding, initialized)
+            } catch (failure: Throwable) {
+                setupFailed = true
+                initializationFailure = preserveSwingFailure(initializationFailure, failure)
+            }
+            setupComplete = true
+            completeIfReady()
+        }
+
+        private fun initializeBindingOnEdt(
+            session: TerminalSession,
+            binding: AtomicBoolean,
+            initialized: (Throwable?) -> Unit,
         ) = selectionController.deferChanges {
-            if (disposed) return@deferChanges
+            if (disposed) {
+                initialized(CancellationException("Terminal view disposed"))
+                return@deferChanges
+            }
             popupCompletionCommand = null
             bindingIdentity.set(false)
+            bindingIdentity = binding
             cleanupSwingResources(
                 ::clearInlineShellSuggestion,
-                {
-                    bindingIdentity = AtomicBoolean(true)
+                initialize@{
+                    if (!binding.get()) return@initialize
                     synchronized(resizePublicationLock) { resizeResultPending = false }
                     resizePublicationSession = null
                     suggestionScheduler?.stop()
@@ -1732,7 +2043,7 @@ public class SwingTerminal
                     mouseController.resetInput()
                     inputController.resetInput()
                     this.session = session
-                    acceptedSessionSettings = null
+                    sessionSettings = SessionSettingsState()
                     chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
                     // Binding can remove the initial shell gutter reservation. Keep packing
                     // geometry consistent with the chrome used to calculate the visible grid.
@@ -1740,19 +2051,13 @@ public class SwingTerminal
                     revalidate()
                     retainedViewport = null
                     resetRenderCaches()
-                    var remaining = 3
-                    var initializationFailure: Throwable? = null
-                    val initialized: (Throwable?) -> Unit = { failure ->
-                        if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
-                        remaining--
-                        if (remaining == 0) onComplete(initializationFailure)
-                    }
                     updateMinimizedStateFromAncestor(initialized)
                     applySettingsToSession(session, settings, onComplete = initialized)
                     resetScrollbackState()
                     selectionController.resetBinding()
                     searchController.reset(renderCache.rows)
                     cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+                    if (!binding.get()) return@initialize
                     shellIntegrationDecorations.reset()
                     if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
                     visualGeometry.reset()
@@ -1766,6 +2071,7 @@ public class SwingTerminal
                     clearPointerHover()
                     hyperlinkDiscoveryController.reset()
                     resizeSessionToVisibleGridOnEdt(initialBinding = true, onComplete = initialized)
+                    if (!binding.get()) return@initialize
                     bindingJob =
                         componentScope.launch {
                             launch {
@@ -1843,7 +2149,8 @@ public class SwingTerminal
             selectionController.deferChanges {
                 popupCompletionCommand = null
                 bindingIdentity.set(false)
-                bindingIdentity = AtomicBoolean(false)
+                val unbound = AtomicBoolean(false)
+                bindingIdentity = unbound
                 cleanupSwingResources(
                     ::clearInlineShellSuggestion,
                     { suggestionScheduler?.stop() },
@@ -1885,6 +2192,7 @@ public class SwingTerminal
                     hyperlinkDiscoveryController::reset,
                     { publishViewportState(0) },
                     ::repaint,
+                    isCurrent = { bindingIdentity === unbound },
                 )
             }
 
@@ -1924,13 +2232,75 @@ public class SwingTerminal
             )
         }
 
-        private fun reloadSettingsOnEdt() {
-            if (disposed) return
+        private fun reloadSettingsOnEdt(onComplete: (Throwable?) -> Unit) {
+            val binding = bindingIdentity
+            val revision = ++settingsReloadRevision
+            var pending = 0
+            var setupComplete = false
+            var completed = false
+            var reloadFailure: Throwable? = null
+
+            fun completeIfReady() {
+                if (!setupComplete || completed || pending != 0) return
+                completed = true
+                if (reloadFailure == null && (disposed || bindingIdentity !== binding)) {
+                    reloadFailure = CancellationException("Terminal session binding replaced")
+                }
+                onComplete(reloadFailure)
+            }
+
+            fun checkCurrent() {
+                if (disposed || bindingIdentity !== binding || settingsReloadRevision != revision) {
+                    throw CancellationException("Terminal settings reload superseded")
+                }
+            }
+
+            fun submit(action: ((Throwable?) -> Unit) -> Unit) {
+                pending++
+                var delivered = false
+                try {
+                    action { failure ->
+                        if (!delivered) {
+                            delivered = true
+                            if (failure != null) reloadFailure = preserveSwingFailure(reloadFailure, failure)
+                            pending--
+                            completeIfReady()
+                        }
+                    }
+                } catch (failure: Throwable) {
+                    if (!delivered) {
+                        delivered = true
+                        pending--
+                    }
+                    throw failure
+                }
+            }
+
+            try {
+                checkCurrent()
+                applyViewSettingsOnEdt(::checkCurrent)
+                session?.let { boundSession ->
+                    submit { applySettingsToSession(boundSession, settings, it) }
+                    checkCurrent()
+                    submit { resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false, onComplete = it) }
+                }
+                checkCurrent()
+            } catch (failure: Throwable) {
+                reloadFailure = preserveSwingFailure(reloadFailure, failure)
+            }
+            setupComplete = true
+            completeIfReady()
+        }
+
+        private fun applyViewSettingsOnEdt(checkCurrent: () -> Unit) {
             val previous = settings
             val next = settingsProvider.currentSettings()
-            if (next != previous) {
+            checkCurrent()
+            val retry = !settingsApplied
+            if (retry || next != previous) {
                 val nextMetrics =
-                    if (next.font != previous.font ||
+                    if (retry ||
+                        next.font != previous.font ||
                         next.lineHeight != previous.lineHeight ||
                         next.columnSpacing != previous.columnSpacing
                     ) {
@@ -1938,34 +2308,49 @@ public class SwingTerminal
                     } else {
                         metrics
                     }
+                checkCurrent()
                 if (nextMetrics != metrics) {
                     gridPixelExtent(renderCache.columns, nextMetrics.cellWidth, 0)
                 }
                 val geometryChanged =
-                    nextMetrics != metrics ||
+                    retry ||
+                        nextMetrics != metrics ||
                         next.padding != previous.padding ||
                         next.alternateScreenPadding != previous.alternateScreenPadding ||
                         next.shellIntegrationDecorationGutterWidth != previous.shellIntegrationDecorationGutterWidth ||
                         next.promptDecoration != previous.promptDecoration
-                if (geometryChanged) viewportController.finishScroll()
+                if (geometryChanged) {
+                    viewportController.finishScroll()
+                    checkCurrent()
+                }
+                settingsApplied = false
                 settings = next
                 viewportController.smoothScrolling = next.smoothScrolling
-                if (next.shellSuggestionStyle != previous.shellSuggestionStyle || next.font != previous.font) {
+                checkCurrent()
+                if (retry || next.shellSuggestionStyle != previous.shellSuggestionStyle || next.font != previous.font) {
                     shellSuggestionController?.reloadAppearance()
+                    checkCurrent()
                 }
-                if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
+                if (retry ||
+                    next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                     next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
                 ) {
                     mouseController.resetWheelInput()
                 }
                 metrics = nextMetrics
-                if (next.font != previous.font) font = next.font
-                if (next.palette != previous.palette) {
-                    background = Color(next.palette.defaultBackground, true)
-                    foreground = Color(next.palette.defaultForeground, true)
+                if (retry || next.font != previous.font) {
+                    font = next.font
+                    checkCurrent()
                 }
-                if (next.cursorBlinkMillis != previous.cursorBlinkMillis) configureCursorTimerOnEdt()
-                if (next.visualBellEnabled != previous.visualBellEnabled ||
+                if (retry || next.palette != previous.palette) {
+                    background = Color(next.palette.defaultBackground, true)
+                    checkCurrent()
+                    foreground = Color(next.palette.defaultForeground, true)
+                    checkCurrent()
+                }
+                if (retry || next.cursorBlinkMillis != previous.cursorBlinkMillis) configureCursorTimerOnEdt()
+                if (retry ||
+                    next.visualBellEnabled != previous.visualBellEnabled ||
                     next.visualBellColor != previous.visualBellColor ||
                     next.visualBellDurationMillis != previous.visualBellDurationMillis ||
                     next.visualBellEdgeThicknessPixels != previous.visualBellEdgeThicknessPixels
@@ -1974,43 +2359,54 @@ public class SwingTerminal
                 }
                 if (geometryChanged) {
                     session?.let { refreshShellIntegrationDecorations(it) }
+                    checkCurrent()
                     searchController.updateViewportHighlights()
+                    checkCurrent()
                     clearPointerHover()
+                    checkCurrent()
                     hyperlinkDiscoveryController.reconcile()
+                    checkCurrent()
                     session?.let { requestRenderFromSession(it) }
                 }
                 if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
                     preferredSize = preferredGridSize(next.columns, next.rows)
+                    checkCurrent()
                     revalidate()
                 }
-                if (next.shellSuggestionAutomaticMode != previous.shellSuggestionAutomaticMode) {
+                if (retry || next.shellSuggestionAutomaticMode != previous.shellSuggestionAutomaticMode) {
                     if (activeSuggestionInteraction == null ||
                         activeSuggestionIsAutomatic ||
                         shellSuggestionController?.isRefreshing == true
                     ) {
                         cancelAndHideShellSuggestionsOnEdt("Automatic suggestion mode changed")
+                        checkCurrent()
                         suggestionScheduler?.refresh()
+                        checkCurrent()
                     }
                 }
                 updateAutomaticSuggestionEligibilityOnEdt()
+                checkCurrent()
                 reconcileSuggestionSchedulerOnEdt()
-                if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                checkCurrent()
+                if (retry ||
+                    next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
                     next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                     next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
                 ) {
                     reconcileHyperlinksOnEdt()
+                    checkCurrent()
                 }
                 updateVisualViewportGeometry()
+                checkCurrent()
                 repaint()
             }
-            session?.let {
-                // Settings listeners can synchronously publish a newer snapshot.
-                applySettingsToSession(it, settings)
-                resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
-            }
             if (!settings.smartSuggestionsEnabled) clearInlineShellSuggestion()
+            checkCurrent()
             if (sharedSuggestionPopupEnabled != null && !settings.inlineShellSuggestionsEnabled) inlineRequests.close()
+            checkCurrent()
             sharedSuggestionPresentation?.refresh()
+            checkCurrent()
+            settingsApplied = true
         }
 
         /**
@@ -3171,27 +3567,29 @@ public class SwingTerminal
             settings: SwingSettings,
             onComplete: (Throwable?) -> Unit = mutationFailureHandler,
         ) {
-            val previous = acceptedSessionSettings
-            // Input policy admission remains independent of a blocked graphics decode.
+            val state = sessionSettings
+            // Paste admission remains independent of a blocked graphics decode.
             session.setPasteControlPolicy(settings.pasteControlPolicy)
-            if (settings.treatAmbiguousAsWide == previous?.treatAmbiguousAsWide &&
-                settings.palette == previous.palette &&
-                settings.cursorShape == previous.cursorShape
-            ) {
-                acceptedSessionSettings = settings
+            if (state.pendingRequests == 0 && state.matches(settings)) {
                 onComplete(null)
                 return
             }
             val binding = bindingIdentity
-            sessionMutations.submit(session, binding::get, apply = {
-                if (settings.treatAmbiguousAsWide != previous?.treatAmbiguousAsWide) {
-                    session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
-                }
-                if (settings.palette != previous?.palette) session.setThemePalette(settings.palette)
-                if (settings.cursorShape != previous?.cursorShape) session.setCursorShape(settings.cursorShape)
-                null
-            }, complete = onComplete)
-            acceptedSessionSettings = settings
+            state.pendingRequests++
+            try {
+                sessionMutations.submit(session, binding::get, apply = {
+                    state.apply(session, settings)
+                    null
+                }, complete = { failure ->
+                    state.pendingRequests--
+                    onComplete(
+                        failure ?: if (session.isClosed) CancellationException("Terminal session closed during settings reload") else null,
+                    )
+                })
+            } catch (failure: Throwable) {
+                state.pendingRequests--
+                throw failure
+            }
         }
 
         private fun reportSessionMutationFailure(failure: Throwable?) {
@@ -3962,6 +4360,8 @@ public class SwingTerminal
                     renderCache.activeBuffer,
                 )
             val boundSession = session
+            val binding = bindingIdentity
+            val settingsRevision = settingsReloadRevision
             if (boundSession == null || width <= 0 || height <= 0) {
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
                 onComplete(if (boundSession == null || force) CancellationException("No visible terminal grid is bound") else null)
@@ -3986,6 +4386,10 @@ public class SwingTerminal
 
             viewportController.finishScroll()
             publishViewportState(renderCache.historySize)
+            if (session !== boundSession || bindingIdentity !== binding || !binding.get() || settingsRevision != settingsReloadRevision) {
+                onComplete(CancellationException("Terminal viewport request superseded"))
+                return false
+            }
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
             val anchorRow = visualGeometry.firstFullyVisibleRow()
@@ -3998,7 +4402,6 @@ public class SwingTerminal
                     0L
                 }
 
-            val binding = bindingIdentity
             synchronized(resizePublicationLock) {
                 if (resizeAnchorBinding !== binding || pendingGeometryRequests == 0 && !isResizePublicationPending()) {
                     resizeAnchorBinding = binding
@@ -4184,6 +4587,7 @@ public class SwingTerminal
             stickyCommandHeader.reset()
             painter.clearImages()
             renderCache.reset()
+            terminalAccessibility?.invalidate()
         }
 
         private fun handlePublishedFrameOnEdt() =
@@ -4246,6 +4650,7 @@ public class SwingTerminal
                     } ?: return
                 }
                 painter.prepareFrame(renderCache)
+                terminalAccessibility?.frameChanged()
                 selectionController.updateFrame(renderCache)
                 inlineShellSuggestion?.let { inline ->
                     if (!session.isCommandEditCurrent(inline.expected) || !inline.reconcile(renderCache)) clearInlineShellSuggestion()
@@ -4431,7 +4836,9 @@ public class SwingTerminal
                 }
             }
             refreshHyperlinkHover()
-            return chromeChanged or layoutChanged or originChanged or headerChanged
+            val changed = chromeChanged or layoutChanged or originChanged or headerChanged
+            if (changed) terminalAccessibility?.invalidate()
+            return changed
         }
 
         private fun promptAnalysisRequest(session: TerminalSession): PromptDecorationAnalysis.Request =

@@ -185,14 +185,17 @@ tail of the output, count UTF-16 code units and physical rows, and preserve stor
 graphemes. Soft wraps are joined; hard breaks and interior spaces are preserved,
 while terminal padding and trailing spaces at hard line ends are omitted.
 
-Select [`OscShellIntegration`](../ketraterm-shell-integration/README.md) with
-compatible shell hooks for the built-in implementation. Custom producers can
-implement `TerminalShellIntegration.commandOutputText`; host metadata alone does
-not provide output. The method returns `null` when unsupported, unfinished,
-unknown, fully evicted, or otherwise unavailable. Empty, untruncated text requires
-known empty output; a character limit too small for the final grapheme returns
-empty text with `truncated = true`. The OSC implementation reads the primary buffer and returns `null` while
-the alternate screen is active; retained output remains readable after closure.
+`TerminalShellIntegrationFactory.host` and
+[`OscShellIntegration`](../ketraterm-shell-integration/README.md) share bounded
+extraction from neutral command anchors. Custom producers can delegate to
+`TerminalShellIntegrationContext.commandOutputText` or supply their own output policy.
+A custom producer's null result remains authoritative.
+
+The method returns `null` when unsupported, unfinished, unknown, fully evicted,
+or otherwise unavailable. Empty, untruncated text requires known empty output.
+A character limit too small for the final grapheme returns empty text with
+`truncated = true`. The shared implementation reads the primary buffer and returns
+`null` while the alternate screen is active. Retained output remains readable after closure.
 
 This is rendered terminal text, including overwrites, rather than a complete
 transcript or separate stdout/stderr streams. Metadata and text retention are

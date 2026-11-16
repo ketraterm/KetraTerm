@@ -25,6 +25,7 @@ controls and platform integrations are listed separately below.
 | Clear screen | Sends Ctrl+L to request clearing/redrawing by the foreground program; accepted requests return to the live viewport. Clears local selection, search, and suggestions. |
 | Closed sessions | Final output remains visible, scrollable, selectable, and searchable. |
 | Completion presentation | Embedded suggestion list or host-owned UI; see [availability and sources](completion.md). |
+| Accessibility | Standard Swing `AccessibleText` exposes the displayed rows, caret, linear selection, and cell geometry. See the [scope](../../ketraterm-ui-swing/README.md#accessibility). |
 | Localization | English catalogs with host-supplied translations and resource overrides. |
 
 Fractional column spacing is unavailable. Resizing a live grid clears physical

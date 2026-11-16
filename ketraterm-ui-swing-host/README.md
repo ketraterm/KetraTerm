@@ -148,9 +148,11 @@ the [completion stability policy](../docs/features/completion.md#stability-exper
 To use the running PowerShell session as the command authority, set
 `shellProvider = SessionShellCompletionProvider(session)` in
 `TerminalCompletionEngines.fromSources` and supply
-`TerminalShellCapabilities.POWERSHELL` in its requests. The adapter lives in
-`io.github.ketraterm.ui.swing.host`; the engine contract lives in
-`io.github.ketraterm.completion.api`. The provider borrows its session and owns no jobs.
+`TerminalShellCapabilities.POWERSHELL` in its requests. The neutral adapter lives in
+[`ketraterm-completion-session`](../ketraterm-completion-session/README.md), in the
+`io.github.ketraterm.completion.session` package. The existing provider in
+`io.github.ketraterm.ui.swing.host` delegates to it and remains available.
+The provider borrows its session and owns no jobs.
 It preserves shell quoting, replacement ranges, and presentation metadata, and
 participates in normal caller cancellation. See the [availability and bounds](../docs/features/completion.md#sources-by-host).
 

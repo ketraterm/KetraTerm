@@ -21,14 +21,15 @@ cross-project boundaries; module guides own local implementation detail.
 - `ketraterm-completion`: parse-once completion evaluation, structured
   concurrency, ranking, and bounded learning; no host I/O.
 - `ketraterm-completion-host`: host-neutral path and directory access.
+- `ketraterm-completion-session`: optional session-to-completion adaptation, without UI dependencies.
 - `ketraterm-completion-persistence`: sanitized, versioned learning snapshots.
 - `ketraterm-render-api`: dependency-free primitive render contracts.
 - `ketraterm-render-cache`: copied render data for consumers, without UI policy.
 - `ketraterm-transport-api`: ordered raw-byte connector contracts.
 - `ketraterm-session`: parser/core synchronization, serialized outbound writes,
-  and neutral shell metadata contracts.
+  neutral shell metadata contracts, and bounded command output extraction.
 - `ketraterm-shell-integration`: optional OSC shell metadata interpretation and
-  bounded command extraction through session-owned frame access.
+  uses session-owned extraction for bounded command output.
 - `ketraterm-ui-swing`: reusable rendering and interaction, transport-agnostic.
 - `ketraterm-ui-swing-host`: host-neutral Swing actions and completion adapters,
   not product policy.

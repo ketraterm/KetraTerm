@@ -75,12 +75,14 @@ val publishedLibraryNames =
         "ketraterm-input",
         "ketraterm-completion",
         "ketraterm-completion-host",
+        "ketraterm-completion-session",
         "ketraterm-completion-persistence",
         "ketraterm-render-api",
         "ketraterm-render-cache",
         "ketraterm-transport-api",
         "ketraterm-session",
         "ketraterm-shell-integration",
+        "ketraterm-shell-launch",
         "ketraterm-ui-swing",
         "ketraterm-ui-swing-host",
         "ketraterm-pty",
@@ -113,7 +115,11 @@ val publicationArtifactChecks =
     tasks.register("publicationArtifactChecks") {
         group = "verification"
         description = "Checks consumers and packaged Maven artifacts before publication."
-        dependsOn(":ketraterm-testkit:publishedConsumerTest", ":ketraterm-testkit:publicationVerificationTest")
+        dependsOn(
+            ":ketraterm-testkit:publishedConsumerTest",
+            ":ketraterm-testkit:publicationVerificationTest",
+            ":ketraterm-testkit:verifyHostIntegrationExample",
+        )
     }
 val publicationChecks =
     tasks.register("publicationChecks") {
@@ -155,6 +161,7 @@ subprojects {
                 setOf(
                     "ketraterm-completion",
                     "ketraterm-completion-host",
+                    "ketraterm-completion-session",
                     "ketraterm-completion-persistence",
                     "ketraterm-ui-swing-host",
                     "ketraterm-app",

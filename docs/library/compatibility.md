@@ -11,8 +11,8 @@ major version preserve supported source, binary, and behavioral contracts.
 | --- | --- |
 | Headless pipeline | protocol, parser, core, host, input, render-api, render-cache, transport-api, session |
 | Swing view | ui-swing |
-| Local processes and shell metadata | pty, shell-integration |
-| Completion | completion, completion-host, completion-persistence |
+| Local processes and shell metadata | pty, shell-integration, shell-launch |
+| Completion | completion, completion-host, completion-session, completion-persistence |
 | Local terminal workspaces | workspace |
 | Swing host controls | ui-swing-host |
 
@@ -132,11 +132,11 @@ any earlier 0.x release.
 
 ## Development migrations
 
-Selection and text color rendering now have explicit host policies. Existing JVM
-entry points remain available, but selection fills are exact, contrast adjustment
-defaults to disabled, and faint text blends toward its displayed background.
+Selection and text color rendering have explicit host policies. Existing JVM
+entry points remain available. Explicit selection fills are exact.
+The default minimum contrast ratio is 3.0. Faint text blends toward its displayed background.
 See [color customization and migration](../../ketraterm-ui-swing/docs/color-customization.md#migration)
-for choosing styles and restoring the earlier 3:1 contrast target.
+for selection styles and contrast settings.
 
 These earlier 0.x changes require affected consumers to recompile. Detailed
 release history remains in the [changelog](../../CHANGELOG.md).

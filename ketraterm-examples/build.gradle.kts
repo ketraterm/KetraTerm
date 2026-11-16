@@ -24,6 +24,10 @@ dependencies {
     implementation(project(":ketraterm-workspace"))
     implementation(project(":ketraterm-ui-swing-host"))
     implementation(project(":ketraterm-completion-host"))
+    implementation(project(":ketraterm-completion-session"))
+    implementation(project(":ketraterm-shell-launch"))
+    implementation(project(":ketraterm-pty"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.20")
 
     testImplementation(kotlin("test"))
@@ -43,4 +47,25 @@ tasks.test { useJUnitPlatform() }
 
 tasks.named<JavaExec>("run") {
     workingDir(rootProject.projectDir)
+}
+
+kotlin.sourceSets {
+    main { kotlin.srcDir("host-integration/src/main/kotlin") }
+    test { kotlin.srcDir("host-integration/src/test/kotlin") }
+}
+
+tasks.register<JavaExec>("runHostIntegration") {
+    group = "application"
+    description = "Runs the complete host integration example."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("io.github.ketraterm.examples.host.HostIntegrationExampleKt")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    workingDir(rootProject.projectDir)
+}
+
+configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    kotlin {
+        target("src/**/*.kt", "host-integration/src/**/*.kt")
+    }
+    kotlinGradle { target("*.gradle.kts", "host-integration/*.gradle.kts") }
 }

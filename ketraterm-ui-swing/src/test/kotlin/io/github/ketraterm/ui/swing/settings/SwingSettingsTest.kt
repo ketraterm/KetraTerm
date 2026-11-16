@@ -489,7 +489,10 @@ class SwingSettingsTest {
                 assertFailsWith<IllegalArgumentException> { component.preferredGridSize(Int.MAX_VALUE, 1) }
                 val condensed = component.preferredGridSize(10, 2)
                 settings = settings.copy { it.columnSpacing = Int.MAX_VALUE }
-                assertFailsWith<IllegalArgumentException> { component.reloadSettings() }
+                val failures = mutableListOf<Throwable?>()
+                component.reloadSettings { failures.add(it) }
+                assertEquals(1, failures.size)
+                assertIs<IllegalArgumentException>(failures.single())
                 assertEquals(condensed, component.preferredGridSize(10, 2))
             } finally {
                 component.dispose()

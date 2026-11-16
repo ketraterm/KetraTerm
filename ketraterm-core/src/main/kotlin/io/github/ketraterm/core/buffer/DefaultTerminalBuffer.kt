@@ -163,6 +163,7 @@ internal class DefaultTerminalBuffer private constructor(
                 newWidth = newWidth,
                 newHeight = newHeight,
                 lineIdProvider = state::allocateLineId,
+                preserveTrailingCursor = !state.isAltScreenActive,
                 oldScrollbackOffset = oldScrollbackOffset,
             )
         val newPrimaryTop = state.primaryBuffer.ring.discardedCount + state.primaryBuffer.ring.size - newHeight

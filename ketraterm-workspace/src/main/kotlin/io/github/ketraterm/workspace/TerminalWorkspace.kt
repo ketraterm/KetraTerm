@@ -29,7 +29,7 @@ import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.*
-import io.github.ketraterm.shell.integration.OscShellIntegration
+import io.github.ketraterm.shell.launch.TerminalShellLaunch
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.net.URI
@@ -618,28 +618,15 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
     ): TerminalSession {
-        val files =
-            if (options.shellIntegrationEnabled && TerminalShellIntegrationBootstrap.supportsCommandInventory(profile)) {
-                ShellCommandInventoryFiles()
-            } else {
-                null
-            }
+        val launch = TerminalShellLaunch.prepare(profile, options.shellIntegrationEnabled)
         try {
-            val launch =
-                TerminalShellIntegrationBootstrap.apply(
-                    profile = profile,
-                    enabled = options.shellIntegrationEnabled,
-                    commandInventoryDirectory = files?.directory,
-                )
             val launchProfile = launch.profile
-            val inventoryFiles = files?.takeIf { launch.promptMarkersExpected }
-            if (inventoryFiles == null) files?.close()
             return TerminalSessions
                 .createLocalPty(
                     PtyOptions.create { draft ->
                         draft.command = launchProfile.command
                         draft.environment =
-                            TerminalShellEnvironmentBootstrap.inheritEnvironment(launchProfile.environment, PtyOptions.defaultEnvironment())
+                            launch.environment(PtyOptions.defaultEnvironment())
                         draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
                         draft.columns = options.columns
                         draft.rows = options.rows
@@ -653,11 +640,22 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                         draft.hostPolicy = options.hostPolicy
                         draft.startupCommand = launchProfile.startupCommand
                         draft.modeReportCapabilities = options.modeReportCapabilities
-                        draft.shellIntegration = OscShellIntegration.configured(launch.promptMarkersExpected, inventoryFiles?.input)
+                        draft.shellIntegration = launch.shellIntegration
                     },
-                ).also { inventoryFiles?.observe(it) }
+                ).also { session ->
+                    try {
+                        launch.attach(session)
+                    } catch (failure: Throwable) {
+                        try {
+                            session.close()
+                        } catch (cleanup: Throwable) {
+                            failure.addSuppressed(cleanup)
+                        }
+                        throw failure
+                    }
+                }
         } catch (failure: Throwable) {
-            files?.close()
+            launch.close()
             throw failure
         }
     }

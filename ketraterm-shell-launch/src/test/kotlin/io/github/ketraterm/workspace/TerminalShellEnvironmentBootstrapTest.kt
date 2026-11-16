@@ -22,6 +22,65 @@ import kotlin.test.*
 
 class TerminalShellEnvironmentBootstrapTest {
     @Test
+    fun `resolved Windows PATH uses the last inherited value across key spellings`() {
+        val inherited = linkedMapOf("Path" to "first-host", "PATH" to "last-host")
+        val launch = ShellIntegrationLaunch(profile(), false)
+
+        assertEquals(
+            mapOf("Path" to "/project/jdk/bin;last-host", "JAVA_HOME" to "/project/jdk"),
+            launch.environment(inherited, windows = true),
+        )
+        assertEquals(linkedMapOf("Path" to "first-host", "PATH" to "last-host"), inherited)
+    }
+
+    @Test
+    fun `resolved Windows environment merges PATH casing before applying the prefix`() {
+        val inherited = linkedMapOf("pAtH" to "host", "KEEP" to "retained")
+        val explicit = linkedMapOf("PATH" to "first-profile", "path" to "last-profile")
+        val selected = linkedMapOf("Path" to "first-selection", "PATH" to "last-selection")
+        val profile = profile(environment = explicit).copy(shellEnvironment = TerminalShellEnvironment(selected, "project-bin"))
+        val launch = ShellIntegrationLaunch(profile, false)
+
+        assertEquals(
+            mapOf("pAtH" to "project-bin;last-selection", "KEEP" to "retained"),
+            launch.environment(inherited, windows = true),
+        )
+        assertEquals(linkedMapOf("pAtH" to "host", "KEEP" to "retained"), inherited)
+        assertEquals(linkedMapOf("PATH" to "first-profile", "path" to "last-profile"), explicit)
+        assertEquals(linkedMapOf("Path" to "first-selection", "PATH" to "last-selection"), selected)
+    }
+
+    @Test
+    fun `resolved POSIX environment keeps differently cased path variables separate`() {
+        val profile =
+            profile(environment = mapOf("path" to "profile-lowercase"))
+                .copy(shellEnvironment = TerminalShellEnvironment(mapOf("Path" to "selected-mixed-case"), "project-bin"))
+        val launch = ShellIntegrationLaunch(profile, false)
+
+        assertEquals(
+            mapOf("PATH" to "project-bin:host", "path" to "profile-lowercase", "Path" to "selected-mixed-case"),
+            launch.environment(mapOf("PATH" to "host", "Path" to "host-mixed-case"), windows = false),
+        )
+    }
+
+    @Test
+    fun `resolved environments without a prefix preserve inherited and explicit PATH values`() {
+        for (windows in listOf(false, true)) {
+            val inherited = mapOf("PATH" to "host", "KEEP" to "retained")
+            val unchanged = ShellIntegrationLaunch(profile().copy(shellEnvironment = TerminalShellEnvironment.Empty), false)
+            assertEquals(inherited, unchanged.environment(inherited, windows))
+
+            val overridden =
+                ShellIntegrationLaunch(
+                    profile(environment = mapOf("PATH" to "explicit"))
+                        .copy(shellEnvironment = TerminalShellEnvironment(mapOf("PATH" to "selected"))),
+                    false,
+                )
+            assertEquals(mapOf("PATH" to "selected", "KEEP" to "retained"), overridden.environment(inherited, windows))
+        }
+    }
+
+    @Test
     fun `empty shell environment keeps launch profile identical`() {
         val profile = profile().copy(shellEnvironment = TerminalShellEnvironment.Empty)
         assertSame(profile, TerminalShellEnvironmentBootstrap.applyInitial(profile))

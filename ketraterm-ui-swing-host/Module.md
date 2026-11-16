@@ -5,7 +5,7 @@ The source module's `README.md` describes consumer wiring and lifecycle.
 
 ### Ownership and dependencies
 
-The module depends on the reusable Swing terminal, the completion API, and
+The module depends on the reusable Swing terminal, the completion API, the optional session completion adapter, and
 coroutines. It adapts their public contracts without owning a terminal session,
 transport, completion engine, source selection, or persisted learning.
 Standalone and IntelliJ products configure these helpers independently.
@@ -15,7 +15,7 @@ Standalone and IntelliJ products configure these helpers independently.
 | Search chrome | `SwingTerminalSearchBar`, `SwingTerminalOverlayPane`, search palette | Search scanning and highlights remain in `SwingTerminal`. |
 | Host actions | Shortcut map and context-menu builder | Hosts install bindings and choose product actions. |
 | Completion | Suggestion provider and feedback recorder | Completion evaluates candidates; Swing coordinates request lifetime and editing admission. |
-| Native shell completion | `SessionShellCompletionProvider` | Session owns correlation and lifetime; the shell supplies command authority and escaped argument edits. Products choose whether to install the provider. |
+| Native shell completion | `SessionShellCompletionProvider` | The completion-session implementation owns mapping. Session owns correlation and lifetime; the shell supplies native edits. |
 | Clipboard consent | Pane prompt, window reader, dialog and message helpers | Session controls permission, deadlines, and terminal replies; hosts provide clipboard access and presentation. |
 
 ### Threading and lifetimes

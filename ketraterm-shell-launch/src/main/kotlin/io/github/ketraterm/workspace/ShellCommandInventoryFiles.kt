@@ -42,6 +42,7 @@ internal class ShellCommandInventoryFiles(
     private var pending: ByteArray? = null
     private var scope: CoroutineScope? = null
 
+    @Synchronized
     fun observe(session: TerminalSession) {
         check(scope == null && !closed.get()) { "Inventory mailbox already observed or closed" }
         val owner = CoroutineScope(SupervisorJob() + dispatcher + CoroutineName("shell-inventory"))
@@ -82,6 +83,7 @@ internal class ShellCommandInventoryFiles(
     }
 
     /** One bounded read/validation step, also used by deterministic lifecycle tests. */
+    @Synchronized
     internal fun poll() {
         if (closed.get()) return
         val attributes =
@@ -105,6 +107,7 @@ internal class ShellCommandInventoryFiles(
         pending?.let { if (input.accept(it)) pending = null }
     }
 
+    @Synchronized
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         input.close()

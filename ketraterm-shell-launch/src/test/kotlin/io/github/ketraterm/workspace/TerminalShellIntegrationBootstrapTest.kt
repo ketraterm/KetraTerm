@@ -395,12 +395,13 @@ class TerminalShellIntegrationBootstrapTest {
                 kind = TerminalProfileKind.WSL,
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val environment = launch.environment(emptyMap())
 
-        assertEquals(profile.command, integrated.command)
-        assertEquals(tempDir.resolve("zsh").toString(), integrated.environment["ZDOTDIR"])
-        assertEquals("KetraTerm_ORIGINAL_ZDOTDIR/up:ZDOTDIR/up", integrated.environment["WSLENV"])
-        assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
+        assertEquals(profile.command, launch.profile.command)
+        assertEquals(tempDir.resolve("zsh").toString(), environment["ZDOTDIR"])
+        assertEquals("ZDOTDIR/up", environment["WSLENV"])
+        assertNull(environment["KetraTerm_OSC7_AUTHORITY"])
         assertTrue(tempDir.resolve("zsh/.zshrc").toFile().isFile)
     }
 

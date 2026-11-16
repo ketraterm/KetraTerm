@@ -130,13 +130,22 @@ internal class CompletionLearningFileStore(
         val parent = requireNotNull(absolutePath.parent) { "persistence path must have a parent: $path" }
         Files.createDirectories(parent)
         val temporary = createTemporaryFile(parent, ".${absolutePath.fileName}.", ".tmp")
+        var failure: Throwable? = null
         try {
             Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
                 for (line in lines) writer.appendLine(line)
             }
             replaceAtomically(temporary, absolutePath)
+        } catch (cause: Throwable) {
+            failure = cause
+            throw cause
         } finally {
-            Files.deleteIfExists(temporary)
+            try {
+                Files.deleteIfExists(temporary)
+            } catch (cleanupFailure: Throwable) {
+                if (failure == null) throw cleanupFailure
+                if (cleanupFailure !== failure) failure.addSuppressed(cleanupFailure)
+            }
         }
     }
 

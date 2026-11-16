@@ -24,6 +24,7 @@ import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.nio.file.DirectoryNotEmptyException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
@@ -526,6 +527,29 @@ class CompletionLearningFileStoreTest {
             )
 
         assertSame(expectedFailure, assertFailsWith<IOException> { store.persist(snapshot("git status")) })
+    }
+
+    @Test
+    fun `write failure survives temporary cleanup failure`() {
+        val target = Files.writeString(directory.resolve("learning.tsv"), "existing snapshot")
+        for (blockCleanup in listOf(false, true)) {
+            val temporary = Files.createDirectory(directory.resolve("temporary-$blockCleanup"))
+            val child = temporary.resolve("child")
+            if (blockCleanup) Files.writeString(child, "prevent directory removal")
+            val store = CompletionLearningFileStore(target, createTemporaryFile = { _, _, _ -> temporary })
+
+            val failure = assertFailsWith<IOException> { store.persist(snapshot("git status")) }
+
+            assertFalse(failure is DirectoryNotEmptyException)
+            if (blockCleanup) {
+                assertIs<DirectoryNotEmptyException>(failure.suppressed.single())
+                assertEquals("prevent directory removal", Files.readString(child))
+            } else {
+                assertTrue(failure.suppressed.isEmpty())
+                assertFalse(Files.exists(temporary))
+            }
+            assertEquals("existing snapshot", Files.readString(target))
+        }
     }
 
     private fun assertRejectedWithoutMutation(originalBytes: ByteArray) {

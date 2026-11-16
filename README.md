@@ -33,6 +33,8 @@ Choose an entry point and add optional integrations as needed:
 | [ketraterm-headless](ketraterm-headless/README.md) | Terminal pipeline and session with a host-owned transport. |
 | [ketraterm-swing](ketraterm-swing/README.md) | Swing terminal component and its headless dependencies. |
 | [ketraterm-pty](ketraterm-pty/README.md) | Local processes through Pty4J. |
+| [ketraterm-shell-launch](ketraterm-shell-launch/README.md) | Shell hooks with host-owned process startup. |
+| [ketraterm-completion-session](ketraterm-completion-session/README.md) | Session command inventories and native completion without Swing. |
 | [ketraterm-workspace](ketraterm-workspace/README.md) | Shell profiles, local terminal tabs, and workspace lifecycle. |
 | [ketraterm-completion-persistence](ketraterm-completion-persistence/README.md) | Optional file storage for experimental completion learning. |
 | [ketraterm-shell-integration](ketraterm-shell-integration/README.md) | Built-in OSC shell metadata producer. |
@@ -74,6 +76,9 @@ See the [PTY guide](ketraterm-pty/README.md#how-to-use) for process startup and
 the [Swing example](ketraterm-ui-swing/README.md#how-to-use) for view setup.
 The [runnable suggestion example](ketraterm-examples/README.md) embeds a real shell
 with independent popup and inline providers and bounded command/output context.
+The [complete host example](ketraterm-examples/host-integration/README.md) covers process ownership,
+settings, host actions, shell metadata, and a host-owned suggestion view.
+Its independent build uses Maven artifacts without application or workspace modules.
 
 ## Documentation
 

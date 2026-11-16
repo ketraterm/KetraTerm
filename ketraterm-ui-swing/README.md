@@ -69,6 +69,19 @@ dimensions determine the live session's grid and connector size. Settings and
 session geometry require at least two columns and one row. A narrower component
 retains that minimum grid and clips painting to its bounds.
 
+### Accessibility
+
+The view implements standard Swing `Accessible` and read-only `AccessibleText`.
+Assistive tools can read the displayed text, caret, linear selection, and character geometry.
+Hosts can set an accessible name and description through `accessibleContext`.
+The view preserves those values across bindings and settings changes.
+
+Text access marshals to the EDT. Accessibility creates text snapshots only after
+an accessible context is requested. The context reports the current viewport;
+scrolling changes its text indices. It does not create an editable document.
+See [the context contract](src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt)
+for Unicode indices, selection limits, notifications, and lifecycle behavior.
+
 ### Binding and configuration ownership
 
 The host owns the session. `unbind()` and `dispose()` cancel view work without
@@ -99,10 +112,13 @@ changed session dimensions with captured component bounds. Both report completio
 on the EDT; acceptance is not application. Resize success confirms current cell
 and pixel geometry with no later geometry request pending. Superseded geometry
 or an obsolete binding reports cancellation, including a resize admitted before
-the view changed. The bounded queue rejects overflow synchronously;
-retrying `reloadSettings` with the same snapshot submits changes not yet accepted,
-including geometry, without resetting already accepted palette/cursor settings.
-Default completion handlers log operational failures. Session closure remains
+the view changed. Binding reports queue rejection through its completion callback.
+Use `reloadSettings(onComplete)` to observe settings and geometry application.
+Its callback runs once on the EDT, including setup and queue failures. Retrying
+the same snapshot applies unfinished changes without resetting an applied host
+palette or cursor setting. Application changes to those applied values remain intact.
+The no-argument overload logs operational failures. Other mutation methods throw
+on the EDT when the queue rejects their work. Session closure remains
 the host's responsibility and must run off the EDT.
 
 Use one controlling view per session. Settings, dimensions, and the published

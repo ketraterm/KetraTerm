@@ -304,7 +304,6 @@ public class TerminalSession private constructor(
     private var resizePending = false // Protected by mutationLock; core may precede connector completion.
     private var resizeReportPending = false // A failed resize discarded a subscribed report.
     private val connectorLifecycleLock = Any()
-    private val connectorResizeLock = Any()
     private var startAttempted = false
     private val closingEvent = AtomicReference<TerminalSessionCloseEvent?>(null)
     private val startupSubmission = startupCommand?.let(::StartupCommandSubmission)
@@ -499,8 +498,9 @@ public class TerminalSession private constructor(
                     // Only session termination may stop this essential worker without failure.
                     if (!isSessionClosed()) failWrite(cancelled)
                     throw cancelled
-                } catch (failure: Exception) {
+                } catch (failure: Throwable) {
                     failWrite(failure)
+                    if (failure is Error) throw failure
                 }
             }
         sessionScope.launch {
@@ -661,7 +661,7 @@ public class TerminalSession private constructor(
      *
      * Returns null for unavailable, unfinished, unknown or evicted command ranges, unsupported
      * producers, or a partial output batch. Retained output can still be read after closure.
-     * The built-in OSC producer reads primary-buffer rows and returns null on the alternate screen.
+     * The standard host and OSC producers read primary-buffer rows and return null on the alternate screen.
      * Missing output is never inferred to be empty. Inspect both result flags before treating text
      * as complete; rendered output does not separate stdout from stderr or preserve overwritten text.
      *
@@ -1253,7 +1253,7 @@ public class TerminalSession private constructor(
      * An admitted resize requests render publication even if a collaborator fails afterward.
      *
      * Calls serialize with terminal mutation. An admitted core resize can finish during closure.
-     * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
+     * Closure rejects later resize admissions. An admitted connector call can overlap disposal.
      * Call off UI threads: this synchronous method can wait for decoding or block in the connector.
      *
      * @param columns terminal column count; at least [TerminalBuffers.MIN_WIDTH].
@@ -1353,9 +1353,7 @@ public class TerminalSession private constructor(
         columns: Int,
         rows: Int,
     ) {
-        synchronized(connectorResizeLock) {
-            if (!isSessionClosed()) connector.resize(columns, rows)
-        }
+        if (!isSessionClosed()) connector.resize(columns, rows)
     }
 
     private fun completeResizeReporting() {
@@ -2172,7 +2170,7 @@ public class TerminalSession private constructor(
         }
     }
 
-    private fun failWrite(failure: Exception) {
+    private fun failWrite(failure: Throwable) {
         requestClosure(
             TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
         )
@@ -2220,9 +2218,7 @@ public class TerminalSession private constructor(
         }
 
         try {
-            cleanup {
-                synchronized(connectorResizeLock) { connector.close() }
-            }
+            cleanup { connector.close() }
             cleanup { clipboardReads?.close() }
             cleanup {
                 runtime.shellCompletion

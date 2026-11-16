@@ -78,6 +78,7 @@ closing the session.
 | Area | Package / contract |
 | --- | --- |
 | Component and host services | `api`; [binding contract](README.md#binding-and-configuration-ownership) |
+| Accessibility | `api`; [standard Swing text access](README.md#accessibility) |
 | Settings and palette | `settings`; immutable snapshots with detached builders |
 | Input collection | `input`; Swing gestures routed to session input |
 | Painting and font caches | `render`; [text rendering](docs/bifurcated-text-rendering.md) |
