@@ -38,6 +38,41 @@ public class TerminalShellIntegrationContext internal constructor(
     /** Serializes a short compound context/frame read with parser and grid mutation. */
     public fun <T> withTerminalState(action: () -> T): T = synchronized(mutationLock, action)
 
+    /**
+     * Copies a completed command's bounded output tail from neutral shell metadata.
+     *
+     * This read serializes with terminal mutation and rejects a changed metadata revision.
+     * Publish matching metadata under [withTerminalState], or from an ordered session callback.
+     * Capture line identities after their output and before later bytes.
+     * Call off the UI thread and outside borrowed frame/cache callbacks.
+     * Do not acquire terminal state while holding an independent producer lock.
+     *
+     * The result joins soft wraps and preserves complete stored graphemes.
+     * Unknown, unfinished, ambiguous, fully evicted, or alternate-buffer output returns null.
+     * Known empty output returns empty text without truncation.
+     * Retained primary-buffer output remains readable after session closure.
+     *
+     * @param state the producer-owned metadata view for this session.
+     * @param recordId a command identifier from [state].
+     * @param maxChars positive UTF-16 code-unit limit for the output tail.
+     * @param maxRows positive limit on physical output rows copied from the tail.
+     * @throws IllegalArgumentException if either limit is nonpositive.
+     */
+    public fun commandOutputText(
+        state: TerminalShellIntegrationView,
+        recordId: Int,
+        maxChars: Int,
+        maxRows: Int,
+    ): TerminalCommandOutputText? {
+        require(maxChars > 0) { "maxChars must be positive" }
+        require(maxRows > 0) { "maxRows must be positive" }
+        return synchronized(mutationLock) {
+            val revision = state.revision.value
+            val result = ShellCommandOutputTextExtractor.extract(reader, state, recordId, maxChars, maxRows)
+            result.takeIf { revision == state.revision.value }
+        }
+    }
+
     /** Borrows the most recent copied frame without acquiring terminal mutation serialization. */
     public fun <T> readPublishedFrame(action: (TerminalRenderCache) -> T): T? = publisher.readCurrent(action)
 

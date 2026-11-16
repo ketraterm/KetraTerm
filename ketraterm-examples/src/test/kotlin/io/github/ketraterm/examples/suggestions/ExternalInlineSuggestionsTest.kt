@@ -97,7 +97,17 @@ class ExternalInlineSuggestionsTest {
             history.recordCommandStart(1, true, "echo old", "file:///example")
             history.recordCommandFinished(2, 1)
             history.recordCommandStart(3, true, "still running", "file:///example")
-            val integration = TerminalShellIntegrationFactory.host(history, TerminalShellCommandLineState())
+            val host = TerminalShellIntegrationFactory.host(history, TerminalShellCommandLineState())
+            val integration =
+                TerminalShellIntegrationFactory { context ->
+                    object : TerminalShellIntegration by host.create(context) {
+                        override fun commandOutputText(
+                            recordId: Int,
+                            maxChars: Int,
+                            maxRows: Int,
+                        ): TerminalCommandOutputText? = null
+                    }
+                }
             SessionFixture(StandardTestDispatcher(testScheduler), integration = integration).use { f ->
                 val context = assertNotNull(readSuggestionContext(f.session, request))
                 assertEquals(1, context.recentCommands.size)

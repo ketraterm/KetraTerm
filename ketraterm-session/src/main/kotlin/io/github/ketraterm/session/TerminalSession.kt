@@ -661,7 +661,7 @@ public class TerminalSession private constructor(
      *
      * Returns null for unavailable, unfinished, unknown or evicted command ranges, unsupported
      * producers, or a partial output batch. Retained output can still be read after closure.
-     * The built-in OSC producer reads primary-buffer rows and returns null on the alternate screen.
+     * The standard host and OSC producers read primary-buffer rows and return null on the alternate screen.
      * Missing output is never inferred to be empty. Inspect both result flags before treating text
      * as complete; rendered output does not separate stdout from stderr or preserve overwritten text.
      *

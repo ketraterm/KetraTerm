@@ -103,10 +103,7 @@ private class OscShellIntegrationSession(
         recordId: Int,
         maxChars: Int,
         maxRows: Int,
-    ): TerminalCommandOutputText? =
-        context.withTerminalState {
-            ShellCommandOutputTextExtractor().extract(context, state, recordId, maxChars, maxRows)
-        }
+    ): TerminalCommandOutputText? = context.commandOutputText(state, recordId, maxChars, maxRows)
 
     private val mutablePromptReady = MutableStateFlow(false)
     override val promptReady: StateFlow<Boolean> = mutablePromptReady.asStateFlow()

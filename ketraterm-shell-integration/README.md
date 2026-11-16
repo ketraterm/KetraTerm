@@ -90,8 +90,9 @@ the session's conditional-edit APIs when admitting asynchronous suggestions.
 
 Completed output is available through
 [`TerminalSession.commandOutputText`](../ketraterm-session/README.md#completed-command-output).
-The producer resolves the recorded primary-buffer range under session
-serialization and copies only a bounded tail. The result reports caller
+The producer delegates to the session's shared extraction for neutral command anchors.
+It reads the primary buffer under session serialization and copies a bounded tail.
+The result reports caller
 truncation separately from missing history; it never reads alternate-screen text
 as primary command output.
 Ranges follow retained row order through line insertion and reflow. When a
@@ -103,7 +104,7 @@ numeric line identities.
 With workspace PowerShell hooks and PSReadLine, this producer also decodes
 [native completion metadata](../docs/reference/protocol.md#private-powershell-completion-metadata).
 Call `session.requestShellCompletions(commandLine, cursorOffset)` from a caller-owned
-coroutine, or install `SessionShellCompletionProvider` from `ketraterm-ui-swing-host`
+coroutine, or install `SessionShellCompletionProvider` from [`ketraterm-completion-session`](../ketraterm-completion-session/README.md)
 in a completion engine. Concurrent requests for the same current editor context
 share one native query; each caller can cancel its own wait. Unsupported, stale,
 failed, or timed-out requests return null. See the session's

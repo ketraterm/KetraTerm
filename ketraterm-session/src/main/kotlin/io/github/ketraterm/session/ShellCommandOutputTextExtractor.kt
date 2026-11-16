@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.shell.integration
+package io.github.ketraterm.session
 
 import io.github.ketraterm.render.api.*
-import io.github.ketraterm.session.*
 
 /** One on-demand read; neither borrowed frames nor row scratch survive the request. */
-internal class ShellCommandOutputTextExtractor {
+internal object ShellCommandOutputTextExtractor {
     fun extract(
         reader: TerminalRenderFrameReader,
         state: TerminalShellIntegrationView,

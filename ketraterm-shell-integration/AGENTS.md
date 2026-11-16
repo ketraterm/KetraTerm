@@ -3,8 +3,8 @@
 This module provides KetraTerm's optional OSC shell integration producer.
 Session owns synchronization, connector coordination, input ordering, and the neutral shell
 model contract. This module interprets accepted OSC 7/133 metadata, anchors
-command records to terminal line identities, and reconstructs bounded command
-text from render data.
+command records to terminal line identities, and reconstructs active command
+text from render data. Session supplies bounded completed-output extraction.
 
 ## Invariants
 

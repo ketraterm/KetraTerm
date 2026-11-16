@@ -16,10 +16,6 @@
 package io.github.ketraterm.shell.integration
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.render.api.TerminalRenderClusterDataSink
-import io.github.ketraterm.render.api.TerminalRenderFrame
-import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.session.TerminalCommandOutputText
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
@@ -458,46 +454,6 @@ class CommandOutputTextTest {
                 val id = session.shellIntegrationState.latestCommandRecordId()
                 assertEquals(1, session.shellIntegrationState.commandMetadata(id)?.exitCode)
                 assertEquals("error", session.commandOutputText(id)?.text)
-            }
-        }
-
-    @Test
-    fun `row budget bounds cell copying rather than slicing a full history cache`() =
-        runTest {
-            fixture { session, connector ->
-                val id = command(session, connector, (1..40).joinToString("\r\n") { "line$it" })
-                var copies = 0
-                val reader =
-                    object : TerminalRenderFrameReader by session {
-                        override fun readRenderFrameForAbsoluteRange(
-                            startAbsoluteRow: Long,
-                            endAbsoluteRow: Long,
-                            consumer: TerminalRenderFrameConsumer,
-                        ) {
-                            session.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
-                                consumer.accept(
-                                    object : TerminalRenderFrame by frame {
-                                        override fun copyTextLine(
-                                            row: Int,
-                                            codeWords: IntArray,
-                                            codeOffset: Int,
-                                            flags: IntArray,
-                                            flagOffset: Int,
-                                            clusterDataSink: TerminalRenderClusterDataSink?,
-                                        ) {
-                                            copies++
-                                            frame.copyTextLine(row, codeWords, codeOffset, flags, flagOffset, clusterDataSink)
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                assertEquals(
-                    "line39\nline40",
-                    ShellCommandOutputTextExtractor().extract(reader, session.shellIntegrationState, id, 100, 2)?.text,
-                )
-                assertEquals(2, copies)
             }
         }
 

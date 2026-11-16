@@ -66,6 +66,7 @@ public interface TerminalShellIntegration {
      * positive evidence of empty output; unknown ranges must remain null. Reads may occur after closure.
      * Custom producers must coordinate their metadata and output snapshots and must not acquire
      * terminal state while holding an independent producer lock. The default has no output source.
+     * Producers with neutral command anchors can delegate to [TerminalShellIntegrationContext.commandOutputText].
      */
     public fun commandOutputText(
         recordId: Int,

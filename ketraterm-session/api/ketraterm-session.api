@@ -479,6 +479,7 @@ public final class io/github/ketraterm/session/TerminalShellIntegrationCommandRe
 }
 
 public final class io/github/ketraterm/session/TerminalShellIntegrationContext : io/github/ketraterm/render/api/TerminalRenderFrameReader {
+	public final fun commandOutputText (Lio/github/ketraterm/session/TerminalShellIntegrationView;III)Lio/github/ketraterm/session/TerminalCommandOutputText;
 	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getShellCompletion ()Lio/github/ketraterm/session/TerminalShellCompletionChannel;
 	public final fun readPublishedFrame (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;

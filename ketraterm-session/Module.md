@@ -31,12 +31,15 @@ One publication viewport is retained per session.
 rows, and exposes allocation-free output ownership separately from completed-command
 selection;
 `TerminalShellCommandLineState` serializes host editing revisions with conditional
-admission. Optional OSC interpretation and grid extraction belong to
+admission. Optional OSC interpretation and active command reconstruction belong to
 `ketraterm-shell-integration`, which this module does not depend on.
 
-`TerminalCommandOutputText` is the detached result of optional producer-owned
-completed-output extraction. Session validates limits, serializes the read, and
-rejects results when the producer's metadata revision changes during capture.
+`TerminalShellIntegrationContext.commandOutputText` shares bounded completed-output
+extraction between standard host and OSC producers. Session validates limits,
+serializes the read, and rejects changed metadata revisions. The internal extractor
+scans retained row identities and copies only the requested tail's cell content.
+`TerminalCommandOutputText` owns the detached result. Custom producers retain their
+own output policy, including an explicit null result.
 
 `captureCommandSuffixPreview` creates caller-owned render cells through a bounded
 isolated parser/core pipeline. It checks editing authority, margin geometry and

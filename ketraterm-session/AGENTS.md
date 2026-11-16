@@ -20,9 +20,10 @@ ordering or lifecycle.
 - Claim termination once. Release the connector before cleanup locks, finalize
   parser EOF, attempt final publication, then publish retained `Closed` state.
   Session owns its jobs, not dispatchers or consumer scopes.
-- Own neutral shell contracts and subscriptions. Protocol interpretation and
-  grid extraction belong in `ketraterm-shell-integration`; external producers
-  remain host-owned. Do not introduce a dependency on that optional module.
+- Own neutral shell contracts, subscriptions, and bounded completed-output extraction.
+  Protocol interpretation and active command reconstruction belong in
+  `ketraterm-shell-integration`. External producers remain host-owned.
+  Do not introduce a dependency on that optional module.
 - Keep consent and native clipboard access in the provider. Session owns
   bounded admission, deadlines, permission revalidation, and reply retirement.
 

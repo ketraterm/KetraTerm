@@ -32,6 +32,7 @@ public fun interface TerminalShellIntegrationFactory {
          * edit admission. Publish through [commandLine] so model updates and the
          * final revision check share its guard. [state] and [promptReady] retain
          * the same ownership as in the StateFlow overload.
+         * Completed output uses the bounded extraction in [TerminalShellIntegrationContext.commandOutputText].
          */
         @JvmStatic
         @JvmOverloads
@@ -43,6 +44,7 @@ public fun interface TerminalShellIntegrationFactory {
 
         /**
          * Selects a versioned host projection with an editor-owned prefix-reset operation.
+         * Completed output uses the supplied neutral command anchors and bounded session extraction.
          *
          * The [prefixResetKeys] sequence is detached before this method returns.
          * Hosts with changing editor capabilities may implement [TerminalShellIntegration]
@@ -68,6 +70,13 @@ public fun interface TerminalShellIntegrationFactory {
             return TerminalShellIntegrationFactory { context ->
                 object : TerminalShellIntegration {
                     override val state = state
+
+                    override fun commandOutputText(
+                        recordId: Int,
+                        maxChars: Int,
+                        maxRows: Int,
+                    ): TerminalCommandOutputText? = context.commandOutputText(state, recordId, maxChars, maxRows)
+
                     override val promptReady = promptReady
                     override val commandLineChanges = commandLine.changes
                     override val commandLinePrefixResetKeys = resetKeys
@@ -92,6 +101,9 @@ public fun interface TerminalShellIntegrationFactory {
          * through the session frame reader after the corresponding output and
          * before consuming later bytes. In particular, IDE document offsets are
          * not terminal line identities. Host callbacks must preserve that ordering.
+         * Capture anchors and publish metadata under [TerminalShellIntegrationContext.withTerminalState]
+         * or from an ordered session callback. Release frame callbacks before publication.
+         * Completed output uses these anchors through [TerminalShellIntegrationContext.commandOutputText].
          *
          * Each subscription signals the current editing context, including null,
          * so consumers can revalidate snapshots captured before observation starts.
@@ -118,6 +130,13 @@ public fun interface TerminalShellIntegrationFactory {
             TerminalShellIntegrationFactory { context ->
                 object : TerminalShellIntegration {
                     override val state = state
+
+                    override fun commandOutputText(
+                        recordId: Int,
+                        maxChars: Int,
+                        maxRows: Int,
+                    ): TerminalCommandOutputText? = context.commandOutputText(state, recordId, maxChars, maxRows)
+
                     override val promptReady = promptReady
 
                     override fun outputProcessed() = state.updateLineOrder(context)
