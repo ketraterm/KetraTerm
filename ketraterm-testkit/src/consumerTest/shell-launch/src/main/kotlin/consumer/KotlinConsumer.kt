@@ -19,6 +19,7 @@ import io.github.ketraterm.shell.launch.TerminalShellLaunch
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalShellEnvironment
 import java.io.File
+import java.nio.file.Files
 
 fun main() {
     JavaConsumer.verify()
@@ -43,6 +44,28 @@ fun main() {
         check(launch.environment(mapOf("PATH" to "host-second"))["PATH"] == "$prefix${File.pathSeparator}host-second")
         check(launch.environment(inherited) == first)
         check(inherited == mapOf("PATH" to "host-first", "HOST_VALUE" to "retained"))
+    }
+    val scripts = Files.createTempDirectory("ketraterm-zsh-consumer")
+    try {
+        val zshProfile = TerminalProfile("zsh", "Zsh", listOf("zsh"))
+        TerminalShellLaunch.prepare(zshProfile, scriptDirectory = scripts).use { launch ->
+            check(launch.promptMarkersExpected)
+            val hookDirectory = scripts.resolve("zsh").toString()
+            val firstDirectory = scripts.resolve("host-first").toString()
+            val first = launch.environment(mapOf("ZDOTDIR" to firstDirectory))
+            check(first["KetraTerm_ORIGINAL_ZDOTDIR"] == firstDirectory)
+            check(first["ZDOTDIR"] == hookDirectory)
+            val secondDirectory = scripts.resolve("host-second").toString()
+            val second = launch.environment(mapOf("ZDOTDIR" to secondDirectory))
+            check(second["KetraTerm_ORIGINAL_ZDOTDIR"] == secondDirectory)
+            check(second["ZDOTDIR"] == hookDirectory)
+            val absent = launch.environment(emptyMap())
+            check("KetraTerm_ORIGINAL_ZDOTDIR" !in absent)
+            check(absent["ZDOTDIR"] == hookDirectory)
+            check(launch.environment(mapOf("ZDOTDIR" to firstDirectory)) == first)
+        }
+    } finally {
+        check(scripts.toFile().deleteRecursively())
     }
     check(runCatching { Class.forName("io.github.ketraterm.workspace.TerminalWorkspace") }.isFailure)
     check(runCatching { Class.forName("io.github.ketraterm.pty.TerminalSessions") }.isFailure)

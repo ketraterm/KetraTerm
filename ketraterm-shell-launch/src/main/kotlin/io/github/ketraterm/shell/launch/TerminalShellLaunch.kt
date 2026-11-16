@@ -43,7 +43,7 @@ public class TerminalShellLaunch private constructor(
 ) : AutoCloseable {
     /**
      * Detached launch profile with shell hooks and initial environment values.
-     * PATH expansion uses the current JVM's environment. Use [environment] for host-provided inheritance.
+     * Environment resolution uses the current JVM's environment. Use [environment] for host-provided inheritance.
      */
     public val profile: TerminalProfile get() = launch.profile
 
@@ -58,6 +58,7 @@ public class TerminalShellLaunch private constructor(
      * Resolves the launch environment against [inherited], with case-insensitive keys on Windows.
      * Selected shell variables override profile entries, which override inherited entries.
      * The PATH prefix applies after these overrides. Calls do not change the supplied map or prepared profile.
+     * Zsh hooks temporarily redirect ZDOTDIR and preserve the selected startup directory.
      */
     public fun environment(inherited: Map<String, String>): Map<String, String> = launch.environment(inherited)
 

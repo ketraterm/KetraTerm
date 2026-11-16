@@ -97,6 +97,7 @@ internal object TerminalShellIntegrationBootstrap {
                     inventoryProfile
                 },
             promptMarkersExpected = promptMarkersExpected,
+            zshStartupDirectory = integrated.environment["ZDOTDIR"].takeIf { promptMarkersExpected && usesZsh(profile) },
         )
     }
 
@@ -132,10 +133,7 @@ internal object TerminalShellIntegrationBootstrap {
         environment =
             when (shellName) {
                 "bash", "bash.exe" -> environment.withWslEnvironmentExport("PROMPT_COMMAND/u")
-                "zsh", "zsh.exe" ->
-                    environment
-                        .withWslEnvironmentExport("KetraTerm_ORIGINAL_ZDOTDIR/up")
-                        .withWslEnvironmentExport("ZDOTDIR/up")
+                "zsh", "zsh.exe" -> environment.withWslEnvironmentExport("ZDOTDIR/up")
                 else -> environment
             }
         return profile.copy(
@@ -143,6 +141,16 @@ internal object TerminalShellIntegrationBootstrap {
             environment = environment,
         )
     }
+
+    private fun usesZsh(profile: TerminalProfile): Boolean =
+        when (profile.kind) {
+            TerminalProfileKind.ZSH -> true
+            TerminalProfileKind.WSL, TerminalProfileKind.UBUNTU -> {
+                val index = explicitWslShellIndex(profile.command)
+                index >= 0 && executableName(profile.command[index]) in setOf("zsh", "zsh.exe")
+            }
+            else -> false
+        }
 
     private fun explicitWslShellIndex(command: List<String>): Int {
         var index = 1
@@ -295,14 +303,11 @@ internal object TerminalShellIntegrationBootstrap {
             return profile
         }
 
-        val originalZdotdir = profile.environment["ZDOTDIR"] ?: System.getenv("ZDOTDIR").orEmpty()
-        val environment =
-            profile.environment +
-                mapOf(
-                    "KetraTerm_ORIGINAL_ZDOTDIR" to originalZdotdir,
-                    "ZDOTDIR" to zshDirectory.toString(),
-                    OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
-                )
+        val windows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+        val environment = profile.environment.toMutableMap()
+        environment.setEnvironmentValue("KetraTerm_ORIGINAL_ZDOTDIR", profile.environment.environmentValue("ZDOTDIR", windows), windows)
+        environment.setEnvironmentValue("ZDOTDIR", zshDirectory.toString(), windows)
+        environment[OSC7_AUTHORITY_ENVIRONMENT_VARIABLE] = LOCAL_OSC7_AUTHORITY
         return profile.copy(environment = environment)
     }
 
@@ -462,11 +467,20 @@ internal object TerminalShellIntegrationBootstrap {
     private fun zshSourceOriginalStartupFile(fileName: String): String =
         """
         __ketraterm_bootstrap_zdotdir=${'$'}ZDOTDIR
-        __ketraterm_original_zdotdir=${'$'}{KetraTerm_ORIGINAL_ZDOTDIR:-${'$'}HOME}
-        if [[ -n "${'$'}__ketraterm_original_zdotdir" && "${'$'}__ketraterm_original_zdotdir" != "${'$'}ZDOTDIR" && -r "${'$'}__ketraterm_original_zdotdir/$fileName" ]]; then
-            ZDOTDIR=${'$'}__ketraterm_original_zdotdir
+        __ketraterm_original_zdotdir=${'$'}{KetraTerm_ORIGINAL_ZDOTDIR-${'$'}{HOME-}}
+        if (( ${'$'}{+KetraTerm_ORIGINAL_ZDOTDIR} || ${'$'}{+HOME} )) &&
+           [[ "${'$'}__ketraterm_original_zdotdir" != "${'$'}ZDOTDIR" && -r "${'$'}__ketraterm_original_zdotdir/$fileName" ]]; then
+            if (( ${'$'}{+KetraTerm_ORIGINAL_ZDOTDIR} )); then
+                ZDOTDIR=${'$'}KetraTerm_ORIGINAL_ZDOTDIR
+            else
+                unset ZDOTDIR
+            fi
             source "${'$'}__ketraterm_original_zdotdir/$fileName"
-            export KetraTerm_ORIGINAL_ZDOTDIR=${'$'}{ZDOTDIR:-${'$'}HOME}
+            if (( ${'$'}{+ZDOTDIR} )); then
+                export KetraTerm_ORIGINAL_ZDOTDIR=${'$'}ZDOTDIR
+            else
+                unset KetraTerm_ORIGINAL_ZDOTDIR
+            fi
         fi
         export ZDOTDIR=${'$'}__ketraterm_bootstrap_zdotdir
         unset __ketraterm_original_zdotdir __ketraterm_bootstrap_zdotdir
@@ -781,16 +795,65 @@ internal object TerminalShellIntegrationBootstrap {
 internal class ShellIntegrationLaunch(
     private val preparedProfile: TerminalProfile,
     val promptMarkersExpected: Boolean,
+    private val zshStartupDirectory: String? = null,
 ) {
-    val profile: TerminalProfile = TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile)
+    val profile: TerminalProfile =
+        TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile).let { initial ->
+            if (zshStartupDirectory == null) {
+                initial
+            } else {
+                val environment = initial.environment.toMutableMap()
+                applyZshDirectory(environment, System.getenv(), System.getProperty("os.name").startsWith("Windows", ignoreCase = true))
+                initial.copy(environment = environment)
+            }
+        }
 
     fun environment(
         inherited: Map<String, String>,
         windows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
     ): Map<String, String> =
-        TerminalShellEnvironmentBootstrap.inheritEnvironment(
-            TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile, inherited, windows).environment,
-            inherited,
-            windows,
-        )
+        TerminalShellEnvironmentBootstrap
+            .inheritEnvironment(
+                TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile, inherited, windows).environment,
+                inherited,
+                windows,
+            ).also { applyZshDirectory(it, inherited, windows) }
+
+    private fun applyZshDirectory(
+        environment: MutableMap<String, String>,
+        inherited: Map<String, String>,
+        windows: Boolean,
+    ) {
+        val startupDirectory = zshStartupDirectory ?: return
+        val original =
+            preparedProfile.shellEnvironment.variables.environmentValue("ZDOTDIR", windows)
+                ?: preparedProfile.environment.environmentValue("KetraTerm_ORIGINAL_ZDOTDIR", windows)
+                ?: inherited.environmentValue("ZDOTDIR", windows)
+        environment.setEnvironmentValue("KetraTerm_ORIGINAL_ZDOTDIR", original, windows)
+        environment.setEnvironmentValue("ZDOTDIR", startupDirectory, windows)
+        if (preparedProfile.kind == TerminalProfileKind.WSL || preparedProfile.kind == TerminalProfileKind.UBUNTU) {
+            var exports =
+                environment.environmentValue("WSLENV", windows).orEmpty().split(':').filter {
+                    it.isNotEmpty() && !it.substringBefore('/').equals("KetraTerm_ORIGINAL_ZDOTDIR", ignoreCase = windows)
+                }
+            if (original != null) {
+                exports = exports + if (original.isEmpty()) "KetraTerm_ORIGINAL_ZDOTDIR/u" else "KetraTerm_ORIGINAL_ZDOTDIR/up"
+            }
+            environment.setEnvironmentValue("WSLENV", exports.joinToString(":"), windows)
+        }
+    }
+}
+
+private fun Map<String, String>.environmentValue(
+    name: String,
+    windows: Boolean,
+): String? = if (windows) entries.lastOrNull { it.key.equals(name, ignoreCase = true) }?.value else this[name]
+
+private fun MutableMap<String, String>.setEnvironmentValue(
+    name: String,
+    value: String?,
+    windows: Boolean,
+) {
+    if (windows) keys.removeAll { it.equals(name, ignoreCase = true) } else remove(name)
+    if (value != null) this[name] = value
 }

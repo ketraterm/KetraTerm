@@ -21,7 +21,7 @@ internal object TerminalShellEnvironmentBootstrap {
         overrides: Map<String, String>,
         inherited: Map<String, String>,
         windows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
-    ): Map<String, String> =
+    ): MutableMap<String, String> =
         if (windows) {
             // Keep one spelling when layering profile values over PTY defaults.
             sortedMapOf<String, String>(String.CASE_INSENSITIVE_ORDER).apply {
@@ -29,7 +29,7 @@ internal object TerminalShellEnvironmentBootstrap {
                 putAll(overrides)
             }
         } else {
-            inherited + overrides
+            inherited.toMutableMap().apply { putAll(overrides) }
         }
 
     fun applyInitial(

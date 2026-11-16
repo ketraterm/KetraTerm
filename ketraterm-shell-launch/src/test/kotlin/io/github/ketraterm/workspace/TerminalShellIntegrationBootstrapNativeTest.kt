@@ -18,6 +18,7 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.session.*
+import io.github.ketraterm.shell.launch.TerminalShellLaunch
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
@@ -1581,6 +1582,130 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
 
+    @Test
+    fun `public zsh launch uses inherited ZDOTDIR and follows user relocation`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val original = Files.createDirectory(tempDir.resolve("host config"))
+        val relocated = Files.createDirectory(tempDir.resolve("relocated config"))
+        Files.writeString(
+            original.resolve(".zshenv"),
+            "export KETRATERM_STARTUP_SEQUENCE=env\nexport ZDOTDIR=${shellSingleQuote(relocated.toString())}\n",
+        )
+        for ((file, stage) in listOf(".zprofile" to "profile", ".zshrc" to "rc", ".zlogin" to "login")) {
+            Files.writeString(relocated.resolve(file), "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:$stage\"\n")
+        }
+        val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-l", "-i"))
+        val inherited =
+            System.getenv() - "KetraTerm_ORIGINAL_ZDOTDIR" +
+                mapOf("HOME" to tempDir.toString(), "ZDOTDIR" to original.toString(), "TERM" to "xterm-256color")
+        TerminalShellLaunch.prepare(profile, scriptDirectory = tempDir.resolve("bootstrap")).use { launch ->
+            assertTrue(launch.promptMarkersExpected)
+            val result =
+                runProcess(
+                    launch.profile.command + listOf("-c", "printf 'STARTUP_RESULT=%s\\n' \"${'$'}KETRATERM_STARTUP_SEQUENCE\""),
+                    environment = launch.environment(inherited),
+                    inheritEnvironment = false,
+                )
+            assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+            assertTrue(result.stdout.contains("STARTUP_RESULT=env:profile:rc:login"), visibleEscapes(result.stdout))
+        }
+    }
+
+    @Test
+    fun `public zsh launch keeps missing ZDOTDIR unset in user startup files`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val home = Files.createDirectory(tempDir.resolve("home"))
+        Files.writeString(home.resolve(".zshenv"), "export KETRATERM_STARTUP_SEQUENCE=env-${'$'}{+ZDOTDIR}\n")
+        Files.writeString(
+            home.resolve(".zshrc"),
+            "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:rc-${'$'}{+ZDOTDIR}\"\n",
+        )
+        val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-i"))
+        val inherited =
+            System.getenv() - "ZDOTDIR" - "KetraTerm_ORIGINAL_ZDOTDIR" +
+                mapOf("HOME" to home.toString(), "TERM" to "xterm-256color")
+        TerminalShellLaunch.prepare(profile, scriptDirectory = tempDir.resolve("bootstrap")).use { launch ->
+            assertTrue(launch.promptMarkersExpected)
+            val result =
+                runProcess(
+                    launch.profile.command + listOf("-c", "printf 'STARTUP_RESULT=%s\\n' \"${'$'}KETRATERM_STARTUP_SEQUENCE\""),
+                    environment = launch.environment(inherited),
+                    inheritEnvironment = false,
+                )
+            assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+            assertTrue(result.stdout.contains("STARTUP_RESULT=env-0:rc-0"), visibleEscapes(result.stdout))
+        }
+    }
+
+    @Test
+    fun `public zsh launch does not use HOME files for empty ZDOTDIR`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val home = Files.createDirectory(tempDir.resolve("home"))
+        for (file in listOf(".zshenv", ".zprofile", ".zshrc", ".zlogin")) {
+            Files.writeString(home.resolve(file), "printf 'UNEXPECTED_HOME_FILE=$file\\n'\n")
+        }
+        val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-l", "-i"))
+        val inherited =
+            System.getenv() - "KetraTerm_ORIGINAL_ZDOTDIR" +
+                mapOf("HOME" to home.toString(), "ZDOTDIR" to "", "TERM" to "xterm-256color")
+        TerminalShellLaunch.prepare(profile, scriptDirectory = tempDir.resolve("bootstrap")).use { launch ->
+            assertTrue(launch.promptMarkersExpected)
+            val result =
+                runProcess(
+                    launch.profile.command + listOf("-c", "printf 'STARTUP_RESULT=complete\\n'"),
+                    environment = launch.environment(inherited),
+                    inheritEnvironment = false,
+                )
+            assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+            assertTrue(result.stdout.contains("STARTUP_RESULT=complete"), visibleEscapes(result.stdout))
+            assertFalse(result.stdout.contains("UNEXPECTED_HOME_FILE="), visibleEscapes(result.stdout))
+        }
+    }
+
+    @Test
+    fun `public zsh launch follows changed HOME after user unsets ZDOTDIR`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val original = Files.createDirectory(tempDir.resolve("original"))
+        val relocated = Files.createDirectory(tempDir.resolve("new home"))
+        Files.writeString(
+            original.resolve(".zshenv"),
+            "export KETRATERM_STARTUP_SEQUENCE=env\nunset ZDOTDIR\nexport HOME=${shellSingleQuote(relocated.toString())}\n",
+        )
+        for ((file, stage) in listOf(".zprofile" to "profile", ".zshrc" to "rc", ".zlogin" to "login")) {
+            Files.writeString(
+                relocated.resolve(file),
+                "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:$stage-${'$'}{+ZDOTDIR}\"\n",
+            )
+        }
+        val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-l", "-i"))
+        val inherited =
+            System.getenv() - "KetraTerm_ORIGINAL_ZDOTDIR" +
+                mapOf("HOME" to tempDir.toString(), "ZDOTDIR" to original.toString(), "TERM" to "xterm-256color")
+        TerminalShellLaunch.prepare(profile, scriptDirectory = tempDir.resolve("bootstrap")).use { launch ->
+            assertTrue(launch.promptMarkersExpected)
+            val result =
+                runProcess(
+                    launch.profile.command + listOf("-c", "printf 'STARTUP_RESULT=%s\\n' \"${'$'}KETRATERM_STARTUP_SEQUENCE\""),
+                    environment = launch.environment(inherited),
+                    inheritEnvironment = false,
+                )
+            assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+            assertTrue(result.stdout.contains("STARTUP_RESULT=env:profile-0:rc-0:login-0"), visibleEscapes(result.stdout))
+        }
+    }
+
     @ParameterizedTest(name = "Fish user binding for F12{0}")
     @ValueSource(strings = ["", "q"])
     fun `fish buffer bridge preserves user bindings and stops advertising after a conflict`(suffix: String) {
@@ -2051,13 +2176,16 @@ class TerminalShellIntegrationBootstrapNativeTest {
         environment: Map<String, String> = emptyMap(),
         standardInput: String? = null,
         workingDirectory: Path? = null,
+        inheritEnvironment: Boolean = true,
     ): ProcessResult {
         val process =
             ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .also { if (workingDirectory != null) it.directory(workingDirectory.toFile()) }
-                .also { it.environment().putAll(environment) }
-                .start()
+                .also {
+                    if (!inheritEnvironment) it.environment().clear()
+                    it.environment().putAll(environment)
+                }.start()
         val outputTask = FutureTask { process.inputStream.use { it.readAllBytes() } }
         Thread.ofVirtual().name("shell-integration-test-output").start(outputTask)
         if (standardInput != null) {
