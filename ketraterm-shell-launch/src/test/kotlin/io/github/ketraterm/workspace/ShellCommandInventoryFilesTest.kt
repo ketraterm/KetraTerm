@@ -96,9 +96,13 @@ class ShellCommandInventoryFilesTest {
         @TempDir root: Path,
     ) = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val mailbox = ShellCommandInventoryFiles(withContext(Dispatchers.IO) {
-            Files.createDirectory(root.resolve("inventory"))
-        }, dispatcher = dispatcher)
+        val mailbox =
+            ShellCommandInventoryFiles(
+                withContext(Dispatchers.IO) {
+                    Files.createDirectory(root.resolve("inventory"))
+                },
+                dispatcher = dispatcher,
+            )
         val session =
             TerminalSession.create(
                 TerminalBuffers.create(80, 4),
