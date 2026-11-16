@@ -169,9 +169,11 @@ the <a href="../docs/features/completion.html#stability-experimental">completion
 <p>To use the running PowerShell session as the command authority, set
 <code>shellProvider = SessionShellCompletionProvider(session)</code> in
 <code>TerminalCompletionEngines.fromSources</code> and supply
-<code>TerminalShellCapabilities.POWERSHELL</code> in its requests. The adapter lives in
-<code>io.github.ketraterm.ui.swing.host</code>; the engine contract lives in
-<code>io.github.ketraterm.completion.api</code>. The provider borrows its session and owns no jobs.
+<code>TerminalShellCapabilities.POWERSHELL</code> in its requests. The neutral adapter lives in
+<a href="../ketraterm-completion-session/README.html"><code>ketraterm-completion-session</code></a>, in the
+<code>io.github.ketraterm.completion.session</code> package. The existing provider in
+<code>io.github.ketraterm.ui.swing.host</code> delegates to it and remains available.
+The provider borrows its session and owns no jobs.
 It preserves shell quoting, replacement ranges, and presentation metadata, and
 participates in normal caller cancellation. See the <a href="../docs/features/completion.html#sources-by-host">availability and bounds</a>.</p>
 <p><code>SwingCompletionSuggestionProvider</code> adapts a
@@ -254,7 +256,7 @@ clipboard services and choose write-consent policy.</p>
 to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
 resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
 bundled English catalog. The selected locale is captured; static component
-labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
 defines keys and arguments. Message arguments are plain text, not markup.</p>
 <p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
 hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
@@ -273,7 +275,7 @@ work is present. The clock stops while the container is hidden; close it on the
 EDT at owner disposal to detach its listener. Hosts may omit animation, freeze
 phase for reduced motion, or provide their own timing and session observation.
 See the <a href="../docs/reference/protocol.html#progress-reporting">progress contract</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

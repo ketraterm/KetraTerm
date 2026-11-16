@@ -48,11 +48,14 @@ One publication viewport is retained per session.</p>
 rows, and exposes allocation-free output ownership separately from completed-command
 selection;
 <code>TerminalShellCommandLineState</code> serializes host editing revisions with conditional
-admission. Optional OSC interpretation and grid extraction belong to
+admission. Optional OSC interpretation and active command reconstruction belong to
 <code>ketraterm-shell-integration</code>, which this module does not depend on.</p>
-<p><code>TerminalCommandOutputText</code> is the detached result of optional producer-owned
-completed-output extraction. Session validates limits, serializes the read, and
-rejects results when the producer&#39;s metadata revision changes during capture.</p>
+<p><code>TerminalShellIntegrationContext.commandOutputText</code> shares bounded completed-output
+extraction between standard host and OSC producers. Session validates limits,
+serializes the read, and rejects changed metadata revisions. The internal extractor
+scans retained row identities and copies only the requested tail&#39;s cell content.
+<code>TerminalCommandOutputText</code> owns the detached result. Custom producers retain their
+own output policy, including an explicit null result.</p>
 <p><code>captureCommandSuffixPreview</code> creates caller-owned render cells through a bounded
 isolated parser/core pipeline. It checks editing authority, margin geometry and
 width policy without changing the live terminal; the renderer owns presentation
@@ -90,7 +93,7 @@ guidance.</li>
 <p>Run <code>./gradlew :ketraterm-session:test</code> from the repository root. This includes
 <code>defaultDispatcherTest</code> in a separate JVM with one ordinary I/O worker, so cleanup
 independence is checked against actual defaults without changing other tests&#39; schedulers.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-session/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

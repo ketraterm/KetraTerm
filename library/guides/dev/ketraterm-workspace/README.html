@@ -93,7 +93,7 @@ after tab publication. Callbacks can skip intermediate states. Dispatch UI work
 without waiting and read <code>tab.session.progress.value</code> again at delivery; do not
 retain a second authoritative progress state. Tab removal cancels observation.</p>
 <h2 id="profiles-and-launch-options">Profiles and launch options</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-shell-launch/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
 as a list, rather than split from a command string. The executable must be nonempty;
@@ -126,7 +126,7 @@ Products own preference schemas, persistence, and the host actions permitted by
 <code>HostPolicy</code>; advertise only mode capabilities the host implements.</p>
 <h2 id="shell-metadata-ownership">Shell metadata ownership</h2>
 <p>The local session factory selects <code>OscShellIntegration</code> and, when enabled,
-prepares interactive PowerShell, Bash, zsh, or fish hooks. Explicit script or
+uses <a href="../ketraterm-shell-launch/README.html">shell launch</a> to prepare interactive PowerShell, Bash, zsh, or fish hooks. Explicit script or
 command entry points are preserved rather than converted into interactive
 launches. Explicit WSL shell launches can receive hooks; startup commands require
 a directly configured interactive shell with hooks enabled. Invalid startup
@@ -185,7 +185,7 @@ for reply and cancellation behavior.</p>
 <li><a href="https://ketraterm.github.io/KetraTerm/settings.html">Standalone profile persistence</a></li>
 <li><a href="../ketraterm-shell-integration/README.html">Shell metadata API</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

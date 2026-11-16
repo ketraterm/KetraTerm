@@ -8,6 +8,8 @@ module:ketraterm-completion-host
 io.github.ketraterm.completion.host
 module:ketraterm-completion-persistence
 io.github.ketraterm.completion.persistence
+module:ketraterm-completion-session
+io.github.ketraterm.completion.session
 module:ketraterm-core
 io.github.ketraterm.core
 io.github.ketraterm.core.api
@@ -37,6 +39,9 @@ module:ketraterm-session
 io.github.ketraterm.session
 module:ketraterm-shell-integration
 io.github.ketraterm.shell.integration
+module:ketraterm-shell-launch
+io.github.ketraterm.shell.launch
+io.github.ketraterm.workspace
 module:ketraterm-transport-api
 io.github.ketraterm.transport
 module:ketraterm-ui-swing

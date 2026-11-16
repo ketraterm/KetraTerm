@@ -56,10 +56,9 @@ data, preserves hard breaks and soft wraps, and fails closed when the required
 range or cluster data cannot be reconstructed. Marker callbacks capture command
 metadata; subscribed edit tracking compares fingerprints before requesting
 allocating snapshots.</p>
-<p><code>ShellCommandOutputTextExtractor</code> resolves completed command ranges and copies a
-bounded logical-text tail. It scans row identities without materializing a full
-history cache and retains only request-local row scratch and result text.
-Session owns serialization and the neutral <code>TerminalCommandOutputText</code> result.</p>
+<p>Completed output delegates to <code>TerminalShellIntegrationContext.commandOutputText</code>.
+Session shares this bounded extraction with neutral host producers and owns
+serialization and the detached <code>TerminalCommandOutputText</code> result.</p>
 <p>The test suite covers real OSC byte streams, marker ordering, clear and resize,
 wrapped and Unicode command extraction, subscription lifetime, and startup
 submission.</p>
@@ -68,7 +67,7 @@ submission.</p>
 for synchronization and model ownership. Capability scope remains in the
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-shell-integration/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-shell-integration/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -58,36 +58,12 @@ The <a href="README.html">README</a> describes construction, listener threading,
 <td>Validated immutable initial session options.</td>
 </tr>
 <tr>
-<td><code>TerminalProfile</code>, <code>TerminalProfileKind</code>, <code>TerminalProfileRegistry</code></td>
-<td>Launch vocabulary, presentation classification, and built-in profile discovery.</td>
+<td><code>TerminalProfileRegistry</code></td>
+<td>Discover built-in profiles.</td>
 </tr>
 <tr>
-<td><code>TerminalShellEnvironment</code></td>
-<td>Host-selected environment overrides and a PATH prefix.</td>
-</tr>
-<tr>
-<td>Internal shell bootstrappers</td>
-<td>Prepare shell startup hooks and environment reapplication without interpreting terminal output.</td>
-</tr>
-<tr>
-<td><code>powershell-completion.ps1</code> resource</td>
-<td>Install the private PSReadLine request bindings, read the live buffer, and serialize bounded native completion results with the supplied request ID.</td>
-</tr>
-<tr>
-<td><code>fish-completion.fish</code> resource</td>
-<td>Confirm the live fish editor buffer without accepting predictions or invoking candidate completers, using the shared private completion protocol.</td>
-</tr>
-<tr>
-<td><code>path-commands.sh</code> resource</td>
-<td>Shared Bash/zsh PATH enumeration in an isolated subshell, with optional native directory-type filtering, shell executable checks, and a builtin fallback.</td>
-</tr>
-<tr>
-<td>Internal <code>ShellCommandInventoryFiles</code></td>
-<td>Own the private session mailbox, bounded I/O polling, and cleanup; forward bytes to the shell-integration decoder.</td>
-</tr>
-<tr>
-<td><code>bash-completion.bash</code>, <code>zsh-completion.zsh</code> resources</td>
-<td>Combine shell tables with discovered executables and publish bounded inventory snapshots.</td>
+<td><code>TerminalShellLaunch</code> dependency</td>
+<td>Prepare shell hooks and inventory resources through the shared launch library.</td>
 </tr>
 </tbody></table></div>
 <h2 id="lifecycle-and-concurrency">Lifecycle and concurrency</h2>
@@ -110,7 +86,7 @@ has one reserved slot. All entries preserve accepted order. Close completion
 waits for retained session closure, including when <code>requestClose</code> claimed
 termination before the workspace operation reached its worker.</p>
 <h2 id="dependency-boundary">Dependency boundary</h2>
-<p><code>ketraterm-session</code> is the API dependency. PTY, shell integration, render API, and
+<p><code>ketraterm-session</code> and <code>ketraterm-shell-launch</code> are API dependencies. PTY, render API, and
 coroutines are implementation dependencies. The workspace chooses local launch
 wiring, while PTY owns process mechanics and session owns synchronization. UI
 views, completion services, preference persistence, and product commands stay in
@@ -127,7 +103,7 @@ validating changes to launch behavior.</p>
 <p>Use <code>./gradlew :ketraterm-workspace:nativeTest</code> for real shell/bootstrap and
 PSReadLine/PTY tests. The <a href="../docs/development/testing.html">shared test guide</a>
 defines the suite selection and environment requirements.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

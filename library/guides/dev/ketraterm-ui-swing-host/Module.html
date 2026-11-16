@@ -26,7 +26,7 @@
 <p>Optional host-facing Swing helpers in <code>io.github.ketraterm.ui.swing.host</code>.
 The source module&#39;s <code>README.md</code> describes consumer wiring and lifecycle.</p>
 <h3 id="ownership-and-dependencies">Ownership and dependencies</h3>
-<p>The module depends on the reusable Swing terminal, the completion API, and
+<p>The module depends on the reusable Swing terminal, the completion API, the optional session completion adapter, and
 coroutines. It adapts their public contracts without owning a terminal session,
 transport, completion engine, source selection, or persisted learning.
 Standalone and IntelliJ products configure these helpers independently.</p>
@@ -56,7 +56,7 @@ Standalone and IntelliJ products configure these helpers independently.</p>
 <tr>
 <td>Native shell completion</td>
 <td><code>SessionShellCompletionProvider</code></td>
-<td>Session owns correlation and lifetime; the shell supplies command authority and escaped argument edits. Products choose whether to install the provider.</td>
+<td>The completion-session implementation owns mapping. Session owns correlation and lifetime; the shell supplies native edits.</td>
 </tr>
 <tr>
 <td>Clipboard consent</td>
@@ -78,7 +78,7 @@ close the terminal, session, or completion engine.</p>
 <p>Tests cover search state and palette changes, overlay geometry, shortcut
 validation, completion context/feedback preservation, localization, clipboard
 admission, prompt cancellation, and session read/write ordering. See the <a href="../ARCHITECTURE.html">repository architecture</a> for cross-module relationships.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/30aa2b778795783fd4133ab6fa65200f12a2a7f3/ketraterm-ui-swing-host/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9480f65c67fc602ed1fc1aae2b3aa0b5bbee4463/ketraterm-ui-swing-host/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
