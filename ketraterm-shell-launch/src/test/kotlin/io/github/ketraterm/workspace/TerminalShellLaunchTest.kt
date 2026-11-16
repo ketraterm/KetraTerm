@@ -22,6 +22,9 @@ import io.github.ketraterm.shell.launch.TerminalShellLaunch
 import io.github.ketraterm.testkit.MockConnector
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -30,6 +33,134 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalShellLaunchTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["enabled", "disabled", "unsupported", "explicit"])
+    fun `selected prefix uses the supplied environment on every resolution`(
+        mode: String,
+        @TempDir scripts: Path,
+    ) {
+        val command =
+            when (mode) {
+                "unsupported" -> listOf("custom")
+                "explicit" -> listOf("pwsh", "-Command", "Write-Output test")
+                else -> listOf("pwsh")
+            }
+        val explicit = mutableMapOf("PROFILE_ONLY" to "profile")
+        val variables = mutableMapOf("SELECTED_ONLY" to "selected")
+        val profile =
+            TerminalProfile(
+                "test",
+                "Test",
+                command,
+                explicit,
+                shellEnvironment = TerminalShellEnvironment(variables, "project-bin"),
+            )
+        TerminalShellLaunch.prepare(profile, enabled = mode != "disabled", scriptDirectory = scripts).use { launch ->
+            assertEquals(mode == "enabled", launch.promptMarkersExpected)
+            val preparedEnvironment = launch.profile.environment.toMap()
+            explicit["PATH"] = "changed-profile"
+            variables["PATH"] = "changed-selection"
+
+            for (hostPath in listOf("first-host-bin", "second-host-bin", "", null)) {
+                val inherited = linkedMapOf("HOST_ONLY" to "retained")
+                if (hostPath != null) inherited["PATH"] = hostPath
+                val originalInherited = inherited.toMap()
+                val environment = launch.environment(inherited)
+                val expectedPath = if (hostPath.isNullOrEmpty()) "project-bin" else "project-bin${File.pathSeparator}$hostPath"
+
+                assertEquals(expectedPath, environment["PATH"])
+                assertEquals("retained", environment["HOST_ONLY"])
+                assertEquals("profile", environment["PROFILE_ONLY"])
+                assertEquals("selected", environment["SELECTED_ONLY"])
+                assertEquals(environment, launch.environment(inherited))
+                assertEquals(originalInherited, inherited)
+                assertEquals(preparedEnvironment, launch.profile.environment)
+                if (launch.promptMarkersExpected) {
+                    assertEquals("project-bin", environment["_KetraTerm_FORCE_PREPEND_PATH"])
+                    assertEquals("selected", environment["_KetraTerm_FORCE_SET_SELECTED_ONLY"])
+                } else {
+                    assertFalse(environment.keys.any { it.startsWith("_KetraTerm_FORCE_") })
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `explicit and selected PATH values keep their precedence`(
+        enabled: Boolean,
+        @TempDir scripts: Path,
+    ) {
+        for ((explicitPath, selectedPath) in listOf(
+            "profile-bin" to null,
+            "profile-bin" to "selected-bin",
+            "" to null,
+            "profile-bin" to "",
+        )) {
+            val profile =
+                TerminalProfile(
+                    "test",
+                    "Test",
+                    listOf("pwsh"),
+                    mapOf("PATH" to explicitPath),
+                    shellEnvironment =
+                        TerminalShellEnvironment(
+                            variables = if (selectedPath == null) emptyMap() else mapOf("PATH" to selectedPath),
+                            pathPrefix = "project-bin",
+                        ),
+                )
+            TerminalShellLaunch.prepare(profile, enabled = enabled, scriptDirectory = scripts).use { launch ->
+                val basePath = selectedPath ?: explicitPath
+                val expected = if (basePath.isEmpty()) "project-bin" else "project-bin${File.pathSeparator}$basePath"
+                assertEquals(expected, launch.environment(mapOf("PATH" to "host-bin"))["PATH"])
+                assertEquals(
+                    expected,
+                    launch.profile.environment.entries
+                        .single { it.key.equals("PATH", ignoreCase = true) }
+                        .value,
+                )
+                assertEquals(mapOf("PATH" to explicitPath), profile.environment)
+                if (enabled && selectedPath != null) {
+                    assertEquals(selectedPath, launch.environment(emptyMap())["_KetraTerm_FORCE_SET_PATH"])
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `prepared profile keeps its local default PATH`() {
+        val profile =
+            TerminalProfile(
+                "custom",
+                "Custom",
+                listOf("custom"),
+                shellEnvironment = TerminalShellEnvironment(pathPrefix = "project-bin"),
+            )
+        val windows = File.pathSeparatorChar == ';'
+        val inheritedPath =
+            System
+                .getenv()
+                .entries
+                .lastOrNull { it.key.equals("PATH", ignoreCase = windows) }
+                ?.value
+        val expected = if (inheritedPath.isNullOrEmpty()) "project-bin" else "project-bin${File.pathSeparator}$inheritedPath"
+        TerminalShellLaunch.prepare(profile, enabled = false).use { launch ->
+            assertEquals(
+                expected,
+                launch.profile.environment.entries
+                    .single { it.key.equals("PATH", ignoreCase = windows) }
+                    .value,
+            )
+            assertEquals("project-bin", launch.environment(emptyMap())["PATH"])
+            assertEquals(
+                expected,
+                launch.profile.environment.entries
+                    .single { it.key.equals("PATH", ignoreCase = windows) }
+                    .value,
+            )
+        }
+    }
+
     @Test
     fun `preparation detaches caller collections and preserves explicit programs`(
         @TempDir scripts: Path,

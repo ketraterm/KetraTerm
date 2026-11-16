@@ -20,8 +20,8 @@ import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.workspace.ShellCommandInventoryFiles
+import io.github.ketraterm.workspace.ShellIntegrationLaunch
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalShellEnvironmentBootstrap
 import io.github.ketraterm.workspace.TerminalShellIntegrationBootstrap
 import java.nio.file.Path
 
@@ -38,19 +38,28 @@ import java.nio.file.Path
  * Closing this handle removes only its private command inventory mailbox.
  */
 public class TerminalShellLaunch private constructor(
-    /** Detached launch profile with the shell hooks installed where supported. */
-    public val profile: TerminalProfile,
-    /** Whether this launch installed prompt hooks. Shell readiness is observed separately. */
-    public val promptMarkersExpected: Boolean,
+    private val launch: ShellIntegrationLaunch,
     private val inventory: ShellCommandInventoryFiles?,
 ) : AutoCloseable {
+    /**
+     * Detached launch profile with shell hooks and initial environment values.
+     * PATH expansion uses the current JVM's environment. Use [environment] for host-provided inheritance.
+     */
+    public val profile: TerminalProfile get() = launch.profile
+
+    /** Whether this launch installed prompt hooks. Shell readiness is observed separately. */
+    public val promptMarkersExpected: Boolean get() = launch.promptMarkersExpected
+
     /** Use this factory for exactly one session that receives this process's output. */
     public val shellIntegration: TerminalShellIntegrationFactory =
         OscShellIntegration.configured(promptMarkersExpected, inventory?.input)
 
-    /** Layers prepared values over [inherited], with case-insensitive keys on Windows. */
-    public fun environment(inherited: Map<String, String>): Map<String, String> =
-        TerminalShellEnvironmentBootstrap.inheritEnvironment(profile.environment, inherited)
+    /**
+     * Resolves the launch environment against [inherited], with case-insensitive keys on Windows.
+     * Selected shell variables override profile entries, which override inherited entries.
+     * The PATH prefix applies after these overrides. Calls do not change the supplied map or prepared profile.
+     */
+    public fun environment(inherited: Map<String, String>): Map<String, String> = launch.environment(inherited)
 
     private var attached = false
     private var closed = false
@@ -115,7 +124,7 @@ public class TerminalShellLaunch private constructor(
                     }
                 val retained = inventory?.takeIf { launch.promptMarkersExpected }
                 if (retained == null) inventory?.close()
-                return TerminalShellLaunch(launch.profile, launch.promptMarkersExpected, retained)
+                return TerminalShellLaunch(launch, retained)
             } catch (failure: Throwable) {
                 inventory?.close()
                 throw failure

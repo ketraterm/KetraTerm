@@ -9,7 +9,8 @@ implementation("io.github.ketraterm:ketraterm-shell-launch")
 ```
 
 Call `io.github.ketraterm.shell.launch.TerminalShellLaunch.prepare(profile)` before process creation.
-Launch `launch.profile.command` with `launch.profile.environment` through your process host.
+Launch `launch.profile.command` with `launch.environment(inheritedEnvironment)` through your process host.
+`inheritedEnvironment` is the environment selected by your process host.
 Create the session with `launch.shellIntegration`, then call `launch.attach(session)` before `session.start`.
 Close the launch on startup failure. On disposal, close the process and session before the launch.
 

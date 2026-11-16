@@ -17,6 +17,8 @@ package consumer
 
 import io.github.ketraterm.shell.launch.TerminalShellLaunch
 import io.github.ketraterm.workspace.TerminalProfile
+import io.github.ketraterm.workspace.TerminalShellEnvironment
+import java.io.File
 
 fun main() {
     JavaConsumer.verify()
@@ -24,6 +26,23 @@ fun main() {
         check(!launch.promptMarkersExpected)
         check(launch.profile.command == listOf("custom"))
         check(launch.environment(mapOf("HOST_VALUE" to "retained"))["HOST_VALUE"] == "retained")
+    }
+    val prefix = "consumer-toolchain"
+    val inherited = linkedMapOf("PATH" to "host-first", "HOST_VALUE" to "retained")
+    val profile =
+        TerminalProfile(
+            "environment",
+            "Environment",
+            listOf("custom"),
+            shellEnvironment = TerminalShellEnvironment(pathPrefix = prefix),
+        )
+    TerminalShellLaunch.prepare(profile, enabled = false).use { launch ->
+        val first = launch.environment(inherited)
+        check(first["PATH"] == "$prefix${File.pathSeparator}host-first")
+        check(first["HOST_VALUE"] == "retained")
+        check(launch.environment(mapOf("PATH" to "host-second"))["PATH"] == "$prefix${File.pathSeparator}host-second")
+        check(launch.environment(inherited) == first)
+        check(inherited == mapOf("PATH" to "host-first", "HOST_VALUE" to "retained"))
     }
     check(runCatching { Class.forName("io.github.ketraterm.workspace.TerminalWorkspace") }.isFailure)
     check(runCatching { Class.forName("io.github.ketraterm.pty.TerminalSessions") }.isFailure)

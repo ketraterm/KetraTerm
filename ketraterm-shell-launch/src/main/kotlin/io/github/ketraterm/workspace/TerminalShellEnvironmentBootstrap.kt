@@ -53,7 +53,7 @@ internal object TerminalShellEnvironmentBootstrap {
         requested.pathPrefix?.let { prefix ->
             val path =
                 environment.entries.lastOrNull { it.key.equals("PATH", ignoreCase = windows) }?.value
-                    ?: inherited.entries.firstOrNull { it.key.equals("PATH", ignoreCase = windows) }?.value
+                    ?: inherited.entries.lastOrNull { it.key.equals("PATH", ignoreCase = windows) }?.value
             val separator = if (windows) ';' else ':'
             setVariable("PATH", if (path.isNullOrEmpty()) prefix else "$prefix$separator$path")
         }

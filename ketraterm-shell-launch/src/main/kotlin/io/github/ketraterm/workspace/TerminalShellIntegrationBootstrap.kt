@@ -54,7 +54,7 @@ internal object TerminalShellIntegrationBootstrap {
             "Startup commands require a directly configured interactive PowerShell, Bash, zsh, or fish shell. " +
                 "WSL launchers are not supported for startup commands."
         }
-        if (!enabled) return ShellIntegrationLaunch(TerminalShellEnvironmentBootstrap.applyInitial(profile), false)
+        if (!enabled) return ShellIntegrationLaunch(profile, false)
 
         val integrated =
             when (profile.kind) {
@@ -87,9 +87,15 @@ internal object TerminalShellIntegrationBootstrap {
             } else {
                 integrated
             }
-        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(inventoryProfile)
         return ShellIntegrationLaunch(
-            profile = if (promptMarkersExpected) TerminalShellEnvironmentBootstrap.withMarkers(launchProfile) else launchProfile,
+            preparedProfile =
+                if (promptMarkersExpected) {
+                    TerminalShellEnvironmentBootstrap.withMarkers(
+                        inventoryProfile,
+                    )
+                } else {
+                    inventoryProfile
+                },
             promptMarkersExpected = promptMarkersExpected,
         )
     }
@@ -772,7 +778,19 @@ internal object TerminalShellIntegrationBootstrap {
 }
 
 /** Launch arguments and the prompt expectation decided while applying shell hooks. */
-internal data class ShellIntegrationLaunch(
-    val profile: TerminalProfile,
+internal class ShellIntegrationLaunch(
+    private val preparedProfile: TerminalProfile,
     val promptMarkersExpected: Boolean,
-)
+) {
+    val profile: TerminalProfile = TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile)
+
+    fun environment(
+        inherited: Map<String, String>,
+        windows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
+    ): Map<String, String> =
+        TerminalShellEnvironmentBootstrap.inheritEnvironment(
+            TerminalShellEnvironmentBootstrap.applyInitial(preparedProfile, inherited, windows).environment,
+            inherited,
+            windows,
+        )
+}
