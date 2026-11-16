@@ -133,7 +133,7 @@ subprojects {
             dependsOn("classes")
             classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
             mainClass.set("consumer.KotlinConsumerKt")
-            if (project.name == "host-spi") {
+            if (project.name in setOf("host-spi", "completion-session")) {
                 jvmArgs("--limit-modules=java.base,java.logging,java.management,java.instrument,jdk.unsupported")
             }
             if (project.name in setOf("ui-swing", "ui-swing-host")) systemProperty("java.awt.headless", "true")
@@ -283,7 +283,7 @@ val verifyPublicationBoundary =
                         check(module.module !in productArtifacts) { "$consumer pulled product artifact $module" }
                         check(module.version == version) { "$consumer mixed library versions: expected $version, got $module" }
                     }
-                    if (consumer in setOf("parser", "core", "host-spi")) {
+                    if (consumer in setOf("parser", "core", "host-spi", "completion-session")) {
                         check(
                             !module.module.startsWith("ketraterm-ui-") &&
                                 module.module != "ketraterm-pty" &&
@@ -301,6 +301,7 @@ val verifyPublicationBoundary =
                                     "ketraterm-ui-swing-host",
                                     "ketraterm-completion",
                                     "ketraterm-completion-host",
+                                    "ketraterm-completion-session",
                                     "ketraterm-completion-persistence",
                                     "ketraterm-workspace",
                                 ) &&

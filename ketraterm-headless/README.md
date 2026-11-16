@@ -46,6 +46,8 @@ ordering. A renderer copies borrowed frame data during session read callbacks.
 
 Add [PTY support](../ketraterm-pty/README.md) for local processes and
 [shell integration](../ketraterm-shell-integration/README.md) for KetraTerm's
-OSC metadata producer when needed. For a Swing view, choose the
+OSC metadata producer when needed.
+Use [shell launch](../ketraterm-shell-launch/README.md) to prepare hooks while keeping process ownership.
+Add [session completion](../ketraterm-completion-session/README.md) to connect the neutral completion engine without Swing. For a Swing view, choose the
 [Swing entry point](../ketraterm-swing/README.md). Individual modules remain
 available for hosts that assemble a smaller pipeline.

@@ -75,6 +75,7 @@ val publishedLibraryNames =
         "ketraterm-input",
         "ketraterm-completion",
         "ketraterm-completion-host",
+        "ketraterm-completion-session",
         "ketraterm-completion-persistence",
         "ketraterm-render-api",
         "ketraterm-render-cache",
@@ -156,6 +157,7 @@ subprojects {
                 setOf(
                     "ketraterm-completion",
                     "ketraterm-completion-host",
+                    "ketraterm-completion-session",
                     "ketraterm-completion-persistence",
                     "ketraterm-ui-swing-host",
                     "ketraterm-app",

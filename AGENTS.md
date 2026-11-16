@@ -21,6 +21,7 @@ cross-project boundaries; module guides own local implementation detail.
 - `ketraterm-completion`: parse-once completion evaluation, structured
   concurrency, ranking, and bounded learning; no host I/O.
 - `ketraterm-completion-host`: host-neutral path and directory access.
+- `ketraterm-completion-session`: optional session-to-completion adaptation, without UI dependencies.
 - `ketraterm-completion-persistence`: sanitized, versioned learning snapshots.
 - `ketraterm-render-api`: dependency-free primitive render contracts.
 - `ketraterm-render-cache`: copied render data for consumers, without UI policy.

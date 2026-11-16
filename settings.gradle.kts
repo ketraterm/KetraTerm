@@ -30,6 +30,7 @@ include(
     ":ketraterm-input",
     ":ketraterm-completion",
     ":ketraterm-completion-host",
+    ":ketraterm-completion-session",
     ":ketraterm-completion-persistence",
     ":ketraterm-host",
     ":ketraterm-pty",

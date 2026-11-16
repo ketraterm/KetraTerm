@@ -12,7 +12,7 @@ major version preserve supported source, binary, and behavioral contracts.
 | Headless pipeline | protocol, parser, core, host, input, render-api, render-cache, transport-api, session |
 | Swing view | ui-swing |
 | Local processes and shell metadata | pty, shell-integration, shell-launch |
-| Completion | completion, completion-host, completion-persistence |
+| Completion | completion, completion-host, completion-session, completion-persistence |
 | Local terminal workspaces | workspace |
 | Swing host controls | ui-swing-host |
 

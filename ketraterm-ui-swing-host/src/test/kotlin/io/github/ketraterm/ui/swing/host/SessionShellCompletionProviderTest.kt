@@ -36,6 +36,57 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionShellCompletionProviderTest {
     @Test
+    fun `existing Swing provider and neutral provider share native results and session authority`() =
+        runTest {
+            val line = "tool -Value n"
+            Fixture(StandardTestDispatcher(testScheduler), line).use { fixture ->
+                val neutral =
+                    io.github.ketraterm.completion.session
+                        .SessionShellCompletionProvider(fixture.session)
+                val request = TerminalCompletionRequest(line, line.length, shellCapabilities = TerminalShellCapabilities.POWERSHELL)
+                val context = TerminalCompletionContext.resolve(request)
+                val existingResult = async { fixture.source.complete(request, context, 2) }
+                val neutralResult = async { neutral.complete(request, context, 2) }
+                runCurrent()
+                assertEquals("e", fixture.connector.writtenBytes.toString(Charsets.UTF_8))
+                fixture.respond(
+                    TerminalShellCompletionResult(
+                        line,
+                        line.length,
+                        12,
+                        13,
+                        listOf(
+                            TerminalShellCompletionCandidate(
+                                "'native value'",
+                                "native value",
+                                "detail",
+                                TerminalShellCompletionKind.ARGUMENT,
+                            ),
+                            TerminalShellCompletionCandidate(
+                                "'native path'",
+                                "native path",
+                                "directory",
+                                TerminalShellCompletionKind.DIRECTORY,
+                            ),
+                        ),
+                        externalCommandName = "tool.exe",
+                    ),
+                )
+                runCurrent()
+                val expected = assertNotNull(neutralResult.await())
+                val actual = assertNotNull(existingResult.await())
+                assertEquals(expected.candidates, actual.candidates)
+                assertEquals(expected.externalCommandName, actual.externalCommandName)
+                fixture.publishCommands(
+                    listOf(TerminalShellCompletionCandidate("gs", "gs", "", TerminalShellCompletionKind.COMMAND, "git status")),
+                )
+                assertEquals(mapOf("gs" to "git status"), fixture.source.commandAliases())
+                assertEquals(neutral.commandAliases(), fixture.source.commandAliases())
+                assertFalse(fixture.session.isClosed)
+            }
+        }
+
+    @Test
     fun `pending and unavailable inventories suppress unverified catalog fallback`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler), "git").use { f ->

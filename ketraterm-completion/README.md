@@ -97,7 +97,7 @@ edits and the resolved external application name, or null when unavailable.
 PowerShell parameter completion uses live shell semantics; other modeled arguments
 prefer specialized sources with native fallback. See the
 [shell behavior](../docs/features/completion.md#powershell-suggestions) for details.
-`SessionShellCompletionProvider` in `ketraterm-ui-swing-host` supplies this contract
+`SessionShellCompletionProvider` in [`ketraterm-completion-session`](../ketraterm-completion-session/README.md) supplies this contract
 for installed PowerShell hooks. See the [shell authority contract](docs/completion-architecture.md#internal-implementation).
 
 Candidates carry optional display-only `argumentHint` text. Command specifications

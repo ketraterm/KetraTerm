@@ -16,6 +16,7 @@ Optional modules can be selected independently through the [BOM](../../ketraterm
 | Metadata observation | Titles, palette changes, hyperlink registry changes, and shell state through host/session contracts. |
 | Shell metadata | Optional built-in OSC producer or a host-owned metadata and editing-context model. |
 | Completion | Independent engine, custom catalogs/sources, context resolution, ranking, and replay-retention policy. |
+| Session completion | Optional [session bridge](../../ketraterm-completion-session/README.md) supplies command inventories and native completion without Swing. |
 | Completion persistence | Optional [versioned file storage](../../ketraterm-completion-persistence/README.md) for bounded learning, with host-owned paths and shutdown. |
 | Local workspaces | [Shell profiles and terminal tabs](../../ketraterm-workspace/README.md) with host-neutral lifecycle, metadata, and clipboard callbacks. |
 | Completion UI | Custom provider, custom presentation, or both, with request-scoped editing and feedback. |

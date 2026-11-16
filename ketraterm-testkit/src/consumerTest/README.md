@@ -61,6 +61,7 @@ Verification covers:
   destruction without starting a native process.
 - Workspace profiles, Java listener defaults, immutable launch options, and
   empty-workspace cleanup without starting a native process.
+- Session completion from Kotlin and Java with `java.desktop` unavailable.
 - Completion-learning persistence, hydration, and reset through a caller-owned
   coroutine lifecycle and temporary files.
 - BOM version alignment and an empty BOM-only runtime graph; entry-point graphs
