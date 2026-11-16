@@ -214,6 +214,7 @@ public class PtyConnector internal constructor(
 
     private fun pumpOutput() {
         val buffer = ByteArray(readBufferSize)
+        var primaryFailure: Throwable? = null
 
         try {
             while (!localCloseRequested.get()) {
@@ -223,23 +224,31 @@ public class PtyConnector internal constructor(
 
                 if (!localCloseRequested.get()) listenerOrThrow().onBytes(buffer, 0, read)
             }
-        } catch (exception: Exception) {
+        } catch (error: Throwable) {
             val report =
                 synchronized(lifecycleLock) {
                     !localCloseRequested.get() && closedNotified.compareAndSet(false, true)
                 }
+            if (report || error is Error) primaryFailure = error
             if (report) {
-                failure = exception
-                try {
-                    listenerOrThrow().onError(exception)
-                } finally {
+                failure = error
+                var cleanupFailed = false
+
+                fun cleanup(action: () -> Unit) {
                     try {
-                        close()
-                    } finally {
-                        listenerOrThrow().onClosed(null)
+                        action()
+                    } catch (secondary: Throwable) {
+                        cleanupFailed = true
+                        if (secondary !== error) error.addSuppressed(secondary)
                     }
                 }
+
+                cleanup { listenerOrThrow().onError(error) }
+                cleanup { close() }
+                cleanup { listenerOrThrow().onClosed(null) }
+                if (cleanupFailed) throw error
             }
+            if (error is Error) throw error
         } finally {
             try {
                 if (localCloseRequested.get() && process.requiresOutputDrainOnClose) {
@@ -251,6 +260,10 @@ public class PtyConnector internal constructor(
                         }
                     } catch (_: IOException) {
                         // The backend may close the stream before this final read.
+                    } catch (drainFailure: Throwable) {
+                        val primary = primaryFailure ?: throw drainFailure
+                        if (drainFailure !== primary) primary.addSuppressed(drainFailure)
+                        throw primary
                     }
                 }
             } finally {

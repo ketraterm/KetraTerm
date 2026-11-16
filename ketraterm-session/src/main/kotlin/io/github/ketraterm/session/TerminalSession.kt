@@ -498,8 +498,9 @@ public class TerminalSession private constructor(
                     // Only session termination may stop this essential worker without failure.
                     if (!isSessionClosed()) failWrite(cancelled)
                     throw cancelled
-                } catch (failure: Exception) {
+                } catch (failure: Throwable) {
                     failWrite(failure)
+                    if (failure is Error) throw failure
                 }
             }
         sessionScope.launch {
@@ -2169,7 +2170,7 @@ public class TerminalSession private constructor(
         }
     }
 
-    private fun failWrite(failure: Exception) {
+    private fun failWrite(failure: Throwable) {
         requestClosure(
             TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
         )

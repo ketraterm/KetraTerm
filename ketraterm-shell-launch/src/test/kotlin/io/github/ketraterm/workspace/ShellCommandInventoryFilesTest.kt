@@ -43,9 +43,12 @@ class ShellCommandInventoryFilesTest {
     fun `only complete files publish and early files are retried after Ready`(
         @TempDir root: Path,
     ) = runTest {
-        val mailbox = ShellCommandInventoryFiles(withContext(Dispatchers.IO) {
-            Files.createDirectory(root.resolve("inventory"))
-        })
+        val mailbox =
+            ShellCommandInventoryFiles(
+                withContext(Dispatchers.IO) {
+                    Files.createDirectory(root.resolve("inventory"))
+                },
+            )
         val connector = MockConnector()
         val dispatcher = StandardTestDispatcher(testScheduler)
         TerminalSession
@@ -93,7 +96,9 @@ class ShellCommandInventoryFilesTest {
         @TempDir root: Path,
     ) = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val mailbox = ShellCommandInventoryFiles(Files.createDirectory(root.resolve("inventory")), dispatcher = dispatcher)
+        val mailbox = ShellCommandInventoryFiles(withContext(Dispatchers.IO) {
+            Files.createDirectory(root.resolve("inventory"))
+        }, dispatcher = dispatcher)
         val session =
             TerminalSession.create(
                 TerminalBuffers.create(80, 4),

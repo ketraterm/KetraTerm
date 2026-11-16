@@ -17,6 +17,8 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.cleanupSwingResources
+import io.github.ketraterm.ui.swing.preserveSwingFailure
 import kotlinx.coroutines.*
 import java.awt.event.MouseEvent
 import kotlin.time.Duration.Companion.milliseconds
@@ -73,22 +75,37 @@ internal class TerminalHyperlinkDiscoveryController(
     /** Ends the binding, cancels owned work, and releases retained text/actions. */
     fun reset() {
         enabled = false
-        bindingEpoch++
-        if (ordered.analysisJob == null) detector.discardOrderedState()
-        configurationJob?.cancel(CancellationException("Hyperlink binding replaced"))
-        configurationJob = null
-        for (lane in lanes) {
-            lane.recoveryJob?.cancel(CancellationException("Hyperlink binding replaced"))
-            lane.recoveryJob = null
-            lane.recoveryAttempt = 0
-            lane.recoveryExhausted = false
-            lane.analysisJob?.cancel(CancellationException("Hyperlink binding replaced"))
-            // An uncooperative provider retains the serialization slot until it returns.
-            lane.sourceScan = null
-        }
-        index.clear()
-        priorityTop = -1L
-        previousLiveTop = -1L
+        val resetEpoch = ++bindingEpoch
+        cleanupSwingResources(
+            { if (ordered.analysisJob == null) detector.discardOrderedState() },
+            {
+                val job = configurationJob
+                configurationJob = null
+                job?.cancel(CancellationException("Hyperlink binding replaced"))
+            },
+            { resetLane(independent) },
+            { resetLane(ordered) },
+            {
+                index.clear()
+                priorityTop = -1L
+                previousLiveTop = -1L
+            },
+            isCurrent = { bindingEpoch == resetEpoch },
+        )
+    }
+
+    private fun resetLane(lane: AnalysisLane) {
+        val recovery = lane.recoveryJob
+        val analysis = lane.analysisJob
+        lane.recoveryJob = null
+        lane.recoveryAttempt = 0
+        lane.recoveryExhausted = false
+        lane.sourceScan = null
+        // An uncooperative provider retains the serialization slot until it returns.
+        cleanupSwingResources(
+            { recovery?.cancel(CancellationException("Hyperlink binding replaced")) },
+            { analysis?.cancel(CancellationException("Hyperlink binding replaced")) },
+        )
     }
 
     fun dispose() {
@@ -110,19 +127,49 @@ internal class TerminalHyperlinkDiscoveryController(
         var sourceReplaced = false
         if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
             val replaced = detector !== host.hyperlinkDetector
-            if (ordered.analysisJob == null) detector.discardOrderedState()
-            providerEpoch++
-            if (replaced) {
-                index.clear()
-                configurationJob?.cancel(CancellationException("Hyperlink provider replaced"))
-                configurationJob = null
-            } else {
-                index.refreshProvider(providerEpoch)
+            val previousDetector = detector
+            val previousBinding = bindingEpoch
+            val previousProvider = providerEpoch
+            var cleanupFailure: Throwable? = null
+            if (ordered.analysisJob == null) {
+                try {
+                    previousDetector.discardOrderedState()
+                } catch (failure: Throwable) {
+                    if (failure is Exception && failure !is CancellationException) {
+                        LOGGER.log(System.Logger.Level.WARNING, "Hyperlink provider cleanup failed", failure)
+                    } else {
+                        cleanupFailure = failure
+                    }
+                }
             }
+            if (disposed || bindingEpoch != previousBinding || providerEpoch != previousProvider || detector !== previousDetector) {
+                cleanupFailure?.let { throw it }
+                return
+            }
+            val nextProvider = ++providerEpoch
+            val configuration = if (replaced || cleanupFailure != null) configurationJob else null
+            if (replaced || cleanupFailure != null) configurationJob = null
+            if (replaced) index.clear() else index.refreshProvider(providerEpoch)
             detector = host.hyperlinkDetector
             providerGeneration = detector.configurationGeneration
             changed = true
-            lanes.forEach { it.analysisJob?.cancel(CancellationException("Hyperlink provider changed")) }
+            val independentJob = independent.analysisJob
+            val orderedJob = ordered.analysisJob
+            try {
+                cleanupSwingResources(
+                    { configuration?.cancel(CancellationException("Hyperlink provider replaced")) },
+                    { independentJob?.cancel(CancellationException("Hyperlink provider changed")) },
+                    { orderedJob?.cancel(CancellationException("Hyperlink provider changed")) },
+                    isCurrent = { bindingEpoch == previousBinding && providerEpoch == nextProvider },
+                )
+            } catch (failure: Throwable) {
+                cleanupFailure = preserveSwingFailure(cleanupFailure, failure)
+            }
+            cleanupFailure?.let {
+                if (bindingEpoch == previousBinding && providerEpoch == nextProvider) contentGeneration = Long.MIN_VALUE
+                throw it
+            }
+            if (bindingEpoch != previousBinding || providerEpoch != nextProvider) return
         }
         if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
             sourceEpoch++
@@ -270,6 +317,7 @@ internal class TerminalHyperlinkDiscoveryController(
                 val requestRevision = demandRevision
                 var completed = false
                 var recover = false
+                var failure: Throwable? = null
                 try {
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
                     val cache = host.renderCache
@@ -399,41 +447,70 @@ internal class TerminalHyperlinkDiscoveryController(
                     index.acceptResults(lines, result, requestContext, validSources)
                     publishOverlay()
                     completed = !recover
+                } catch (original: Throwable) {
+                    failure = original
+                    throw original
                 } finally {
-                    if (lane === ordered &&
-                        (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch) || !scope.isActive)
-                    ) {
-                        requestDetector.discardOrderedState()
-                    }
-                    if (!completed &&
-                        requestContext == SwingHyperlinkDetectionContext.ORDERED_CONTENT &&
-                        requestAnalysisEpoch == index.orderedEpoch
-                    ) {
-                        index.restartOrdered()
-                    }
-                    lane.analysisJob = null
-                    if (!disposed && enabled && scope.isActive) {
-                        if (requestRevision != demandRevision ||
-                            !isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
+                    var cleanupFailure: Throwable? = null
+                    try {
+                        if (lane === ordered &&
+                            (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch) || !scope.isActive)
                         ) {
-                            startAnalysis()
-                        } else if (completed) {
-                            lane.recoveryAttempt = 0
-                            startAnalysis()
-                        } else if (recover) {
-                            scheduleRecovery(lane)
+                            requestDetector.discardOrderedState()
                         }
+                    } catch (next: Throwable) {
+                        cleanupFailure = next
+                    }
+                    try {
+                        if (!completed &&
+                            requestContext == SwingHyperlinkDetectionContext.ORDERED_CONTENT &&
+                            requestAnalysisEpoch == index.orderedEpoch
+                        ) {
+                            index.restartOrdered()
+                        }
+                    } catch (next: Throwable) {
+                        cleanupFailure = preserveSwingFailure(cleanupFailure, next)
+                    }
+                    try {
+                        lane.analysisJob = null
+                        if (!disposed && enabled && scope.isActive) {
+                            if (requestRevision != demandRevision ||
+                                !isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
+                            ) {
+                                startAnalysis()
+                            } else if (completed) {
+                                lane.recoveryAttempt = 0
+                                startAnalysis()
+                            } else if (recover) {
+                                scheduleRecovery(lane)
+                            }
+                        }
+                    } catch (next: Throwable) {
+                        cleanupFailure = preserveSwingFailure(cleanupFailure, next)
+                    }
+                    cleanupFailure?.let {
+                        val original = failure
+                        if (original is CancellationException && it !is CancellationException) {
+                            throw preserveSwingFailure(it, original)
+                        }
+                        throw preserveSwingFailure(original, it)
                     }
                 }
             }
         lane.analysisJob = job
-        job.invokeOnCompletion {
-            if (!entered && lane === ordered) requestDetector.discardOrderedState()
-            // Cancellation before dispatch never enters the body's finally block.
-            scope.launch {
-                if (lane.analysisJob === job) {
-                    lane.analysisJob = null
-                    startAnalysis()
+        job.invokeOnCompletion { cause ->
+            try {
+                if (!entered && lane === ordered) requestDetector.discardOrderedState()
+            } catch (failure: Throwable) {
+                if (cause != null) preserveSwingFailure(failure, cause)
+                throw failure
+            } finally {
+                // Cancellation before dispatch never enters the body's finally block.
+                scope.launch {
+                    if (lane.analysisJob === job) {
+                        lane.analysisJob = null
+                        startAnalysis()
+                    }
                 }
             }
         }

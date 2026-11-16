@@ -27,11 +27,13 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class PtyConnectorTest {
     private val connectors = mutableListOf<PtyConnector>()
@@ -276,9 +278,16 @@ class PtyConnectorTest {
         }
     }
 
-    @Test
-    fun `byte listener failure reports its cause and disposes the live process`() {
-        val failure = IllegalStateException("terminal byte consumer failed")
+    @ParameterizedTest
+    @ValueSource(strings = ["exception", "cancellation", "error"])
+    fun `byte listener failure reports its cause and disposes the live process`(kind: String) {
+        val failure =
+            when (kind) {
+                "exception" -> IllegalStateException("terminal byte consumer failed")
+                "cancellation" -> CancellationException("terminal byte consumer cancelled")
+                else -> AssertionError("terminal byte consumer assertion failed")
+            }
+        val uncaught = AtomicReference<Throwable?>()
         val input = GatedInputStream("output".ascii())
         val output = RecordingOutputStream()
         val process = TestProcess(input = input, output = output, blockWaitFor = true)
@@ -290,6 +299,7 @@ class PtyConnectorTest {
                     offset: Int,
                     length: Int,
                 ) {
+                    Thread.currentThread().uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, error -> uncaught.set(error) }
                     super.onBytes(bytes, offset, length)
                     throw failure
                 }
@@ -303,6 +313,7 @@ class PtyConnectorTest {
                 { assertEquals("output", listener.byteEvents.single().asciiText()) },
                 { assertEquals(listOf(failure), listener.errors, "a failed byte consumer must reach the transport failure boundary") },
                 { assertSame(failure, connector.failure) },
+                { assertSame(failure as? Error, uncaught.get()) },
                 { assertEquals(listOf<Int?>(null), listener.closed) },
                 { assertTrue(process.destroyed, "a failed reader must not leave the child running without output consumption") },
                 { assertEquals(1, process.destroyCount) },
@@ -312,6 +323,66 @@ class PtyConnectorTest {
             assertTrue(connector.joinWatcher(10_000), "process disposal did not release its watcher")
             connector.close()
             assertEquals(1, process.destroyCount)
+            assertEquals(1, input.closeCount)
+            assertEquals(1, output.closeCount)
+        } finally {
+            input.release()
+            connector.close()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `reader failure retains its cause when notifications and cleanup also fail`(assertionFailure: Boolean) {
+        val failure = if (assertionFailure) AssertionError("byte consumer failed") else IllegalStateException("byte consumer failed")
+        val notificationFailure = IllegalStateException("error notification failed")
+        val cleanupFailure = IllegalStateException("process cleanup failed")
+        val closureFailure = IllegalStateException("closure notification failed")
+        val uncaught = AtomicReference<Throwable?>()
+        val input = GatedInputStream("output".ascii())
+        val output = RecordingOutputStream()
+        val delegate = TestProcess(input = input, output = output, blockWaitFor = true)
+        val process =
+            object : PtyProcess by delegate {
+                override fun destroy() {
+                    delegate.destroy()
+                    throw cleanupFailure
+                }
+            }
+        val connector = createConnector(process)
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    Thread.currentThread().uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, error -> uncaught.set(error) }
+                    throw failure
+                }
+
+                override fun onError(error: Throwable) {
+                    super.onError(error)
+                    throw notificationFailure
+                }
+
+                override fun onClosed(exitCode: Int?) {
+                    super.onClosed(exitCode)
+                    throw closureFailure
+                }
+            }
+        try {
+            connector.start(listener)
+            assertTrue(input.readEntered.await(10, TimeUnit.SECONDS))
+            input.release()
+            assertTrue(connector.joinReader(10_000))
+            assertTrue(connector.joinWatcher(10_000))
+            assertSame(failure, connector.failure)
+            assertSame(failure, uncaught.get())
+            assertEquals(listOf(notificationFailure, cleanupFailure, closureFailure), failure.suppressed.toList())
+            assertEquals(listOf(failure), listener.errors)
+            assertEquals(listOf<Int?>(null), listener.closed)
+            assertEquals(1, delegate.destroyCount)
             assertEquals(1, input.closeCount)
             assertEquals(1, output.closeCount)
         } finally {
@@ -686,6 +757,76 @@ class PtyConnectorTest {
         assertEquals(listOf<Int?>(null), listener.closed)
         assertSame(failure, connector.failure)
         assertEquals(1, process.destroyCount)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "exception,exception",
+        "exception,error",
+        "exception,io",
+        "error,exception",
+        "error,error",
+        "error,io",
+    )
+    fun `backend owned drain failure preserves the original reader failure`(
+        kind: String,
+        drainKind: String,
+    ) {
+        val failure = if (kind == "error") AssertionError("byte consumer failed") else IllegalStateException("byte consumer failed")
+        val drainFailure =
+            when (drainKind) {
+                "error" -> AssertionError("shutdown drain failed")
+                "io" -> IOException("backend closed its stream")
+                else -> IllegalStateException("shutdown drain failed")
+            }
+        val uncaught = AtomicReference<Throwable?>()
+        var reads = 0
+        var inputCloses = 0
+        val input =
+            object : ByteArrayInputStream("output".ascii()) {
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ): Int {
+                    if (++reads > 1) throw drainFailure
+                    return super.read(buffer, offset, length)
+                }
+
+                override fun close() {
+                    inputCloses++
+                }
+            }
+        val output = RecordingOutputStream()
+        val process = TestProcess(input = input, output = output, blockWaitFor = true, requiresOutputDrainOnClose = true)
+        val connector = createConnector(process)
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    Thread.currentThread().uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, error -> uncaught.set(error) }
+                    super.onBytes(bytes, offset, length)
+                    throw failure
+                }
+            }
+        connector.use {
+            connector.start(listener)
+            assertTrue(connector.joinReader(10_000))
+            assertTrue(connector.joinWatcher(10_000))
+            assertSame(failure, connector.failure)
+            assertSame(if (kind == "error" || drainKind != "io") failure else null, uncaught.get())
+            assertEquals(if (drainKind == "io") emptyList() else listOf(drainFailure), failure.suppressed.toList())
+            assertEquals(listOf(failure), listener.errors)
+            assertEquals(listOf<Int?>(null), listener.closed)
+            assertEquals(listOf("output"), listener.byteEvents.map { it.asciiText() })
+            assertEquals(2, reads)
+            assertEquals(1, process.destroyCount)
+            assertEquals(0, inputCloses)
+            assertEquals(0, output.closeCount)
+        }
     }
 
     @Test

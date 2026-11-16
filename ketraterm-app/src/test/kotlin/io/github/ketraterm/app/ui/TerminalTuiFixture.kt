@@ -47,7 +47,6 @@ import javax.imageio.ImageIO
 import javax.swing.JFrame
 import kotlin.math.ceil
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -255,9 +254,9 @@ internal class TerminalTuiFixture private constructor(
 
     suspend fun exit(request: () -> Unit) {
         request()
-        withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } }
-        assertEquals(0, session.exitCode)
-        assertNull(session.failure)
+        val closed = withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } } as TerminalSessionState.Closed
+        closed.event.failure?.let { throw AssertionError("TUI failed before a clean exit", it) }
+        assertEquals(0, closed.event.exitCode, "Unexpected terminal closure: ${closed.event}")
         session.readRenderFrame { frame -> assertEquals(TerminalRenderBufferKind.PRIMARY, frame.activeBuffer) }
     }
 
