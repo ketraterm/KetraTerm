@@ -400,7 +400,16 @@ fun main() =
                                     pasteRequest = request
                                 }
                         },
-                    ).apply { size = preferredSize }
+                    ).apply {
+                        size = preferredSize
+                        val accessible: javax.accessibility.Accessible = this
+                        val context = accessible.accessibleContext
+                        check(context.accessibleRole == javax.accessibility.AccessibleRole.TEXT)
+                        check(context.accessibleText != null)
+                        check(context.accessibleEditableText == null)
+                        context.accessibleName = "Host terminal"
+                        check(accessibleContext.accessibleName == "Host terminal")
+                    }
                 }
             try {
                 val bound = CompletableDeferred<Unit>()
