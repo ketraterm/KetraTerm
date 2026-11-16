@@ -1595,7 +1595,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             "export KETRATERM_STARTUP_SEQUENCE=env\nexport ZDOTDIR=${shellSingleQuote(relocated.toString())}\n",
         )
         for ((file, stage) in listOf(".zprofile" to "profile", ".zshrc" to "rc", ".zlogin" to "login")) {
-            Files.writeString(relocated.resolve(file), "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:$stage\"\n")
+            Files.writeString(relocated.resolve(file), "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}{KETRATERM_STARTUP_SEQUENCE}:$stage\"\n")
         }
         val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-l", "-i"))
         val inherited =
@@ -1624,7 +1624,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         Files.writeString(home.resolve(".zshenv"), "export KETRATERM_STARTUP_SEQUENCE=env-${'$'}{+ZDOTDIR}\n")
         Files.writeString(
             home.resolve(".zshrc"),
-            "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:rc-${'$'}{+ZDOTDIR}\"\n",
+            "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}{KETRATERM_STARTUP_SEQUENCE}:rc-${'$'}{+ZDOTDIR}\"\n",
         )
         val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-i"))
         val inherited =
@@ -1686,7 +1686,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         for ((file, stage) in listOf(".zprofile" to "profile", ".zshrc" to "rc", ".zlogin" to "login")) {
             Files.writeString(
                 relocated.resolve(file),
-                "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}KETRATERM_STARTUP_SEQUENCE:$stage-${'$'}{+ZDOTDIR}\"\n",
+                "export KETRATERM_STARTUP_SEQUENCE=\"${'$'}{KETRATERM_STARTUP_SEQUENCE}:$stage-${'$'}{+ZDOTDIR}\"\n",
             )
         }
         val profile = TerminalProfile("zsh", "Zsh", listOf(requireNotNull(zsh), "-l", "-i"))

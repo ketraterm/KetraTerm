@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
-import java.util.Base64
+import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -130,6 +130,7 @@ class PtyLifecycleNativeTest {
 
         fun awaitClosed() {
             closeTask.get(10, TimeUnit.SECONDS)
+            assertTrue(process.waitFor(10, TimeUnit.SECONDS), "the native child did not exit after local close")
             assertTrue(connector.joinReader(10_000), "native stdout reader remained active after local close")
             assertTrue(connector.joinWatcher(10_000), "native process watcher remained active after local close")
             assertFalse(process.isAlive, "the native child remained alive after local close")
