@@ -48,8 +48,12 @@ Add integrations according to the host's needs:
 | Dependency | Purpose |
 | --- | --- |
 | [`ketraterm-pty`](../ketraterm-pty/README.md) | Local processes through Pty4J. |
+| [`ketraterm-shell-launch`](../ketraterm-shell-launch/README.md) | Shell hooks with host-owned process startup. |
 | [`ketraterm-shell-integration`](../ketraterm-shell-integration/README.md) | Optional OSC shell metadata producer, configured explicitly by the host. |
 | [`ketraterm-ui-swing-host`](../ketraterm-ui-swing-host/README.md) | Search chrome, host actions, clipboard consent, and completion adapters. |
+
+See the [complete host example](../ketraterm-examples/host-integration/README.md)
+for a runnable composition using Maven artifacts.
 
 For custom assembly, depend directly on individual modules. For a terminal
 without Swing, use [the headless entry point](../ketraterm-headless/README.md).

@@ -115,7 +115,11 @@ val publicationArtifactChecks =
     tasks.register("publicationArtifactChecks") {
         group = "verification"
         description = "Checks consumers and packaged Maven artifacts before publication."
-        dependsOn(":ketraterm-testkit:publishedConsumerTest", ":ketraterm-testkit:publicationVerificationTest")
+        dependsOn(
+            ":ketraterm-testkit:publishedConsumerTest",
+            ":ketraterm-testkit:publicationVerificationTest",
+            ":ketraterm-testkit:verifyHostIntegrationExample",
+        )
     }
 val publicationChecks =
     tasks.register("publicationChecks") {

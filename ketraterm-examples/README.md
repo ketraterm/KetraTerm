@@ -4,6 +4,9 @@ This unpublished module embeds KetraTerm through public library APIs. It has no
 dependency on the standalone app and is built and tested with the repository.
 Use JDK 25 and a graphical desktop, with PowerShell, Bash, or zsh installed.
 
+The [complete host example](host-integration/README.md) uses Maven artifacts without the workspace module.
+It covers explicit process ownership, host actions, settings, metadata, and a custom suggestion view.
+
 ## Independent popup and inline providers
 
 From the repository root:

@@ -50,3 +50,4 @@ not supported. Disposing a view does not close its session.
 Start with the [library setup](../../README.md#using-the-libraries),
 [configuration guide](../library/configuration.md), and
 [compatibility contract](../library/compatibility.md).
+The [complete host example](../../ketraterm-examples/host-integration/README.md) composes published artifacts and tests host ownership.

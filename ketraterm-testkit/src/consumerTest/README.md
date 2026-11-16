@@ -85,6 +85,10 @@ they remain optional dependencies of embedding hosts.
 separately invokes Java compilation against exported project API variants.
 It does not replace the artifact-based source-consumer checks above.
 
+The [complete host example](../../../ketraterm-examples/host-integration/README.md) has a separate artifact-only build.
+`verifyHostIntegrationExample` compiles it and runs its headless integration tests from the staged repository.
+The publication gate includes this check.
+
 ## Packaging verification
 
 ```text
