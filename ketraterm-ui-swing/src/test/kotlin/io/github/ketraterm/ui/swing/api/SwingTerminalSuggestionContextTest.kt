@@ -957,12 +957,20 @@ class SwingTerminalSuggestionContextTest {
                     it.smartSuggestionsEnabled = false
                     it.font = it.font.deriveFont(it.font.size2D + 3f)
                 }
-            assertSame(failure, assertFailsWith<RuntimeException> { view.reloadSettings() })
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertSame(failure, failures.single())
             assertEquals(fixture.settings.font, view.font)
             assertNotEquals(previousSize, view.preferredSize)
             assertEquals(view.preferredGridSize(fixture.settings.columns, fixture.settings.rows), view.preferredSize)
             assertNull(view.beginInlineShellSuggestionInteraction())
-            view.reloadSettings()
+            val retried = mutableListOf<Throwable?>()
+            view.reloadSettings { retried.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(listOf<Throwable?>(null), retried)
+            assertEquals(1, failures.size)
             assertEquals(fixture.settings.font, view.font)
         }
 

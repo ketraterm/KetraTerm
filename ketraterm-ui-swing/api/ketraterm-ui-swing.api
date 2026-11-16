@@ -322,6 +322,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public static synthetic fun presentShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;IIILjava/lang/Object;)V
 	public final fun refreshShellSuggestions ()V
 	public final fun reloadSettings ()V
+	public final fun reloadSettings (Lkotlin/jvm/functions/Function1;)V
 	public fun removeNotify ()V
 	public final fun removeSelectionListener (Lio/github/ketraterm/ui/swing/api/TerminalSelectionListener;)V
 	public final fun removeShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V

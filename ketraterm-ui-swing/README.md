@@ -100,10 +100,12 @@ on the EDT; acceptance is not application. Resize success confirms current cell
 and pixel geometry with no later geometry request pending. Superseded geometry
 or an obsolete binding reports cancellation, including a resize admitted before
 the view changed. Binding reports queue rejection through its completion callback.
-Other mutation methods throw on the EDT when the queue rejects their work;
-retrying `reloadSettings` with the same snapshot submits changes not yet accepted,
-including geometry, without resetting already accepted palette/cursor settings.
-Default completion handlers log operational failures. Session closure remains
+Use `reloadSettings(onComplete)` to observe settings and geometry application.
+Its callback runs once on the EDT, including setup and queue failures. Retrying
+the same snapshot applies unfinished changes without resetting an applied host
+palette or cursor setting. Application changes to those applied values remain intact.
+The no-argument overload logs operational failures. Other mutation methods throw
+on the EDT when the queue rejects their work. Session closure remains
 the host's responsibility and must run off the EDT.
 
 Use one controlling view per session. Settings, dimensions, and the published

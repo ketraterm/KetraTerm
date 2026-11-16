@@ -343,6 +343,14 @@ fun main() =
                 val provider = SwingShellSuggestionProvider { flowOf(emptyList()) }
                 val componentFirst = createUnboundTerminalView().apply { setShellSuggestionProvider(provider) }
                 try {
+                    var reloadCompletions = 0
+                    componentFirst.reloadSettings { failure ->
+                        check(SwingUtilities.isEventDispatchThread())
+                        check(failure == null)
+                        reloadCompletions++
+                    }
+                    check(reloadCompletions == 1)
+                    componentFirst.reloadSettings()
                     check(componentFirst.hasShellSuggestionProvider)
                     componentFirst.bind(session)
                     componentFirst.unbind()

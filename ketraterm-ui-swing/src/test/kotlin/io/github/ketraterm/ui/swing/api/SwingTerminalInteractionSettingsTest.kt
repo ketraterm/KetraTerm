@@ -363,8 +363,11 @@ class SwingTerminalInteractionSettingsTest {
                     it.pasteControlPolicy = PasteControlPolicy.PRESERVE
                     it.palette = TerminalTheme.NORD.createPalette()
                 }
-            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
             dispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertInstanceOf(IllegalStateException::class.java, failures.single())
             assertTrue(view.pasteText("a\u0003b"))
             dispatcher.scheduler.runCurrent()
             assertEquals("a\u0003b", output.toString(Charsets.UTF_8))
@@ -431,11 +434,14 @@ class SwingTerminalInteractionSettingsTest {
                     it.rows = 4
                 }
 
-            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
             val expectedGrid = view.visibleGridSize()
             assertTrue(expectedGrid.width < 10)
             assertEquals(view.preferredGridSize(12, 4), view.preferredSize)
             dispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertInstanceOf(IllegalStateException::class.java, failures.single())
             assertEquals(queuedPolicies == 63, session.modeSnapshot.treatAmbiguousAsWide)
 
             view.reloadSettings()
@@ -459,8 +465,11 @@ class SwingTerminalInteractionSettingsTest {
                     it.cursorShape = TerminalRenderCursorShape.UNDERLINE
                     it.columnSpacing += 4
                 }
-            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
             dispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertInstanceOf(IllegalStateException::class.java, failures.single())
             session.readRenderFrame { frame ->
                 assertEquals(settings.palette, frame.palette)
                 assertEquals(settings.cursorShape, frame.cursor.shape)
@@ -1828,7 +1837,11 @@ class SwingTerminalInteractionSettingsTest {
                         }
                 }
 
-            assertThrows(IllegalArgumentException::class.java) { view.reloadSettings() }
+            val failures = mutableListOf<Throwable?>()
+            view.reloadSettings { failures.add(it) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, failures.size)
+            assertInstanceOf(IllegalArgumentException::class.java, failures.single())
             assertEquals(originalFont, view.font)
             assertEquals(originalSize, view.preferredGridSize(10, 2))
             assertEquals(originalVisibleSize, view.visibleGridSize())

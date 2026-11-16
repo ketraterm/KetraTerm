@@ -1234,7 +1234,10 @@ class SwingTerminalThreadingTest {
                     }
                 failUpdates = true
 
-                assertSame(failure, assertThrows(RuntimeException::class.java) { component.reloadSettings() })
+                val failures = mutableListOf<Throwable?>()
+                component.reloadSettings { failures.add(it) }
+                assertEquals(1, failures.size)
+                assertSame(failure, failures.single())
 
                 assertFalse(component.isAutomaticShellSuggestionEligible())
                 assertFalse(view.component.isVisible)
@@ -1248,7 +1251,10 @@ class SwingTerminalThreadingTest {
                     currentSettings.copy { draft ->
                         draft.smartSuggestionsEnabled = true
                     }
-                component.reloadSettings()
+                val retried = mutableListOf<Throwable?>()
+                component.reloadSettings { retried.add(it) }
+                assertEquals(listOf<Throwable?>(null), retried)
+                assertEquals(1, failures.size)
                 assertTrue(component.isAutomaticShellSuggestionEligible())
                 assertEquals(listOf(false, true), eligibilityChanges)
                 assertEquals(listOf(false, false), visibleDuringCallback)
