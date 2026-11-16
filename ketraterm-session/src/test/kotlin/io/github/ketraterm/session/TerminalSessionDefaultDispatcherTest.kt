@@ -18,6 +18,8 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -26,6 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 /** Runs in the defaultDispatcherTest JVM, with its ordinary I/O parallelism set before initialization. */
 class TerminalSessionDefaultDispatcherTest {
@@ -83,8 +86,58 @@ class TerminalSessionDefaultDispatcherTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    @Suppress("BlockingMethodInNonBlockingContext") // The test thread waits while the only ordinary I/O worker runs resize.
+    fun `default cleanup releases a resize occupying the only ordinary IO worker`(duringStartup: Boolean) =
+        runBlocking {
+            assertEquals("1", System.getProperty("kotlinx.coroutines.io.parallelism"))
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val delegate = MockConnector()
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        delegate.resize(columns, rows)
+                        if (columns == 8) {
+                            entered.countDown()
+                            check(release.await(10, TimeUnit.SECONDS)) { "Connector resize was not released" }
+                        }
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        release.countDown()
+                    }
+                }
+            val session = TerminalSession.create(TerminalBuffers.create(10, 3), connector)
+            try {
+                if (!duringStartup) session.start(10, 3)
+                val resize =
+                    async(Dispatchers.IO) {
+                        if (duringStartup) session.start(8, 2) else assertNotNull(session.tryResizeViewport(8, 2))
+                    }
+                assertTrue(entered.await(10, TimeUnit.SECONDS), "The ordinary I/O worker did not enter resize")
+                session.requestClose()
+                val closed = awaitClosed(session)
+                withTimeout(10.seconds) { resize.await() }
+                assertEquals(if (duringStartup) 0 else 1, delegate.startCount)
+                assertTrue(closed.event.locallyRequested)
+                assertNull(closed.event.failure)
+                assertEquals(1, delegate.closeCount)
+                assertEquals(8 to 2, session.readPublishedFrame { it.columns to it.rows })
+            } finally {
+                release.countDown()
+                session.close()
+                awaitClosed(session)
+            }
+        }
+
     private fun awaitClosed(session: TerminalSession): TerminalSessionState.Closed =
         runBlocking {
-            withTimeout(10_000) { session.state.first { it is TerminalSessionState.Closed } as TerminalSessionState.Closed }
+            withTimeout(10.seconds) { session.state.first { it is TerminalSessionState.Closed } as TerminalSessionState.Closed }
         }
 }

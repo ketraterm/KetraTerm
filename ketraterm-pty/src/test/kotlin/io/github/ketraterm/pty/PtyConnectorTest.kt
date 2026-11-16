@@ -181,6 +181,60 @@ class PtyConnectorTest {
     }
 
     @Test
+    fun `local close releases a blocked process resize and closes resources once`() {
+        val resizeEntered = CountDownLatch(1)
+        val releaseResize = CountDownLatch(1)
+        val input = GatedInputStream(ByteArray(0))
+        val output = RecordingOutputStream()
+        val delegate = TestProcess(input = input, output = output)
+        val process =
+            object : PtyProcess by delegate {
+                override fun resize(
+                    columns: Int,
+                    rows: Int,
+                ) {
+                    delegate.resize(columns, rows)
+                    resizeEntered.countDown()
+                    assertTrue(releaseResize.await(10, TimeUnit.SECONDS), "process destruction did not release resize")
+                }
+
+                override fun destroy() {
+                    delegate.destroy()
+                    releaseResize.countDown()
+                }
+            }
+        val connector = createConnector(process)
+        val resizer = FutureTask { connector.resize(100, 40) }
+        val closer = FutureTask { connector.close() }
+        var closerStarted = false
+        try {
+            Thread(resizer, "test-pty-resizer").apply { isDaemon = true }.start()
+            assertTrue(resizeEntered.await(10, TimeUnit.SECONDS), "resize did not reach the process")
+            Thread(closer, "test-pty-closer").apply { isDaemon = true }.start()
+            closerStarted = true
+            closer.get(10, TimeUnit.SECONDS)
+            resizer.get(10, TimeUnit.SECONDS)
+            connector.close()
+            connector.resize(120, 50)
+            assertAll(
+                { assertEquals(listOf(100 to 40), delegate.sizes) },
+                { assertEquals(1, delegate.destroyCount) },
+                { assertEquals(1, input.closeCount) },
+                { assertEquals(1, output.closeCount) },
+            )
+        } finally {
+            releaseResize.countDown()
+            try {
+                resizer.get(10, TimeUnit.SECONDS)
+            } finally {
+                connector.use {
+                    if (closerStarted) closer.get(10, TimeUnit.SECONDS)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `close destroys process and closes output once`() {
         val output = RecordingOutputStream()
         val process = TestProcess(input = BlockingInputStream(), output = output)

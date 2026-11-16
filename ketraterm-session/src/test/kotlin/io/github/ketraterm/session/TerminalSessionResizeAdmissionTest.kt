@@ -323,7 +323,7 @@ class TerminalSessionResizeAdmissionTest {
     }
 
     @Test
-    fun `connector cleanup waits for admitted DECCOLM transport resize before final core publication`() {
+    fun `connector cleanup releases admitted DECCOLM transport resize before final core publication`() {
         val recorded = MockConnector()
         val resizeEntered = CountDownLatch(1)
         val releaseResize = CountDownLatch(1)
@@ -336,6 +336,7 @@ class TerminalSessionResizeAdmissionTest {
                     columns: Int,
                     rows: Int,
                 ) {
+                    recorded.resize(columns, rows)
                     if (columns == 132) {
                         assertEquals(80, terminal.width, "Transport resize must precede the destructive core reset")
                         assertEquals("before", terminal.getLineAsString(0))
@@ -343,7 +344,6 @@ class TerminalSessionResizeAdmissionTest {
                         resizeEntered.countDown()
                         check(releaseResize.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Connector resize was not released" }
                     }
-                    recorded.resize(columns, rows)
                     if (columns == 132) events += "resize completed"
                 }
 
@@ -351,6 +351,7 @@ class TerminalSessionResizeAdmissionTest {
                     events += "close"
                     recorded.close()
                     connectorClosed.countDown()
+                    releaseResize.countDown()
                 }
             }
         try {
@@ -370,14 +371,8 @@ class TerminalSessionResizeAdmissionTest {
                         try {
                             assertTrue(resizeEntered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
                             SessionTestThread("session-close-during-deccolm-resize") { session.close() }.use { close ->
-                                try {
-                                    close.awaitBlockedBy(output)
-                                    assertTrue(session.isClosed)
-                                    assertEquals(1L, connectorClosed.count, "Connector cleanup overlapped its active resize")
-                                    assertEquals(listOf("resize entered"), events)
-                                } finally {
-                                    releaseResize.countDown()
-                                }
+                                assertTrue(connectorClosed.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                                assertTrue(session.isClosed)
                                 output.awaitCompletion()
                                 close.awaitCompletion()
                             }
@@ -385,13 +380,85 @@ class TerminalSessionResizeAdmissionTest {
                             releaseResize.countDown()
                         }
                     }
-                    assertEquals(listOf("resize entered", "resize completed", "close"), events)
+                    assertEquals(listOf("resize entered", "close", "resize completed"), events)
                     assertEquals(listOf(80 to 3, 132 to 3), recorded.resizeCalls)
                     assertEquals(1, recorded.closeCount)
                     assertTrue(session.state.value is TerminalSessionState.Closed)
                     assertEquals(132, terminal.width)
                     assertEquals("after", terminal.getLineAsString(0))
                     assertEquals(132, session.readPublishedFrame { it.columns })
+                }
+        } finally {
+            releaseResize.countDown()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `closure releases an active resize and rejects a waiting resize`(resizeFails: Boolean) {
+        val recorded = MockConnector()
+        val resizeEntered = CountDownLatch(1)
+        val releaseResize = CountDownLatch(1)
+        val failure = CancellationException("Transport closed during resize")
+        val connector =
+            object : TerminalConnector by recorded {
+                override fun resize(
+                    columns: Int,
+                    rows: Int,
+                ) {
+                    recorded.resize(columns, rows)
+                    if (columns == 8) {
+                        resizeEntered.countDown()
+                        check(releaseResize.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Connector resize was not released" }
+                        if (resizeFails) throw failure
+                    }
+                }
+
+                override fun close() {
+                    recorded.close()
+                    releaseResize.countDown()
+                }
+            }
+        try {
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    SessionTestThread("session-active-resize") {
+                        if (resizeFails) {
+                            assertSame(failure, assertThrows(CancellationException::class.java) { session.tryResizeViewport(8, 2) })
+                        } else {
+                            assertNotNull(session.tryResizeViewport(8, 2))
+                        }
+                    }.use { resize ->
+                        try {
+                            assertTrue(resizeEntered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                            SessionTestThread("session-waiting-resize") {
+                                assertNull(session.tryResizeViewport(20, 6))
+                            }.use { waiting ->
+                                waiting.awaitBlockedBy(resize)
+                                SessionTestThread("session-close-during-resize") { session.close() }.use { close ->
+                                    resize.awaitCompletion()
+                                    waiting.awaitCompletion()
+                                    close.awaitCompletion()
+                                }
+                            }
+                        } finally {
+                            releaseResize.countDown()
+                        }
+                    }
+                    assertEquals(listOf(10 to 3, 8 to 2), recorded.resizeCalls)
+                    assertEquals(1, recorded.closeCount)
+                    val closed = session.state.value as TerminalSessionState.Closed
+                    assertTrue(closed.event.locallyRequested)
+                    assertNull(closed.event.failure)
+                    assertEquals(8 to 2, session.readPublishedFrame { it.columns to it.rows })
                 }
         } finally {
             releaseResize.countDown()

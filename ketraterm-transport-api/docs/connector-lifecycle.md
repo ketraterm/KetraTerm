@@ -38,8 +38,9 @@ Remote closure and local shutdown are distinct:
 - `onError(error)` is terminal for the session. A listener may close the connector
   from this callback to release resources.
 - `close()` requests local shutdown. It is idempotent and may be called before
-  startup, concurrently with startup/output, or from a lifecycle callback.
-  Resource release must not wait for an active byte callback to return.
+  startup, concurrently with startup, writes, or resizes, or from a lifecycle callback.
+  Begin transport shutdown without waiting for active writes or resizes.
+  Resource release must not wait for a byte callback to return.
   It does not promise a remote-close event
   or delivery of bytes still buffered in the transport.
 
@@ -68,6 +69,8 @@ it cannot infer the intended order of independently submitted terminal events.
 `write`, `resize`, `start`, and `close` are ordinary synchronous methods. Depending
 on the implementation, they can perform blocking I/O or wait for worker cleanup.
 Synchronous buffer consumption is a lifetime rule, not a nonblocking guarantee.
+An admitted resize can enter after concurrent closure releases resources.
+The connector must prevent access to released resources when it observes closure.
 
 ### Inbound Read Threading
 
