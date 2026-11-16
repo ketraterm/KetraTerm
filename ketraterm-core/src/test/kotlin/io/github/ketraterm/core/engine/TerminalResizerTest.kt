@@ -201,6 +201,76 @@ class TerminalResizerTest {
     @Nested
     @DisplayName("Width changes (reflow)")
     inner class WidthChangeTests {
+        @ParameterizedTest
+        @CsvSource("0,0", "0,1", "4,0", "4,1")
+        fun `untouched cursor rows follow reflowed content without becoming output`(
+            history: Int,
+            gap: Int,
+        ) {
+            val state = buildState(cols = 6, rows = 8, history = history)
+            repeat(state.ring.size) { row -> state.ring[row].assignLineId(row + 1L) }
+            state.writeLine(0, "abcdef")
+            state.ring[0].wrapped = true
+            state.writeLine(1, "ghijkl")
+            state.cursor.row = 2 + gap
+            state.cursor.col = 4
+            val cursorLineId = state.ring[state.cursor.row].lineId
+
+            resizeState(state, 3, 8)
+
+            assertEquals(listOf("abc", "def", "ghi", "jkl"), state.screenLines().take(4))
+            assertEquals(4 + gap, state.cursor.row)
+            assertEquals(2, state.cursor.col)
+            assertEquals(cursorLineId, state.ring[state.cursor.row].lineId)
+            assertFalse(state.ring[state.cursor.row].hasOutput)
+            assertEquals("", state.ring[state.cursor.row].toTextTrimmed())
+
+            resizeState(state, 12, 8)
+
+            assertEquals("abcdefghijkl", state.screenLines()[0])
+            assertEquals(1 + gap, state.cursor.row)
+            assertEquals(2, state.cursor.col)
+            assertEquals(cursorLineId, state.ring[state.cursor.row].lineId)
+            assertFalse(state.ring[state.cursor.row].hasOutput)
+            assertEquals("", state.ring[state.cursor.row].toTextTrimmed())
+        }
+
+        @Test
+        fun `combined width and height shrink does not store untouched cursor gaps as history`() {
+            val state = buildState(cols = 6, rows = 8, history = 10)
+            state.cursor.row = 7
+            state.cursor.col = 5
+
+            resizeState(state, 3, 2)
+
+            assertEquals(2, state.ring.size)
+            assertEquals(0, state.historySize)
+            assertEquals(1, state.cursor.row)
+            assertEquals(2, state.cursor.col)
+            assertEquals(listOf("", ""), state.screenLines())
+            repeat(state.ring.size) { row -> assertFalse(state.ring[row].hasOutput) }
+        }
+
+        @Test
+        fun `a blank cursor after expanded output stays visible within bounded history`() {
+            val state = buildState(cols = 6, rows = 4, history = 1)
+            repeat(state.ring.size) { row -> state.ring[row].assignLineId(row + 1L) }
+            state.writeLine(0, "abcdef")
+            state.ring[0].wrapped = true
+            state.writeLine(1, "ghijkl")
+            state.cursor.row = 3
+
+            resizeState(state, 2, 4)
+
+            assertEquals(5, state.ring.size)
+            assertEquals(1, state.historySize)
+            assertEquals(listOf("ij", "kl", "", ""), state.screenLines())
+            assertEquals(3, state.cursor.row)
+            val cursorLine = state.ring[state.historySize + state.cursor.row]
+            assertEquals(4L, cursorLine.lineId)
+            assertFalse(cursorLine.hasOutput)
+        }
+
         @Test
         fun `narrowing splits a long line into two physical lines`() {
             val state = buildState(cols = 10, rows = 5)

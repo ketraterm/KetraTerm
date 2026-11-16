@@ -68,6 +68,25 @@ class TerminalScrollbackPolicyTest {
         }
     }
 
+    @Test
+    fun `an active blank cursor survives full history reflow before subsequent output`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 3, maxHistory = 1)
+        writeLines(buffer, "AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD")
+        buffer.carriageReturn()
+        buffer.newLine()
+        assertEquals(1, buffer.historySize)
+
+        buffer.resize(3, 3)
+
+        assertEquals(1, buffer.historySize)
+        assertEquals(2, buffer.cursorRow)
+        assertEquals(0, buffer.cursorCol)
+        assertEquals("CCC\nDDD\nDDD\n", buffer.getAllAsString())
+        buffer.writeText("x")
+        assertEquals("CCC\nDDD\nDDD\nx", buffer.getAllAsString())
+        assertEquals("DDD\nDDD\nx", buffer.getScreenAsString())
+    }
+
     @ParameterizedTest(name = "alternate mode {0}")
     @ValueSource(ints = [47, 1047, 1049])
     fun `repeated alternate resize cycles never resurrect evicted primary rows`(mode: Int) {
