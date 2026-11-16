@@ -99,7 +99,8 @@ changed session dimensions with captured component bounds. Both report completio
 on the EDT; acceptance is not application. Resize success confirms current cell
 and pixel geometry with no later geometry request pending. Superseded geometry
 or an obsolete binding reports cancellation, including a resize admitted before
-the view changed. The bounded queue rejects overflow synchronously;
+the view changed. Binding reports queue rejection through its completion callback.
+Other mutation methods throw on the EDT when the queue rejects their work;
 retrying `reloadSettings` with the same snapshot submits changes not yet accepted,
 including geometry, without resetting already accepted palette/cursor settings.
 Default completion handlers log operational failures. Session closure remains

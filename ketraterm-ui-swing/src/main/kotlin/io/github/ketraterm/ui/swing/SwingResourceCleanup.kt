@@ -15,10 +15,14 @@
  */
 package io.github.ketraterm.ui.swing
 
-/** Runs every independent teardown action in order, then propagates the first failure, including cancellation. */
-internal fun cleanupSwingResources(vararg actions: () -> Unit) {
+/** Runs teardown while its owner remains current, then propagates the first failure, including cancellation. */
+internal fun cleanupSwingResources(
+    vararg actions: () -> Unit,
+    isCurrent: () -> Boolean = { true },
+) {
     var failure: Throwable? = null
     for (action in actions) {
+        if (!isCurrent()) break
         try {
             action()
         } catch (next: Throwable) {

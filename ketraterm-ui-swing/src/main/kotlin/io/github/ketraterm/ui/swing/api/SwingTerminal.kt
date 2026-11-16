@@ -979,8 +979,8 @@ public class SwingTerminal
          * @param session terminal session to display.
          * @param onComplete receives `null` after initial session settings and geometry
          * have applied, or their failure. Runs once on the EDT; rebinding or disposal
-         * before admission reports [CancellationException].
-         * @throws IllegalStateException if the bounded session mutation queue is full.
+         * before admission reports [CancellationException]. Queue rejection is also reported here.
+         * A setup failure removes the partial binding. Applied session settings are not restored.
          */
         @JvmOverloads
         public fun bind(
@@ -1716,14 +1716,65 @@ public class SwingTerminal
         private fun bindOnEdt(
             session: TerminalSession,
             onComplete: (Throwable?) -> Unit,
+        ) {
+            val binding = AtomicBoolean(true)
+            var remaining = 3
+            var setupComplete = false
+            var setupFailed = false
+            var completed = false
+            var initializationFailure: Throwable? = null
+
+            fun completeIfReady() {
+                if (completed || !setupComplete) return
+                val current = bindingIdentity === binding && binding.get()
+                if (initializationFailure == null && !current) {
+                    initializationFailure = CancellationException("Terminal session binding replaced")
+                }
+                if (!setupFailed && current && remaining != 0) return
+                completed = true
+                if (setupFailed && bindingIdentity === binding) {
+                    try {
+                        unbindOnEdt()
+                    } catch (failure: Throwable) {
+                        initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                    }
+                }
+                onComplete(initializationFailure)
+            }
+
+            val initialized: (Throwable?) -> Unit = { failure ->
+                if (!completed) {
+                    if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
+                    remaining--
+                    completeIfReady()
+                }
+            }
+            try {
+                initializeBindingOnEdt(session, binding, initialized)
+            } catch (failure: Throwable) {
+                setupFailed = true
+                initializationFailure = preserveSwingFailure(initializationFailure, failure)
+            }
+            setupComplete = true
+            completeIfReady()
+        }
+
+        private fun initializeBindingOnEdt(
+            session: TerminalSession,
+            binding: AtomicBoolean,
+            initialized: (Throwable?) -> Unit,
         ) = selectionController.deferChanges {
-            if (disposed) return@deferChanges
+            if (disposed) {
+                initialized(CancellationException("Terminal view disposed"))
+                return@deferChanges
+            }
             popupCompletionCommand = null
             bindingIdentity.set(false)
+            bindingIdentity = binding
             cleanupSwingResources(
                 ::clearInlineShellSuggestion,
-                {
-                    bindingIdentity = AtomicBoolean(true)
+                initialize@{
+                    if (!binding.get()) return@initialize
                     synchronized(resizePublicationLock) { resizeResultPending = false }
                     resizePublicationSession = null
                     suggestionScheduler?.stop()
@@ -1740,19 +1791,13 @@ public class SwingTerminal
                     revalidate()
                     retainedViewport = null
                     resetRenderCaches()
-                    var remaining = 3
-                    var initializationFailure: Throwable? = null
-                    val initialized: (Throwable?) -> Unit = { failure ->
-                        if (failure != null) initializationFailure = preserveSwingFailure(initializationFailure, failure)
-                        remaining--
-                        if (remaining == 0) onComplete(initializationFailure)
-                    }
                     updateMinimizedStateFromAncestor(initialized)
                     applySettingsToSession(session, settings, onComplete = initialized)
                     resetScrollbackState()
                     selectionController.resetBinding()
                     searchController.reset(renderCache.rows)
                     cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+                    if (!binding.get()) return@initialize
                     shellIntegrationDecorations.reset()
                     if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
                     visualGeometry.reset()
@@ -1766,6 +1811,7 @@ public class SwingTerminal
                     clearPointerHover()
                     hyperlinkDiscoveryController.reset()
                     resizeSessionToVisibleGridOnEdt(initialBinding = true, onComplete = initialized)
+                    if (!binding.get()) return@initialize
                     bindingJob =
                         componentScope.launch {
                             launch {
@@ -1843,7 +1889,8 @@ public class SwingTerminal
             selectionController.deferChanges {
                 popupCompletionCommand = null
                 bindingIdentity.set(false)
-                bindingIdentity = AtomicBoolean(false)
+                val unbound = AtomicBoolean(false)
+                bindingIdentity = unbound
                 cleanupSwingResources(
                     ::clearInlineShellSuggestion,
                     { suggestionScheduler?.stop() },
@@ -1885,6 +1932,7 @@ public class SwingTerminal
                     hyperlinkDiscoveryController::reset,
                     { publishViewportState(0) },
                     ::repaint,
+                    isCurrent = { bindingIdentity === unbound },
                 )
             }
 
@@ -3962,6 +4010,7 @@ public class SwingTerminal
                     renderCache.activeBuffer,
                 )
             val boundSession = session
+            val binding = bindingIdentity
             if (boundSession == null || width <= 0 || height <= 0) {
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
                 onComplete(if (boundSession == null || force) CancellationException("No visible terminal grid is bound") else null)
@@ -3986,6 +4035,10 @@ public class SwingTerminal
 
             viewportController.finishScroll()
             publishViewportState(renderCache.historySize)
+            if (session !== boundSession || bindingIdentity !== binding || !binding.get()) {
+                onComplete(CancellationException("Terminal session binding replaced"))
+                return false
+            }
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
             val anchorRow = visualGeometry.firstFullyVisibleRow()
@@ -3998,7 +4051,6 @@ public class SwingTerminal
                     0L
                 }
 
-            val binding = bindingIdentity
             synchronized(resizePublicationLock) {
                 if (resizeAnchorBinding !== binding || pendingGeometryRequests == 0 && !isResizePublicationPending()) {
                     resizeAnchorBinding = binding

@@ -920,26 +920,27 @@ class SwingTerminalSuggestionContextTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `rebinding completes when inline close listeners throw`(cancelled: Boolean) =
+    fun `rebinding reports inline close failures once and permits retry`(cancelled: Boolean) =
         withInlineFixture { fixture, _, _ ->
             val view = fixture.terminal
             val failure = if (cancelled) CancellationException("close cancelled") else IllegalStateException("close failed")
             val inline = assertNotNull(view.beginInlineShellSuggestionInteraction())
             inline.addChangeListener { if (it.isClosed) throw failure }
-            var completed = false
-            assertSame(
-                failure,
-                assertFailsWith<RuntimeException> {
-                    view.bind(fixture.replacementSession) {
-                        assertNull(it)
-                        completed = true
-                    }
-                },
-            )
+            val failures = mutableListOf<Throwable?>()
+            view.bind(fixture.replacementSession) { failures.add(it) }
             fixture.mutationDispatcher.scheduler.runCurrent()
-            assertTrue(completed)
+            assertEquals(1, failures.size)
+            assertSame(failure, failures.single())
+            assertFalse(view.hasActiveRenderBinding)
             assertFalse(fixture.session.isClosed)
             assertFalse(fixture.replacementSession.isClosed)
+
+            val retried = mutableListOf<Throwable?>()
+            view.bind(fixture.replacementSession) { retried.add(it) }
+            fixture.mutationDispatcher.scheduler.runCurrent()
+            assertEquals(listOf<Throwable?>(null), retried)
+            assertEquals(1, failures.size)
+            assertTrue(view.hasActiveRenderBinding)
         }
 
     @ParameterizedTest

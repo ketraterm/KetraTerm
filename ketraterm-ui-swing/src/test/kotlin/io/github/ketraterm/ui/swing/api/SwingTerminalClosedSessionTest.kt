@@ -51,10 +51,20 @@ class SwingTerminalClosedSessionTest {
         session.onClosed(0)
         val calls = connector.resizes.toList()
         edt {
-            val component = SwingTerminal()
+            val component =
+                SwingTerminal(
+                    { SwingSettings() },
+                    SwingHostServices(),
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
             try {
                 component.size = component.preferredGridSize(6, 2)
-                component.bind(session)
+                val completions = mutableListOf<Throwable?>()
+                component.bind(session) { completions.add(it) }
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, completions.size)
+                assertInstanceOf(java.util.concurrent.CancellationException::class.java, completions.single())
                 assertTrue(component.selectAll())
                 assertNotNull(component.currentSelection())
                 assertEquals(calls, connector.resizes)
