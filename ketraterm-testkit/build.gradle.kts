@@ -466,6 +466,8 @@ val compileClientBaseline =
     tasks.register<JavaExec>("compileClientBaseline") {
         group = "verification"
         description = "Intentionally recompiles and replaces the retained consumer baseline for review."
+        outputs.dir(consumerFixtureDirectory.map { it.dir("baseline") })
+        outputs.upToDateWhen { false }
         val releasedVersion = providers.gradleProperty("compiledClientBaselineVersion").orNull
         configureConsumerBuild("gradle", ":recordCompiledClientBaseline", releasedLibraryVersion = releasedVersion)
         args("-PbaselineBasis=${if (releasedVersion == null) "reviewed-working-tree" else "published-release"}")
