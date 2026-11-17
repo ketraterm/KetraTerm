@@ -297,7 +297,7 @@ internal class CursorEngine(
      * Mutates the pre-allocated state.savedCursor slot in place — zero heap
      * allocation. If called again before a restore, the previous save is overwritten.
      */
-    fun saveCursor() {
+    fun saveCursor(followsPrimaryResize: Boolean = false) {
         state.savedCursor.col = state.cursor.col
         state.savedCursor.row = state.cursor.row
         state.savedCursor.attr = state.pen.currentAttr
@@ -305,6 +305,7 @@ internal class CursorEngine(
         state.savedCursor.pendingWrap = state.cursor.pendingWrap
         state.savedCursor.isOriginMode = state.modes.isOriginMode
         state.savedCursor.isSaved = true
+        state.savedCursor.followsPrimaryResize = followsPrimaryResize
     }
 
     /**

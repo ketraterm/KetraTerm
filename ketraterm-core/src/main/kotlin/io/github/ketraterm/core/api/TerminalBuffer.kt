@@ -56,7 +56,8 @@ public interface TerminalBuffer :
      * the full viewport. Tab stops are resized non-destructively: surviving
      * custom stops are preserved, stops past the new width are dropped, and any
      * newly exposed columns receive the default 8-column VT rhythm. Saved-cursor
-     * state is clamped to the new bounds.
+     * state is clamped to the new bounds. The return cursor saved by
+     * [enterAltBuffer] follows the primary cursor through reflow.
      *
      * Invalid dimensions are rejected before allocation or state mutation.
      * An unchanged grid preserves known pixel dimensions. A changed grid makes

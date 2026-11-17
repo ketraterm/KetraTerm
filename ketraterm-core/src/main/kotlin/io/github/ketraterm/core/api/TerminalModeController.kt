@@ -350,7 +350,8 @@ public interface TerminalModeController {
      *
      * Restores the primary cursor position, pen attributes, and origin mode
      * saved when [enterAltBuffer] was called. Alternate buffer content is not
-     * visible after the switch. Primary scrollback history is unaffected.
+     * visible after the switch. The saved position follows primary reflow during
+     * a resize. Primary scrollback history is unaffected.
      */
     public fun exitAltBuffer()
 

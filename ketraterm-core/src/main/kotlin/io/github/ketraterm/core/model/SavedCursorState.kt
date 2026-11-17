@@ -29,6 +29,7 @@ internal class SavedCursorState {
     var pendingWrap: Boolean = false
     var isOriginMode: Boolean = false
     var isSaved: Boolean = false
+    var followsPrimaryResize: Boolean = false
 
     fun clear() {
         col = 0
@@ -38,5 +39,6 @@ internal class SavedCursorState {
         pendingWrap = false
         isOriginMode = false
         isSaved = false
+        followsPrimaryResize = false
     }
 }

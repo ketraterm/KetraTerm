@@ -8,6 +8,7 @@ controls and platform integrations are listed separately below.
 | Feature | Description |
 | --- | --- |
 | Text rendering | Java2D rendering, script-run shaping, bidirectional text, font fallback, and Windows color-emoji rasterization. |
+| Bidirectional layout | The primary screen reorders bidirectional text within each row. The alternate screen preserves application cell positions, including pane borders, cursors, and selections. Primary-screen application panes do not define separate bidi regions. |
 | Presentation selectors | VS15 requests text fonts; VS16 requests emoji rendering. Oversized isolated fallback glyphs scale proportionally within their cell span. Text glyph availability depends on installed fonts. |
 | Terminal glyphs | Programmatic drawing of supported box-drawing, block, geometric, all Braille patterns, sextants (`U+1FB00–U+1FB3B`), octants (`U+1CD00–U+1CDE5`), and geometric Powerline separators (`U+E0B0–U+E0BF`) for consistent cell alignment. |
 | Appearance | Themes, fonts, line height, signed integer column spacing, padding, cursor styling, and [color customization](../../ketraterm-ui-swing/docs/color-customization.md): focused/inactive selection colors, palette-aware defaults and exact explicit ARGB fills, per-cell reverse video, independent normal/active search fills, foregrounds and inset borders, configurable minimum text contrast, and configurable faint intensity. |

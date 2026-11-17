@@ -64,7 +64,6 @@ internal object TerminalResizer {
      * The returned value is the updated scrollback offset for a user-controlled
      * viewport. A return value of zero means the viewport remains attached to
      * the live screen.
-     * An inactive cursor does not retain untouched trailing rows during background reflow.
      */
     fun resizeBuffer(
         buffer: ScreenBuffer,
@@ -74,7 +73,6 @@ internal object TerminalResizer {
         newHeight: Int,
         oldScrollbackOffset: Int = 0,
         lineIdProvider: () -> Long = ResizeFallbackLineIdProvider(),
-        preserveTrailingCursor: Boolean = true,
     ): Int {
         require(oldWidth >= MIN_WIDTH) { "oldWidth must be at least $MIN_WIDTH" }
         require(oldHeight > 0) { "oldHeight must be positive" }
@@ -350,7 +348,7 @@ internal object TerminalResizer {
              */
             if (
                 i >= oldTrailingBlankStart &&
-                (!preserveTrailingCursor || i > absoluteOldCursorRow || i <= absoluteOldCursorRow - newHeight) &&
+                (i > absoluteOldCursorRow || i <= absoluteOldCursorRow - newHeight) &&
                 i < oldLiveScreenTop + oldHeight
             ) {
                 continue

@@ -170,6 +170,7 @@ internal class TerminalState(
         if (!isAltScreenActive) return
         graphics.invalidateTransfer()
         activeBuffer = primaryBuffer
+        primaryBuffer.savedCursor.followsPrimaryResize = false
         modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
         cursorShape = primaryCursorShape
         modes.isCursorBlinking = primaryCursorBlinking
