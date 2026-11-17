@@ -136,13 +136,23 @@ internal suspend fun startBoundSession(
     bound: Deferred<Unit>,
     closed: Deferred<Unit>,
 ): Boolean =
-    withContext(Dispatchers.IO) {
+    supervisorScope {
         val ready =
             select {
                 closed.onAwait { false }
                 bound.onAwait { true }
             }
-        if (!ready || closed.isCompleted) return@withContext false
-        session.start()
-        true
+        if (!ready || closed.isCompleted) return@supervisorScope false
+        val startup = async(Dispatchers.IO) { session.start() }
+        try {
+            select {
+                closed.onAwait { false }
+                startup.onAwait { true }
+            }
+        } finally {
+            if (!startup.isCompleted) {
+                session.requestClose()
+                startup.cancel()
+            }
+        }
     }

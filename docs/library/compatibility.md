@@ -1,9 +1,9 @@
 # Library compatibility
 
-KetraTerm's published libraries support Kotlin and Java hosts. The current 0.x
-API snapshots are a development baseline, not a stable API freeze or a promise
-of compatibility with earlier 0.x releases. Starting at 1.0, releases within one
-major version preserve supported source, binary, and behavioral contracts.
+KetraTerm's published libraries support Kotlin and Java hosts. Releases within
+the 1.x series preserve supported source, binary, and documented behavioral contracts.
+Experimental APIs follow their [separate policy](#experimental-completion-models).
+The 0.x releases preceded this compatibility commitment; their migration notes remain below.
 
 ## Supported boundary
 
@@ -21,7 +21,8 @@ headless/Swing entry points are additional metadata publications. Use one
 KetraTerm version throughout the dependency graph; see [installation](../../README.md#using-the-libraries)
 and [Maven setup](../../ketraterm-bom/README.md#maven).
 
-Public/protected declarations in published libraries are supported contracts.
+Public/protected declarations in published libraries are supported contracts,
+except APIs explicitly marked experimental.
 Kotlin internal/private declarations are excluded, except published inline
 bridges that already-compiled callers can reference. App, testkit, benchmarks,
 and IntelliJ product implementation APIs
@@ -40,6 +41,8 @@ this boundary using both Gradle metadata and POM-only resolution.
 
 ## Evolution rules
 
+These rules apply to supported APIs within a stable major version.
+
 - Preserve JVM signatures, Kotlin metadata, defaults, and documented semantics.
 - Preserve constructor, copy, component, and default-call shapes of value data
   classes. Adding a defaulted constructor field can still break binaries.
@@ -57,21 +60,22 @@ this boundary using both Gradle metadata and POM-only resolution.
 
 ## OSC 22 sink migration
 
-External sinks must implement `setPointerShape(TerminalPointerShape?)`; null
-restores the host pointer default. Recompile sink implementations and Kotlin
-delegates.
+This migration applies to external sinks compiled before OSC 22 support in 0.x.
+Implement `setPointerShape(TerminalPointerShape?)`; null restores the host pointer
+default. Recompile those sink implementations and Kotlin delegates.
 
 ## OSC 21 color migration
 
-Custom `TerminalCommandSink` implementations must implement
+This migration applies to custom implementations compiled before OSC 21 support in 0.x.
+Affected `TerminalCommandSink` implementations must implement
 `applyColorRequest(TerminalColorRequest)` and consume the borrowed batch
 synchronously. Custom `TerminalModeController` implementations must implement
 `applyColorRequest(TerminalColorRequest, Boolean)` with ordered mutations and
 permission-controlled replies. Recompile these implementations and Kotlin
 delegates. Existing palette constructor and `copy` signatures remain available.
 
-Color-stack support also requires `pushColors()` and `popColors()` on both
-interfaces. Recompile custom implementations and Kotlin delegates; the core
+The 0.x color-stack additions also require `pushColors()` and `popColors()` on both
+interfaces. Recompile affected implementations and Kotlin delegates; the core
 methods follow the [color-stack contract](../reference/protocol.md#color-stack).
 
 ## Verification and baseline changes
@@ -86,6 +90,7 @@ repository without uploading. The [consumer fixture guide](../../ketraterm-testk
 explains individual checks and baseline refreshes. A deliberate development
 baseline refresh must record the break and migration; it cannot be presented as
 proof of compatibility with the earlier API or retained clients.
+A baseline refresh does not authorize breaking a supported contract within a stable major version.
 
 ABI checks do not establish threading, lifecycle, coordinate, or protocol
 correctness. Those require semantic tests and the module contracts. Product
@@ -93,21 +98,25 @@ release verification remains separate; see the [gap map](../terminal-feature-gap
 
 ### Experimental completion models
 
-The 0.x completion request, candidate, and specification models and the Swing
-suggestion models remain experimental. New data-class fields preserve existing
-Java constructor overloads but change Kotlin default-constructor and `copy`
-signatures. Recompile consumers of these experimental models when upgrading.
+Completion and suggestion APIs remain experimental in 1.x. The
+`ExperimentalTerminalCompletionApi` and `ExperimentalShellSuggestionsApi` markers
+identify these APIs. They can change before stabilization, including their source
+and binary contracts. This exception applies to Java and Kotlin consumers.
+See the [completion stability policy](../features/completion.md#stability-experimental).
+
+Earlier model changes preserved Java constructor overloads but changed Kotlin
+default-constructor and `copy` signatures. Recompile consumers affected by those changes.
 Custom engines and providers must honor the request's `includeCommandNames` flag
 for parameter-only completion.
 
-The parameter-only request change deliberately refreshes only the retained
+The 0.x parameter-only request change deliberately refreshed only the retained
 `completion` client, with reviewed sources, ABI snapshots, artifacts, and provenance.
 Other baselines remain unchanged. These clients verify subsequent upgrades;
 they do not establish binary compatibility with earlier experimental models.
 
 ### Color-reset and change-report baseline decision
 
-The 0.x color-reset and mode 2031/2048 migration deliberately establishes a new
+The 0.x color-reset and mode 2031/2048 migration deliberately established a new
 retained-client baseline. Existing method signatures remain available, but the
 required additions to `TerminalCommandSink`, `TerminalModeController`,
 `TerminalResponseChannel`, and `TerminalBuffer` change their implementer
@@ -115,8 +124,8 @@ contracts. Retained pre-feature Kotlin `by` delegates do not contain forwarding
 methods for these additions: the Swing consumer fails with `AbstractMethodError`
 when host assembly calls `setChangeNotificationsAllowed`.
 
-Recompile Kotlin delegates against the updated interfaces, even when their
-source is unchanged. Custom implementations must implement the new reset,
+When migrating from that earlier API, recompile Kotlin delegates even when their
+source is unchanged. Affected implementations must implement the new reset,
 subscription, notification-permission, and pixel-aware resize methods. These
 methods enforce terminal semantics and host authorization; they have no silent
 fallback defaults.
@@ -131,6 +140,9 @@ it does not establish binary compatibility with the pre-feature baseline or
 any earlier 0.x release.
 
 ## Development migrations
+
+This section records migrations from APIs that preceded 1.0. These changes do not
+require recompilation when upgrading supported APIs within 1.x.
 
 Selection and text color rendering have explicit host policies. Existing JVM
 entry points remain available. Explicit selection fills are exact.
