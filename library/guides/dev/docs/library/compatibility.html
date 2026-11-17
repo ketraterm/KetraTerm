@@ -23,10 +23,10 @@
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
   <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="configuration.html">Configuration</a><a aria-current="page" href="compatibility.html">Compatibility</a><a  href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Library compatibility</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#supported-boundary">Supported boundary</a><a class="depth-2" href="#evolution-rules">Evolution rules</a><a class="depth-2" href="#osc-22-sink-migration">OSC 22 sink migration</a><a class="depth-2" href="#osc-21-color-migration">OSC 21 color migration</a><a class="depth-2" href="#verification-and-baseline-changes">Verification and baseline changes</a><a class="depth-3" href="#experimental-completion-models">Experimental completion models</a><a class="depth-3" href="#color-reset-and-change-report-baseline-decision">Color-reset and change-report baseline decision</a><a class="depth-2" href="#development-migrations">Development migrations</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-compatibility">Library compatibility</h1>
-<p>KetraTerm&#39;s published libraries support Kotlin and Java hosts. The current 0.x
-API snapshots are a development baseline, not a stable API freeze or a promise
-of compatibility with earlier 0.x releases. Starting at 1.0, releases within one
-major version preserve supported source, binary, and behavioral contracts.</p>
+<p>KetraTerm&#39;s published libraries support Kotlin and Java hosts. Releases within
+the 1.x series preserve supported source, binary, and documented behavioral contracts.
+Experimental APIs follow their <a href="#experimental-completion-models">separate policy</a>.
+The 0.x releases preceded this compatibility commitment; their migration notes remain below.</p>
 <h2 id="supported-boundary">Supported boundary</h2>
 <div class="table-scroll"><table>
 <thead>
@@ -64,7 +64,8 @@ major version preserve supported source, binary, and behavioral contracts.</p>
 headless/Swing entry points are additional metadata publications. Use one
 KetraTerm version throughout the dependency graph; see <a href="../../README.html#using-the-libraries">installation</a>
 and <a href="../../ketraterm-bom/README.html#maven">Maven setup</a>.</p>
-<p>Public/protected declarations in published libraries are supported contracts.
+<p>Public/protected declarations in published libraries are supported contracts,
+except APIs explicitly marked experimental.
 Kotlin internal/private declarations are excluded, except published inline
 bridges that already-compiled callers can reference. App, testkit, benchmarks,
 and IntelliJ product implementation APIs
@@ -79,6 +80,7 @@ without <code>java.desktop</code> or frontend SDKs, including PNG decoding. Fron
 neutral render data and own their graphics resources. Publication checks verify
 this boundary using both Gradle metadata and POM-only resolution.</p>
 <h2 id="evolution-rules">Evolution rules</h2>
+<p>These rules apply to supported APIs within a stable major version.</p>
 <ul>
 <li>Preserve JVM signatures, Kotlin metadata, defaults, and documented semantics.</li>
 <li>Preserve constructor, copy, component, and default-call shapes of value data
@@ -96,18 +98,19 @@ behavior; signature checks cannot detect semantic drift.</li>
 incompatible removal belongs in a new major release.</li>
 </ul>
 <h2 id="osc-22-sink-migration">OSC 22 sink migration</h2>
-<p>External sinks must implement <code>setPointerShape(TerminalPointerShape?)</code>; null
-restores the host pointer default. Recompile sink implementations and Kotlin
-delegates.</p>
+<p>This migration applies to external sinks compiled before OSC 22 support in 0.x.
+Implement <code>setPointerShape(TerminalPointerShape?)</code>; null restores the host pointer
+default. Recompile those sink implementations and Kotlin delegates.</p>
 <h2 id="osc-21-color-migration">OSC 21 color migration</h2>
-<p>Custom <code>TerminalCommandSink</code> implementations must implement
+<p>This migration applies to custom implementations compiled before OSC 21 support in 0.x.
+Affected <code>TerminalCommandSink</code> implementations must implement
 <code>applyColorRequest(TerminalColorRequest)</code> and consume the borrowed batch
 synchronously. Custom <code>TerminalModeController</code> implementations must implement
 <code>applyColorRequest(TerminalColorRequest, Boolean)</code> with ordered mutations and
 permission-controlled replies. Recompile these implementations and Kotlin
 delegates. Existing palette constructor and <code>copy</code> signatures remain available.</p>
-<p>Color-stack support also requires <code>pushColors()</code> and <code>popColors()</code> on both
-interfaces. Recompile custom implementations and Kotlin delegates; the core
+<p>The 0.x color-stack additions also require <code>pushColors()</code> and <code>popColors()</code> on both
+interfaces. Recompile affected implementations and Kotlin delegates; the core
 methods follow the <a href="../reference/protocol.html#color-stack">color-stack contract</a>.</p>
 <h2 id="verification-and-baseline-changes">Verification and baseline changes</h2>
 <p>Supported modules use explicit API mode and checked-in ABI snapshots. Published
@@ -115,34 +118,38 @@ consumer fixtures compile and run independent Java/Kotlin clients; retained
 binaries test upgrades without recompilation. Deliberate linkage-failure controls
 check that the upgrade harness detects missing symbols.</p>
 <p><code>./gradlew publicationChecks</code> runs the library publication gates against a local
-repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/0fb2abc7e86235c096908efaf0e363788f4f3250/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
+repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
 explains individual checks and baseline refreshes. A deliberate development
 baseline refresh must record the break and migration; it cannot be presented as
-proof of compatibility with the earlier API or retained clients.</p>
+proof of compatibility with the earlier API or retained clients.
+A baseline refresh does not authorize breaking a supported contract within a stable major version.</p>
 <p>ABI checks do not establish threading, lifecycle, coordinate, or protocol
 correctness. Those require semantic tests and the module contracts. Product
 release verification remains separate; see the <a href="../terminal-feature-gap-map.html#product-and-release-work">gap map</a>.</p>
 <h3 id="experimental-completion-models">Experimental completion models</h3>
-<p>The 0.x completion request, candidate, and specification models and the Swing
-suggestion models remain experimental. New data-class fields preserve existing
-Java constructor overloads but change Kotlin default-constructor and <code>copy</code>
-signatures. Recompile consumers of these experimental models when upgrading.
+<p>Completion and suggestion APIs remain experimental in 1.x. The
+<code>ExperimentalTerminalCompletionApi</code> and <code>ExperimentalShellSuggestionsApi</code> markers
+identify these APIs. They can change before stabilization, including their source
+and binary contracts. This exception applies to Java and Kotlin consumers.
+See the <a href="../features/completion.html#stability-experimental">completion stability policy</a>.</p>
+<p>Earlier model changes preserved Java constructor overloads but changed Kotlin
+default-constructor and <code>copy</code> signatures. Recompile consumers affected by those changes.
 Custom engines and providers must honor the request&#39;s <code>includeCommandNames</code> flag
 for parameter-only completion.</p>
-<p>The parameter-only request change deliberately refreshes only the retained
+<p>The 0.x parameter-only request change deliberately refreshed only the retained
 <code>completion</code> client, with reviewed sources, ABI snapshots, artifacts, and provenance.
 Other baselines remain unchanged. These clients verify subsequent upgrades;
 they do not establish binary compatibility with earlier experimental models.</p>
 <h3 id="color-reset-and-change-report-baseline-decision">Color-reset and change-report baseline decision</h3>
-<p>The 0.x color-reset and mode 2031/2048 migration deliberately establishes a new
+<p>The 0.x color-reset and mode 2031/2048 migration deliberately established a new
 retained-client baseline. Existing method signatures remain available, but the
 required additions to <code>TerminalCommandSink</code>, <code>TerminalModeController</code>,
 <code>TerminalResponseChannel</code>, and <code>TerminalBuffer</code> change their implementer
 contracts. Retained pre-feature Kotlin <code>by</code> delegates do not contain forwarding
 methods for these additions: the Swing consumer fails with <code>AbstractMethodError</code>
 when host assembly calls <code>setChangeNotificationsAllowed</code>.</p>
-<p>Recompile Kotlin delegates against the updated interfaces, even when their
-source is unchanged. Custom implementations must implement the new reset,
+<p>When migrating from that earlier API, recompile Kotlin delegates even when their
+source is unchanged. Affected implementations must implement the new reset,
 subscription, notification-permission, and pixel-aware resize methods. These
 methods enforce terminal semantics and host authorization; they have no silent
 fallback defaults.</p>
@@ -150,11 +157,13 @@ fallback defaults.</p>
 new interfaces, with fixture sources, jar hashes, compiler/toolchain details,
 and staged dependency hashes in their provenance. Review sources, artifacts,
 provenance, and ABI snapshots together, then run the source-consumer and retained
-client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/0fb2abc7e86235c096908efaf0e363788f4f3250/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
+client checks described in the <a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline">consumer guide</a>.
 The refreshed baseline verifies subsequent upgrades of those recompiled clients;
 it does not establish binary compatibility with the pre-feature baseline or
 any earlier 0.x release.</p>
 <h2 id="development-migrations">Development migrations</h2>
+<p>This section records migrations from APIs that preceded 1.0. These changes do not
+require recompilation when upgrading supported APIs within 1.x.</p>
 <p>Selection and text color rendering have explicit host policies. Existing JVM
 entry points remain available. Explicit selection fills are exact.
 The default minimum contrast ratio is 3.0. Faint text blends toward its displayed background.
@@ -244,7 +253,7 @@ release history remains in the <a href="../../CHANGELOG.html">changelog</a>.</p>
 </tbody></table></div>
 <p>See <a href="configuration.html">configuration</a>, <a href="../../ketraterm-session/README.html#custom-assembly">session assembly</a>,
 and <a href="../../ketraterm-ui-swing/README.html">Swing APIs</a> for current usage.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/0fb2abc7e86235c096908efaf0e363788f4f3250/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
