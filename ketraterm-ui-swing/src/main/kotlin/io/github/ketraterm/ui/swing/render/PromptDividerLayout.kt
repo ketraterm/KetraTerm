@@ -48,7 +48,8 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
     var contentGeneration = Long.MIN_VALUE
         private set
     private var retainedLineId = 0L
-    private var retainedLineRow = NO_ROW
+    var retainedLineRow = NO_ROW
+        private set
     var retainedPromptLineId = 0L
         private set
     private var source: TerminalRenderFrameReader? = null
@@ -114,6 +115,7 @@ internal class PromptDividerLayout : TerminalRenderCursorSink {
             it.gridRows = gridRows
             it.resolvedAnchorRow = resolvedAnchorRow
             it.retainedPromptLineId = retainedPromptLineId
+            it.retainedLineRow = retainedLineRow
             it.contentGeneration = contentGeneration
             it.historyGeneration = historyGeneration
         }

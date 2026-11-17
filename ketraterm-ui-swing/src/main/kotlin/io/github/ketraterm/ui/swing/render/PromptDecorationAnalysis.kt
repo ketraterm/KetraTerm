@@ -15,7 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationView
 import kotlinx.coroutines.*
 
@@ -46,6 +48,29 @@ internal class PromptDecorationAnalysis(
     private var projection: PromptDividerLayout? = null
 
     fun projection(request: Request): PromptDividerLayout? = projection.takeIf { completed == request }
+
+    fun isPromptRetained(
+        reader: TerminalRenderFrameReader,
+        state: TerminalShellIntegrationView,
+        cache: TerminalRenderCache,
+        lineId: Long,
+    ): Boolean {
+        val completed = completed ?: return false
+        val layout = projection ?: return false
+        if (completed.reader !== reader ||
+            completed.state !== state ||
+            !cache.hasFrame ||
+            cache.activeBuffer != TerminalRenderBufferKind.PRIMARY ||
+            layout.historyGeneration != cache.historyContentGeneration ||
+            lineId == 0L ||
+            layout.retainedPromptLineId != lineId
+        ) {
+            return false
+        }
+        val row = layout.retainedLineRow
+        if (row < cache.discardedCount) return false
+        return layout.contentGeneration == cache.contentGeneration || row < layout.liveTop
+    }
 
     fun request(request: Request) {
         if (demand == request) return

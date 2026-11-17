@@ -528,7 +528,9 @@ public class SwingTerminal
         private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
         private val stickyCommandHeader = StickyCommandHeader(chrome, hostServices.fontResolver)
         private var promptProjection: PromptDividerLayout? = null
-        private val promptRetained: (Long) -> Boolean = { it != 0L && promptProjection?.retainedPromptLineId == it }
+        private val promptRetained: (Long) -> Boolean = { lineId ->
+            session?.let { promptAnalysis.isPromptRetained(it, it.shellIntegrationState, renderCache, lineId) } == true
+        }
         private val promptAnalysis =
             PromptDecorationAnalysis(componentScope, searchDispatcher) {
                 val bound = session
