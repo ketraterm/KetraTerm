@@ -472,7 +472,8 @@ pixel-change reporting rules.</p>
 <p>An effective resize:</p>
 <ul>
 <li>Reconstructs and rewraps primary logical lines when width changes, relocating
-the cursor and copying surviving cluster payloads into new rows.</li>
+the cursor and copying surviving cluster payloads into new rows. A continuation
+containing only the cursor retains its logical column when widened again.</li>
 <li>Preserves retained primary physical rows, attributes, wrap flags, identities,
 and cluster handles for height-only changes. Untouched trailing rows serve as
 layout capacity; cursor and viewport positions adjust to the new boundary.</li>
@@ -546,7 +547,7 @@ per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/920db9f3d632d09a55812cb057061224969dfd5a/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ced14b7766a7b8be66136d05c53562241685a860/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
