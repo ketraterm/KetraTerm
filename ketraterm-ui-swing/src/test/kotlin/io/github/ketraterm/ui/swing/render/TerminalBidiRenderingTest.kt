@@ -42,6 +42,38 @@ class TerminalBidiRenderingTest {
         }
     private val colors = intArrayOf(TEST_RED, TEST_GREEN, TEST_BLUE)
 
+    @ParameterizedTest
+    @EnumSource(TerminalRenderCursorShape::class)
+    fun `alternate screen paints cursor and decorations at application columns`(shape: TerminalRenderCursorShape) {
+        val image = paint(buffer = TerminalRenderBufferKind.ALTERNATE)
+        for (column in 0..2) {
+            assertEquals(colors[column], image.getRGB(column * metrics.cellWidth + 1, 1))
+            assertEquals(colors[column], image.getRGB(column * metrics.cellWidth + 1, metrics.underlineY))
+        }
+        val withCursor =
+            paint(
+                buffer = TerminalRenderBufferKind.ALTERNATE,
+                cursor = TerminalRenderCursor(0, 0, true, false, shape, 1),
+            )
+        val y = if (shape == TerminalRenderCursorShape.UNDERLINE) metrics.cellHeight - 1 else 0
+        assertEquals(settings.palette.cursorBackground, withCursor.getRGB(0, y))
+        assertEquals(TEST_BLUE, withCursor.getRGB(metrics.cellWidth * 2, y))
+    }
+
+    @Test
+    fun `alternate screen paints selection and search at application columns`() {
+        val selected = paint(buffer = TerminalRenderBufferKind.ALTERNATE, selection = CellSelection(0, 0, 1, 0))
+        assertNotEquals(TEST_RED, selected.getRGB(1, 1))
+        assertEquals(TEST_BLUE, selected.getRGB(metrics.cellWidth * 2 + 1, 1))
+        val highlights = TerminalSearchViewportHighlights()
+        highlights.reset(1)
+        highlights.add(0, 0, 1, active = true)
+        highlights.finish()
+        val searched = paint(buffer = TerminalRenderBufferKind.ALTERNATE, highlights = highlights)
+        assertNotEquals(TEST_RED, searched.getRGB(1, 1))
+        assertEquals(TEST_BLUE, searched.getRGB(metrics.cellWidth * 2 + 1, 1))
+    }
+
     @Test
     fun `unchanged live bidi geometry survives repeated inline overlay paints`() {
         val live =
@@ -249,6 +281,7 @@ class TerminalBidiRenderingTest {
     }
 
     private fun paint(
+        buffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
         cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1),
         selection: CellSelection? = null,
         highlights: TerminalSearchViewportHighlights? = null,
@@ -281,6 +314,7 @@ class TerminalBidiRenderingTest {
                     cursorValue = cursor,
                 ) {
                     override val palette = settings.palette
+                    override val activeBuffer = buffer
                 },
             )
         val image = BufferedImage(metrics.cellWidth * 3, metrics.cellHeight, BufferedImage.TYPE_INT_ARGB)

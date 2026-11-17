@@ -25,6 +25,130 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
     @ParameterizedTest
+    @CsvSource("false, 0", "false, 2", "false, 100", "true, 0", "true, 2", "true, 100")
+    fun `primary resize retains the same content and cursor while alternate is active`(
+        saveCursor: Boolean,
+        maxHistory: Int,
+    ) {
+        val expected = DefaultTerminalBuffer(16, 6, maxHistory)
+        val actual = DefaultTerminalBuffer(16, 6, maxHistory)
+        for (buffer in listOf(expected, actual)) {
+            repeat(20) {
+                buffer.writeText("row-$it-0123456789")
+                buffer.carriageReturn()
+                buffer.newLine()
+            }
+        }
+        if (saveCursor) actual.enterAltBuffer() else actual.enterAltBufferWithoutCursorSave(true)
+
+        for ((width, height) in listOf(8 to 3, 24 to 8, 6 to 4, 16 to 6)) {
+            expected.resize(width, height)
+            actual.resize(width, height)
+        }
+        if (saveCursor) actual.exitAltBuffer() else actual.exitAltBufferWithoutCursorRestore()
+
+        assertEquals(expected.cursorRow, actual.cursorRow)
+        assertEquals(expected.cursorCol, actual.cursorCol)
+        assertEquals(expected.historySize, actual.historySize)
+        assertEquals(expected.getAllAsString(), actual.getAllAsString())
+        expected.writeText("[exited]")
+        actual.writeText("[exited]")
+        assertEquals(expected.getAllAsString(), actual.getAllAsString())
+    }
+
+    @Test
+    fun `soft reset keeps its home save after alternate resize`() {
+        val buffer = DefaultTerminalBuffer(16, 6, 100)
+        buffer.writeText("0123456789abcd")
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.enterAltBuffer()
+        buffer.softReset()
+        buffer.resize(8, 6)
+        buffer.exitAltBuffer()
+
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(0, buffer.cursorCol)
+        assertFalse(stateOf(buffer).cursor.pendingWrap)
+    }
+
+    @Test
+    fun `alternate exit leaves its cursor save in physical coordinates`() {
+        val buffer = DefaultTerminalBuffer(16, 6, 100)
+        buffer.writeText("0123456789abcd")
+        buffer.enterAltBuffer()
+        buffer.resize(8, 6)
+        buffer.exitAltBuffer()
+        assertEquals(1, buffer.cursorRow)
+        assertEquals(6, buffer.cursorCol)
+
+        buffer.resize(16, 6)
+        buffer.restoreCursor()
+        assertEquals(1, buffer.cursorRow)
+        assertEquals(6, buffer.cursorCol)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, false", "false, true", "true, false", "true, true")
+    fun `alternate screen resize preserves the primary cursor after wrapped output`(
+        saveCursor: Boolean,
+        blankCursorRow: Boolean,
+    ) {
+        val buffer = DefaultTerminalBuffer(16, 6, 100)
+        buffer.writeText("0123456789abcd")
+        buffer.carriageReturn()
+        buffer.newLine()
+        if (!blankCursorRow) buffer.writeText("PS> tmux")
+        if (saveCursor) buffer.enterAltBuffer() else buffer.enterAltBufferWithoutCursorSave(true)
+
+        buffer.resize(8, 6)
+        if (saveCursor) buffer.exitAltBuffer() else buffer.exitAltBufferWithoutCursorRestore()
+
+        assertEquals(if (blankCursorRow) 2 else 3, buffer.cursorRow)
+        assertEquals(0, buffer.cursorCol)
+        buffer.writeText("[exited]")
+        assertEquals(
+            if (blankCursorRow) "01234567\n89abcd\n[exited]\n\n\n" else "01234567\n89abcd\nPS> tmux\n[exited]\n\n",
+            buffer.getScreenAsString(),
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `saved cursor follows alternate resize without restoring pending wrap`(widenAgain: Boolean) {
+        val buffer = DefaultTerminalBuffer(16, 6, 100)
+        buffer.writeText("0123456789abcdef")
+        assertTrue(stateOf(buffer).cursor.pendingWrap)
+        buffer.enterAltBuffer()
+        buffer.resize(8, 6)
+        if (widenAgain) buffer.resize(16, 6)
+        buffer.exitAltBuffer()
+
+        assertEquals(if (widenAgain) 0 else 1, buffer.cursorRow)
+        assertEquals(if (widenAgain) 15 else 7, buffer.cursorCol)
+        assertFalse(stateOf(buffer).cursor.pendingWrap)
+        buffer.writeCodepoint('X'.code)
+        assertEquals("0123456789abcdeX", buffer.getAllAsString().replace("\n", ""))
+    }
+
+    @Test
+    fun `explicit saved cursor keeps physical coordinates when alternate resize does not save it`() {
+        val buffer = DefaultTerminalBuffer(16, 6, 100)
+        buffer.writeText("0123456789abcd")
+        buffer.saveCursor()
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.enterAltBufferWithoutCursorSave(true)
+        buffer.resize(8, 6)
+        buffer.exitAltBufferWithoutCursorRestore()
+
+        assertEquals(2, buffer.cursorRow)
+        buffer.restoreCursor()
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(7, buffer.cursorCol)
+    }
+
+    @ParameterizedTest
     @CsvSource("4, 4, 0", "5, 4, 0", "7, 4, 0", "4, 2, 4", "5, 2, 4", "7, 2, 4")
     fun `cursor alone on a reflowed continuation returns to its logical column`(
         cursorColumn: Int,

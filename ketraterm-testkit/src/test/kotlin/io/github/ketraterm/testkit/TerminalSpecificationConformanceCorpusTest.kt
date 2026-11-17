@@ -93,10 +93,29 @@ class TerminalSpecificationConformanceCorpusTest {
         assertTrue(reference.retainedRows[reference.liveRowStart].wrapped)
         assertTrue(reference.retainedRows[reference.liveRowStart + 1].wrapped)
         assertFalse(reference.retainedRows[reference.liveRowStart + 2].wrapped)
-        assertEquals(2, reference.cursor.column)
-        assertEquals(1, reference.cursor.row)
+        assertTrue(reference.retainedRows[reference.liveRowStart + 2].cells.all { it.codepoint == 0 && it.cluster == null })
+        assertEquals(0, reference.cursor.column)
+        assertEquals(2, reference.cursor.row)
 
         assertVariantsMatch(reference, columns = 5, rows = 2, maxHistory = 4, variants = variants, suffix = suffix)
+
+        val resumedSuffix =
+            suffix.dropLast(1) +
+                listOf(
+                    TerminalReplayEvent.Input.utf8("J"),
+                    TerminalReplayEvent.EndOfInput,
+                )
+        val resumed = replay(columns = 5, rows = 2, maxHistory = 4, variants.first().transcript.events + resumedSuffix)
+
+        assertEquals(TerminalSnapshotBufferKind.PRIMARY, resumed.activeBuffer)
+        assertEquals(reference.historyRows, resumed.historyRows)
+        assertEquals(reference.retainedRows.dropLast(1), resumed.retainedRows.dropLast(1))
+        assertCodepoints(resumed, resumed.liveRowStart + 2, 0, "J")
+        assertFalse(resumed.retainedRows[resumed.liveRowStart + 2].wrapped)
+        assertEquals(1, resumed.cursor.column)
+        assertEquals(2, resumed.cursor.row)
+
+        assertVariantsMatch(resumed, columns = 5, rows = 2, maxHistory = 4, variants = variants, suffix = resumedSuffix)
     }
 
     @Test

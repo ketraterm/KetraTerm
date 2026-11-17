@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import java.text.Bidi
@@ -29,6 +30,7 @@ import java.text.Bidi
  * storage and unchanged permutations. Column scratch grows independently of row capacity.
  * Rows without stable line identities invalidate when structure or viewport mapping changes.
  * Grapheme clusters and wide-cell pairs remain atomic when applying UBA level reordering.
+ * The alternate screen preserves application cell positions without row reordering.
  */
 internal class TerminalBidiLayout {
     private var source: TerminalRenderCache? = null
@@ -54,6 +56,10 @@ internal class TerminalBidiLayout {
         row: Int,
     ): Row? {
         if (row !in 0 until cache.rows) return null
+        if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            reset()
+            return null
+        }
         if (layouts.size < cache.lineIds.size) {
             val previousCapacity = layouts.size
             layouts = layouts.copyOf(cache.lineIds.size)

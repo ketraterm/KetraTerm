@@ -163,7 +163,6 @@ internal class DefaultTerminalBuffer private constructor(
                 newWidth = newWidth,
                 newHeight = newHeight,
                 lineIdProvider = state::allocateLineId,
-                preserveTrailingCursor = !state.isAltScreenActive,
                 oldScrollbackOffset = oldScrollbackOffset,
             )
         val newPrimaryTop = state.primaryBuffer.ring.discardedCount + state.primaryBuffer.ring.size - newHeight
@@ -187,6 +186,12 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetScrollRegion(newHeight)
         state.primaryBuffer.resetLeftRightMargins(newWidth)
         state.altBuffer.resetLeftRightMargins(newWidth)
+        val primarySavedCursor = state.primaryBuffer.savedCursor
+        if (state.isAltScreenActive && primarySavedCursor.followsPrimaryResize) {
+            primarySavedCursor.col = state.primaryBuffer.cursor.col
+            primarySavedCursor.row = state.primaryBuffer.cursor.row
+            primarySavedCursor.pendingWrap = false
+        }
         state.primaryBuffer.clampSavedCursorToBounds(newWidth, newHeight)
         state.altBuffer.clampSavedCursorToBounds(newWidth, newHeight)
         state.primaryBuffer.cursor.pendingWrap = false
@@ -278,6 +283,7 @@ internal class DefaultTerminalBuffer private constructor(
         target.pendingWrap = false
         target.isOriginMode = false
         target.isSaved = true
+        target.followsPrimaryResize = false
     }
 
     private data class Components(
@@ -304,6 +310,7 @@ internal class DefaultTerminalBuffer private constructor(
             target.pendingWrap = pendingWrap
             target.isOriginMode = isOriginMode
             target.isSaved = isSaved
+            target.followsPrimaryResize = false
         }
 
         companion object {

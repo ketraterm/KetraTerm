@@ -29,6 +29,29 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostCursorStateTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `alternate exit output follows the reflowed primary prompt`(widenAgain: Boolean) {
+        val exit = "\u001B[?1049l[exited]\r\nPS> ".encodeToByteArray()
+        assertAllByteSplits(exit) { split ->
+            val terminal = TerminalBuffers.create(16, 6)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept("0123456789abcd\r\n\u001B[31m\u001B[?1049h\u001B[32mALT".encodeToByteArray())
+            terminal.resize(8, 6)
+            if (widenAgain) terminal.resize(16, 6)
+            parser.accept(exit, 0, split)
+            parser.accept(exit, split, exit.size - split)
+
+            assertEquals(
+                if (widenAgain) "0123456789abcd\n[exited]\nPS> \n\n\n" else "01234567\n89abcd\n[exited]\nPS> \n\n",
+                terminal.getScreenAsString(),
+            )
+            assertEquals(if (widenAgain) 2 else 3, terminal.cursorRow)
+            assertEquals(4, terminal.cursorCol)
+            assertEquals(CellColor.indexed(1), terminal.getAttrAt(0, terminal.cursorRow)?.foreground)
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("'1048;47',113", "'47;1048',9472")
     fun `ordered mode lists save charsets on the screen active at each parameter`(
         modes: String,

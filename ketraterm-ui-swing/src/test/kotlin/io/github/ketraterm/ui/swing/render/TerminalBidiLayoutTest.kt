@@ -18,13 +18,53 @@ package io.github.ketraterm.ui.swing.render
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Point
+import java.awt.Rectangle
 import java.text.Bidi
 import kotlin.test.*
 
 class TerminalBidiLayoutTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["אבג 12│34 דהו", "العربية 12│34 עברית", "אבג 12 34 דהו"])
+    fun `alternate screen preserves application columns across adjacent panes`(text: String) {
+        val frame =
+            object : TestRenderFrame(arrayOf(Array(text.length) { TestCell(text[it].code, TerminalRenderCellFlags.CODEPOINT) })) {
+                override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            }
+        val cache = renderCache(frame)
+        val geometry = TerminalVisualViewportGeometry()
+        val metrics = SwingMetrics(12, 24, 16, 18, 10, 0, 1)
+        val bounds = Rectangle()
+        val position = Point()
+        for (column in text.indices) {
+            assertTrue(geometry.copyCellBounds(cache, metrics, column, 0, 0, 0, text.length * 12, 24, bounds))
+            assertEquals(column * 12, bounds.x)
+            assertTrue(geometry.copyCellPositionAt(cache, metrics, column * 12 + 6, 12, 0, 0, text.length * 12, 24, position))
+            assertEquals(column, position.x)
+        }
+    }
+
+    @Test
+    fun `returning from alternate screen restores primary bidi with matching metadata`() {
+        val cells = arrayOf(Array(3) { TestCell(0x05D0 + it, TerminalRenderCellFlags.CODEPOINT) })
+        val primary = TestRenderFrame(cells)
+        val alternate =
+            object : TestRenderFrame(cells) {
+                override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            }
+        val cache = renderCache(primary)
+        val geometry = TerminalBidiLayout()
+        assertEquals(2, assertNotNull(geometry.row(cache, 0)).visualColumn(0))
+        cache.accept(alternate)
+        assertNull(geometry.row(cache, 0))
+        cache.accept(primary)
+        assertEquals(2, assertNotNull(geometry.row(cache, 0)).visualColumn(0))
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `overscan row count transitions preserve text direction`(rtl: Boolean) {

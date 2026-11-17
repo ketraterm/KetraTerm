@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.ui.swing.render.TestCell
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
@@ -344,6 +345,31 @@ class TerminalSelectionTextExtractorTest {
             )
 
         assertEquals(expected, extractor.selectedText(cache, CellSelection(selectedColumn, 0, selectedColumn + 1, 0, isBlock = true)))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `alternate screen block copy keeps wide cells at application columns`(clustered: Boolean) {
+        val text = if (clustered) "👩🏽‍💻" else "字"
+        val lead =
+            if (clustered) {
+                TestCell(flags = TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING, cluster = text)
+            } else {
+                TestCell(codeWord = '字'.code, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING)
+            }
+        val frame =
+            object : TestRenderFrame(
+                arrayOf(textCells("א") + arrayOf(lead, TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING)) + textCells("בג")),
+            ) {
+                override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            }
+        val cache = renderCache(frame)
+
+        for (column in 1..2) {
+            assertEquals(text, extractor.selectedText(cache, CellSelection(column, 0, column + 1, 0, isBlock = true)))
+        }
+        assertEquals("א", extractor.selectedText(cache, CellSelection(0, 0, 1, 0, isBlock = true)))
+        assertEquals("א${text}בג", extractor.selectedText(cache, CellSelection(0, 0, 5, 0, isBlock = true)))
     }
 
     @Test

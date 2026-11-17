@@ -219,7 +219,7 @@ internal class TerminalModeControllerImpl(
     override fun enterAltBuffer() {
         if (state.isAltScreenActive) return
 
-        cursorEngine.saveCursor()
+        cursorEngine.saveCursor(followsPrimaryResize = true)
         state.enterAltScreen(clearBeforeEnter = true)
         state.markStructureChanged()
         state.markCursorChanged()

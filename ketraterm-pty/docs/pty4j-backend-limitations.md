@@ -66,6 +66,17 @@ Cursor synchronization is not graphics-aware screen-buffer storage: the upstream
 fix does not make ConPTY understand image pixels or guarantee complete buffer
 consistency for every application.
 
+## Windows alternate-screen resize
+
+The same bundled backend can lose cursor synchronization after an alternate-screen
+application resizes. The terminal restores the reflowed prompt, but the next
+PSReadLine redraw can send an absolute position above it.
+
+Microsoft added [cursor queries after resize](https://github.com/microsoft/terminal/discussions/19947)
+in ConPTY 1.25. An upgrade of the matching native helper pair still needs
+validation for this path. Changing terminal reflow alone does not synchronize
+the backend's console cursor.
+
 ## Distinguish terminal policy from backend limitations
 
 Ordinary Kitty images keep physical cell anchors on width reflow, while text
