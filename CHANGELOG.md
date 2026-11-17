@@ -12,6 +12,9 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Restore the cursor's logical column when widening after a resize moves only
+  the cursor onto a wrapped continuation row.
+
 - Keep sticky command headers visible while typing refreshes the prompt layout.
 
 - Show the inserted text in completion popups, including path prefixes and quotes.

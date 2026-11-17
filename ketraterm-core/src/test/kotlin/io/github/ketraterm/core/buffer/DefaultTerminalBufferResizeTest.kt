@@ -25,6 +25,61 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
     @ParameterizedTest
+    @CsvSource("4, 4, 0", "5, 4, 0", "7, 4, 0", "4, 2, 4", "5, 2, 4", "7, 2, 4")
+    fun `cursor alone on a reflowed continuation returns to its logical column`(
+        cursorColumn: Int,
+        narrowWidth: Int,
+        maxHistory: Int,
+    ) {
+        val buffer = DefaultTerminalBuffer(10, 5, maxHistory)
+        buffer.writeText("abcd")
+        buffer.positionCursor(cursorColumn, 0)
+
+        repeat(3) {
+            buffer.resize(narrowWidth, 5)
+            assertEquals(cursorColumn / narrowWidth, buffer.cursorRow)
+            assertEquals(cursorColumn % narrowWidth, buffer.cursorCol)
+            assertEquals("", stateOf(buffer).ring[buffer.cursorRow].toTextTrimmed())
+            assertFalse(stateOf(buffer).ring[buffer.cursorRow].hasOutput)
+
+            buffer.resize(10, 5)
+            assertEquals(0, buffer.cursorRow)
+            assertEquals(cursorColumn, buffer.cursorCol)
+            assertEquals("abcd\n\n\n\n", buffer.getScreenAsString())
+            assertEquals(0, buffer.historySize)
+        }
+
+        buffer.writeCodepoint('X'.code)
+        assertEquals("abcd" + " ".repeat(cursorColumn - 4) + "X", stateOf(buffer).ring[0].toTextTrimmed())
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `cursor only continuation preserves preceding wide and clustered cells on widening`(clustered: Boolean) {
+        val buffer = DefaultTerminalBuffer(8, 3, 0)
+        buffer.writeText("ab")
+        val payload = intArrayOf(0x2764, 0xFE0F)
+        if (clustered) buffer.writeCluster(payload) else buffer.writeCodepoint(0x4E2D)
+        assertEquals(4, buffer.cursorCol)
+
+        buffer.resize(4, 3)
+        assertEquals(1, buffer.cursorRow)
+        assertEquals(0, buffer.cursorCol)
+        assertEquals("", stateOf(buffer).ring[1].toTextTrimmed())
+
+        buffer.resize(8, 3)
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(4, buffer.cursorCol)
+        assertEquals(if (clustered) "ab\u2764\uFE0F" else "ab中", stateOf(buffer).ring[0].toTextTrimmed())
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getLine(0).getCodepoint(3))
+        if (clustered) {
+            val actual = IntArray(payload.size)
+            assertEquals(payload.size, buffer.getLine(0).readCluster(2, actual))
+            assertArrayEquals(payload, actual)
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `width reflow cancels primary pending wrap while alternate screen is active`(alternate: Boolean) {
         val buffer = DefaultTerminalBuffer(2, 2, 0)

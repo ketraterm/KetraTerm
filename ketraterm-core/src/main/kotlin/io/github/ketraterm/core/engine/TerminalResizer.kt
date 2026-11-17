@@ -383,7 +383,9 @@ internal object TerminalResizer {
                     i == absoluteOldViewportTopRow
 
             val readLength =
-                if (hasCursor && buffer.cursor.col > 0 && i < oldTrailingBlankStart) {
+                // A cursor-only continuation still belongs to the preceding wrapped cells.
+                // Include its cell so the marker keeps its offset in that logical line.
+                if (hasCursor && (builder.size > 0 || (buffer.cursor.col > 0 && i < oldTrailingBlankStart))) {
                     maxOf(
                         dataLength,
                         buffer.cursor.col + 1,
