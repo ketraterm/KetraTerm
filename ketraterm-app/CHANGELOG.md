@@ -8,6 +8,15 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 [0.2.1](#021---2026-07-14) · [0.2.0](#020---2026-07-13) · [0.1.3](#013---2026-07-08) ·
 [0.1.2](#012---2026-07-03) · [0.1.1](#011---2026-07-02) · [0.1.0](#010---2026-06-30)
 
+## [Unreleased]
+
+### Fixed
+
+- Up dismisses automatic suggestions and recalls command history. Further Up/Down
+  presses stay with the shell until typing resumes or completion is requested.
+- Completion popups show the inserted text, including path prefixes and quotes.
+- Sticky command headers remain visible while typing refreshes the prompt layout.
+
 ## [1.0.0] - 2026-11-17
 
 ### Suggestions

@@ -87,7 +87,10 @@ internal class StandaloneSuggestionFixture private constructor(
                 },
         )
 
-    private suspend fun start(decorateProvider: (SwingShellSuggestionProvider) -> SwingShellSuggestionProvider) {
+    private suspend fun start(
+        decorateProvider: (SwingShellSuggestionProvider) -> SwingShellSuggestionProvider,
+        shared: Boolean,
+    ) {
         withContext(Dispatchers.Swing) {
             terminal.preferredSize = terminal.preferredGridSize(COLUMNS, ROWS)
             val effectiveProvider = decorateProvider(provider)
@@ -116,7 +119,7 @@ internal class StandaloneSuggestionFixture private constructor(
                         )
                     }
                 }
-            terminal.setShellSuggestionProvider(fixtureProvider)
+            if (shared) terminal.setSharedShellSuggestionProvider(fixtureProvider) else terminal.setShellSuggestionProvider(fixtureProvider)
             terminal.bind(session) { failure ->
                 if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
             }
@@ -260,7 +263,9 @@ internal class StandaloneSuggestionFixture private constructor(
     }
 
     suspend fun setAutomaticSuggestionsEnabled(enabled: Boolean) {
-        withContext(Dispatchers.IO) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled)) }
+        withContext(
+            Dispatchers.IO,
+        ) { settings.update(settings.config.copy(shellSuggestionsEnabled = enabled, inlineSuggestionsEnabled = enabled)) }
         focusTerminal()
         withContext(Dispatchers.Swing) { terminal.reloadSettings() }
     }
@@ -309,6 +314,15 @@ internal class StandaloneSuggestionFixture private constructor(
     private fun press(code: Int) {
         terminal.keyListeners.forEach { it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
         terminal.keyListeners.forEach { it.keyReleased(KeyEvent(terminal, KeyEvent.KEY_RELEASED, 0, 0, code, KeyEvent.CHAR_UNDEFINED)) }
+    }
+
+    suspend fun acceptInlineWithRight(expectedLine: String) {
+        withTimeout(15.seconds) { terminal.inlineShellSuggestionPresentation.first { it != null } }
+        key(KeyEvent.VK_RIGHT)
+        withContext(Dispatchers.Swing) {
+            assertTrue(!terminal.currentShellSuggestionState().visible, "Inline acceptance must retire popup rows before shell echo")
+        }
+        awaitLine(expectedLine)
     }
 
     suspend fun selectAndAccept(
@@ -402,6 +416,7 @@ internal class StandaloneSuggestionFixture private constructor(
             profile: TerminalProfile,
             directory: Path,
             decorateProvider: (SwingShellSuggestionProvider) -> SwingShellSuggestionProvider = { it },
+            shared: Boolean = false,
             scenario: suspend StandaloneSuggestionFixture.() -> Unit,
         ) {
             val registry = StandaloneCompletionRegistry.create(directory.resolve("learning.json"), persistenceEnabled = false)
@@ -441,7 +456,7 @@ internal class StandaloneSuggestionFixture private constructor(
                     withContext(Dispatchers.Swing) {
                         StandaloneSuggestionFixture(tab, provider, settings).also { fixture = it }
                     }
-                created.start(decorateProvider)
+                created.start(decorateProvider, shared)
                 if (setup != null) {
                     created.awaitExecution(setup)
                     created.awaitLine("", requireShellCompletion = true)
@@ -450,7 +465,15 @@ internal class StandaloneSuggestionFixture private constructor(
                 created.scenario()
                 // Await the shell's exit before JUnit deletes its working directory.
                 // Closing the workspace requests termination but does not await the OS process.
-                withContext(Dispatchers.Swing) { created.terminal.setShellSuggestionProvider(null) }
+                withContext(Dispatchers.Swing) {
+                    if (shared) {
+                        created.terminal.setSharedShellSuggestionProvider(
+                            null,
+                        )
+                    } else {
+                        created.terminal.setShellSuggestionProvider(null)
+                    }
+                }
                 withTimeout(15.seconds) { submitExit(tab.session) }
                 created.awaitClosedAfterExit()
             } catch (caught: Throwable) {

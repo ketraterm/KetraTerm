@@ -30,8 +30,8 @@ import java.util.regex.Pattern
  *
  * @property replacementText text the provider intends to insert or use for
  * command-line replacement after acceptance.
- * @property displayText primary text shown in the popup.
- * @property detail secondary contextual text shown with [displayText], such as
+ * @property displayText provider label addressed by [matchedRanges]. The default popup shows [replacementText].
+ * @property detail secondary contextual text, such as
  * flags, path context, or a short description.
  * @property source stable provider identifier used for feedback and learning,
  * such as `history`, `path`, or `intellij-git-branch`.
@@ -49,7 +49,7 @@ import java.util.regex.Pattern
  * @property replacementEndOffset exclusive UTF-16 end offset in the request
  * command text.
  * @property matchedRanges immutable ordered UTF-16 intervals relative to
- * [displayText] used to visually highlight matching fragments.
+ * [displayText] used to highlight matching fragments when the label equals [replacementText].
  * @property argumentHint display-only placeholders shown after [displayText]. Never inserted,
  * matched, or included in command-learning text; custom providers may supply their own hint.
  * @property backslashPathSeparator whether `\` separates path components in [displayText]

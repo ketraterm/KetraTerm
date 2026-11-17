@@ -35,6 +35,76 @@ class SwingShellSuggestionControllerTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun `retained and hidden popup rows never claim navigation keys`() =
+        onEdt {
+            val scope = TestScope()
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), presentationScope = scope)
+            val old = SwingShellSuggestionInteraction(request())
+            val fresh = SwingShellSuggestionInteraction(request())
+
+            fun assertUnclaimed() {
+                for (key in listOf(
+                    KeyEvent.VK_UP,
+                    KeyEvent.VK_DOWN,
+                    KeyEvent.VK_HOME,
+                    KeyEvent.VK_END,
+                    KeyEvent.VK_TAB,
+                    KeyEvent.VK_ENTER,
+                )) {
+                    assertFalse(controller.handleKeyPressed(keyPressed(key)))
+                }
+            }
+            try {
+                old.publish(suggestions(3))
+                controller.present(old, explicit = false)
+                assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)))
+                controller.retainPresentation()
+                old.close()
+                assertUnclaimed()
+                controller.present(fresh, explicit = false)
+                assertUnclaimed()
+                scope.advanceTimeBy(201.milliseconds)
+                scope.runCurrent()
+                assertFalse(controller.state().visible)
+                assertUnclaimed()
+                fresh.publish(suggestions(3))
+                assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP)))
+                assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)))
+                assertTrue(fresh.hasExplicitSelection)
+            } finally {
+                controller.close()
+                old.close()
+                fresh.close()
+                scope.cancel()
+            }
+        }
+
+    @Test
+    fun `passive popup leaves history and cursor keys to the shell until Down starts browsing`() =
+        onEdt {
+            val scope = TestScope()
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), presentationScope = scope)
+            val interaction = SwingShellSuggestionInteraction(request())
+            try {
+                interaction.publish(suggestions(3))
+                controller.present(interaction, explicit = false)
+                for (key in listOf(KeyEvent.VK_UP, KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_PAGE_UP, KeyEvent.VK_PAGE_DOWN)) {
+                    assertFalse(controller.handleKeyPressed(keyPressed(key)))
+                }
+                assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_ENTER)))
+                assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB)))
+                assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)))
+                assertTrue(controller.isBrowsing)
+                assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP)))
+            } finally {
+                controller.close()
+                interaction.close()
+                scope.cancel()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun `versioned clicks ignore retained rows and accept only the fresh publication`() =
         onEdt {
             val scope = TestScope()
@@ -51,7 +121,7 @@ class SwingShellSuggestionControllerTest {
             val items = suggestions(1)
             try {
                 old.publish(items)
-                controller.present(old)
+                controller.present(old, explicit = false)
                 val displayed = view.snapshot
                 controller.retainPresentation()
                 old.close()
@@ -89,7 +159,7 @@ class SwingShellSuggestionControllerTest {
             val next = SwingShellSuggestionInteraction(request("new"))
             try {
                 old.publish(suggestions(2))
-                controller.present(old)
+                controller.present(old, explicit = false)
                 controller.retainPresentation()
                 old.close()
                 controller.present(next)
@@ -124,7 +194,7 @@ class SwingShellSuggestionControllerTest {
             val next = SwingShellSuggestionInteraction(request("new"))
             try {
                 old.publish(suggestions(2))
-                controller.present(old)
+                controller.present(old, explicit = false)
                 controller.retainPresentation()
                 old.close()
                 controller.present(next)

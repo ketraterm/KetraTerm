@@ -38,6 +38,7 @@ internal class SwingShellSuggestionController(
     private var presentationRevision = 0L
     private var visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
     private var retentionJob: Job? = null
+    private var explicitRequest = false
 
     // Losing a selected candidate must not hand the keyboard to a late inline result.
     var isBrowsing: Boolean = false
@@ -111,6 +112,7 @@ internal class SwingShellSuggestionController(
     /** Keeps only the last painted rows. Their closed publication cannot admit pointer or keyboard actions. */
     fun retainPresentation() {
         isBrowsing = false
+        explicitRequest = false
         if (!view.component.isVisible || visualSnapshot.visibleSuggestions.isEmpty()) return
         presentationRevision++
         interaction?.removeChangeListener(changeListener)
@@ -133,12 +135,16 @@ internal class SwingShellSuggestionController(
         interaction: SwingShellSuggestionInteraction,
         anchorColumn: Int = 0,
         anchorRow: Int = 0,
+        explicit: Boolean = true,
     ): Boolean {
         require(anchorColumn >= 0 && anchorRow >= 0) { "suggestion anchor must be nonnegative" }
         if (!host.settings.smartSuggestionsEnabled || !interaction.isActive) return false
         reloadAppearance()
         if (this.interaction !== interaction) {
-            if (!isRefreshing) isBrowsing = interaction.hasExplicitSelection
+            if (!isRefreshing) {
+                isBrowsing = interaction.hasExplicitSelection
+                explicitRequest = explicit
+            }
             this.interaction?.removeChangeListener(changeListener)
             this.interaction = interaction
             viewportStartIndex = 0
@@ -152,6 +158,7 @@ internal class SwingShellSuggestionController(
 
     fun hide(): Boolean {
         isBrowsing = false
+        explicitRequest = false
         retentionJob?.cancel()
         retentionJob = null
         isRefreshing = false
@@ -166,7 +173,7 @@ internal class SwingShellSuggestionController(
     }
 
     private fun clearPresentation() {
-        if (interaction == null) isBrowsing = false
+        isBrowsing = false
         visualSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
         cleanupSwingResources(
             { view.component.isVisible = false },
@@ -202,6 +209,7 @@ internal class SwingShellSuggestionController(
         val explicitSelection = active.hasExplicitSelection
         val acceptWithEnter = host.settings.acceptSelectedSuggestionWithEnter
         val action = host.suggestionKeymap.actionFor(event) ?: return null
+        if (!isBrowsing && !explicitRequest && action in PASSIVE_SHELL_ACTIONS) return null
         if (action == SwingShellSuggestionAction.ACCEPT_NEXT_WORD) return null
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED && !explicitSelection) return null
         if (action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
@@ -214,8 +222,8 @@ internal class SwingShellSuggestionController(
     }
 
     fun handleKeyPressed(event: KeyEvent): Boolean {
-        val expected = publication ?: return false
         val action = actionFor(event) ?: return false
+        val expected = publication
         val handled = handleAction(action, expected)
         if (handled) event.consume()
         return handled
@@ -364,6 +372,14 @@ internal class SwingShellSuggestionController(
     }
 
     private companion object {
+        val PASSIVE_SHELL_ACTIONS =
+            setOf(
+                SwingShellSuggestionAction.SELECT_PREVIOUS,
+                SwingShellSuggestionAction.SELECT_FIRST,
+                SwingShellSuggestionAction.SELECT_LAST,
+                SwingShellSuggestionAction.SELECT_NEXT_PAGE,
+                SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE,
+            )
         val RETAINED_PRESENTATION_GRACE = 200.milliseconds
     }
 }

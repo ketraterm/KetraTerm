@@ -130,8 +130,7 @@ internal class SwingTerminalInputController(
                     !TerminalModifiers.hasCtrl(event.modifiers) &&
                     !TerminalModifiers.hasAlt(event.modifiers) &&
                     !TerminalModifiers.hasMeta(event.modifiers)
-            if (!textEdit) host.hideShellSuggestions()
-            host.invalidateShellSuggestions()
+            host.invalidateShellSuggestions(textEdit)
         }
         val admitted = host.session?.submitInput(event) == TerminalInputAdmission.ACCEPTED
         if (admitted && !preservesCommandLine) {

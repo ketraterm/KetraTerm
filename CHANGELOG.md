@@ -8,6 +8,19 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 [0.2.1](#021---2026-07-14) · [0.2.0](#020---2026-07-13) · [0.1.3](#013---2026-07-08) ·
 [0.1.2](#012---2026-07-03) · [0.1.1](#011---2026-07-02) · [0.1.0](#010---2026-06-30)
 
+## [Unreleased]
+
+### Fixed
+
+- Keep sticky command headers visible while typing refreshes the prompt layout.
+
+- Show the inserted text in completion popups, including path prefixes and quotes.
+
+- Preserve shell history navigation when automatic Swing suggestions appear.
+  Keep dismissed popups hidden during shell redraws and reject late popup results.
+  Pause automatic inline queries during navigation to preserve shell history.
+  Keep both automatic completion modes.
+
 ## [1.0.0] - 2026-11-17
 
 ### Headless runtime

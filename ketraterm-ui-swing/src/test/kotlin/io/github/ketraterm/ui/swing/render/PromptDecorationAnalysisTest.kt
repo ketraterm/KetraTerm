@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.render
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.api.edtCall
 import kotlinx.coroutines.*
@@ -35,6 +36,68 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PromptDecorationAnalysisTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["typing", "reflow", "eviction", "reset", "binding"])
+    fun `confirmed history prompt survives typing but not invalidation`(transition: String) =
+        runTest {
+            val buffer = TerminalBuffers.create(20, 4, maxHistory = 8)
+            val state = TerminalShellIntegrationState()
+            val cache = TerminalRenderCache(20, 4)
+            buffer.writeText("prompt")
+            buffer.readRenderFrame { cache.accept(it) }
+            val prompt = cache.lineIds[0]
+            state.recordPromptStart(prompt)
+            repeat(4) {
+                buffer.newLine()
+                buffer.writeText("output")
+            }
+            val analysis = PromptDecorationAnalysis(this, StandardTestDispatcher(testScheduler)) {}
+            val initial = request(buffer, state).copy(promptLineId = prompt)
+            analysis.request(initial)
+            runCurrent()
+            buffer.readRenderFrame { cache.accept(it) }
+            assertTrue(analysis.isPromptRetained(buffer, state, cache, prompt))
+            when (transition) {
+                "typing" -> buffer.writeText("x")
+                "reflow" -> buffer.resize(10, 4)
+                "eviction" ->
+                    repeat(20) {
+                        buffer.newLine()
+                        buffer.writeText("tail")
+                    }
+                "reset" -> analysis.reset()
+                "binding" -> Unit
+            }
+            buffer.readRenderFrame { cache.accept(it) }
+            val next = request(buffer, state).copy(promptLineId = prompt)
+            analysis.request(next)
+            val view = if (transition == "binding") TerminalShellIntegrationState() else state
+            assertEquals(transition == "typing", analysis.isPromptRetained(buffer, view, cache, prompt))
+            if (transition == "typing") {
+                assertNull(analysis.projection(next), "The layout worker has not processed the typed character")
+            }
+            runCurrent()
+        }
+
+    @Test
+    fun `live prompt retention needs a current content generation`() =
+        runTest {
+            val buffer = TerminalBuffers.create(20, 4)
+            val state = TerminalShellIntegrationState()
+            val cache = TerminalRenderCache(20, 4)
+            buffer.writeText("prompt")
+            buffer.readRenderFrame { cache.accept(it) }
+            val prompt = cache.lineIds[0]
+            state.recordPromptStart(prompt)
+            val analysis = PromptDecorationAnalysis(this, StandardTestDispatcher(testScheduler)) {}
+            analysis.request(request(buffer, state).copy(promptLineId = prompt))
+            runCurrent()
+            assertTrue(analysis.isPromptRetained(buffer, state, cache, prompt))
+            buffer.writeText("x")
+            buffer.readRenderFrame { cache.accept(it) }
+            assertFalse(analysis.isPromptRetained(buffer, state, cache, prompt))
+        }
+
     @ParameterizedTest
     @ValueSource(strings = ["replace", "reset", "dispose"])
     fun `blocked source leaves EDT responsive and obsolete projections cannot replace the latest demand`(transition: String) {

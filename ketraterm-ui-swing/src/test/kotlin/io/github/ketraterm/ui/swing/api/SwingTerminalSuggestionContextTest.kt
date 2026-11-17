@@ -667,6 +667,93 @@ class SwingTerminalSuggestionContextTest {
             assertEquals("\u007f".repeat(6) + "git status", writes.toString("UTF-8"))
         }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["right", "api", "word"])
+    fun `inline acceptance retires popup results before echo without discarding a word remainder`(acceptance: String) =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionsEnabled = true
+                }
+            view.reloadSettings()
+            var requests = 0
+            view.setSharedShellSuggestionProvider(provider = { request ->
+                requests++
+                flowOf(
+                    listOf(
+                        SwingShellSuggestion("git status --short", 0, request.cursorOffset, "test", "COMMAND"),
+                        SwingShellSuggestion("git stash", 0, request.cursorOffset, "test", "COMMAND"),
+                    ),
+                )
+            })
+            dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(view.currentShellSuggestionState().visible)
+            assertNotNull(view.inlineShellSuggestionPresentation.value)
+            when (acceptance) {
+                "right" -> assertTrue(fixture.press(KeyEvent.VK_RIGHT).isConsumed)
+                "word" -> assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestionNextWord())
+                else -> assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, view.acceptInlineShellSuggestion())
+            }
+            assertFalse(view.currentShellSuggestionState().visible, "Accepted input must retire the old popup before shell echo")
+            dispatcher.scheduler.runCurrent()
+            val command = if (acceptance == "word") "git status" else "git status --short"
+            assertTrue(writes.size() > 0)
+            fixture.feedHost("\r\u001b[2K    $command")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot(command, command.length, 4 + command.length, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertFalse(view.currentShellSuggestionState().visible)
+            assertEquals(1, requests, "Accepted text must not start another automatic request")
+            if (acceptance == "word") {
+                assertNotNull(view.inlineShellSuggestionPresentation.value)
+            } else {
+                assertNull(view.inlineShellSuggestionPresentation.value)
+            }
+        }
+
+    @Test
+    fun `history recall pauses shared providers until typing resumes`() =
+        withInlineFixture { fixture, dispatcher, writes ->
+            val view = fixture.terminal
+            fixture.settings =
+                fixture.settings.copy {
+                    it.inlineShellSuggestionsEnabled = true
+                    it.shellSuggestionsEnabled = true
+                }
+            view.reloadSettings()
+            var requests = 0
+            view.setSharedShellSuggestionProvider(
+                provider = { request ->
+                    requests++
+                    flowOf(
+                        listOf(
+                            SwingShellSuggestion("git status", 0, request.cursorOffset, "spec", "COMMAND"),
+                            SwingShellSuggestion("git stash", 0, request.cursorOffset, "spec", "COMMAND"),
+                        ),
+                    )
+                },
+            )
+            dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(view.currentShellSuggestionState().visible)
+            fixture.press(KeyEvent.VK_UP)
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    git st")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git st", 6, 10, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals("\u001b[A", writes.toString("UTF-8"))
+            assertFalse(view.currentShellSuggestionState().visible)
+            assertNull(view.inlineShellSuggestionPresentation.value)
+            assertEquals(1, requests)
+            view.keyListeners.forEach { it.keyTyped(KeyEvent(view, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 'a')) }
+            dispatcher.scheduler.runCurrent()
+            fixture.feedHost("\r\u001b[2K    git sta")
+            fixture.editableSource.value = TerminalShellCommandLineSnapshot("git sta", 7, 11, 0)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(2, requests)
+            assertNotNull(view.inlineShellSuggestionPresentation.value)
+        }
+
     @Test
     fun `shared publication presents inline from the current frame before the copied frame catches up`() =
         withInlineFixture { fixture, dispatcher, writes ->

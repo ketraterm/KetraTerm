@@ -311,12 +311,14 @@ private class CompletionRenderer(
 
     private fun presentation(suggestion: SwingShellSuggestion): CompletionRow {
         val primaryLimit = 4096
-        val primary = displayText(suggestion.displayText, primaryLimit)
+        val primary = displayText(suggestion.replacementText, primaryLimit)
+        val labelMatchesReplacement = suggestion.displayText == suggestion.replacementText
         val matches =
-            if (suggestion.displayText.length > primaryLimit) {
-                suggestion.matchedRanges.truncatedTo(suggestion.displayText, primary.length - 1)
-            } else {
-                suggestion.matchedRanges
+            when {
+                !labelMatchesReplacement -> SwingShellSuggestionMatchRanges.EMPTY
+                suggestion.replacementText.length > primaryLimit ->
+                    suggestion.matchedRanges.truncatedTo(suggestion.replacementText, primary.length - 1)
+                else -> suggestion.matchedRanges
             }
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
@@ -328,6 +330,7 @@ private class CompletionRenderer(
         val pathNameStart =
             nameStart.takeIf {
                 isPath &&
+                    labelMatchesReplacement &&
                     it > 0 &&
                     nameEnd > it &&
                     primary.none { character -> character.isWhitespace() || character in "'\"`~%*?[]{}()$" } &&

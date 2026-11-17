@@ -38,6 +38,34 @@ import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
     @ParameterizedTest
+    @ValueSource(strings = [".\\utf8.txt", "'./utf8 file.txt'", "folder/utf8.txt", "x"])
+    fun `popup shows replacement instead of a different provider label`(replacement: String) =
+        onEdt {
+            val label = "utf8.txt"
+            val candidate =
+                suggestion(label).copy(
+                    replacementText = replacement,
+                    kind = "PATH",
+                    detail = "File",
+                    matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(label, intArrayOf(0, label.length)),
+                )
+            val view = createView(RecordingListener())
+            try {
+                view.update(snapshot(listOf(candidate), -1, 1, 0))
+                view.list.setSize(1000, 40)
+                val row = view.renderedLabel(candidate)
+                assertEquals("<html>$replacement</html>", row.text.replace("&nbsp;", " "))
+                assertEquals(replacement, row.accessibleContext.accessibleName)
+                assertEquals("<html>$replacement<br>File</html>", row.toolTipText.replace("&nbsp;", " "))
+                assertTrue(row.accessibleContext.accessibleDescription.contains("File"))
+                assertEquals(replacement, candidate.replacementText)
+                assertEquals(label, candidate.displayText)
+            } finally {
+                view.close()
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["foo\\bar.txt", "dir\\name/foo\\bar.txt", "parent/foo\\", "parent/foo\\.."])
     fun `POSIX path presentation preserves literal backslashes in names and parents`(path: String) =
         onEdt {
@@ -198,7 +226,6 @@ class SwingCompletionPopupViewTest {
                 suggestion(path).copy(
                     kind = "PATH",
                     accentRole = SwingShellSuggestionAccentRole.PATH,
-                    replacementText = "'module/rendering/runs/gaps-build.log'",
                     matchedRanges =
                         SwingShellSuggestionMatchRanges.fromPackedOffsets(
                             path,
@@ -219,7 +246,7 @@ class SwingCompletionPopupViewTest {
                 assertTrue(row.text.contains(">g</b>aps-<b "))
                 assertEquals("<html>$path</html>", row.toolTipText)
                 assertEquals(path, row.accessibleContext.accessibleName)
-                assertEquals("'module/rendering/runs/gaps-build.log'", candidate.replacementText)
+                assertEquals(path, candidate.replacementText)
 
                 val selected = view.renderedLabel(candidate, selected = true)
                 assertTrue(selected.text.contains("color:#654321"))
