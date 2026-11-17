@@ -24,11 +24,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.suggestion.*
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.params.ParameterizedTest
@@ -830,6 +826,106 @@ class SwingTerminalCompletionLifecycleTest {
             }
         }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `history input suppresses automatic results before and after publication`(published: Boolean) =
+        onEdtTest {
+            for (mode in SwingShellSuggestionAutomaticMode.entries) {
+                val fixture = SessionFixture(StandardTestDispatcher(testScheduler))
+                val view = RecordingView()
+                val terminal = terminal(testScheduler, view) { settings().copy { it.shellSuggestionAutomaticMode = mode } }
+                val target = RecordingTarget()
+
+                fun press(code: Int) {
+                    terminal.keyListeners.forEach {
+                        it.keyPressed(KeyEvent(terminal, KeyEvent.KEY_PRESSED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED))
+                        it.keyReleased(KeyEvent(terminal, KeyEvent.KEY_RELEASED, 0L, 0, code, KeyEvent.CHAR_UNDEFINED))
+                    }
+                }
+                try {
+                    terminal.setShellSuggestionTarget(target)
+                    terminal.bind(fixture.session)
+                    focus(terminal, true)
+                    runCurrent()
+                    advanceTimeBy(75.milliseconds)
+                    runCurrent()
+                    val original = target.interactions.single()
+                    terminal.presentShellSuggestions(original)
+                    if (published) original.publish(listOf(suggestion))
+
+                    press(KeyEvent.VK_UP)
+                    runCurrent()
+                    fixture.model.value = TerminalShellCommandLineSnapshot("git status", 10, 10, 0)
+                    runCurrent()
+                    original.publish(listOf(suggestion))
+                    focus(terminal, false)
+                    focus(terminal, true)
+                    advanceTimeBy(100.milliseconds)
+                    runCurrent()
+                    press(KeyEvent.VK_DOWN)
+                    runCurrent()
+                    fixture.model.value = snapshot
+                    runCurrent()
+                    advanceTimeBy(100.milliseconds)
+                    runCurrent()
+                    assertEquals("\u001b[A\u001b[B", fixture.connector.output.toString(Charsets.UTF_8))
+                    assertEquals(1, target.interactions.size)
+                    assertTrue(view.snapshot.visibleSuggestions.isEmpty())
+
+                    press(KeyEvent.VK_BACK_SPACE)
+                    runCurrent()
+                    fixture.model.value = TerminalShellCommandLineSnapshot("git ", 4, 4, 0)
+                    runCurrent()
+                    advanceTimeBy(75.milliseconds)
+                    runCurrent()
+                    assertEquals(2, target.interactions.size)
+                    assertEquals(
+                        mode != SwingShellSuggestionAutomaticMode.PARAMETERS_ONLY,
+                        target.interactions
+                            .last()
+                            .request.includeCommandNames,
+                    )
+                } finally {
+                    terminal.dispose()
+                    fixture.close()
+                    runCurrent()
+                }
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste resumes automatic popups only for a single line`(multiline: Boolean) =
+        onEdtTest {
+            val fixture = SessionFixture(StandardTestDispatcher(testScheduler))
+            val terminal = terminal(testScheduler)
+            val target = RecordingTarget()
+            try {
+                terminal.setShellSuggestionTarget(target)
+                terminal.bind(fixture.session)
+                focus(terminal, true)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                val original = target.interactions.single()
+                original.publish(listOf(suggestion))
+                assertTrue(original.dismiss(original.snapshot))
+                assertTrue(terminal.pasteText(if (multiline) "status\ncat file" else "status"))
+                runCurrent()
+                fixture.model.value = TerminalShellCommandLineSnapshot("git status", 10, 10, 0)
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(if (multiline) 1 else 2, target.interactions.size)
+                val explicit = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
+                assertTrue(explicit.request.includeCommandNames)
+            } finally {
+                terminal.dispose()
+                fixture.close()
+                runCurrent()
+            }
+        }
+
     @Test
     fun `explicit empty results retire a pending automatic refresh`() =
         onEdtTest {
@@ -1398,7 +1494,7 @@ class SwingTerminalCompletionLifecycleTest {
         }
 
     @Test
-    fun `acceptance and dismissal suppress unchanged automatic commands until a shell edit`() =
+    fun `acceptance and dismissal suppress automatic commands until a user edit`() =
         onEdtTest {
             for (accept in listOf(false, true)) {
                 val session = SessionFixture(StandardTestDispatcher(testScheduler))
@@ -1434,6 +1530,15 @@ class SwingTerminalCompletionLifecycleTest {
                         runCurrent()
                         assertEquals(1, target.interactions.size, "Cursor movement must retain explicit dismissal")
                     }
+                    session.model.value = snapshot.copy(commandText = "git status", cursorOffset = 10, cursorColumn = 10)
+                    runCurrent()
+                    advanceTimeBy(75.milliseconds)
+                    runCurrent()
+                    assertEquals(1, target.interactions.size, "Shell output alone must not reopen the popup")
+                    terminal.keyListeners.forEach {
+                        it.keyTyped(KeyEvent(terminal, KeyEvent.KEY_TYPED, 0L, 0, KeyEvent.VK_UNDEFINED, 't'))
+                    }
+                    runCurrent()
                     session.model.value = snapshot.copy(commandText = "git st", cursorOffset = 6, cursorColumn = 6)
                     runCurrent()
                     advanceTimeBy(75.milliseconds)

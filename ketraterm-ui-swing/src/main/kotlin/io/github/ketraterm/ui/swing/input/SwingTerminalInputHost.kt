@@ -78,13 +78,14 @@ internal interface SwingTerminalInputHost {
     /**
      * Revokes stale requests and editing capabilities before shell-bound input is submitted.
      *
-     * Cancels provider work and notifies invalidation listeners synchronously. Previously painted
-     * rows may survive as a noninteractive preview while automatic results refresh. Call
-     * [hideShellSuggestions] first when the input also requires immediate visual dismissal.
+     * Sets request eligibility before cancelling provider work and notifying listeners.
+     * Text edits can retain a noninteractive preview. Other input hides the popup immediately.
+     *
+     * @param textEdit true for text insertion or deletion; false for navigation and other shell input.
      *
      * @throws Exception if request cleanup or an invalidation listener fails; input must not be submitted.
      */
-    fun invalidateShellSuggestions()
+    fun invalidateShellSuggestions(textEdit: Boolean)
 
     /**
      * Cancels active suggestion work and removes the surface, including any retained preview.

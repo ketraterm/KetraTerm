@@ -32,6 +32,7 @@ internal class InlineShellSuggestionController(
     private val hide: () -> Unit,
     private val visible: () -> Boolean,
     private val popupOwnsInput: () -> Boolean,
+    private val onAccepting: () -> Unit,
     private val failure: (SwingShellSuggestionInteraction, Exception) -> Unit,
 ) {
     private var active: SwingShellSuggestionInteraction? = null
@@ -122,7 +123,11 @@ internal class InlineShellSuggestionController(
                     observation = null
                     feedbackForPublication = null
                     currentFeedback = null
-                    hide()
+                    val revision = sourceRevision
+                    io.github.ketraterm.ui.swing.cleanupSwingResources(
+                        { if (!interaction.isClosed) onAccepting() },
+                        { if (sourceRevision == revision && active == null) hide() },
+                    )
                 }
             }
         }

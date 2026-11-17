@@ -467,6 +467,12 @@ public class SwingTerminal
                         activeSuggestionInteraction?.let { it.isActive && it.hasExplicitSelection } == true ||
                         popupCompletionCommand?.let { it == session?.activeShellCommandLine()?.commandText } == true
                 },
+                onAccepting = {
+                    automaticSuggestionsSuppressed = true
+                    cancelAndHideShellSuggestionsOnEdt("Inline suggestion acceptance started")
+                    suggestionScheduler?.onInvalidated()
+                    inlineSuggestionScheduler?.onInvalidated()
+                },
                 failure = { interaction, error -> suggestionFailureHandler.onSuggestionFailure(interaction.request, error) },
             )
         }
@@ -798,6 +804,7 @@ public class SwingTerminal
                 analysisDispatcher = searchDispatcher,
             )
         private var shellSuggestionController: SwingShellSuggestionController? = null
+        private var automaticSuggestionsSuppressed = false
         private val inputController =
             SwingTerminalInputController(
                 object : SwingTerminalInputHost {
@@ -861,8 +868,9 @@ public class SwingTerminal
                         return popupAction != null && popup.handleAction(popupAction, popupPublication)
                     }
 
-                    override fun invalidateShellSuggestions() {
-                        invalidateShellSuggestionsOnEdt(retainPresentation = true)
+                    override fun invalidateShellSuggestions(textEdit: Boolean) {
+                        automaticSuggestionsSuppressed = !textEdit
+                        invalidateShellSuggestionsOnEdt(retainPresentation = textEdit)
                     }
 
                     override fun hideShellSuggestions() {
@@ -1197,6 +1205,10 @@ public class SwingTerminal
                     override fun inputMethodTextChanged(event: InputMethodEvent) {
                         val text = event.text
                         inlineCompositionActive = text != null && text.endIndex - text.beginIndex > event.committedCharacterCount
+                        if (inlineCompositionActive) {
+                            automaticSuggestionsSuppressed = true
+                            cancelAndHideShellSuggestionsOnEdt("Input composition started")
+                        }
                         clearInlineShellSuggestion()
                         updateInlineSuggestionEligibilityOnEdt()
                     }
@@ -2029,6 +2041,7 @@ public class SwingTerminal
                 return@deferChanges
             }
             popupCompletionCommand = null
+            automaticSuggestionsSuppressed = false
             bindingIdentity.set(false)
             bindingIdentity = binding
             cleanupSwingResources(
@@ -2990,7 +3003,11 @@ public class SwingTerminal
                     observationScope = componentScope,
                     edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
                     isFocused = { terminalFocused },
-                    isEligible = { isAutomaticShellSuggestionEligible() },
+                    isEligible = {
+                        isAutomaticShellSuggestionEligible() &&
+                            !automaticSuggestionsSuppressed &&
+                            !inlineCompositionActive
+                    },
                     isRequestCurrent = {
                         activeSuggestionInteraction?.let { it.isActive && it.contextIsCurrent?.invoke() != false } == true
                     },
@@ -3052,7 +3069,7 @@ public class SwingTerminal
                     observationScope = componentScope,
                     edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
                     isFocused = { terminalFocused },
-                    isEligible = ::isInlineSuggestionEligibleOnEdt,
+                    isEligible = { !automaticSuggestionsSuppressed && isInlineSuggestionEligibleOnEdt() },
                     isRequestCurrent = inlineRequests::isRequestCurrent,
                     requestSuggestions = { _, feedback ->
                         val provider = inlineShellSuggestionProvider
@@ -3135,6 +3152,7 @@ public class SwingTerminal
                     request
                 }
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return null
+            if (automatic && automaticSuggestionsSuppressed) return null
             if (automatic && !activeSuggestionIsAutomatic) {
                 val revision = suggestionRevision
                 if (activeSuggestionInteraction?.validateContext() == true || suggestionRevision != revision) return null
@@ -3237,6 +3255,7 @@ public class SwingTerminal
                             {
                                 if (!interaction.isClosed || interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED) {
                                     if (suggestionRevision == revision) {
+                                        automaticSuggestionsSuppressed = true
                                         suggestionScheduler?.onInvalidated(
                                             dismissed = interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED,
                                         )
@@ -3334,7 +3353,8 @@ public class SwingTerminal
             check(SwingUtilities.isEventDispatchThread()) { "suggestion presentation must run on the EDT" }
             require(anchorColumn >= 0 && anchorRow >= 0) { "suggestion anchor must be nonnegative" }
             if (activeSuggestionInteraction !== interaction || !interaction.isActive) return
-            getOrCreateShellSuggestionController().present(interaction, anchorColumn, anchorRow)
+            if (activeSuggestionIsAutomatic && automaticSuggestionsSuppressed) return
+            getOrCreateShellSuggestionController().present(interaction, anchorColumn, anchorRow, explicit = !activeSuggestionIsAutomatic)
             doLayout()
         }
 
@@ -3403,7 +3423,13 @@ public class SwingTerminal
                         },
                         hideInline = { inlineRequests.close() },
                         popupEnabled = {
-                            sharedSuggestionPopupEnabled == true && (!activeSuggestionIsAutomatic || settings.shellSuggestionsEnabled)
+                            sharedSuggestionPopupEnabled == true &&
+                                (
+                                    !activeSuggestionIsAutomatic ||
+                                        settings.shellSuggestionsEnabled &&
+                                        !automaticSuggestionsSuppressed &&
+                                        !inlineCompositionActive
+                                )
                         },
                     )
             }
@@ -3798,6 +3824,7 @@ public class SwingTerminal
             identity: Any,
         ): Boolean {
             if (text.isEmpty() || !isCurrentPasteBinding(boundSession, identity)) return false
+            automaticSuggestionsSuppressed = text.any { it == '\r' || it == '\n' }
             invalidateShellSuggestionsOnEdt()
             if (!isCurrentPasteBinding(boundSession, identity) ||
                 boundSession.submitInput(TerminalPasteEvent(text)) != TerminalInputAdmission.ACCEPTED
@@ -3886,6 +3913,7 @@ public class SwingTerminal
             val boundSession = session ?: return false
             selectionController.clearSelection()
             searchController.clear()
+            automaticSuggestionsSuppressed = true
             invalidateShellSuggestionsOnEdt()
             if (boundSession.submitInput(CLEAR_SCREEN_KEY_EVENT) != TerminalInputAdmission.ACCEPTED) return false
             scrollViewportToOnEdt(0)

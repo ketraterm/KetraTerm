@@ -387,7 +387,8 @@ class SwingTerminalInputControllerTest {
             return shellSuggestionKeyHandled
         }
 
-        override fun invalidateShellSuggestions() {
+        override fun invalidateShellSuggestions(textEdit: Boolean) {
+            if (!textEdit) hideShellSuggestions()
             invalidationCount++
             visibilityAtInvalidation += suggestionsVisible
         }

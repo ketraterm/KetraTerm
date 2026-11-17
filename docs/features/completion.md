@@ -63,20 +63,29 @@ prediction. KetraTerm's inline preview does not paint over fish's native predict
 
 With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
-An automatic popup is passive: provider preselection and hover do not enable
-Tab or Enter acceptance. Deliberate navigation selects an item; Tab or Enter inserts it without
-executing when that preference is enabled. After acceptance, new results become
-passive again, so Enter executes the committed command rather than accepting a
-new child directory. With no visible inline text or deliberate popup selection,
-Tab reaches the shell for its own completion, even when there is only one candidate.
-Automatic refreshes cannot replace an active Ctrl+Space request.
-After Escape, automatic suggestions remain dismissed across cursor movement and
-focus changes until the command text changes. Completion candidates that leave the
-command text unchanged are omitted; explicit completion remains available.
-Enter acceptance and automatic popups are preferences. Shell-native Tab completion
-remains a separate facility.
+An automatic popup is passive. Up dismisses it and recalls shell history.
+Down starts popup navigation. Home, End, and Page keys stay with the shell until
+popup navigation starts. Provider preselection and hover do not enable Tab or
+Enter acceptance. Deliberate navigation selects an item. Tab or Enter inserts it
+without executing when that preference is enabled.
+
+History navigation suppresses automatic popups until a text edit or an explicit
+completion request. Cursor movement, native Tab completion, and redraws do not
+reopen the popup. Escape and suggestion acceptance also suppress automatic
+popups until a text edit. Focus changes preserve this suppression.
+Automatic inline requests also pause during shell navigation. Native queries can
+reset the shell editor's history position. Shell-owned predictions remain available.
+
+With no visible inline text or deliberate popup selection, Tab reaches the shell
+for its own completion, even when there is only one candidate. Automatic refreshes
+cannot replace an active Ctrl+Space request. Completion candidates that leave the
+command text unchanged are omitted. Explicit completion remains available.
+Hosts can change the suggestion keymap.
 
 ### Argument hints
+
+The default Swing popup shows the replacement text, including path prefixes and quotes.
+Provider labels do not hide differences in the inserted text.
 
 Command and option rows show argument placeholders when command specifications
 provide metadata, for example `switch <branch>` and `-m <message>`. Named optional

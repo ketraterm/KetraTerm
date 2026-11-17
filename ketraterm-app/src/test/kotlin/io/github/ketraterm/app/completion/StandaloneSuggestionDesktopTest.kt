@@ -23,15 +23,12 @@ import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
@@ -43,12 +40,86 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Native PTY scenarios using standalone sources and the default Swing popup. Run with desktopTest. */
 @Tag("desktop")
 class StandaloneSuggestionDesktopTest {
+    @ParameterizedTest
+    @EnumSource(StandaloneSuggestionShell::class)
+    internal fun `Right accepts shared inline text and closes popup alternatives`(
+        shell: StandaloneSuggestionShell,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            withSession(shell.profile(directory), directory, shared = true, decorateProvider = {
+                SwingShellSuggestionProvider { request ->
+                    flowOf(
+                        listOf(
+                            SwingShellSuggestion("git status", 0, request.commandText.length, "test", "COMMAND"),
+                            SwingShellSuggestion("git stash", 0, request.commandText.length, "test", "COMMAND"),
+                        ),
+                    )
+                }
+            }) {
+                type("git s")
+                awaitPopup("git s", "git stash")
+                acceptInlineWithRight("git status")
+            }
+        }
+
+    @ParameterizedTest
+    @EnumSource(StandaloneSuggestionShell::class)
+    internal fun `automatic suggestions leave repeated shell history navigation intact`(
+        shell: StandaloneSuggestionShell,
+        @TempDir directory: Path,
+    ): Unit =
+        runBlocking {
+            for (shared in listOf(false, true)) {
+                val requests = Channel<String>(Channel.UNLIMITED)
+                withSession(shell.profile(directory), directory, shared = shared, decorateProvider = { delegate ->
+                    object : SwingShellSuggestionProvider {
+                        override fun suggestions(request: SwingShellSuggestionRequest) = delegate.suggestions(request)
+
+                        override fun open(
+                            request: SwingShellSuggestionRequest,
+                        ): io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource {
+                            requests.trySend(request.commandText).getOrThrow()
+                            return delegate.open(request)
+                        }
+                    }
+                }) {
+                    setAutomaticSuggestionsEnabled(false)
+                    val commands = listOf("echo first", "echo second", "echo third")
+                    for (command in commands) {
+                        type(command)
+                        key(KeyEvent.VK_ENTER)
+                        awaitExecution(command)
+                        awaitLine("")
+                    }
+                    setAutomaticSuggestionsEnabled(true)
+                    assertTrue(requests.tryReceive().isFailure, "Shell setup must not start suggestion requests")
+                    for ((key, lines) in listOf(KeyEvent.VK_UP to commands.reversed(), KeyEvent.VK_DOWN to commands.drop(1))) {
+                        for (command in lines) {
+                            key(key)
+                            awaitLine(command)
+                            assertNull(
+                                withTimeoutOrNull(500.milliseconds) { requests.receive() },
+                                "History must not start a native completion query",
+                            )
+                        }
+                    }
+                    type(" ")
+                    awaitLine("echo third ")
+                    assertEquals("echo third ", withTimeout(15.seconds) { requests.receive() })
+                }
+                requests.close()
+            }
+        }
+
     @ParameterizedTest(name = "automatic inline prediction [wrapped={0}, alreadyVisible={1}]")
     @CsvSource("false, false", "false, true", "true, false", "true, true")
     internal fun `PowerShell automatically confirms inline predictions before showing and accepting suggestions`(
