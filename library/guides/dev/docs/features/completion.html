@@ -75,19 +75,25 @@ prediction. KetraTerm&#39;s inline preview does not paint over fish&#39;s native
 <h2 id="using-suggestions">Using suggestions</h2>
 <p>With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
-An automatic popup is passive: provider preselection and hover do not enable
-Tab or Enter acceptance. Deliberate navigation selects an item; Tab or Enter inserts it without
-executing when that preference is enabled. After acceptance, new results become
-passive again, so Enter executes the committed command rather than accepting a
-new child directory. With no visible inline text or deliberate popup selection,
-Tab reaches the shell for its own completion, even when there is only one candidate.
-Automatic refreshes cannot replace an active Ctrl+Space request.
-After Escape, automatic suggestions remain dismissed across cursor movement and
-focus changes until the command text changes. Completion candidates that leave the
-command text unchanged are omitted; explicit completion remains available.
-Enter acceptance and automatic popups are preferences. Shell-native Tab completion
-remains a separate facility.</p>
+An automatic popup is passive. Up dismisses it and recalls shell history.
+Down starts popup navigation. Home, End, and Page keys stay with the shell until
+popup navigation starts. Provider preselection and hover do not enable Tab or
+Enter acceptance. Deliberate navigation selects an item. Tab or Enter inserts it
+without executing when that preference is enabled.</p>
+<p>History navigation suppresses automatic popups until a text edit or an explicit
+completion request. Cursor movement, native Tab completion, and redraws do not
+reopen the popup. Escape and suggestion acceptance also suppress automatic
+popups until a text edit. Focus changes preserve this suppression.
+Automatic inline requests also pause during shell navigation. Native queries can
+reset the shell editor&#39;s history position. Shell-owned predictions remain available.</p>
+<p>With no visible inline text or deliberate popup selection, Tab reaches the shell
+for its own completion, even when there is only one candidate. Automatic refreshes
+cannot replace an active Ctrl+Space request. Completion candidates that leave the
+command text unchanged are omitted. Explicit completion remains available.
+Hosts can change the suggestion keymap.</p>
 <h3 id="argument-hints">Argument hints</h3>
+<p>The default Swing popup shows the replacement text, including path prefixes and quotes.
+Provider labels do not hide differences in the inserted text.</p>
 <p>Command and option rows show argument placeholders when command specifications
 provide metadata, for example <code>switch &lt;branch&gt;</code> and <code>-m &lt;message&gt;</code>. Named optional
 arguments use <code>[name]</code>. Repeated arguments use the same compact placeholder.
@@ -431,7 +437,7 @@ for location, retention, and encoding.</p>
 <p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
 <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
 and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d7f7838ca312310f1a956375f9bd319a311d71bf/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/424ad4a165bdcc309614778c9b26ccf083ac4c1a/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
