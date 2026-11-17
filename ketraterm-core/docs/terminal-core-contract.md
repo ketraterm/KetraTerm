@@ -431,7 +431,9 @@ An effective resize:
   retained anchor or clamps to the oldest surviving row if it is evicted.
 - Wipes and recreates the alternate grid at the new dimensions.
 - Resets vertical and horizontal margins on both screens, resizes tab stops,
-  clamps saved cursors, and clears pending wrap on both screens.
+  and clears pending wrap on both screens.
+- Relocates the mode 1049 return cursor with the primary cursor while the alternate
+  screen is active. Other saved cursors retain their coordinates, clamped to the new bounds.
 
 The returned pair is `(newScrollbackOffset, newHistorySize)` for the active
 screen. Alternate returns `(0, 0)` while primary is resized in the background.
