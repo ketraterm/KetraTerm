@@ -32,8 +32,13 @@ Product changes are recorded in the <a href="https://ketraterm.github.io/KetraTe
 <h2 id="unreleased">[Unreleased]</h2>
 <h3 id="fixed">Fixed</h3>
 <ul>
+<li><p>Keep alternate-screen pane borders, text, cursors, and selections at their
+application positions when rows contain bidirectional text.</p>
+</li>
 <li><p>Restore the cursor&#39;s logical column when widening after a resize moves only
-the cursor onto a wrapped continuation row.</p>
+the cursor onto a wrapped continuation row.
+Keep the primary cursor aligned after resizing an alternate-screen application.
+Exit output no longer overwrites earlier text.</p>
 </li>
 <li><p>Keep sticky command headers visible while typing refreshes the prompt layout.</p>
 </li>
@@ -1014,7 +1019,7 @@ cmd.exe.</p>
 <li><p>Configurable typography, default colors, palettes, and scrollback capacity.</p>
 </li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ced14b7766a7b8be66136d05c53562241685a860/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/0fb2abc7e86235c096908efaf0e363788f4f3250/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

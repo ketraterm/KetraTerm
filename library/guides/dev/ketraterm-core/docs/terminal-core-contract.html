@@ -481,7 +481,9 @@ layout capacity; cursor and viewport positions adjust to the new boundary.</li>
 retained anchor or clamps to the oldest surviving row if it is evicted.</li>
 <li>Wipes and recreates the alternate grid at the new dimensions.</li>
 <li>Resets vertical and horizontal margins on both screens, resizes tab stops,
-clamps saved cursors, and clears pending wrap on both screens.</li>
+and clears pending wrap on both screens.</li>
+<li>Relocates the mode 1049 return cursor with the primary cursor while the alternate
+screen is active. Other saved cursors retain their coordinates, clamped to the new bounds.</li>
 </ul>
 <p>The returned pair is <code>(newScrollbackOffset, newHistorySize)</code> for the active
 screen. Alternate returns <code>(0, 0)</code> while primary is resized in the background.</p>
@@ -547,7 +549,7 @@ per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/ced14b7766a7b8be66136d05c53562241685a860/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/0fb2abc7e86235c096908efaf0e363788f4f3250/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
