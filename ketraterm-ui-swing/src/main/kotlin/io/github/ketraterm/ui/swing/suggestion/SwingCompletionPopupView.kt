@@ -329,7 +329,8 @@ private class CompletionRenderer(
         val isPath = suggestion.kind == "PATH"
         val pathNameStart =
             nameStart.takeIf {
-                isPath && labelMatchesReplacement &&
+                isPath &&
+                    labelMatchesReplacement &&
                     it > 0 &&
                     nameEnd > it &&
                     primary.none { character -> character.isWhitespace() || character in "'\"`~%*?[]{}()$" } &&
