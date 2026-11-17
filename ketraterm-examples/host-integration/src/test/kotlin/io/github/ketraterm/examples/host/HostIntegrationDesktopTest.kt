@@ -65,8 +65,7 @@ class HostIntegrationDesktopTest {
                             }
                         }
                         val content = checkNotNull(pane)
-                        withTimeout(10.seconds) { bound.await() }
-                        session.start()
+                        assertTrue(withTimeout(10.seconds) { startBoundSession(session, bound, CompletableDeferred()) })
                         awaitCondition { session.activeShellCommandLine() != null }
                         val marker = "host_lifecycle_${iteration}_complete"
                         assertEquals(

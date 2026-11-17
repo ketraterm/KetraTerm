@@ -62,6 +62,7 @@ It awaits binding outside the EDT before starting output. The PTY input policy p
 
 The window owns the view lifetime. The outer scope owns the session and launch lifetime.
 Closing the window disposes the view on the EDT, then closes the session and launch off the EDT.
+A close request or host cancellation during startup requests session shutdown before waiting for the startup worker.
 A partial startup follows the same ownership rules. The view never closes a supplied session.
 
 [`HostTerminalPane.kt`](src/main/kotlin/io/github/ketraterm/examples/host/HostTerminalPane.kt) supplies the host chrome and services:
