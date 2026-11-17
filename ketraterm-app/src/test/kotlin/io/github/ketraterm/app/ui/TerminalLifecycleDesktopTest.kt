@@ -28,21 +28,16 @@ import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.awt.GraphicsEnvironment
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JFrame
@@ -223,8 +218,13 @@ class TerminalLifecycleDesktopTest {
                 }
                 cleanup {
                     withContext(Dispatchers.IO) {
+                        // On Linux, ProcessHandle.onExit can complete while the child is still
+                        // a zombie. The PTY watcher waits for PTY4J to reap it before returning.
+                        ownedThreads.firstOrNull { it.name == watcherName }?.let { watcher ->
+                            watcher.join(10_000)
+                            assertFalse(watcher.isAlive, "The owned PTY watcher must terminate")
+                        }
                         process?.let {
-                            it.onExit().get(15, TimeUnit.SECONDS)
                             assertFalse(it.isAlive, "The owned PTY process must terminate")
                         }
                     }

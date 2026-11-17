@@ -422,7 +422,8 @@ pixel-change reporting rules.
 An effective resize:
 
 - Reconstructs and rewraps primary logical lines when width changes, relocating
-  the cursor and copying surviving cluster payloads into new rows.
+  the cursor and copying surviving cluster payloads into new rows. A continuation
+  containing only the cursor retains its logical column when widened again.
 - Preserves retained primary physical rows, attributes, wrap flags, identities,
   and cluster handles for height-only changes. Untouched trailing rows serve as
   layout capacity; cursor and viewport positions adjust to the new boundary.

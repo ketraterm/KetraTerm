@@ -12,6 +12,8 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- The cursor returns to its correct position when widening the window after
+  narrowing moves only the cursor onto the next line.
 - Up dismisses automatic suggestions and recalls command history. Further Up/Down
   presses stay with the shell until typing resumes or completion is requested.
 - Completion popups show the inserted text, including path prefixes and quotes.
