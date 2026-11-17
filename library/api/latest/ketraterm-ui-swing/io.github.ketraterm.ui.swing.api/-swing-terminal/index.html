@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v1.0.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -102,7 +102,7 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-ui-swing</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.ui.swing.api</a><span class="delimiter">/</span><span class="current">SwingTerminal</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Swing</span><wbr><span><span>Terminal</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingTerminal</a> : <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html">JComponent</a>, <a href="../-swing-scrollbar-scroller/index.html">SwingScrollbarScroller</a></div><p class="paragraph">Reusable Swing terminal component.</p><p class="paragraph">The component consumes published render-cache snapshots from a <a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a> and paints terminal rows without knowing which transport produced the bytes. Hosts own session creation, process lifecycle, and connector choice outside this component. One controlling view per session is supported: settings, grid dimensions, and the published viewport belong to the session. Binding multiple components does not create independently configured or independently scrolling views.</p><p class="paragraph">Component state belongs to the Swing Event Dispatch Thread (EDT). Access it on the EDT unless a method explicitly documents another threading contract. Snapshot access and dispatch to the EDT are specified by each public method.</p><p class="paragraph">Component or font/settings changes that resize the bound session's grid clear selection and stop selection dragging. Selection uses physical cell coordinates; unchanged grid dimensions preserve it.</p><p class="paragraph">After closure, the view preserves the final grid, active buffer, palette, and selection. Width changes clip columns without reflow. Height changes show a bottom-anchored window over retained rows. Scrolling includes grid rows hidden above a shorter view. Font changes affect only presentation. No transport work or session restart occurs.</p><p class="paragraph">A focused terminal paints the application's cursor shape and blink state. Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application cursor visibility and viewport clipping. Focus never changes the session's cursor style.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>settings</span><wbr><span><span>Provider</span></span></u></div></span></div><div><div class="title"><p class="paragraph">provider for immutable settings snapshots.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Services</span></span></u></div></span></div><div><div class="title"><p class="paragraph">host-provided non-render services.</p></div></div></div></div></div></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SwingTerminal</a> : <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/swing/JComponent.html">JComponent</a>, <a href="../-swing-scrollbar-scroller/index.html">SwingScrollbarScroller</a>, <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/accessibility/Accessible.html">Accessible</a></div><p class="paragraph">Reusable Swing terminal component.</p><p class="paragraph">The component consumes published render-cache snapshots from a <a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-session/index.html">TerminalSession</a> and paints terminal rows without knowing which transport produced the bytes. Hosts own session creation, process lifecycle, and connector choice outside this component. One controlling view per session is supported: settings, grid dimensions, and the published viewport belong to the session. Binding multiple components does not create independently configured or independently scrolling views.</p><p class="paragraph">Component state belongs to the Swing Event Dispatch Thread (EDT). Access it on the EDT unless a method explicitly documents another threading contract. Snapshot access and dispatch to the EDT are specified by each public method.</p><p class="paragraph">Component or font/settings changes that resize the bound session's grid clear selection and stop selection dragging. Selection uses physical cell coordinates; unchanged grid dimensions preserve it.</p><p class="paragraph">After closure, the view preserves the final grid, active buffer, palette, and selection. Width changes clip columns without reflow. Height changes show a bottom-anchored window over retained rows. Scrolling includes grid rows hidden above a shorter view. Font changes affect only presentation. No transport work or session restart occurs.</p><p class="paragraph">A focused terminal paints the application's cursor shape and blink state. Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application cursor visibility and viewport clipping. Focus never changes the session's cursor style.</p><p class="paragraph">Construct on the EDT. Other operations follow their individual threading contracts.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>settings</span><wbr><span><span>Provider</span></span></u></div></span></div><div><div class="title"><p class="paragraph">provider for immutable settings snapshots.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>host</span><wbr><span><span>Services</span></span></u></div></span></div><div><div class="title"><p class="paragraph">host-provided non-render services.</p></div></div></div></div></div></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
@@ -128,17 +128,17 @@
       </div>
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="1450835443%2FProperties%2F848369053" anchor-label="accessibleContext" id="1450835443%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="-236044324%2FProperties%2F848369053" anchor-label="accessibleContext" id="-236044324%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
-                  <div><a href="index.html#1450835443%2FProperties%2F848369053"><span>accessible</span><wbr><span><span>Context</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1450835443%2FProperties%2F848369053"></span>
+                  <div><a href="accessible-context.html"><span>accessible</span><wbr><span><span>Context</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-236044324%2FProperties%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="index.html#1450835443%2FProperties%2F848369053">accessibleContext</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/accessibility/AccessibleContext.html">AccessibleContext</a><span class="token operator">?</span></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">val </span><a href="accessible-context.html">accessibleContext</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/accessibility/AccessibleContext.html">AccessibleContext</a></div></div></div>
                 </div>
               </div>
             </div>
@@ -634,6 +634,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@set:</span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/beans/BeanProperty.html"><span class="token annotation builtin">BeanProperty</span></a><span class="token punctuation">(</span><span>description<span class="token operator"> = </span><span class="breakable-word"><span class="token string">"Whether or not the JPopupMenu is inherited"</span></span></span><wbr><span class="token punctuation">)</span></div></div><span class="token keyword">open </span><span class="token keyword">var </span><a href="index.html#-1908519171%2FProperties%2F848369053">inheritsPopupMenu</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1324889408%2FProperties%2F848369053" anchor-label="inlineShellSuggestionPresentation" id="1324889408%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="inline-shell-suggestion-presentation.html"><span>inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Presentation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1324889408%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">val </span><a href="inline-shell-suggestion-presentation.html">inlineShellSuggestionPresentation</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/StateFlow///PointingToDeclaration/">StateFlow</span><span class="token operator">&lt;</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-snapshot/index.html">SwingShellSuggestionSnapshot</a><span class="token operator">?</span><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Current managed inline publication when its ghost text can be displayed, otherwise null. This read-only state includes rendering eligibility, not merely provider availability. Updates are conflated; collectors must not infer acceptance from disappearance. Rendering-only presentations have no managed publication. Observing this state does not change input routing.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -1632,7 +1647,37 @@
       </div>
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="1633909446%2FFunctions%2F848369053" anchor-label="action" id="1633909446%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+        <div class="table"><a data-name="475506658%2FFunctions%2F848369053" anchor-label="acceptInlineShellSuggestion" id="475506658%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="accept-inline-shell-suggestion.html"><span>accept</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="475506658%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="accept-inline-shell-suggestion.html"><span class="token function">acceptInlineShellSuggestion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-acceptance-result/index.html">SwingShellSuggestionAcceptanceResult</a></div><div class="brief "><p class="paragraph">Attempts the entire currently visible inline edit once, using its original captured authority.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-35743547%2FFunctions%2F848369053" anchor-label="acceptInlineShellSuggestionNextWord" id="-35743547%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="accept-inline-shell-suggestion-next-word.html"><span>accept</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span>Next</span><wbr><span><span>Word</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-35743547%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="accept-inline-shell-suggestion-next-word.html"><span class="token function">acceptInlineShellSuggestionNextWord</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-acceptance-result/index.html">SwingShellSuggestionAcceptanceResult</a></div><div class="brief "><p class="paragraph">Accepts leading whitespace and the next non-whitespace run of the visible inline suffix. Paths stay together; spaces split quoted arguments too. Grapheme clusters stay intact. The remainder is hidden until the shell reports the accepted prefix without intervening input, resize, or shell metadata changes. Runs on the EDT; unbound in the default keymap.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1633909446%2FFunctions%2F848369053" anchor-label="action" id="1633909446%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -1962,6 +2007,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1366075238%2FFunctions%2F848369053" anchor-label="beginInlineShellSuggestionInteraction" id="-1366075238%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="begin-inline-shell-suggestion-interaction.html"><span>begin</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Interaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1366075238%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="begin-inline-shell-suggestion-interaction.html"><span class="token function">beginInlineShellSuggestionInteraction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">feedbackHandler<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-feedback-handler/index.html">SwingShellSuggestionFeedbackHandler</a><span class="token operator"> = </span>SwingShellSuggestionFeedbackHandler.NONE</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-interaction/index.html">SwingShellSuggestionInteraction</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Captures an independent session-backed inline interaction on the EDT, before provider work.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-1635472203%2FFunctions%2F848369053" anchor-label="beginShellSuggestionInteraction" id="-1635472203%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -2022,6 +2082,21 @@
               </div>
             </div>
           </div>
+<a data-name="-288718025%2FFunctions%2F848369053" anchor-label="clearInlineShellSuggestion" id="-288718025%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="clear-inline-shell-suggestion.html"><span>clear</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-288718025%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="clear-inline-shell-suggestion.html"><span class="token function">clearInlineShellSuggestion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Closes managed inline work and removes its presentation on the EDT. A token passed to the low-level rendering overload remains caller-owned and is not cancelled.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-2077166116%2FFunctions%2F848369053" anchor-label="clearScreen" id="-2077166116%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -2078,6 +2153,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-output-text.html"><span class="token function">commandOutputText</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns all currently retained output for <a href="command-output-text.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1677111712%2FFunctions%2F848369053" anchor-label="commandOutputTextAsync" id="1677111712%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-output-text-async.html"><span>command</span><wbr><span>Output</span><wbr><span>Text</span><wbr><span><span>Async</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1677111712%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="command-output-text-async.html"><span class="token function">commandOutputTextAsync</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Reads retained command output off the EDT. May be called from any coroutine. Returns null when unavailable, changed during extraction, or the binding was replaced. Caller cancellation or an ended binding stops extraction between bounded batches. Cancellation and failures propagate to the caller.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -2382,6 +2472,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1988017484%2FFunctions%2F848369053" anchor-label="dismissInlineShellSuggestion" id="-1988017484%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="dismiss-inline-shell-suggestion.html"><span>dismiss</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1988017484%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="dismiss-inline-shell-suggestion.html"><span class="token function">dismissInlineShellSuggestion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Explicitly dismisses the visible inline publication and reports its preference feedback.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-1236079426%2FFunctions%2F848369053" anchor-label="dispatchEvent" id="-1236079426%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -2483,6 +2588,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte/index.html">Byte</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte/index.html">Byte</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-short/index.html">Short</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-short/index.html">Short</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-char/index.html">Char</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-char/index.html">Char</a></span></span><span class="token punctuation">)</span></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#879512178%2FFunctions%2F848369053"><span class="token function">firePropertyChange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">propertyName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">oldValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">newValue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1623786846%2FFunctions%2F848369053" anchor-label="getAccessibleContext" id="-1623786846%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-accessible-context.html"><span>get</span><wbr><span>Accessible</span><wbr><span><span>Context</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1623786846%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="get-accessible-context.html"><span class="token function">getAccessibleContext</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/javax/accessibility/AccessibleContext.html">AccessibleContext</a></div><div class="brief "><p class="paragraph">Returns the standard Swing accessibility context. Calls may originate outside the EDT.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -3372,6 +3492,21 @@
               </div>
             </div>
           </div>
+<a data-name="-811151450%2FFunctions%2F848369053" anchor-label="presentInlineShellSuggestion" id="-811151450%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="present-inline-shell-suggestion.html"><span>present</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-811151450%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="present-inline-shell-suggestion.html"><span class="token function">presentInlineShellSuggestion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">expected<span class="token operator">: </span><a href="../../../ketraterm-session/io.github.ketraterm.session/-terminal-command-edit-context/index.html">TerminalCommandEditContext</a><span class="token punctuation">, </span></span><span class="parameter ">ghostText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">foreground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Presents a literal append-only ghost suffix against a previously captured edit context. Call on the EDT after asynchronous provider work. Returns false and clears the previous preview for stale, unconfirmed, unsupported or obstructed input. Text is single-line, control-free UTF-16, bounded to 16,384 code units. Wrapping clips to free visible cells; the live grid, selection and copied output never include the preview. <a href="present-inline-shell-suggestion.html">foreground</a> is an optional ARGB color; otherwise the current terminal foreground is used, at muted opacity. This rendering API installs no provider or acceptance bindings and does not own <a href="present-inline-shell-suggestion.html">expected</a>. A newer request started by a close callback takes precedence over this presentation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-557201497%2FFunctions%2F848369053" anchor-label="presentShellSuggestions" id="-557201497%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -3477,17 +3612,17 @@
               </div>
             </div>
           </div>
-<a data-name="-485156279%2FFunctions%2F848369053" anchor-label="reloadSettings" id="-485156279%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+<a data-name="1654797953%2FFunctions%2F848369053" anchor-label="reloadSettings" id="1654797953%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
                   <div><a href="reload-settings.html"><span>reload</span><wbr><span><span>Settings</span></span></a></div>
-<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-485156279%2FFunctions%2F848369053"></span>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1654797953%2FFunctions%2F848369053"></span>
                     <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="reload-settings.html"><span class="token function">reloadSettings</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies changed settings, rebuilding geometry only when its inputs change.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="reload-settings.html"><span class="token function">reloadSettings</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies changed settings and logs operational failures. See <a href="reload-settings.html">reloadSettings</a> with a completion callback.</p></div><div class="symbol monospace"><span class="token keyword">fun </span><a href="reload-settings.html"><span class="token function">reloadSettings</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">onComplete<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies changed settings, rebuilding geometry only when its inputs change.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -3792,6 +3927,21 @@
               </div>
             </div>
           </div>
+<a data-name="191291623%2FFunctions%2F848369053" anchor-label="requestActiveInlineShellSuggestions" id="191291623%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-active-inline-shell-suggestions.html"><span>request</span><wbr><span>Active</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="191291623%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="request-active-inline-shell-suggestions.html"><span class="token function">requestActiveInlineShellSuggestions</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">feedbackHandler<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-feedback-handler/index.html">SwingShellSuggestionFeedbackHandler</a><span class="token operator"> = </span>SwingShellSuggestionFeedbackHandler.NONE</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-interaction/index.html">SwingShellSuggestionInteraction</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Explicitly requests the configured inline provider, even when automatic inline requests are disabled. Call on the EDT. Returns the caller-owned interaction, or null when no provider or editable context is available.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1708153196%2FFunctions%2F848369053" anchor-label="requestActiveShellSuggestions" id="1708153196%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -3848,6 +3998,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#955488965%2FFunctions%2F848369053"><span class="token function">requestFocusInWindow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">cause<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/event/FocusEvent.Cause.html">FocusEvent.Cause</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="index.html#955488965%2FFunctions%2F848369053"><span class="token function">requestFocusInWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="98972865%2FFunctions%2F848369053" anchor-label="requestInlineShellSuggestions" id="98972865%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-inline-shell-suggestions.html"><span>request</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span><span>Suggestions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="98972865%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="request-inline-shell-suggestions.html"><span class="token function">requestInlineShellSuggestions</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">interaction<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-interaction/index.html">SwingShellSuggestionInteraction</a><span class="token punctuation">, </span></span><span class="parameter ">provider<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-inline-shell-suggestion-provider/index.html">SwingInlineShellSuggestionProvider</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Opens one inline provider on the EDT and collects its source off the EDT. Popup requests remain independent.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -4122,6 +4287,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1490253727%2FFunctions%2F848369053" anchor-label="selectedTextAsync" id="-1490253727%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="selected-text-async.html"><span>selected</span><wbr><span>Text</span><wbr><span><span>Async</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1490253727%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="selected-text-async.html"><span class="token function">selectedTextAsync</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Reads the captured selection off the EDT, including retained offscreen rows. May be called from any coroutine. Returns null if selection, layout, or binding becomes obsolete, or content changes during extraction. Wide cells, bidi block selection and soft wrapping follow <a href="selected-text.html">selectedText</a>. Caller cancellation or an ended binding stops work between bounded batches; cancellation and failures propagate to the caller.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-1617304943%2FFunctions%2F848369053" anchor-label="selectNextSearchResult" id="-1617304943%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -4208,6 +4388,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">fun </span><a href="set-host-policy.html"><span class="token function">setHostPolicy</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">policy<span class="token operator">: </span><a href="../../../ketraterm-host/io.github.ketraterm.host/-host-policy/index.html">HostPolicy</a><span class="token punctuation">, </span></span><span class="parameter ">onComplete<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>mutationFailureHandler</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies <a href="set-host-policy.html">policy</a> after previously accepted view settings and geometry changes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1165713376%2FFunctions%2F848369053" anchor-label="setInlineShellSuggestionKeymap" id="-1165713376%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-inline-shell-suggestion-keymap.html"><span>set</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Keymap</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1165713376%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="set-inline-shell-suggestion-keymap.html"><span class="token function">setInlineShellSuggestionKeymap</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">keymap<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-keymap/index.html">SwingShellSuggestionKeymap</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Replaces inline Right/Escape defaults. Inline acceptance wins while the popup is passive; deliberate popup browsing hides inline text and owns its acceptance keys.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1803706962%2FFunctions%2F848369053" anchor-label="setInlineShellSuggestionProvider" id="1803706962%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-inline-shell-suggestion-provider.html"><span>set</span><wbr><span>Inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Provider</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1803706962%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="set-inline-shell-suggestion-provider.html"><span class="token function">setInlineShellSuggestionProvider</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">provider<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-inline-shell-suggestion-provider/index.html">SwingInlineShellSuggestionProvider</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Installs a host-owned inline provider for optional automatic and explicit requests. Call on the EDT before or after binding. Replacement cancels automatic inline work; manual interactions remain caller-owned. Providers survive rebinding and are never closed here.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -4317,6 +4527,21 @@
               </div>
             </div>
           </div>
+<a data-name="1627487941%2FFunctions%2F848369053" anchor-label="setSharedShellSuggestionProvider" id="1627487941%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-shared-shell-suggestion-provider.html"><span>set</span><wbr><span>Shared</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Provider</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1627487941%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="set-shared-shell-suggestion-provider.html"><span class="token function">setSharedShellSuggestionProvider</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">provider<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-provider/index.html">SwingShellSuggestionProvider</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">popupEnabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Uses one source, debounce and ranking for inline text and the built-in popup. Each ranking is presented on the EDT: the best result is tried inline first, and the popup receives the remaining rows, or all rows when inline cannot render. Deliberate popup browsing keeps its rows stable and suppresses inline text. <a href="set-shared-shell-suggestion-provider.html">popupEnabled</a> also controls explicit popup availability; inline uses its normal settings. Automatic work uses <a href="../../io.github.ketraterm.ui.swing.settings/-swing-settings/shell-suggestion-debounce-millis.html">SwingSettings.shellSuggestionDebounceMillis</a>. This replaces any independent inline provider. Call on the EDT.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="341169890%2FFunctions%2F848369053" anchor-label="setShellSuggestionFailureHandler" id="341169890%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -4328,6 +4553,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="set-shell-suggestion-failure-handler.html"><span class="token function">setShellSuggestionFailureHandler</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">handler<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-failure-handler/index.html">SwingShellSuggestionFailureHandler</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Selects provider diagnostics for this view on the EDT; null restores logging.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2110648039%2FFunctions%2F848369053" anchor-label="setShellSuggestionKeymap" id="2110648039%2FFunctions%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-shell-suggestion-keymap.html"><span>set</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span><span>Keymap</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2110648039%2FFunctions%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">fun </span><a href="set-shell-suggestion-keymap.html"><span class="token function">setShellSuggestionKeymap</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">keymap<span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-keymap/index.html">SwingShellSuggestionKeymap</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Replaces popup bindings on the EDT. Selected-only actions still require deliberate selection.</p></div></div></div>
                 </div>
               </div>
             </div>

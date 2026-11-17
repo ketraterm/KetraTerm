@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v1.0.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -105,7 +105,7 @@
     <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalRenderFrame</a></div><p class="paragraph">Short-lived primitive view of the terminal's render state for one viewport.</p><p class="paragraph">A frame exposes stable public render encodings, not core internal storage. Consumers should copy rows into caller-owned primitive arrays during the enclosing <a href="../-terminal-render-frame-reader/read-render-frame.html">TerminalRenderFrameReader.readRenderFrame</a> callback.</p></div></div>
   </div>
   <div class="tabbedcontent">
-    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button><button class="section-tab" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION,EXTENSION_PROPERTY,EXTENSION_FUNCTION">Members &amp; Extensions</button></div>
     <div class="tabs-section-body">
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
@@ -134,7 +134,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Number of visible columns in each render row.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="columns.html">columns</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Positive number of visible columns in each render row.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -229,6 +229,21 @@
               </div>
             </div>
           </div>
+<a data-name="1938855208%2FProperties%2F1947863099" anchor-label="hasFullScreenMargins" id="1938855208%2FProperties%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="has-full-screen-margins.html"><span>has</span><wbr><span>Full</span><wbr><span>Screen</span><wbr><span><span>Margins</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1938855208%2FProperties%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="has-full-screen-margins.html">hasFullScreenMargins</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Whether printable wrapping uses the full grid with unrestricted margins. Readers without this optional geometry proof return false; text previews must fail closed.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="1230980283%2FProperties%2F1947863099" anchor-label="historyContentGeneration" id="1230980283%2FProperties%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
             <div class="main-subrow keyValue ">
@@ -254,7 +269,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="history-size.html">historySize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Number of retained off-screen history lines available in this frame.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">val </span><a href="history-size.html">historySize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Nonnegative number of retained off-screen history lines available in this frame.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -299,7 +314,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Number of visible render rows.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="rows.html">rows</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Positive number of visible render rows.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -439,6 +454,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="line-wrapped.html"><span class="token function">lineWrapped</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Reports whether visible <a href="line-wrapped.html">row</a> soft-wraps into the next row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1009121439%2FFunctions%2F1947863099" anchor-label="requireValidGeometry" id="-1009121439%2FFunctions%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-togglable="EXTENSION_FUNCTION" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../require-valid-geometry.html"><span>require</span><wbr><span>Valid</span><wbr><span><span>Geometry</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1009121439%2FFunctions%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="index.html">TerminalRenderFrame</a><span class="token punctuation">.</span><a href="../require-valid-geometry.html"><span class="token function">requireValidGeometry</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Validates a borrowed frame's dimensions and retained-row geometry without copying cells. The provider must keep the frame stable throughout validation and subsequent use.</p></div></div></div>
                 </div>
               </div>
             </div>

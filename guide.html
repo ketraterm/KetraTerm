@@ -12,7 +12,7 @@
   <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
   <script type="module" src="assets/site.js"></script>
 </head>
-<body data-product="app" data-version="v0.5.0 · Stable release">
+<body data-product="app" data-version="v1.0.0 · Stable release">
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="site-identity">
@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a aria-current="page"  href="guide.html">Guide</a><a   href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a aria-current="page" href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App guide</span></li></ol></nav><div class="doc-version"><span>v0.5.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shells-and-sessions">Shells and sessions</a><a class="depth-2" href="#commands-and-output">Commands and output</a><a class="depth-2" href="#appearance-and-settings">Appearance and settings</a><a class="depth-2" href="#completion">Completion</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a></nav></details><div class="article-content"><div class="prose"><h1 id="using-ketraterm">Using KetraTerm</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a aria-current="page" href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App guide</span></li></ol></nav><div class="doc-version"><span>v1.0.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shells-and-sessions">Shells and sessions</a><a class="depth-2" href="#commands-and-output">Commands and output</a><a class="depth-2" href="#appearance-and-settings">Appearance and settings</a><a class="depth-2" href="#keyboard-scrolling-and-selection">Keyboard, scrolling, and selection</a><a class="depth-2" href="#companion-commands">Companion commands</a><a class="depth-2" href="#completion">Completion</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a></nav></details><div class="article-content"><div class="prose"><h1 id="using-ketraterm">Using KetraTerm</h1>
 <p>KetraTerm runs your local shells in tabs and split panes. Platform packages
 include a Java runtime; the Java-preinstalled archive requires Java 25.</p>
 <h2 id="shells-and-sessions">Shells and sessions</h2>
@@ -34,6 +34,11 @@ your machine; WSL discovery uses the default distribution.</p>
 <p>Use tabs for separate sessions and split panes to keep sessions side by side.
 Tabs can have custom names and accent colors. The app does not restore sessions
 after a restart.</p>
+<p>When a process exits unsuccessfully, the terminal retains its output and shows
+an exit-status banner with a Close button. Transport failures and exits without
+a reported status are retained too. You can still scroll, select, copy, and
+search; the ended session accepts no input. Closing it does not ask to kill a
+process. Successful exits keep the normal automatic close behavior.</p>
 <h2 id="commands-and-output">Commands and output</h2>
 <p>Interactive PowerShell, Bash, zsh, and fish launches receive prompt hooks.
 These enable command markers, exit status, navigation between retained commands,
@@ -43,6 +48,9 @@ these hooks. Prompt customizations can affect command tracking.</p>
 <p>Use terminal search to find text in the visible screen and retained history.
 Copying reconstructs soft-wrapped lines. Hold Shift to use local mouse selection
 when a terminal application has enabled mouse reporting.</p>
+<p>Pasting text with line breaks or control characters opens a review dialog.
+Controls appear as escapes in a shortened preview. Choose Paste to submit the
+captured clipboard text, or Cancel to leave the running application untouched.</p>
 <h2 id="appearance-and-settings">Appearance and settings</h2>
 <p>Open the settings dialog to choose a theme and font, adjust line height and
 cursor appearance, and configure shell and terminal permissions. Saved
@@ -51,6 +59,98 @@ new terminals.</p>
 <p>The <a href="settings.html">settings reference</a> lists configuration keys,
 defaults, and file locations. Restart the app after editing <code>config.toml</code>
 directly. Built-in keyboard shortcuts follow the platform.</p>
+<h2 id="keyboard-scrolling-and-selection">Keyboard, scrolling, and selection</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Windows</th>
+<th>Linux</th>
+<th>macOS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Copy selection</td>
+<td>Ctrl+C or Ctrl+Shift+C</td>
+<td>Ctrl+Shift+C</td>
+<td>Cmd+C</td>
+</tr>
+<tr>
+<td>Paste</td>
+<td>Ctrl+V or Ctrl+Shift+V</td>
+<td>Ctrl+Shift+V</td>
+<td>Cmd+V</td>
+</tr>
+<tr>
+<td>New terminal</td>
+<td>Ctrl+Shift+T</td>
+<td>Ctrl+Shift+T</td>
+<td>Cmd+T</td>
+</tr>
+<tr>
+<td>Close active pane</td>
+<td>Ctrl+Shift+W</td>
+<td>Ctrl+Shift+W</td>
+<td>Cmd+W</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>Ctrl+Shift+F</td>
+<td>Ctrl+Shift+F</td>
+<td>Cmd+Shift+F</td>
+</tr>
+<tr>
+<td>Increase / decrease font size</td>
+<td>Ctrl+Plus / Ctrl+Minus</td>
+<td>Ctrl+Plus / Ctrl+Minus</td>
+<td>Cmd+Plus / Cmd+Minus</td>
+</tr>
+<tr>
+<td>Reset font size</td>
+<td>Ctrl+0</td>
+<td>Ctrl+0</td>
+<td>Cmd+0</td>
+</tr>
+<tr>
+<td>Next / previous tab</td>
+<td>Ctrl+Tab / Ctrl+Shift+Tab</td>
+<td>Ctrl+Tab / Ctrl+Shift+Tab</td>
+<td>Ctrl+Tab / Ctrl+Shift+Tab</td>
+</tr>
+<tr>
+<td>Page through history</td>
+<td>Shift+Page Up / Shift+Page Down</td>
+<td>Shift+Page Up / Shift+Page Down</td>
+<td>Shift+Page Up / Shift+Page Down</td>
+</tr>
+<tr>
+<td>Oldest history / live output</td>
+<td>Shift+Home / Shift+End</td>
+<td>Shift+Home / Shift+End</td>
+<td>Shift+Home / Shift+End</td>
+</tr>
+</tbody></table></div>
+<p>On Windows, Ctrl+C reaches the running program when nothing is selected. Font
+zoom affects only the current pane and is not saved. Reset restores the font
+size configured in settings. The equals key also increases the size with the
+platform modifier; numeric-keypad plus and minus work too.</p>
+<p>Wheel scrolling follows the operating system&#39;s scroll amount, and fractional
+trackpad motion accumulates without being discarded. Paging retains one row of
+context. New output follows the bottom while you are there and preserves your
+position when you scroll back; <code>scroll_on_output</code> can explicitly enable returning
+to the bottom on new output. Accepted terminal input or paste returns to live
+output. Terminal mouse reporting takes priority over local scrolling; alternate
+screen applications without mouse reporting can receive wheel motion as arrow keys.</p>
+<p>Drag to select text, double-click to select a word or path, and triple-click to
+select a row. Continuing a double- or triple-click drag extends by whole words
+or rows, including when you reverse direction. Alt+drag makes a rectangular
+selection. Copying preserves indentation and interior spaces, removes trailing
+row blanks, and joins soft wraps for a linear selection. Block selections keep
+their row breaks. Selection alone does not overwrite the clipboard.</p>
+<p>Hold Shift for local mouse interaction when an application reports mouse input,
+unless it explicitly requests Shift capture. Bare Ctrl+A and Ctrl+L remain
+available to the shell. Tab and pane shortcuts apply only in the app&#39;s own window.</p>
+<h2 id="companion-commands">Companion commands</h2>
 <p>Native local profiles include three helper commands:</p>
 <pre><code class="language-shell">ketra version
 ketra info
@@ -60,8 +160,8 @@ ketra config
 the helper&#39;s editor selection. WSL and Ubuntu launcher profiles do not receive
 the native helper.</p>
 <h2 id="completion">Completion</h2>
-<p>KetraTerm suggestions are enabled by default. Use the Shell Suggestions section
-in settings to change automatic popups, Enter acceptance, and learning persistence.
+<p>KetraTerm suggestions are enabled by default. Use the <strong>Suggestions</strong> settings
+page to change inline previews, popup mode, shortcuts, and learning persistence.
 The master switch is also available in <code>config.toml</code>; restart the app after
 editing the file directly:</p>
 <pre><code class="language-toml">[behavior]
@@ -69,11 +169,32 @@ smart_suggestions_enabled = true
 </code></pre>
 <p>Suggestions need an editable command context from shell integration. Press
 Ctrl+Space to request them, use arrows or Page Up/Page Down to navigate, Tab to
-accept, and Escape to dismiss. Enter accepts an already selected suggestion by default. Shell-native
-Tab completion is separate.</p>
+accept a deliberately selected item, and Escape to dismiss. Enter also accepts a
+deliberately selected suggestion by default. With no deliberate popup selection or
+visible inline text, Tab reaches the shell&#39;s own completion. When no editable shell context is available,
+Ctrl+Space reaches the running application instead.</p>
 <p>Suggestions combine built-in command specifications, local files and directories,
 and bounded learning. WSL or remote directory reports do not provide a remote
 filesystem completion service.</p>
+<p>Enable <strong>Inline suggestions</strong> on the Suggestions page to preview the first ranked
+completion as ghost text. This is off by default and works even when popups are
+disabled. Both surfaces use the same completion sources and ranking. If the top
+result would rewrite existing text, it remains popup-only; inline does not skip
+to another result.
+Right Arrow accepts a visible suffix while the popup is passive; Tab invokes shell completion. Up/Down select
+popup items and hide inline text; Tab or Enter then inserts that choice without
+execution. Fresh child suggestions remain passive for Tab and Enter: Tab invokes
+shell completion and Enter executes the directory already entered. Escape dismisses the popup first, then inline text. See the
+<a href="https://github.com/ketraterm/KetraTerm/blob/d7f7838ca312310f1a956375f9bd319a311d71bf/docs/features/completion.md#inline-suffix-presentation">inline contract</a>
+for matching and shell-prediction limits.</p>
+<p>Choose popup mode <strong>Off</strong>, <strong>On request</strong>, or <strong>Automatic</strong>. Automatic popups
+include command names by default; clear <strong>Include command names</strong> to show them
+only for parameters. Inline and popup presentation can be enabled independently; the master
+switch disables both.</p>
+<p>The three shortcut rows control accepting inline text, accepting a selected popup
+item, and opening the popup. Click <strong>+</strong>, then press the shortcut to add it. Click
+a chip to remove it; removing every chip disables that action. Remove Enter from
+<strong>Accept selected popup</strong> to keep Enter available to the shell.</p>
 <p>Learning stays in memory unless persistence is enabled explicitly. Persisted
 learning can include plaintext command data; filtering cannot identify every
 secret. Treat the learning file as sensitive. See the persistence setting in the
@@ -83,8 +204,11 @@ secret. Treat the learning file as sensitive. See the persistence setting in the
 including nested SSH sessions. They are separate from your explicit copy and
 paste actions. New configurations allow clipboard writes and ask before reads;
 you can change this in settings. Window manipulation is disabled by default.</p>
+<p>Invalid explicit clipboard or title permissions deny access and report the
+affected key and configuration file. If the whole file cannot be loaded, these
+permissions are denied in the recovery configuration as well.</p>
 <p>See the <a href="changelog.html">app changelog</a> for changes by release.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7dcfc83900ee09cc023b78035e6a56199042ac2/ketraterm-app/docs/user-guide.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/d7f7838ca312310f1a956375f9bd319a311d71bf/ketraterm-app/docs/user-guide.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
     <p>Open source · Apache 2.0</p>

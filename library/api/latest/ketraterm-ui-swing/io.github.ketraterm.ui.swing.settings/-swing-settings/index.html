@@ -38,7 +38,7 @@
 <div class="ketraterm-api-navigation">
   <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
   <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
-  <div class="ketraterm-api-reference"><span>API · v0.5.0</span><a href="../../../../../versions.html">All versions</a></div>
+  <div class="ketraterm-api-reference"><span>API · v1.0.0</span><a href="../../../../../versions.html">All versions</a></div>
 </div>
 <!-- ketraterm-api-navigation:end -->
     <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
@@ -247,7 +247,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="copy-on-selection.html">copyOnSelection</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Copies a nonempty selection once when a local primary-button gesture completes. Defaults to false and uses the supplied clipboard handler. The gesture captures this value at press. Programmatic changes never trigger copying. Clipboard callbacks run on the EDT. Failures propagate after gesture cleanup.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="copy-on-selection.html">copyOnSelection</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Copies a nonempty selection once when a local primary-button gesture completes. Defaults to false and uses the supplied clipboard handler. The gesture captures this value at press. Programmatic changes never trigger copying. Host suspend callbacks start on the EDT; system access runs on a worker. Asynchronous failures are logged.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -322,7 +322,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="font.html">font</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a></div><div class="brief "><p class="paragraph">primary terminal font.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="font.html">font</a><span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/Font.html">Font</a></div><div class="brief "><p class="paragraph">primary terminal font with a finite, positive point size.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -372,6 +372,36 @@
               </div>
             </div>
           </div>
+<a data-name="-378974081%2FProperties%2F848369053" anchor-label="inlineShellSuggestionDebounceMillis" id="-378974081%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="inline-shell-suggestion-debounce-millis.html"><span>inline</span><wbr><span>Shell</span><wbr><span>Suggestion</span><wbr><span>Debounce</span><wbr><span><span>Millis</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-378974081%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">val </span><a href="inline-shell-suggestion-debounce-millis.html">inlineShellSuggestionDebounceMillis</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Independent debounce for automatic inline requests in milliseconds; zero requests without a delay.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-811288352%2FProperties%2F848369053" anchor-label="inlineShellSuggestionsEnabled" id="-811288352%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="inline-shell-suggestions-enabled.html"><span>inline</span><wbr><span>Shell</span><wbr><span>Suggestions</span><wbr><span><span>Enabled</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-811288352%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">val </span><a href="inline-shell-suggestions-enabled.html">inlineShellSuggestionsEnabled</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Enables automatic requests from the configured inline provider. Manual requests remain available.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="361518998%2FProperties%2F848369053" anchor-label="lineHeight" id="361518998%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
             <div class="main-subrow keyValue ">
@@ -397,7 +427,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="middle-click-paste.html">middleClickPaste</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Enables paste on a local middle-button press, using <a href="middle-click-paste-source.html">middleClickPasteSource</a>. Defaults to false. Application mouse tracking takes priority; Shift restores local input unless XTSHIFTESCAPE requests capture. Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard. Without a <a href="../../io.github.ketraterm.ui.swing.api/-swing-host-services/middle-click-paste-handler.html">io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler</a>, clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access and may complete later. Changing this setting does not cancel requests already issued to a hook.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="middle-click-paste.html">middleClickPaste</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Enables paste on a local middle-button press, using <a href="middle-click-paste-source.html">middleClickPasteSource</a>. Defaults to false. Application mouse tracking takes priority; Shift restores local input unless XTSHIFTESCAPE requests capture. Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard. Without a <a href="../../io.github.ketraterm.ui.swing.api/-swing-host-services/middle-click-paste-handler.html">io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler</a>, suspend clipboard callbacks start on the EDT; the system service reads on a worker and failures are logged. A supplied hook owns clipboard access and may complete later. Changing this setting does not cancel requests already issued to a hook.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -878,6 +908,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">val </span><a href="shell-suggestion-automatic-mode.html">shellSuggestionAutomaticMode</a><span class="token operator">: </span><a href="../../io.github.ketraterm.ui.swing.suggestion/-swing-shell-suggestion-automatic-mode/index.html">SwingShellSuggestionAutomaticMode</a></div><div class="brief "><p class="paragraph">Scope of automatic completion requests; explicit requests remain unrestricted.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1825728634%2FProperties%2F848369053" anchor-label="shellSuggestionDebounceMillis" id="-1825728634%2FProperties%2F848369053" data-filterable-set=":ketraterm-ui-swing/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-ui-swing/main" data-filterable-set=":ketraterm-ui-swing/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="shell-suggestion-debounce-millis.html"><span>shell</span><wbr><span>Suggestion</span><wbr><span>Debounce</span><wbr><span><span>Millis</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1825728634%2FProperties%2F848369053"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-ui-swing/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="../../io.github.ketraterm.ui.swing.suggestion/-experimental-shell-suggestions-api/index.html"><span class="token annotation builtin">ExperimentalShellSuggestionsApi</span></a></div></div><span class="token keyword">val </span><a href="shell-suggestion-debounce-millis.html">shellSuggestionDebounceMillis</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Debounce for automatic popup requests in milliseconds; zero requests without a delay.</p></div></div></div>
                 </div>
               </div>
             </div>
