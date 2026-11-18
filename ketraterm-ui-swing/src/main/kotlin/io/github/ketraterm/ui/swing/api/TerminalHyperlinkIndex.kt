@@ -574,16 +574,19 @@ internal class TerminalHyperlinkIndex {
             val start = if (anchor == source.start.absoluteRow) source.start.offset else 0
             val end = minOf(if (anchor == source.end.absoluteRow) source.end.offset else snapshot.text.length, snapshot.text.length - 1)
             if (start >= end) continue
-            val independent = !ordered && dependency.start.absoluteRow == anchor && dependency.end.absoluteRow == anchor
+            val lineLocal =
+                dependency.start.absoluteRow == anchor &&
+                    dependency.end.absoluteRow == anchor &&
+                    (!ordered || producer.firstAbsoluteRow == anchor)
             affected[anchor] = snapshot
             mapped.getOrPut(anchor) { ArrayList() }.add(
                 DetectedSpan(
                     start,
                     end,
                     hyperlink,
-                    if (independent) dependency.start.offset else 0,
-                    if (independent) dependency.end.offset else snapshot.text.length,
-                    contextDependent = !independent,
+                    if (lineLocal) dependency.start.offset else 0,
+                    if (lineLocal) dependency.end.offset else snapshot.text.length,
+                    contextDependent = !lineLocal,
                 ),
             )
         }

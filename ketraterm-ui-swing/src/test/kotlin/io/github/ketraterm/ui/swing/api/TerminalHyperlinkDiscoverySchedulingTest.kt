@@ -983,6 +983,31 @@ class TerminalHyperlinkDiscoverySchedulingTest {
     }
 
     @Test
+    fun `ordered URL keeps its painted occurrence during progress redraws until its token changes`() {
+        val opened = ArrayList<String>()
+        val detector = viewportDetector { request -> findUrls(request, opened, validateUrlToken = true) }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show("$URL 60%")
+            fixture.completeAnalysis()
+            fixture.onEdt {
+                val id = fixture.controller.hyperlinkIdAt(0, 0, fixture.cache)
+                assertTrue(id < 0)
+                val presentation = checkNotNull(fixture.controller.hyperlinkPresentationsFor(fixture.cache)?.get(0))
+                for (percent in 61..65) {
+                    fixture.show("$URL $percent%")
+                    assertEquals(id, fixture.controller.hyperlinkIdAt(0, 0, fixture.cache))
+                    assertSame(presentation, fixture.controller.hyperlinkPresentationsFor(fixture.cache)?.get(0))
+                    assertTrue(fixture.openAt(0))
+                }
+                fixture.show("$URL/other 65%")
+                assertEquals(0, fixture.controller.hyperlinkIdAt(0, 0, fixture.cache))
+                assertFalse(fixture.openAt(0))
+            }
+            assertEquals(List(5) { URL }, opened)
+        }
+    }
+
+    @Test
     fun `explicit URL dependency keeps an existing action usable during percentage changes`() {
         Fixture(validateUrlToken = true).use { fixture ->
             fixture.show("$URL 10%")
