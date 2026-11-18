@@ -77,7 +77,8 @@ They require shell integration and are unavailable for WSL launchers.
 
 PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
-reports. PowerShell directory reports cover filesystem locations only.
+reports. PowerShell reports filesystem paths, resolving session drive aliases to
+their native directories and preserving literal percent sequences in file URIs.
 The finish marker uses a fresh `$LASTEXITCODE` even when it repeats the previous
 numeric value. If the command leaves `$LASTEXITCODE` untouched, the marker uses
 PowerShell's success flag and reports `0` for success or `1` for failure.

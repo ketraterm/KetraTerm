@@ -737,9 +737,13 @@ internal object TerminalShellIntegrationBootstrap {
                     if (${'$'}location.Provider.Name -ne 'FileSystem') {
                         return
                     }
-                    ${'$'}builder = [System.UriBuilder]::new('file', 'localhost')
-                    ${'$'}builder.Path = ${'$'}location.Path
-                    [Console]::Write(([string][char]27) + ']7;' + ${'$'}builder.Uri.AbsoluteUri + ([string][char]7))
+                    ${'$'}path = ${'$'}location.ProviderPath.Replace([IO.Path]::DirectorySeparatorChar, [char]47)
+                    if (-not ${'$'}path.StartsWith('/')) {
+                        ${'$'}path = '/' + ${'$'}path
+                    }
+                    # Escape raw filenames first so literal percent escapes survive one URI decode.
+                    ${'$'}encodedPath = [Uri]::EscapeDataString(${'$'}path).Replace('%2F', '/').Replace('%3A', ':')
+                    [Console]::Write(([string][char]27) + ']7;file://localhost' + ${'$'}encodedPath + ([string][char]7))
                 } catch {
                 }
             }

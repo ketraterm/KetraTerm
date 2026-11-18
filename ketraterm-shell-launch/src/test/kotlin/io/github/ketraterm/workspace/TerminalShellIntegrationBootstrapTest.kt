@@ -119,7 +119,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(script.contains("function global:PSConsoleHostReadLine"))
         assertTrue(script.contains("]133;"))
         assertTrue(script.contains("]7;"))
-        assertTrue(script.contains("[System.UriBuilder]::new('file', 'localhost')"))
+        assertTrue(script.contains("]7;file://localhost"))
         assertTrue(script.contains("Provider.Name -ne 'FileSystem'"))
         assertTrue(script.contains("'D;' + ${'$'}exitCode"))
         assertFalse(script.contains('"'))

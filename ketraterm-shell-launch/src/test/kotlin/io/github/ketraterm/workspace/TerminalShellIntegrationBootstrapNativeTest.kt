@@ -1989,12 +1989,14 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
 
-    @Test
-    fun `generated PowerShell bootstrap emits encoded current directory before prompt when PowerShell is installed`(
+    @ParameterizedTest(name = "PowerShell directory URI encoding [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell directory reports preserve literal percent escapes`(
+        executableName: String,
         @TempDir tempDir: Path,
     ) {
-        val powerShell = installedExecutable("pwsh", "pwsh.exe", "powershell.exe")
-        assumeTrue(powerShell != null, "PowerShell is not installed")
+        val powerShell = installedExecutable(executableName)
+        assumeTrue(powerShell != null, "$executableName is not installed")
 
         val profile =
             TerminalProfile(
@@ -2005,7 +2007,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
         val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
         val invocation = Base64.getEncoder().encodeToString("$bootstrap\nprompt | Out-Host".toByteArray(Charsets.UTF_16LE))
-        val workingDirectory = Files.createDirectory(tempDir.resolve("space % directory"))
+        val workingDirectory = Files.createDirectory(tempDir.resolve("literal%20space # café %2F"))
         val result =
             runProcess(
                 listOf(powerShell, "-NoProfile", "-EncodedCommand", invocation),
@@ -2015,7 +2017,56 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(0, result.exitCode)
         assertMarkerOrder(result.stdout, "A")
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 1)
-        assertTrue(result.stdout.contains("space%20%25%20directory"), visibleEscapes(result.stdout))
+        val uri = assertNotNull(Regex("\u001B]7;([^\u0007]+)\u0007").find(result.stdout)).groupValues[1]
+        assertTrue(uri.endsWith("/literal%2520space%20%23%20caf%C3%A9%20%252F"), visibleEscapes(result.stdout))
+        assertEquals(
+            workingDirectory
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/'),
+            URI(uri).path,
+            visibleEscapes(result.stdout),
+        )
+    }
+
+    @ParameterizedTest(name = "PowerShell mapped filesystem directory [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell reports the native directory behind a session drive`(
+        executableName: String,
+        @TempDir directory: Path,
+    ) {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val sourceDirectory = Files.createDirectory(directory.resolve("src"))
+        val profile = TerminalProfile("powershell", "PowerShell", listOf(executable!!))
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
+        val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
+        val script =
+            """
+            ${'$'}ErrorActionPreference = 'Stop'
+            $bootstrap
+            New-PSDrive -Name Review -PSProvider FileSystem -Root (Get-Location).ProviderPath | Out-Null
+            Set-Location -LiteralPath 'Review:/src'
+            [Console]::WriteLine('DRIVE=' + (Get-Location).Drive.Name)
+            prompt | Out-Host
+            """.trimIndent()
+        val invocation = Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE))
+        val result = runProcess(listOf(executable, "-NoProfile", "-EncodedCommand", invocation), workingDirectory = directory)
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it == "DRIVE=Review" }, visibleEscapes(result.stdout))
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 1)
+        val uri = assertNotNull(Regex("\u001B]7;([^\u0007]+)\u0007").find(result.stdout)).groupValues[1]
+        assertEquals(
+            sourceDirectory
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/'),
+            URI(uri).path,
+            visibleEscapes(result.stdout),
+        )
     }
 
     @Test

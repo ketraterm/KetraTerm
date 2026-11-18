@@ -12,6 +12,8 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Resolve PowerShell completion and relative file links from the correct directory
+  when using a session drive or a folder name containing a literal percent escape.
 - Show the exact exit code when consecutive PowerShell commands return the same
   native failure code.
 - Keep Bash startup `DEBUG` hooks working across prompts while preserving

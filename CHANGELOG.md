@@ -12,6 +12,9 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Report native filesystem directories for PowerShell session drives and preserve
+  literal percent sequences in working-directory URIs.
+
 - Report repeated native exit codes accurately in PowerShell command-finished events.
 
 - Preserve existing Bash `DEBUG` traps while keeping prompt markers, directory
