@@ -962,6 +962,48 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(line, String(Base64.getDecoder().decode(fields[4]), Charsets.UTF_8))
     }
 
+    @ParameterizedTest(name = "PowerShell command exit status [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell reports repeated native exit codes and ignores stale codes for cmdlets`(executableName: String): Unit =
+        runBlocking {
+            val executable = installedExecutable(executableName)
+            assumeTrue(executable != null, "$executableName is not installed")
+            val nativeFailure = if (isWindows()) "cmd.exe /d /c exit 7" else "/bin/sh -c 'exit 7'"
+            TerminalWorkspace().use { workspace ->
+                val session =
+                    workspace.openTab(
+                        TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                        TerminalWorkspaceOpenOptions(),
+                    ).session
+                val state = session.shellIntegrationState
+                val commands =
+                    listOf(
+                        nativeFailure to 7,
+                        nativeFailure to 7,
+                        "Get-Location" to 0,
+                        "Write-Error 'expected error'" to 1,
+                        "if (\$LASTEXITCODE -ne 7) { throw 'Expected LASTEXITCODE=7' }" to 0,
+                    )
+                for ((index, execution) in commands.withIndex()) {
+                    val (command, expectedExitCode) = execution
+                    session.awaitLine("")
+                    val previousRecord = state.latestCommandRecordId()
+                    session.submitInput(TerminalPasteEvent(command))
+                    session.awaitLine(command)
+                    session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
+                    withTimeout(15.seconds) {
+                        state.revision.first {
+                            val record = state.latestCommandRecordId()
+                            record != previousRecord && state.commandMetadata(record)?.finishedAtEpochMillis != null
+                        }
+                    }
+                    val finished = assertNotNull(state.commandMetadata(state.latestCommandRecordId()))
+                    assertEquals(command, finished.commandText)
+                    assertEquals(expectedExitCode, finished.exitCode, "Command ${index + 1}: $command")
+                }
+            }
+        }
+
     @ParameterizedTest(name = "PowerShell completion round trip [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
     fun `PowerShell native completion round trips through real PSReadLine and PTY`(executableName: String): Unit =
@@ -1351,7 +1393,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
             "PROMPT_COMMAND='user_prompt; # user comment'",
         ],
     )
-    fun `ordinary Bash startup keeps markers when bashrc replaces the prompt hook`(
+    fun `Bash without a DEBUG trap reports command lifecycles alongside bashrc prompt hooks`(
         promptCommand: String,
         @TempDir directory: Path,
     ) {
@@ -1377,6 +1419,52 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(listOf("A", "B", "C", "D;1", "A", "B", "C", "D;0", "A", "B", "C"), markers, visibleEscapes(result.stdout))
         assertTrue(result.stdout.contains("USER_PROMPT=1"), visibleEscapes(result.stdout))
         assertEquals(3, Regex("test> \u001b]133;B\u0007").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `Bash preserves the bashrc DEBUG hook across prompts and reports directory changes`(
+        @TempDir directory: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        val home = Files.createDirectory(directory.resolve("home"))
+        val nextDirectory = Files.createDirectory(home.resolve("next directory"))
+        val command = "cd -- \"${'$'}HOME/next directory\""
+        Files.writeString(
+            home.resolve(".bashrc"),
+            """
+            PS1='test> '
+            user_debug() {
+                if [[ ${'$'}1 == '$command' ]]; then
+                    printf 'USER_DEBUG\n'
+                fi
+            }
+            trap 'user_debug "${'$'}BASH_COMMAND"' DEBUG
+            """.trimIndent(),
+        )
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf(bash!!, "-i"),
+                environment = mapOf("HOME" to home.toString(), "TERM" to "xterm-256color"),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory.resolve("hooks")).profile
+        val result = runProcess(launch.command, launch.environment, "$command\n$command\nexit\n", workingDirectory = home)
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val events =
+            Regex("\u001B]133;([^\u0007]+)\u0007|USER_DEBUG").findAll(result.stdout).map { it.groups[1]?.value ?: it.value }.toList()
+        assertEquals(listOf("A", "B", "USER_DEBUG", "A", "B", "USER_DEBUG", "A", "B"), events, visibleEscapes(result.stdout))
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
+        val reportedDirectories =
+            Regex("\u001B]7;([^\u0007]+)\u0007")
+                .findAll(result.stdout)
+                .map {
+                    val uri = URI(it.groupValues[1])
+                    Path.of(URI("file", null, uri.path, null)).toRealPath()
+                }.toList()
+        assertEquals(listOf(home.toRealPath(), nextDirectory.toRealPath(), nextDirectory.toRealPath()), reportedDirectories)
     }
 
     @Test

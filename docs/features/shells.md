@@ -78,6 +78,9 @@ They require shell integration and are unavailable for WSL launchers.
 PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell directory reports cover filesystem locations only.
+The finish marker uses a fresh `$LASTEXITCODE` even when it repeats the previous
+numeric value. If the command leaves `$LASTEXITCODE` untouched, the marker uses
+PowerShell's success flag and reports `0` for success or `1` for failure.
 
 When PSReadLine is loaded, the PowerShell bootstrap also installs private
 [request bindings](../reference/protocol.md#private-powershell-completion-metadata)
@@ -95,6 +98,12 @@ prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible pro
 An explicit `--norc` launch keeps startup files disabled and receives only the
 environment hook. Explicit WSL Bash launches also use the environment hook, which
 can be replaced by guest startup files.
+
+If Bash already has a `DEBUG` trap at the first prompt, KetraTerm preserves it.
+Prompt markers, working-directory reports, and supported completion remain
+available. KetraTerm's command-start and command-finish markers are unavailable
+in that session, so features that rely on those markers, such as exit status
+and completed command output, have no command data from the hook.
 
 Bash 5.3+ with `base64` checks background command discovery at each terminal prompt for
 [command suggestions](completion.md#sources-by-host), including explicit Bash
