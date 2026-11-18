@@ -224,6 +224,9 @@ Suggestions use the confirmed editor buffer even when inline history
 predictions appear after the cursor. Suggestions remain unavailable when the cursor is before
 real editable suffix text. See the <a href="../reference/protocol.html#private-powershell-completion-metadata">bridge protocol</a>
 for request limits and validation.</p>
+<p>KetraTerm preserves PowerShell shortcuts that use standalone <code>F12</code> or one of its
+private completion chords. Native suggestions are unavailable at prompts where
+one of those bindings is in use.</p>
 <p>On Windows, combining accents (for example, <code>e</code> followed by U+0301) can make native
 suggestions unavailable in PowerShell 5.1 and 7. PSReadLine may position the cursor
 beyond the rendered text, causing KetraTerm&#39;s exact editor-buffer validation to fail.</p>
@@ -437,7 +440,7 @@ for location, retention, and encoding.</p>
 <p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
 <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
 and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9efd8b11250e09ba80faae5430a59ccc75a4ce76/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/989c183ece847dde35edff9334080d8fb019d40f/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

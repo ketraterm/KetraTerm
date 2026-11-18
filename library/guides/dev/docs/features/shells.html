@@ -170,9 +170,11 @@ They require shell integration and are unavailable for WSL launchers.</p>
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell reports filesystem paths, resolving session drive aliases to
 their native directories and preserving literal percent sequences in file URIs.
-The finish marker uses a fresh <code>$LASTEXITCODE</code> even when it repeats the previous
-numeric value. If the command leaves <code>$LASTEXITCODE</code> untouched, the marker uses
-PowerShell&#39;s success flag and reports <code>0</code> for success or <code>1</code> for failure.</p>
+The finish marker reports <code>0</code> when PowerShell finishes the line successfully
+(<code>$?</code> is true). A failed line reports a fresh nonzero <code>$LASTEXITCODE</code> when
+available, including repeated numeric codes, and otherwise reports <code>1</code>. On a
+line with multiple failures, a native exit code can come from an earlier command
+on that line. Custom PowerShell prompts also receive the line&#39;s success flag.</p>
 <p>When PSReadLine is loaded, the PowerShell bootstrap also installs private
 <a href="../reference/protocol.html#private-powershell-completion-metadata">request bindings</a>
 for <a href="completion.html#sources-by-host">native suggestions</a>. The handler
@@ -181,12 +183,15 @@ replacing the command. Each prompt announces a fresh completion epoch.</p>
 <p>Fish hooks also install read-only
 <a href="../reference/protocol.html#private-fish-editor-buffer-confirmation">editor-buffer confirmation</a>
 when its prerequisites are available. This lets popup suggestions coexist with
-fish&#39;s native autosuggestions; fish&#39;s own Tab completion remains unchanged.</p>
+fish&#39;s native autosuggestions; fish&#39;s own Tab completion remains unchanged.
+Replacing <code>fish_prompt</code> during a session keeps prompt markers, directory reports,
+and buffer confirmation active on subsequent prompts.</p>
 <p>Direct interactive Bash launches load the user&#39;s startup files before installing
 prompt hooks, preserving existing <code>PROMPT_COMMAND</code> callbacks and the visible prompt.
 An explicit <code>--norc</code> launch keeps startup files disabled and receives only the
 environment hook. Explicit WSL Bash launches also use the environment hook, which
-can be replaced by guest startup files.</p>
+can be replaced by guest startup files.
+In Bash and zsh, directory reporting preserves the shell&#39;s <code>REPLY</code> variable.</p>
 <p>If Bash already has a <code>DEBUG</code> trap at the first prompt, KetraTerm preserves it.
 Prompt markers, working-directory reports, and supported completion remain
 available. KetraTerm&#39;s command-start and command-finish markers are unavailable
@@ -201,7 +206,9 @@ Git Bash and Cygwin publish native Windows directory URIs so local path and Git
 completion resolve the same directory as the shell.
 Literal alias definitions feed shared argument analysis while accepted edits preserve
 the user&#39;s alias; see the <a href="completion.html#sources-by-host">supported alias subset</a>.</p>
-<p>zsh uses the same inventory protocol, command authority, and alias analysis.
+<p>zsh keeps marking the editable input boundary when a <code>precmd</code> callback rebuilds
+the prompt. Directory reports also work with <code>KSH_ARRAYS</code> enabled.
+zsh uses the same inventory protocol, command authority, and alias analysis.
 With <code>zsh/parameter</code> and <code>base64</code> available, it discovers enabled ordinary aliases,
 functions (including autoloads), and builtins at terminal prompts. Executable
 discovery runs independently in the background. Same-environment scans are coalesced;
@@ -264,7 +271,7 @@ Native standalone profiles also receive the <code>ketra version</code>, <code>ke
 <code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
 <p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
 and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9efd8b11250e09ba80faae5430a59ccc75a4ce76/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/989c183ece847dde35edff9334080d8fb019d40f/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
