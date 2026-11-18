@@ -1989,6 +1989,46 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
 
+    @ParameterizedTest(name = "PowerShell custom prompt status [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell custom prompts see the command status without a synthetic error in history`(
+        executableName: String,
+        @TempDir directory: Path,
+    ) {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val profile = TerminalProfile("powershell", "PowerShell", listOf(executable!!))
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
+        val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
+        val script =
+            """
+            function global:prompt {
+                if (${'$'}?) { 'PROMPT_OK' } else { 'PROMPT_FAIL' }
+            }
+            $bootstrap
+            ${'$'}ErrorActionPreference = 'Stop'
+            ${'$'}Error.Clear()
+            ${'$'}global:__KetraTermCommandStarted = ${'$'}true
+            Get-Item -LiteralPath 'missing-file' -ErrorAction Continue
+            prompt | Out-Host
+            ${'$'}global:__KetraTermCommandStarted = ${'$'}true
+            Get-Location | Out-Null
+            prompt | Out-Host
+            [Console]::WriteLine('ERROR_HISTORY=' + ${'$'}Error.Count + ':' + ${'$'}Error[0].CategoryInfo.Reason)
+            """.trimIndent()
+        val invocation = Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE))
+        val result = runProcess(listOf(executable, "-NoProfile", "-EncodedCommand", invocation), workingDirectory = directory)
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val events =
+            Regex("\u001B]133;D;([01])\u0007|(PROMPT_(?:OK|FAIL))(?=\u001B]133;B\u0007)")
+                .findAll(result.stdout)
+                .map { it.groups[1]?.value ?: it.groupValues[2] }
+                .toList()
+        assertEquals(listOf("1", "PROMPT_FAIL", "0", "PROMPT_OK"), events, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it == "ERROR_HISTORY=1:ItemNotFoundException" }, visibleEscapes(result.stdout))
+    }
+
     @ParameterizedTest(name = "PowerShell directory URI encoding [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
     fun `PowerShell directory reports preserve literal percent escapes`(

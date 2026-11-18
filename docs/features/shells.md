@@ -82,6 +82,7 @@ their native directories and preserving literal percent sequences in file URIs.
 The finish marker uses a fresh `$LASTEXITCODE` even when it repeats the previous
 numeric value. If the command leaves `$LASTEXITCODE` untouched, the marker uses
 PowerShell's success flag and reports `0` for success or `1` for failure.
+Custom PowerShell prompts also receive the previous command's success flag (`$?`).
 
 When PSReadLine is loaded, the PowerShell bootstrap also installs private
 [request bindings](../reference/protocol.md#private-powershell-completion-metadata)

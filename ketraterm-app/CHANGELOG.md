@@ -12,6 +12,7 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Keep custom PowerShell prompt indicators accurate after a command fails.
 - Double-click a wrapped file path to select it across visible rows.
 - Complete Windows paths such as `/logs/` on the terminal's current drive.
 - Resolve PowerShell completion and relative file links from the correct directory

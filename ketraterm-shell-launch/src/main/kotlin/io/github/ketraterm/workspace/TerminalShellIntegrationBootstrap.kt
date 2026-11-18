@@ -767,6 +767,10 @@ internal object TerminalShellIntegrationBootstrap {
                 global:__KetraTermOsc7
                 global:__KetraTermOsc133 'A'
                 try {
+                    # $? is read-only. An ignored error sets it to false without changing error history.
+                    if (-not ${'$'}success) {
+                        Microsoft.PowerShell.Utility\Write-Error -Message 'The previous command failed.' -ErrorAction Ignore
+                    }
                     ${'$'}promptText = & ${'$'}global:__KetraTermOriginalPrompt
                 } finally {
                     if (${'$'}nativeExitCode -is [int]) {
