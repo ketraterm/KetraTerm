@@ -168,7 +168,11 @@ direct shell reports readiness. User input before readiness cancels submission.
 They require shell integration and are unavailable for WSL launchers.</p>
 <p>PowerShell command-start/finish tracking requires a <code>PSConsoleHostReadLine</code>
 function to wrap. Without it, the bootstrap still supplies prompt and directory
-reports. PowerShell directory reports cover filesystem locations only.</p>
+reports. PowerShell reports filesystem paths, resolving session drive aliases to
+their native directories and preserving literal percent sequences in file URIs.
+The finish marker uses a fresh <code>$LASTEXITCODE</code> even when it repeats the previous
+numeric value. If the command leaves <code>$LASTEXITCODE</code> untouched, the marker uses
+PowerShell&#39;s success flag and reports <code>0</code> for success or <code>1</code> for failure.</p>
 <p>When PSReadLine is loaded, the PowerShell bootstrap also installs private
 <a href="../reference/protocol.html#private-powershell-completion-metadata">request bindings</a>
 for <a href="completion.html#sources-by-host">native suggestions</a>. The handler
@@ -183,6 +187,11 @@ prompt hooks, preserving existing <code>PROMPT_COMMAND</code> callbacks and the 
 An explicit <code>--norc</code> launch keeps startup files disabled and receives only the
 environment hook. Explicit WSL Bash launches also use the environment hook, which
 can be replaced by guest startup files.</p>
+<p>If Bash already has a <code>DEBUG</code> trap at the first prompt, KetraTerm preserves it.
+Prompt markers, working-directory reports, and supported completion remain
+available. KetraTerm&#39;s command-start and command-finish markers are unavailable
+in that session, so features that rely on those markers, such as exit status
+and completed command output, have no command data from the hook.</p>
 <p>Bash 5.3+ with <code>base64</code> checks background command discovery at each terminal prompt for
 <a href="completion.html#sources-by-host">command suggestions</a>, including explicit Bash
 launches inside WSL. It installs no completion key binding and does not invoke
@@ -255,7 +264,7 @@ Native standalone profiles also receive the <code>ketra version</code>, <code>ke
 <code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
 <p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
 and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9efd8b11250e09ba80faae5430a59ccc75a4ce76/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

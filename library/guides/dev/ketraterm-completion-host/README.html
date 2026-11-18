@@ -70,8 +70,9 @@ See the <a href="../ketraterm-completion/README.html#request-completions">reques
 <p><code>TerminalCompletionPathResolver</code> resolves the engine&#39;s lexical
 <code>TerminalDirectoryListingRequest</code> into a normalized absolute local <code>Path</code>.
 It accepts relative and absolute paths, <code>~/</code> using the configured home directory,
-and Windows drive or UNC syntax when Windows support is enabled. Requests use
-forward slashes as separators. Remaining backslashes are literal filename
+and Windows drive or UNC syntax when Windows support is enabled. On Windows,
+a prefix such as <code>/logs/</code> starts at the root of the terminal&#39;s current drive.
+Requests use forward slashes as separators. Remaining backslashes are literal filename
 characters: POSIX filesystems preserve them; Windows resolution rejects them.
 Shell parsing and quoting stay in the completion engine.</p>
 <p><code>TerminalLocalFileUriResolver</code> accepts <code>file:</code> working-directory URIs with an
@@ -106,7 +107,7 @@ projection for an already bounded collection; it does not limit collection size.
 <li><a href="../ketraterm-completion/docs/completion-architecture.html#evaluation-and-failure-behavior">Completion evaluation and failure behavior</a></li>
 <li><a href="../ketraterm-ui-swing-host/README.html">Swing completion bridge</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/ketraterm-completion-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9efd8b11250e09ba80faae5430a59ccc75a4ce76/ketraterm-completion-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

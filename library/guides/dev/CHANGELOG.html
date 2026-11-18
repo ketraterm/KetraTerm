@@ -32,6 +32,16 @@ Product changes are recorded in the <a href="https://ketraterm.github.io/KetraTe
 <h2 id="unreleased">[Unreleased]</h2>
 <h3 id="fixed">Fixed</h3>
 <ul>
+<li><p>Resolve root-relative Windows completion paths on the terminal&#39;s current drive.</p>
+</li>
+<li><p>Report native filesystem directories for PowerShell session drives and preserve
+literal percent sequences in working-directory URIs.</p>
+</li>
+<li><p>Report repeated native exit codes accurately in PowerShell command-finished events.</p>
+</li>
+<li><p>Preserve existing Bash <code>DEBUG</code> traps while keeping prompt markers, directory
+updates, and supported completion active.</p>
+</li>
 <li><p>Keep alternate-screen pane borders, text, cursors, and selections at their
 application positions when rows contain bidirectional text.</p>
 </li>
@@ -1021,7 +1031,7 @@ cmd.exe.</p>
 <li><p>Configurable typography, default colors, palettes, and scrollback capacity.</p>
 </li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/9efd8b11250e09ba80faae5430a59ccc75a4ce76/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../index.html"><img class="brand-mark" src="../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
