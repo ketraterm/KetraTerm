@@ -95,12 +95,15 @@ Fish hooks also install read-only
 [editor-buffer confirmation](../reference/protocol.md#private-fish-editor-buffer-confirmation)
 when its prerequisites are available. This lets popup suggestions coexist with
 fish's native autosuggestions; fish's own Tab completion remains unchanged.
+Replacing `fish_prompt` during a session keeps prompt markers, directory reports,
+and buffer confirmation active on subsequent prompts.
 
 Direct interactive Bash launches load the user's startup files before installing
 prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible prompt.
 An explicit `--norc` launch keeps startup files disabled and receives only the
 environment hook. Explicit WSL Bash launches also use the environment hook, which
 can be replaced by guest startup files.
+In Bash and zsh, directory reporting preserves the shell's `REPLY` variable.
 
 If Bash already has a `DEBUG` trap at the first prompt, KetraTerm preserves it.
 Prompt markers, working-directory reports, and supported completion remain
@@ -118,6 +121,8 @@ completion resolve the same directory as the shell.
 Literal alias definitions feed shared argument analysis while accepted edits preserve
 the user's alias; see the [supported alias subset](completion.md#sources-by-host).
 
+zsh keeps marking the editable input boundary when a `precmd` callback rebuilds
+the prompt. Directory reports also work with `KSH_ARRAYS` enabled.
 zsh uses the same inventory protocol, command authority, and alias analysis.
 With `zsh/parameter` and `base64` available, it discovers enabled ordinary aliases,
 functions (including autoloads), and builtins at terminal prompts. Executable

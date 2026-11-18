@@ -24,6 +24,12 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Preserve Bash and zsh `REPLY` across prompts and report zsh directories correctly
+  with `KSH_ARRAYS` enabled.
+
+- Keep shell integration active after a zsh `precmd` callback rebuilds the prompt
+  or a fish theme replaces `fish_prompt`.
+
 - Preserve user PSReadLine bindings that overlap PowerShell's native completion chords.
 
 - Preserve the previous command's `$?` value when invoking a custom PowerShell prompt.

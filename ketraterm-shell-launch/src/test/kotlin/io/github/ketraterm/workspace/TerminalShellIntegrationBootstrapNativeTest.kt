@@ -1531,6 +1531,27 @@ class TerminalShellIntegrationBootstrapNativeTest {
     }
 
     @Test
+    fun `Bash prompt directory reports preserve REPLY between commands`(
+        @TempDir directory: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        val profile = TerminalProfile("bash", "Bash", listOf(bash!!, "--noprofile", "--norc", "-i"))
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory.resolve("hooks")).profile
+        val result =
+            runProcess(
+                launch.command,
+                launch.environment,
+                standardInput = "read -r <<< 'hello'\nprintf '\\nREAD_RESULT=%s\\n' \"\$REPLY\"\nexit\n",
+                workingDirectory = directory,
+            )
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it == "READ_RESULT=hello" }, visibleEscapes(result.stdout))
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
+    }
+
+    @Test
     fun `Bash startup applies project toolchain after bashrc replaces environment and prompt hook`(
         @TempDir tempDir: Path,
     ) {
@@ -2253,6 +2274,114 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(1, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;0", "A", "C", "D;1", "A")
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
+    }
+
+    @Test
+    fun `zsh rebuilds the prompt boundary while preserving REPLY and Korn array indexing`(
+        @TempDir directory: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val project = Files.createDirectory(directory.resolve("space # %"))
+        val expectedPath =
+            project
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        Files.writeString(directory.resolve(".zshrc"), "PROMPT='before> '\n")
+        val profile =
+            TerminalProfile(
+                "zsh",
+                "Zsh",
+                listOf(assertNotNull(zsh), "-d", "-i"),
+                environment = mapOf("ZDOTDIR" to directory.toString()),
+                workingDirectory = project,
+            )
+        TerminalWorkspace().use { workspace ->
+            val session = workspace.openTab(profile, TerminalWorkspaceOpenOptions()).session
+            runBlocking {
+                session.awaitLine("")
+                val changeTheme = "REPLY=hello; setopt KSH_ARRAYS; theme_prompt() { PROMPT='after> '; }; add-zsh-hook precmd theme_prompt"
+                session.submitPromptTestCommand(changeTheme)
+                session.awaitLine("", "first prompt after zsh theme change")
+                session.assertReportedDirectoryPath(expectedPath)
+
+                val record = session.submitPromptTestCommand("printf '%s\\n' \"\$REPLY\"; [[ -o KSH_ARRAYS ]]")
+                session.awaitLine("", "second prompt after zsh theme change")
+                assertEquals(0, session.shellIntegrationState.commandMetadata(record)?.exitCode)
+                assertEquals("hello", session.commandOutputText(record, maxChars = 128, maxRows = 4)?.text?.trim())
+                session.assertReportedDirectoryPath(expectedPath)
+            }
+        }
+    }
+
+    @Test
+    fun `fish prompt replacement preserves directory reports and buffer confirmation on successive prompts`(
+        @TempDir directory: Path,
+    ) {
+        val fish = installedExecutable("fish", "fish.exe")
+        assumeTrue(fish != null, "fish is not installed")
+        assumeTrue(installedExecutable("base64", "base64.exe") != null, "base64 is not installed")
+        val first = Files.createDirectory(directory.resolve("first # %"))
+        val second = Files.createDirectory(directory.resolve("second # %"))
+        val firstPath =
+            first
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        val secondPath =
+            second
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        val setup = "set -g fish_greeting; fish_default_key_bindings; function fish_prompt; printf 'before> '; end"
+        val profile =
+            TerminalProfile(
+                "fish",
+                "Fish",
+                listOf(assertNotNull(fish), "--no-config", "-C", setup, "-i"),
+                environment = mapOf("XDG_DATA_HOME" to directory.toString()),
+                workingDirectory = directory,
+            )
+        TerminalWorkspace().use { workspace ->
+            val session = workspace.openTab(profile, TerminalWorkspaceOpenOptions()).session
+            runBlocking {
+                assertTrue(session.confirmCommandEdit(session.awaitLine("")), "The original fish prompt must confirm its buffer")
+                val changeTheme =
+                    "functions --copy fish_prompt theme_previous_prompt; " +
+                        "function fish_prompt; theme_previous_prompt; printf 'after> '; end; cd 'first # %'"
+                for ((command, expectedPath) in listOf(changeTheme to firstPath, "cd '../second # %'" to secondPath)) {
+                    session.submitPromptTestCommand(command)
+                    val edit = session.awaitLine("", "prompt after $command")
+                    session.assertReportedDirectoryPath(expectedPath)
+                    assertTrue(session.confirmCommandEdit(edit), "The replacement fish prompt must confirm its buffer")
+                }
+            }
+        }
+    }
+
+    private fun TerminalSession.assertReportedDirectoryPath(expectedPath: String) {
+        val uri = assertNotNull(currentWorkingDirectoryUri(), "The shell did not report a working directory")
+        assertEquals(expectedPath, URI(uri).path)
+    }
+
+    private suspend fun TerminalSession.submitPromptTestCommand(command: String): Int {
+        val state = shellIntegrationState
+        val previous = state.latestCommandRecordId()
+        assertEquals(
+            TerminalInputAdmission.ACCEPTED,
+            submitInput(listOf(TerminalPasteEvent(command), TerminalKeyEvent.key(TerminalKey.ENTER))),
+        )
+        withTimeout(15.seconds) {
+            state.revision.first {
+                val record = state.latestCommandRecordId()
+                record != previous && state.commandMetadata(record)?.finishedAtEpochMillis != null
+            }
+        }
+        return state.latestCommandRecordId()
     }
 
     @Test

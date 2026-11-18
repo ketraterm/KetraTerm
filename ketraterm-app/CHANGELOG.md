@@ -21,6 +21,9 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Preserve `REPLY` between commands in Bash and zsh, and keep zsh directory reports
+  accurate with Korn-style array indexing enabled.
+- Keep shell integration working when reloading a zsh or fish prompt theme.
 - Keep custom PowerShell F12 shortcuts when opening a terminal or rebinding keys.
 - Keep custom PowerShell prompt indicators accurate after a command fails.
 - Complete Windows paths such as `/logs/` on the terminal's current drive.
