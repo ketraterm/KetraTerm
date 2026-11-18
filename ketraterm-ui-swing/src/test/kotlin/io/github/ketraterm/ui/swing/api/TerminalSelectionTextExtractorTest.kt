@@ -489,6 +489,28 @@ class TerminalSelectionTextExtractorTest {
         }
 
     @Test
+    fun `double click selection includes the URL fragment from either side of the hash`() {
+        val url = "https://example.org/docs#install"
+        val cache = renderCache(TestRenderFrame.text("\"$url\" next"))
+        val hashColumn = 1 + url.indexOf('#')
+
+        for (column in hashColumn - 1..hashColumn + 1) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, 0, column))
+            assertEquals(url, extractor.selectedText(cache, selection), "clicked column $column")
+        }
+    }
+
+    @Test
+    fun `hash remains a word boundary in plain text`() {
+        val cache = renderCache(TestRenderFrame.text("foo#bar"))
+
+        for ((column, expected) in listOf(1 to "foo", 3 to "#", 5 to "bar")) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, 0, column))
+            assertEquals(expected, extractor.selectedText(cache, selection))
+        }
+    }
+
+    @Test
     fun `double clicking whitespace or delimiters never absorbs an adjacent path`() {
         val text = "foo.txt  /tmp/bar"
         val cache = renderCache(TestRenderFrame.text(text))

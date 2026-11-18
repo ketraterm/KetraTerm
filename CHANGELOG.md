@@ -10,18 +10,29 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ## [Unreleased]
 
+### Improvements
+
+- Swing double-click selection follows words and paths across visible soft wraps
+  and includes URL fragments such as `#install`.
+
+- Completion popups show the text that will be inserted, including path prefixes
+  and quotes.
+
+- Shell history navigation takes priority over automatic suggestions. Popup
+  dismissal survives redraws and late results, and automatic inline queries
+  pause during history navigation.
+
 ### Fixed
 
 - Preserve the previous command's `$?` value when invoking a custom PowerShell prompt.
-
-- Select a whole word or path on double-click when it spans visible soft-wrapped rows.
 
 - Resolve root-relative Windows completion paths on the terminal's current drive.
 
 - Report native filesystem directories for PowerShell session drives and preserve
   literal percent sequences in working-directory URIs.
 
-- Report repeated native exit codes accurately in PowerShell command-finished events.
+- Report PowerShell's final success or failure for lines that mix native commands
+  and cmdlets. Retain fresh nonzero native exit codes on failed lines, including repeats.
 
 - Preserve existing Bash `DEBUG` traps while keeping prompt markers, directory
   updates, and supported completion active.
@@ -36,14 +47,7 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 - Keep sticky command headers visible while typing refreshes the prompt layout.
 
-- fix URL flickering when updating text on the same line
-
-- Show the inserted text in completion popups, including path prefixes and quotes.
-
-- Preserve shell history navigation when automatic Swing suggestions appear.
-  Keep dismissed popups hidden during shell redraws and reject late popup results.
-  Pause automatic inline queries during navigation to preserve shell history.
-  Keep both automatic completion modes.
+- Prevent URL flicker when text updates on the same line.
 
 ## [1.0.0] - 2026-11-17
 

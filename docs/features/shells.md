@@ -79,10 +79,11 @@ PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell reports filesystem paths, resolving session drive aliases to
 their native directories and preserving literal percent sequences in file URIs.
-The finish marker uses a fresh `$LASTEXITCODE` even when it repeats the previous
-numeric value. If the command leaves `$LASTEXITCODE` untouched, the marker uses
-PowerShell's success flag and reports `0` for success or `1` for failure.
-Custom PowerShell prompts also receive the previous command's success flag (`$?`).
+The finish marker reports `0` when PowerShell finishes the line successfully
+(`$?` is true). A failed line reports a fresh nonzero `$LASTEXITCODE` when
+available, including repeated numeric codes, and otherwise reports `1`. On a
+line with multiple failures, a native exit code can come from an earlier command
+on that line. Custom PowerShell prompts also receive the line's success flag.
 
 When PSReadLine is loaded, the PowerShell bootstrap also installs private
 [request bindings](../reference/protocol.md#private-powershell-completion-metadata)

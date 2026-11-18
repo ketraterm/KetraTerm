@@ -10,24 +10,29 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ## [Unreleased]
 
+### Improvements
+
+- Double-click to select a whole word or path across visible wrapped rows,
+  including URL fragments such as `#install`.
+- Completion popups show the text that will be inserted, including path prefixes
+  and quotes.
+- Up dismisses automatic suggestions and recalls command history. Further Up/Down
+  presses stay with the shell until typing resumes or completion is requested.
+
 ### Fixed
 
 - Keep custom PowerShell prompt indicators accurate after a command fails.
-- Double-click a wrapped file path to select it across visible rows.
 - Complete Windows paths such as `/logs/` on the terminal's current drive.
 - Resolve PowerShell completion and relative file links from the correct directory
   when using a session drive or a folder name containing a literal percent escape.
-- Show the exact exit code when consecutive PowerShell commands return the same
-  native failure code.
+- Show the final success or failure of PowerShell lines that mix native commands
+  and cmdlets, and retain exact native failure codes when they repeat.
 - Keep Bash startup `DEBUG` hooks working across prompts while preserving
   directory updates and suggestions.
 - Keep split panes aligned in full-screen applications that display bidirectional text.
 - The cursor returns to its correct position when widening the window after
   narrowing moves only the cursor onto the next line.
   Exiting a resized full-screen application no longer overwrites earlier output.
-- Up dismisses automatic suggestions and recalls command history. Further Up/Down
-  presses stay with the shell until typing resumes or completion is requested.
-- Completion popups show the inserted text, including path prefixes and quotes.
 - Sticky command headers remain visible while typing refreshes the prompt layout.
 
 ## [1.0.0] - 2026-11-17

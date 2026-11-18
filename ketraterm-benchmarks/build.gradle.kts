@@ -52,6 +52,11 @@ dependencies {
 
     implementation("org.openjdk.jmh:jmh-core:1.37")
     annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+    constraints {
+        add("jmh", "org.ow2.asm:asm:9.11.1") {
+            because("JMH's bytecode generator depends on ASM 9.0, which predates security fixes")
+        }
+    }
     swingBenchmarkClasses(project(path = ":ketraterm-ui-swing", configuration = "benchmarkElements"))
 }
 

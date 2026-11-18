@@ -964,16 +964,25 @@ class TerminalShellIntegrationBootstrapNativeTest {
 
     @ParameterizedTest(name = "PowerShell command exit status [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
-    fun `PowerShell reports repeated native exit codes and ignores stale codes for cmdlets`(executableName: String): Unit =
+    fun `PowerShell reports final line status and preserves repeated native exit codes`(
+        executableName: String,
+        @TempDir directory: Path,
+    ): Unit =
         runBlocking {
             val executable = installedExecutable(executableName)
             assumeTrue(executable != null, "$executableName is not installed")
+            val nativeSuccess = if (isWindows()) "cmd.exe /d /c exit 0" else "/bin/sh -c 'exit 0'"
             val nativeFailure = if (isWindows()) "cmd.exe /d /c exit 7" else "/bin/sh -c 'exit 7'"
             TerminalWorkspace().use { workspace ->
                 val session =
                     workspace
                         .openTab(
-                            TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                            TerminalProfile(
+                                "powershell",
+                                "PowerShell",
+                                listOf(executable!!, "-NoLogo", "-NoProfile"),
+                                workingDirectory = directory,
+                            ),
                             TerminalWorkspaceOpenOptions(),
                         ).session
                 val state = session.shellIntegrationState
@@ -983,25 +992,28 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         nativeFailure to 7,
                         "Get-Location" to 0,
                         "Write-Error 'expected error'" to 1,
+                        "$nativeSuccess; Get-Item -LiteralPath 'missing-file'" to 1,
+                        "$nativeFailure; Write-Output done" to 0,
                         "Write-Output ('KETRA_STATUS=' + \$LASTEXITCODE)" to 0,
                     )
-                for ((index, execution) in commands.withIndex()) {
-                    val (command, expectedExitCode) = execution
-                    session.awaitLine("")
-                    val previousRecord = state.latestCommandRecordId()
-                    session.submitInput(TerminalPasteEvent(command))
-                    session.awaitLine(command)
-                    session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
-                    withTimeout(15.seconds) {
-                        state.revision.first {
-                            val record = state.latestCommandRecordId()
-                            record != previousRecord && state.commandMetadata(record)?.finishedAtEpochMillis != null
+                val reported =
+                    commands.map { (command, _) ->
+                        session.awaitLine("")
+                        val previousRecord = state.latestCommandRecordId()
+                        session.submitInput(TerminalPasteEvent(command))
+                        session.awaitLine(command)
+                        session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
+                        withTimeout(15.seconds) {
+                            state.revision.first {
+                                val record = state.latestCommandRecordId()
+                                record != previousRecord && state.commandMetadata(record)?.finishedAtEpochMillis != null
+                            }
                         }
+                        val finished = assertNotNull(state.commandMetadata(state.latestCommandRecordId()))
+                        assertEquals(command, finished.commandText)
+                        command to finished.exitCode
                     }
-                    val finished = assertNotNull(state.commandMetadata(state.latestCommandRecordId()))
-                    assertEquals(command, finished.commandText)
-                    assertEquals(expectedExitCode, finished.exitCode, "Command ${index + 1}: $command")
-                }
+                assertEquals(commands, reported)
                 val output = assertNotNull(session.commandOutputText(state.latestCommandRecordId(), maxChars = 128, maxRows = 4))
                 assertEquals("KETRA_STATUS=7", output.text.trim())
             }

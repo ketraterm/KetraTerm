@@ -752,12 +752,13 @@ internal object TerminalShellIntegrationBootstrap {
                 ${'$'}success = ${'$'}?
                 ${'$'}nativeExitCode = ${'$'}global:LASTEXITCODE
                 if (${'$'}global:__KetraTermCommandStarted) {
-                    # PowerShell stores a new boxed Int32 on each native exit, even when the code repeats.
-                    if (${'$'}nativeExitCode -is [int] -and
+                    # The last native exit code may belong to an earlier command on the line.
+                    # PowerShell boxes each native exit separately, even when the code repeats.
+                    if (${'$'}success) {
+                        ${'$'}exitCode = 0
+                    } elseif (${'$'}nativeExitCode -is [int] -and ${'$'}nativeExitCode -ne 0 -and
                         -not [object]::ReferenceEquals(${'$'}nativeExitCode, ${'$'}global:__KetraTermLastExitCodeBeforeCommand)) {
                         ${'$'}exitCode = ${'$'}nativeExitCode
-                    } elseif (${'$'}success) {
-                        ${'$'}exitCode = 0
                     } else {
                         ${'$'}exitCode = 1
                     }

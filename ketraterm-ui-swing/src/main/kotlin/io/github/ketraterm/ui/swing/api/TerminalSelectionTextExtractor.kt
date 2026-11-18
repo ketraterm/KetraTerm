@@ -281,7 +281,7 @@ internal class TerminalSelectionTextExtractor {
         if (Character.isLetterOrDigit(codeWord)) return true
         return when (codeWord) {
             '_'.code, '-'.code, '/'.code, '\\'.code, '.'.code, ':'.code, '~'.code,
-            '?'.code, '&'.code, '='.code, '%'.code, '+'.code, '@'.code, '$'.code, '*'.code,
+            '?'.code, '#'.code, '&'.code, '='.code, '%'.code, '+'.code, '@'.code, '$'.code, '*'.code,
             -> true
             else -> false
         }
