@@ -497,6 +497,29 @@ class TerminalSelectionControllerTest {
     }
 
     @Test
+    fun `double click drag retains both endpoints of a wrapped path when reversing`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(8, 4)
+            cache.accept(AbsoluteLinesFrame(listOf("previous", "src/main", "/App.kt", "next"), historySize = 0, wrappedRow = 1))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.updateFrame(cache)
+            val button = JButton()
+            controller.handleSelectionMousePressed(
+                MouseEvent(button, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 25, 45, 2, false, MouseEvent.BUTTON1),
+            )
+
+            assertEquals(CellSelection(0, 1, 7, 2), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 5, alt = false))
+            assertEquals(CellSelection(7, 2, 0, 0), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 25, alt = false))
+            assertEquals(CellSelection(0, 1, 7, 2), controller.getViewportSelection(cache))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 65, alt = false))
+            assertEquals(CellSelection(0, 1, 4, 3), controller.getViewportSelection(cache))
+            controller.stopSelectionDrag()
+        }
+    }
+
+    @Test
     fun `triple click drag selects whole rows in either direction`() {
         SwingUtilities.invokeAndWait {
             val cache = TerminalRenderCache(8, 3)
@@ -916,6 +939,7 @@ class TerminalSelectionControllerTest {
         override val historySize: Int,
         override val scrollbackOffset: Int = 0,
         override val discardedCount: Long = 0L,
+        private val wrappedRow: Int = -1,
     ) : TerminalRenderFrame {
         override val columns: Int = 8
         override val rows: Int = lines.size
@@ -926,7 +950,7 @@ class TerminalSelectionControllerTest {
 
         override fun lineGeneration(row: Int): Long = row.toLong() + 1L
 
-        override fun lineWrapped(row: Int): Boolean = false
+        override fun lineWrapped(row: Int): Boolean = row == wrappedRow
 
         override fun copyLine(
             row: Int,

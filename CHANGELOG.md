@@ -12,6 +12,8 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Select a whole word or path on double-click when it spans visible soft-wrapped rows.
+
 - Resolve root-relative Windows completion paths on the terminal's current drive.
 
 - Report native filesystem directories for PowerShell session drives and preserve

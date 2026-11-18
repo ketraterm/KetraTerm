@@ -88,60 +88,75 @@ internal class TerminalSelectionTextExtractor {
     ): CellSelection? {
         if (row !in 0 until cache.rows || column !in 0 until cache.columns) return null
 
-        val rowOffset = cache.rowOffset(row)
-        val flagsPlane = cache.flags
-        val codeWords = cache.codeWords
-
-        // 1. Expand with the wide path/URL character set
-        val clickedColumn = leadingColumn(cache, rowOffset, column)
-        var pathStart = clickedColumn
-        val clickedIsPath = isPathCell(cache, rowOffset, clickedColumn)
-        while (clickedIsPath && pathStart > 0) {
-            if (!isPathCell(cache, rowOffset, pathStart - 1)) break
-            pathStart--
-        }
-
-        var pathEnd = clickedColumn + 1
-        while (clickedIsPath && pathEnd < cache.columns) {
-            if (!isPathCell(cache, rowOffset, pathEnd)) break
-            pathEnd++
-        }
-
-        // Check if the expanded path contains any path-defining characters
+        val offset = cache.rowOffset(row)
+        val clickedColumn = leadingColumn(cache, offset, column)
         var hasPathIndicator = false
-        var col = pathStart
-        while (col < pathEnd) {
-            val index = rowOffset + col
-            val charVal = codeWords[index]
-            if (flagsPlane[index] and TerminalRenderCellFlags.CODEPOINT != 0 &&
-                (charVal == '/'.code || charVal == '\\'.code || charVal == '.'.code || charVal == ':'.code)
-            ) {
-                hasPathIndicator = true
-                break
-            }
-            col++
+        val path =
+            expandSelection(
+                cache,
+                row,
+                clickedColumn,
+                matches = { flags, codeWord ->
+                    val matches = isPathChar(flags, codeWord)
+                    if (matches &&
+                        flags and TerminalRenderCellFlags.CODEPOINT != 0 &&
+                        (codeWord == '/'.code || codeWord == '\\'.code || codeWord == '.'.code || codeWord == ':'.code)
+                    ) {
+                        hasPathIndicator = true
+                    }
+                    matches
+                },
+                accept = { hasPathIndicator },
+            )
+        if (path != null) return path
+
+        val clickedKind = wordKind(cache.flags[offset + clickedColumn], cache.codeWords[offset + clickedColumn])
+        return expandSelection(cache, row, clickedColumn, matches = { flags, codeWord -> wordKind(flags, codeWord) == clickedKind })
+    }
+
+    private inline fun expandSelection(
+        cache: TerminalRenderCache,
+        row: Int,
+        column: Int,
+        matches: (flags: Int, codeWord: Int) -> Boolean,
+        accept: () -> Boolean = { true },
+    ): CellSelection? {
+        if (!matchesCell(cache, row, column, matches)) return null
+
+        var startRow = row
+        var start = column
+        while (true) {
+            while (start > 0 && matchesCell(cache, startRow, start - 1, matches)) start--
+            if (start != 0 || startRow == 0 || !cache.lineWrapped[startRow - 1]) break
+            val previous = wrappedTextEndColumn(cache, startRow - 1) - 1
+            if (previous < 0 || !matchesCell(cache, startRow - 1, previous, matches)) break
+            startRow--
+            start = previous
         }
 
-        if (clickedIsPath && hasPathIndicator) {
-            return CellSelection(pathStart, row, pathEnd, row)
+        var endRow = row
+        var end = column + 1
+        while (true) {
+            val wrapped = cache.lineWrapped[endRow]
+            val textEnd = if (wrapped) wrappedTextEndColumn(cache, endRow) else cache.columns
+            while (end < textEnd && matchesCell(cache, endRow, end, matches)) end++
+            if (end != textEnd || !wrapped || endRow == cache.rows - 1 || !matchesCell(cache, endRow + 1, 0, matches)) break
+            endRow++
+            end = 1
         }
 
-        // 2. Otherwise, fall back to standard word selection (letters, digits, underscore)
-        val clickedKind = wordKindAt(cache, rowOffset, clickedColumn)
+        return if (accept()) CellSelection(start, startRow, end, endRow) else null
+    }
 
-        var start = clickedColumn
-        while (start > 0) {
-            if (wordKindAt(cache, rowOffset, start - 1) != clickedKind) break
-            start--
-        }
-
-        var end = clickedColumn + 1
-        while (end < cache.columns) {
-            if (wordKindAt(cache, rowOffset, end) != clickedKind) break
-            end++
-        }
-
-        return CellSelection(start, row, end, row)
+    private inline fun matchesCell(
+        cache: TerminalRenderCache,
+        row: Int,
+        column: Int,
+        matches: (flags: Int, codeWord: Int) -> Boolean,
+    ): Boolean {
+        val offset = cache.rowOffset(row)
+        val index = offset + leadingColumn(cache, offset, column)
+        return matches(cache.flags[index], cache.codeWords[index])
     }
 
     private fun leadingColumn(
@@ -150,22 +165,13 @@ internal class TerminalSelectionTextExtractor {
         column: Int,
     ): Int = if (column > 0 && cache.flags[offset + column] and TerminalRenderCellFlags.WIDE_TRAILING != 0) column - 1 else column
 
-    private fun isPathCell(
+    private fun wrappedTextEndColumn(
         cache: TerminalRenderCache,
-        offset: Int,
-        column: Int,
-    ): Boolean {
-        val index = offset + leadingColumn(cache, offset, column)
-        return isPathChar(cache.flags[index], cache.codeWords[index])
-    }
-
-    private fun wordKindAt(
-        cache: TerminalRenderCache,
-        offset: Int,
-        column: Int,
+        row: Int,
     ): Int {
-        val index = offset + leadingColumn(cache, offset, column)
-        return wordKind(cache.flags[index], cache.codeWords[index])
+        val columns = cache.columns
+        if (columns == 0) return 0
+        return if (cache.flags[cache.rowOffset(row) + columns - 1] and TerminalRenderCellFlags.WRAP_PADDING != 0) columns - 1 else columns
     }
 
     /** Bounds trimming by the whole row, so a partial selection retains interior spaces. */
@@ -173,12 +179,9 @@ internal class TerminalSelectionTextExtractor {
         cache: TerminalRenderCache,
         row: Int,
     ): Int {
+        if (cache.lineWrapped[row]) return wrappedTextEndColumn(cache, row)
         val rowOffset = cache.rowOffset(row)
         var end = cache.columns
-        if (cache.lineWrapped[row]) {
-            if (end > 0 && cache.flags[rowOffset + end - 1] and TerminalRenderCellFlags.WRAP_PADDING != 0) end--
-            return end
-        }
         while (end > 0) {
             val index = rowOffset + end - 1
             val flags = cache.flags[index]

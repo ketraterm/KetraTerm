@@ -241,6 +241,7 @@ internal class TerminalSelectionController(
     private var dragAnchorVisualColumn: Int = 0
     private var dragClickCount = 1
     private var dragAnchorEndColumn = 0
+    private var dragAnchorStartAbsoluteRow = 0L
     private var dragAnchorEndAbsoluteRow = 0L
 
     var selectionAnchorAbsoluteRow: Long? = null
@@ -348,6 +349,7 @@ internal class TerminalSelectionController(
             }
         }
         dragAnchorEndColumn = selectionCaretColumn
+        dragAnchorStartAbsoluteRow = selectionAnchorAbsoluteRow ?: 0L
         dragAnchorEndAbsoluteRow = selectionCaretAbsoluteRow ?: selectionAnchorAbsoluteRow ?: 0L
         updateSelectionAutoscroll()
         host.repaint()
@@ -481,30 +483,35 @@ internal class TerminalSelectionController(
         val column = unpackCellColumn(cell)
         val row = unpackCellRow(cell)
 
-        val caretAbsRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
+        val viewportTop = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        val caretAbsRow = viewportTop + row
         if (!selectionIsBlock && dragClickCount >= 2) {
-            val anchorDiscarded = dragAnchorEndAbsoluteRow < cache.discardedCount
-            val originalRow = dragAnchorEndAbsoluteRow.coerceAtLeast(cache.discardedCount)
-            val originalStart = if (anchorDiscarded) 0 else dragAnchorLogicalColumn
-            val originalEnd = if (anchorDiscarded) 0 else dragAnchorEndColumn
+            val firstRow = cache.discardedCount
+            val originalStartRow = dragAnchorStartAbsoluteRow.coerceAtLeast(firstRow)
+            val originalEndRow = dragAnchorEndAbsoluteRow.coerceAtLeast(firstRow)
+            val originalStart = if (dragAnchorStartAbsoluteRow < firstRow) 0 else dragAnchorLogicalColumn
+            val originalEnd = if (dragAnchorEndAbsoluteRow < firstRow) 0 else dragAnchorEndColumn
             val target =
                 if (dragClickCount >= 3) {
                     CellSelection(0, row, cache.columns, row)
                 } else {
                     selectionTextExtractor.wordSelectionAt(cache, row, column) ?: return
                 }
+            val targetStartRow = viewportTop + target.anchorRow
+            val targetEndRow = viewportTop + target.caretRow
             val beforeAnchor =
-                caretAbsRow < originalRow ||
-                    caretAbsRow == originalRow &&
-                    target.anchorColumn < originalStart
-            selectionAnchorAbsoluteRow = originalRow
-            selectionCaretAbsoluteRow = caretAbsRow
+                targetStartRow < originalStartRow || targetStartRow == originalStartRow && target.anchorColumn < originalStart
             if (beforeAnchor) {
+                selectionAnchorAbsoluteRow = originalEndRow
                 selectionAnchorColumn = originalEnd
+                selectionCaretAbsoluteRow = targetStartRow
                 selectionCaretColumn = target.anchorColumn
             } else {
+                selectionAnchorAbsoluteRow = originalStartRow
                 selectionAnchorColumn = originalStart
-                selectionCaretColumn = target.caretColumn
+                val afterAnchor = targetEndRow > originalEndRow || targetEndRow == originalEndRow && target.caretColumn > originalEnd
+                selectionCaretAbsoluteRow = if (afterAnchor) targetEndRow else originalEndRow
+                selectionCaretColumn = if (afterAnchor) target.caretColumn else originalEnd
             }
             return
         }
