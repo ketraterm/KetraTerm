@@ -53,7 +53,6 @@ public class TerminalCompletionPathResolver
                         prefix.startsWith("~/") -> homeDirectory?.resolve(prefix.substring(2))
                         prefix.hasWindowsDriveRoot() -> if (windows) Path.of(prefix.replace('/', '\\')) else null
                         prefix.startsWith("//") -> if (windows) Path.of(prefix.replace('/', '\\')) else null
-                        prefix.startsWith('/') -> Path.of(prefix)
                         prefix.isEmpty() -> workingDirectory
                         else -> workingDirectory.resolve(prefix)
                     } ?: return null

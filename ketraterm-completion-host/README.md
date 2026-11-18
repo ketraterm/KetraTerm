@@ -59,8 +59,9 @@ See the [request contract](../ketraterm-completion/README.md#request-completions
 `TerminalCompletionPathResolver` resolves the engine's lexical
 `TerminalDirectoryListingRequest` into a normalized absolute local `Path`.
 It accepts relative and absolute paths, `~/` using the configured home directory,
-and Windows drive or UNC syntax when Windows support is enabled. Requests use
-forward slashes as separators. Remaining backslashes are literal filename
+and Windows drive or UNC syntax when Windows support is enabled. On Windows,
+a prefix such as `/logs/` starts at the root of the terminal's current drive.
+Requests use forward slashes as separators. Remaining backslashes are literal filename
 characters: POSIX filesystems preserve them; Windows resolution rejects them.
 Shell parsing and quoting stay in the completion engine.
 
