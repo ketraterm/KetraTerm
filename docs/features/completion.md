@@ -196,6 +196,10 @@ predictions appear after the cursor. Suggestions remain unavailable when the cur
 real editable suffix text. See the [bridge protocol](../reference/protocol.md#private-powershell-completion-metadata)
 for request limits and validation.
 
+KetraTerm preserves PowerShell shortcuts that use standalone `F12` or one of its
+private completion chords. Native suggestions are unavailable at prompts where
+one of those bindings is in use.
+
 On Windows, combining accents (for example, `e` followed by U+0301) can make native
 suggestions unavailable in PowerShell 5.1 and 7. PSReadLine may position the cursor
 beyond the rendered text, causing KetraTerm's exact editor-buffer validation to fail.

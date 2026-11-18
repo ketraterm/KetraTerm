@@ -255,15 +255,25 @@ function global:__KetraTermInstallCompletionHandlers {
         foreach ($digit in 0..9) {
             $handlers[[string]$digit] = { param($key, $arg) global:__KetraTermCompletionAppend $key.KeyChar }
         }
+        $handlerDescription = 'KetraTermCompletionProtocol'
+        foreach ($binding in (Get-PSReadLineKeyHandler -Bound -ErrorAction Stop)) {
+            # PSReadLine encloses Vi command-mode keys in angle brackets.
+            $chord = $binding.Key.Trim([char[]]'<>')
+            if ($chord -ceq 'F12' -or
+                ($chord.StartsWith('F12,', [StringComparison]::Ordinal) -and
+                 $chord.Substring(4) -cin $handlers.Keys -and $binding.Function -cne $handlerDescription)) {
+                return
+            }
+        }
         $global:__KetraTermCompletionPrefixResetInstalled = $true
         foreach ($suffix in $handlers.Keys) {
             try {
                 if ($mode -eq 'Vi') {
                     foreach ($viMode in @('Insert', 'Command')) {
-                        Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -ViMode $viMode -ErrorAction Stop
+                        Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -BriefDescription $handlerDescription -ViMode $viMode -ErrorAction Stop
                     }
                 } else {
-                    Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -ErrorAction Stop
+                    Set-PSReadLineKeyHandler -Chord ('F12,' + $suffix) -ScriptBlock $handlers[$suffix] -BriefDescription $handlerDescription -ErrorAction Stop
                 }
             } catch {
                 if ($suffix -eq 'b') {

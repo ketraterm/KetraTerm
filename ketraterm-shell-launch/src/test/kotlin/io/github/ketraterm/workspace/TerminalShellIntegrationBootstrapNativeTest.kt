@@ -1312,6 +1312,54 @@ class TerminalShellIntegrationBootstrapNativeTest {
             }
         }
 
+    @ParameterizedTest(name = "PowerShell F12 ownership [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completion preserves user F12 bindings across prompts`(
+        executableName: String,
+        @TempDir directory: Path,
+    ) {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val hook = checkNotNull(javaClass.getResourceAsStream("powershell-completion.ps1")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            """
+            ${'$'}ErrorActionPreference = 'Stop'
+            Import-Module PSReadLine
+            $hook
+            function Assert-UserBinding([string] ${'$'}key) {
+                ${'$'}binding = Get-PSReadLineKeyHandler -Bound | Where-Object Key -CEQ ${'$'}key
+                if (${'$'}binding.Function -ne 'HistorySearchBackward') { throw ('Lost user shortcut ' + ${'$'}key) }
+            }
+
+            Set-PSReadLineOption -EditMode Windows
+            Set-PSReadLineKeyHandler -Chord F12 -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding F12
+
+            Set-PSReadLineOption -EditMode Vi
+            Set-PSReadLineKeyHandler -Chord 'F12,q' -ViMode Command -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            Assert-UserBinding '<F12,q>'
+
+            Set-PSReadLineOption -EditMode Windows
+            Set-PSReadLineKeyHandler -Chord 'F12,s' -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding 'F12,s'
+            Set-PSReadLineKeyHandler -Chord F12 -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding F12
+            """.trimIndent()
+        val scriptPath = Files.writeString(directory.resolve("f12-bindings.ps1"), script)
+        val result =
+            runProcess(listOf(executable!!, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath.toString()))
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertEquals(2, Regex("KetraTermCompletion;3;Ready;").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+    }
+
     @Test
     fun `PowerShell native hook uses functions aliases and registered completers from its own session`(
         @TempDir directory: Path,

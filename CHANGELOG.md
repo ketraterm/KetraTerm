@@ -24,6 +24,8 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Preserve user PSReadLine bindings that overlap PowerShell's native completion chords.
+
 - Preserve the previous command's `$?` value when invoking a custom PowerShell prompt.
 
 - Resolve root-relative Windows completion paths on the terminal's current drive.
