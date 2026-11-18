@@ -126,7 +126,7 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `PowerShell bootstrap prefers changed native exit code before success fallback`() {
+    fun `PowerShell bootstrap prefers a fresh native exit code before success fallback`() {
         val script = integratedPowerShellScript()
 
         assertTrue(

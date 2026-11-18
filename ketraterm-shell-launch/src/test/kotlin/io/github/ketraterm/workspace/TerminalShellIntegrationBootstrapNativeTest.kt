@@ -971,10 +971,11 @@ class TerminalShellIntegrationBootstrapNativeTest {
             val nativeFailure = if (isWindows()) "cmd.exe /d /c exit 7" else "/bin/sh -c 'exit 7'"
             TerminalWorkspace().use { workspace ->
                 val session =
-                    workspace.openTab(
-                        TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
-                        TerminalWorkspaceOpenOptions(),
-                    ).session
+                    workspace
+                        .openTab(
+                            TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                            TerminalWorkspaceOpenOptions(),
+                        ).session
                 val state = session.shellIntegrationState
                 val commands =
                     listOf(
@@ -982,7 +983,7 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         nativeFailure to 7,
                         "Get-Location" to 0,
                         "Write-Error 'expected error'" to 1,
-                        "if (\$LASTEXITCODE -ne 7) { throw 'Expected LASTEXITCODE=7' }" to 0,
+                        "Write-Output ('KETRA_STATUS=' + \$LASTEXITCODE)" to 0,
                     )
                 for ((index, execution) in commands.withIndex()) {
                     val (command, expectedExitCode) = execution
@@ -1001,6 +1002,8 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     assertEquals(command, finished.commandText)
                     assertEquals(expectedExitCode, finished.exitCode, "Command ${index + 1}: $command")
                 }
+                val output = assertNotNull(session.commandOutputText(state.latestCommandRecordId(), maxChars = 128, maxRows = 4))
+                assertEquals("KETRA_STATUS=7", output.text.trim())
             }
         }
 
