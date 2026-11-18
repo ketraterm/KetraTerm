@@ -126,16 +126,6 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `PowerShell bootstrap prefers a fresh native exit code before success fallback`() {
-        val script = integratedPowerShellScript()
-
-        assertTrue(
-            script.indexOf("if (\$nativeExitCode -is [int]") < script.indexOf("elseif (\$success)"),
-            "native LASTEXITCODE branch must be evaluated before PowerShell success fallback",
-        )
-    }
-
-    @Test
     fun `PowerShell bootstrap restores native exit code even when user prompt fails`() {
         val script = integratedPowerShellScript()
 

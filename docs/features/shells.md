@@ -79,9 +79,11 @@ PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
 function to wrap. Without it, the bootstrap still supplies prompt and directory
 reports. PowerShell reports filesystem paths, resolving session drive aliases to
 their native directories and preserving literal percent sequences in file URIs.
-The finish marker uses a fresh `$LASTEXITCODE` even when it repeats the previous
-numeric value. If the command leaves `$LASTEXITCODE` untouched, the marker uses
-PowerShell's success flag and reports `0` for success or `1` for failure.
+The finish marker reports `0` when PowerShell finishes the line successfully
+(`$?` is true). A failed line reports a fresh nonzero `$LASTEXITCODE` when
+available, including repeated numeric codes, and otherwise reports `1`. On a
+line with multiple failures, a native exit code can come from an earlier command
+on that line. Custom PowerShell prompts also receive the line's success flag.
 
 When PSReadLine is loaded, the PowerShell bootstrap also installs private
 [request bindings](../reference/protocol.md#private-powershell-completion-metadata)
@@ -93,12 +95,15 @@ Fish hooks also install read-only
 [editor-buffer confirmation](../reference/protocol.md#private-fish-editor-buffer-confirmation)
 when its prerequisites are available. This lets popup suggestions coexist with
 fish's native autosuggestions; fish's own Tab completion remains unchanged.
+Replacing `fish_prompt` during a session keeps prompt markers, directory reports,
+and buffer confirmation active on subsequent prompts.
 
 Direct interactive Bash launches load the user's startup files before installing
 prompt hooks, preserving existing `PROMPT_COMMAND` callbacks and the visible prompt.
 An explicit `--norc` launch keeps startup files disabled and receives only the
 environment hook. Explicit WSL Bash launches also use the environment hook, which
 can be replaced by guest startup files.
+In Bash and zsh, directory reporting preserves the shell's `REPLY` variable.
 
 If Bash already has a `DEBUG` trap at the first prompt, KetraTerm preserves it.
 Prompt markers, working-directory reports, and supported completion remain
@@ -116,6 +121,8 @@ completion resolve the same directory as the shell.
 Literal alias definitions feed shared argument analysis while accepted edits preserve
 the user's alias; see the [supported alias subset](completion.md#sources-by-host).
 
+zsh keeps marking the editable input boundary when a `precmd` callback rebuilds
+the prompt. Directory reports also work with `KSH_ARRAYS` enabled.
 zsh uses the same inventory protocol, command authority, and alias analysis.
 With `zsh/parameter` and `base64` available, it discovers enabled ordinary aliases,
 functions (including autoloads), and builtins at terminal prompts. Executable

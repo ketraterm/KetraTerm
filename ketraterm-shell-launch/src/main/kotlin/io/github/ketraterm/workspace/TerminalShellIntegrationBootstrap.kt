@@ -539,17 +539,6 @@ internal object TerminalShellIntegrationBootstrap {
             __ketraterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
             __ketraterm_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_hostname" ]] || __ketraterm_hostname=localhost
-            __ketraterm_encode_uri_path() {
-                local LC_ALL=C __ketraterm_value=${'$'}1 __ketraterm_encoded= __ketraterm_char __ketraterm_hex __ketraterm_index
-                for (( __ketraterm_index=0; __ketraterm_index<${'$'}{${'#'}__ketraterm_value}; __ketraterm_index++ )); do
-                    __ketraterm_char=${'$'}{__ketraterm_value:__ketraterm_index:1}
-                    case "${'$'}__ketraterm_char" in
-                        [a-zA-Z0-9/._~-]) __ketraterm_encoded+=${'$'}__ketraterm_char ;;
-                        *) printf -v __ketraterm_hex '%%%02X' "'${'$'}__ketraterm_char"; __ketraterm_encoded+=${'$'}__ketraterm_hex ;;
-                    esac
-                done
-                REPLY=${'$'}__ketraterm_encoded
-            }
             __ketraterm_osc7() {
                 local __ketraterm_directory=${'$'}PWD
                 # MSYS/Cygwin mount paths are not native Windows file URI paths.
@@ -557,8 +546,15 @@ internal object TerminalShellIntegrationBootstrap {
                     __ketraterm_directory=${'$'}(/usr/bin/cygpath -m -- "${'$'}PWD") || __ketraterm_directory=${'$'}PWD
                     [[ ${'$'}__ketraterm_directory == /* ]] || __ketraterm_directory=/"${'$'}__ketraterm_directory"
                 fi
-                __ketraterm_encode_uri_path "${'$'}__ketraterm_directory"
-                printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_hostname" "${'$'}REPLY"
+                local LC_ALL=C __ketraterm_encoded= __ketraterm_char __ketraterm_hex __ketraterm_index
+                for (( __ketraterm_index=0; __ketraterm_index<${'$'}{${'#'}__ketraterm_directory}; __ketraterm_index++ )); do
+                    __ketraterm_char=${'$'}{__ketraterm_directory:__ketraterm_index:1}
+                    case "${'$'}__ketraterm_char" in
+                        [a-zA-Z0-9/._~-]) __ketraterm_encoded+=${'$'}__ketraterm_char ;;
+                        *) printf -v __ketraterm_hex '%%%02X' "'${'$'}__ketraterm_char"; __ketraterm_encoded+=${'$'}__ketraterm_hex ;;
+                    esac
+                done
+                printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_hostname" "${'$'}__ketraterm_encoded"
             }
             __ketraterm_install_prompt_end() {
                 case "${'$'}PS1" in
@@ -628,8 +624,23 @@ internal object TerminalShellIntegrationBootstrap {
                 set -l encoded_path (string escape --style=url -- "${'$'}PWD" | string replace -a '%2F' '/' | string replace -a '%2f' '/')
                 printf '\e]7;file://%s%s\a' "${'$'}__ketraterm_fish_hostname" "${'$'}encoded_path"
             end
+            function __ketraterm_fish_prompt_is_wrapped
+                set -l details (functions --details --verbose fish_prompt)
+                test "${'$'}details[5]" = 'KetraTerm prompt wrapper'
+            end
             function __ketraterm_fish_prompt --on-event fish_prompt
                 set -l code ${'$'}status
+                if not __ketraterm_fish_prompt_is_wrapped
+                    functions --erase __ketraterm_original_fish_prompt
+                    functions --copy fish_prompt __ketraterm_original_fish_prompt; or return
+                    # Fish renders the prompt after all prompt events, including its own OSC 7 handler.
+                    function fish_prompt --description 'KetraTerm prompt wrapper'
+                        __ketraterm_original_fish_prompt ${'$'}argv
+                        __ketraterm_osc7
+                        __ketraterm_osc133 B
+                        __ketraterm_fish_completion_ready
+                    end
+                end
                 if test "${'$'}__ketraterm_fish_native_markers" = 1
                     return
                 end
@@ -640,6 +651,12 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_osc133 A
             end
             function __ketraterm_fish_preexec --on-event fish_preexec
+                # Commands that save or replace fish_prompt must see the theme's own function.
+                if __ketraterm_fish_prompt_is_wrapped
+                    functions --erase fish_prompt
+                    functions --copy __ketraterm_original_fish_prompt fish_prompt
+                end
+                functions --erase __ketraterm_original_fish_prompt
                 if test "${'$'}__ketraterm_fish_native_markers" = 1
                     return
                 end
@@ -656,16 +673,6 @@ internal object TerminalShellIntegrationBootstrap {
                     set -g __ketraterm_fish_command_started 0
                 end
             end
-            # Prompt events (including Fish's own OSC 7 handler) finish before this
-            # output is rendered. Keep the launcher's filesystem authority last.
-            # Older Fish lacks native B and ignores SHELL_PROMPT_SUFFIX.
-            functions --copy fish_prompt __ketraterm_original_fish_prompt
-            function fish_prompt
-                __ketraterm_original_fish_prompt
-                __ketraterm_osc7
-                __ketraterm_osc133 B
-                __ketraterm_fish_completion_ready
-            end
         end
         """.trimIndent()
 
@@ -681,8 +688,9 @@ internal object TerminalShellIntegrationBootstrap {
             }
             typeset -g __ketraterm_zsh_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_zsh_hostname" ]] || __ketraterm_zsh_hostname=localhost
-            function __ketraterm_zsh_encode_uri_path() {
-                local LC_ALL=C value=${'$'}1 encoded='' char hex
+            function __ketraterm_zsh_osc7() {
+                emulate -L zsh
+                local LC_ALL=C value=${'$'}PWD encoded='' char hex
                 local -i index
                 for (( index=1; index<=${'$'}{${'#'}value}; index++ )); do
                     char=${'$'}{value[index]}
@@ -691,15 +699,17 @@ internal object TerminalShellIntegrationBootstrap {
                         *) printf -v hex '%%%02X' "'${'$'}char"; encoded+=${'$'}hex ;;
                     esac
                 done
-                REPLY=${'$'}encoded
-            }
-            function __ketraterm_zsh_osc7() {
-                __ketraterm_zsh_encode_uri_path "${'$'}PWD"
-                printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_zsh_hostname" "${'$'}REPLY"
+                printf '\033]7;file://%s%s\a' "${'$'}__ketraterm_zsh_hostname" "${'$'}encoded"
             }
             function __ketraterm_zsh_preexec() {
                 __ketraterm_zsh_command_started=1
                 __ketraterm_osc133 C
+            }
+            function __ketraterm_zsh_install_prompt_end() {
+                case "${'$'}PROMPT" in
+                    *${'$'}'\033]133;B\a'*) ;;
+                    *) PROMPT="${'$'}PROMPT"${'$'}'%{\033]133;B\a%}' ;;
+                esac
             }
             function __ketraterm_zsh_precmd() {
                 local code=${'$'}?
@@ -710,15 +720,22 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_zsh_osc7
                 __ketraterm_zsh_completion_ready
                 __ketraterm_osc133 A
+                __ketraterm_zsh_install_prompt_end
                 return ${'$'}code
+            }
+            function __ketraterm_zsh_line_init() {
+                # ZLE has drawn the prompt by now, including changes from later precmd callbacks.
+                if [[ ${'$'}CONTEXT == start && ${'$'}PROMPT != *${'$'}'\033]133;B\a'* ]]; then
+                    __ketraterm_osc133 B
+                fi
             }
             autoload -Uz add-zsh-hook
             add-zsh-hook preexec __ketraterm_zsh_preexec
             add-zsh-hook precmd __ketraterm_zsh_precmd
-            case "${'$'}PROMPT" in
-                *${'$'}'\033]133;B\a'*) ;;
-                *) PROMPT="${'$'}PROMPT"${'$'}'%{\033]133;B\a%}' ;;
-            esac
+            if [[ -o interactive && -o zle ]] && zmodload zsh/zle; then
+                autoload -Uz add-zle-hook-widget
+                add-zle-hook-widget line-init __ketraterm_zsh_line_init
+            fi
         fi
         """.trimIndent()
 
@@ -752,12 +769,13 @@ internal object TerminalShellIntegrationBootstrap {
                 ${'$'}success = ${'$'}?
                 ${'$'}nativeExitCode = ${'$'}global:LASTEXITCODE
                 if (${'$'}global:__KetraTermCommandStarted) {
-                    # PowerShell stores a new boxed Int32 on each native exit, even when the code repeats.
-                    if (${'$'}nativeExitCode -is [int] -and
+                    # The last native exit code may belong to an earlier command on the line.
+                    # PowerShell boxes each native exit separately, even when the code repeats.
+                    if (${'$'}success) {
+                        ${'$'}exitCode = 0
+                    } elseif (${'$'}nativeExitCode -is [int] -and ${'$'}nativeExitCode -ne 0 -and
                         -not [object]::ReferenceEquals(${'$'}nativeExitCode, ${'$'}global:__KetraTermLastExitCodeBeforeCommand)) {
                         ${'$'}exitCode = ${'$'}nativeExitCode
-                    } elseif (${'$'}success) {
-                        ${'$'}exitCode = 0
                     } else {
                         ${'$'}exitCode = 1
                     }
@@ -767,6 +785,10 @@ internal object TerminalShellIntegrationBootstrap {
                 global:__KetraTermOsc7
                 global:__KetraTermOsc133 'A'
                 try {
+                    # $? is read-only. An ignored error sets it to false without changing error history.
+                    if (-not ${'$'}success) {
+                        Microsoft.PowerShell.Utility\Write-Error -Message 'The previous command failed.' -ErrorAction Ignore
+                    }
                     ${'$'}promptText = & ${'$'}global:__KetraTermOriginalPrompt
                 } finally {
                     if (${'$'}nativeExitCode -is [int]) {

@@ -414,6 +414,68 @@ class TerminalSelectionTextExtractorTest {
     }
 
     @Test
+    fun `double clicking either part of a soft-wrapped path selects the same text as a wide terminal`() {
+        val path = "src/main/Application.kt"
+        val wide = renderCache(TestRenderFrame.text(path.padEnd(32)))
+        val wrapped =
+            renderCache(
+                object : TestRenderFrame(arrayOf(textCells("src/main/App"), textCells("lication.kt "))) {
+                    override fun lineWrapped(row: Int): Boolean = row == 0
+                },
+            )
+        val hardBreak = renderCache(TestRenderFrame(arrayOf(textCells("src/main/App"), textCells("lication.kt "))))
+
+        assertEquals(path, extractor.selectedText(wide, requireNotNull(extractor.wordSelectionAt(wide, 0, 3))))
+        for (row in 0..1) {
+            val selection = requireNotNull(extractor.wordSelectionAt(wrapped, row, 3))
+            assertEquals(path, extractor.selectedText(wrapped, selection, joinSoftWrappedRows = true))
+        }
+        for ((row, expected) in listOf("src/main/App", "lication.kt").withIndex()) {
+            val selection = requireNotNull(extractor.wordSelectionAt(hardBreak, row, 3))
+            assertEquals(expected, extractor.selectedText(hardBreak, selection, joinSoftWrappedRows = true))
+        }
+    }
+
+    @Test
+    fun `word selection follows a soft wrap and stops at a word delimiter`() {
+        val cache =
+            renderCache(
+                object : TestRenderFrame(arrayOf(textCells("abcde"), textCells("fg hi"))) {
+                    override fun lineWrapped(row: Int): Boolean = row == 0
+                },
+            )
+
+        assertEquals(CellSelection(0, 0, 2, 1), extractor.wordSelectionAt(cache, 1, 0))
+        assertEquals(CellSelection(3, 1, 5, 1), extractor.wordSelectionAt(cache, 1, 4))
+    }
+
+    @Test
+    fun `wrapped path selection crosses synthetic padding before a wide character`() {
+        val cache =
+            renderCache(
+                object : TestRenderFrame(
+                    arrayOf(
+                        textCells("/src") + TestCell(flags = TerminalRenderCellFlags.WRAP_PADDING),
+                        arrayOf(
+                            TestCell(
+                                codeWord = '字'.code,
+                                flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
+                            ),
+                            TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                        ) + textCells("app"),
+                    ),
+                ) {
+                    override fun lineWrapped(row: Int): Boolean = row == 0
+                },
+            )
+
+        for ((row, column) in listOf(0 to 1, 1 to 0, 1 to 1)) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, row, column))
+            assertEquals("/src字app", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+        }
+    }
+
+    @Test
     fun `url selection groups entire url when containing indicators`() {
         val cache = renderCache(TestRenderFrame.text("https://google.com/search?q=test"))
         val selection = extractor.wordSelectionAt(cache, row = 0, column = 10) // clicks on "o" in "google"
@@ -425,6 +487,28 @@ class TerminalSelectionTextExtractorTest {
         Array(text.length) { index ->
             TestCell(codeWord = text[index].code, flags = TerminalRenderCellFlags.CODEPOINT)
         }
+
+    @Test
+    fun `double click selection includes the URL fragment from either side of the hash`() {
+        val url = "https://example.org/docs#install"
+        val cache = renderCache(TestRenderFrame.text("\"$url\" next"))
+        val hashColumn = 1 + url.indexOf('#')
+
+        for (column in hashColumn - 1..hashColumn + 1) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, 0, column))
+            assertEquals(url, extractor.selectedText(cache, selection), "clicked column $column")
+        }
+    }
+
+    @Test
+    fun `hash remains a word boundary in plain text`() {
+        val cache = renderCache(TestRenderFrame.text("foo#bar"))
+
+        for ((column, expected) in listOf(1 to "foo", 3 to "#", 5 to "bar")) {
+            val selection = requireNotNull(extractor.wordSelectionAt(cache, 0, column))
+            assertEquals(expected, extractor.selectedText(cache, selection))
+        }
+    }
 
     @Test
     fun `double clicking whitespace or delimiters never absorbs an adjacent path`() {

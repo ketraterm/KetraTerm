@@ -519,7 +519,9 @@ A new `A` also clears the previous epoch and requires a fresh announcement.
 Prompt announcements never reset the session's request IDs. Every accepted
 announcement invalidates earlier editing contexts and pending results,
 including announcements that change only `PrefixReset` or `BufferState`.
-The hook reinstalls its private PSReadLine bindings before each `Ready` announcement.
+Before each `Ready` announcement the hook checks PSReadLine's active editing mode,
+including both Vi keymaps, and reinstalls its private bindings. An existing user
+binding for standalone `F12` or a protocol chord suppresses `Ready` for that prompt.
 Readiness advertises the prompt's hook, not completion of prompt rendering or
 PSReadLine initialization. The query handler reads the editor when the shell
 processes the completed request frame.

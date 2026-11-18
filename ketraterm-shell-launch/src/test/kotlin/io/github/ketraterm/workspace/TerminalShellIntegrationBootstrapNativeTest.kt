@@ -964,16 +964,25 @@ class TerminalShellIntegrationBootstrapNativeTest {
 
     @ParameterizedTest(name = "PowerShell command exit status [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
-    fun `PowerShell reports repeated native exit codes and ignores stale codes for cmdlets`(executableName: String): Unit =
+    fun `PowerShell reports final line status and preserves repeated native exit codes`(
+        executableName: String,
+        @TempDir directory: Path,
+    ): Unit =
         runBlocking {
             val executable = installedExecutable(executableName)
             assumeTrue(executable != null, "$executableName is not installed")
+            val nativeSuccess = if (isWindows()) "cmd.exe /d /c exit 0" else "/bin/sh -c 'exit 0'"
             val nativeFailure = if (isWindows()) "cmd.exe /d /c exit 7" else "/bin/sh -c 'exit 7'"
             TerminalWorkspace().use { workspace ->
                 val session =
                     workspace
                         .openTab(
-                            TerminalProfile("powershell", "PowerShell", listOf(executable!!, "-NoLogo", "-NoProfile")),
+                            TerminalProfile(
+                                "powershell",
+                                "PowerShell",
+                                listOf(executable!!, "-NoLogo", "-NoProfile"),
+                                workingDirectory = directory,
+                            ),
                             TerminalWorkspaceOpenOptions(),
                         ).session
                 val state = session.shellIntegrationState
@@ -983,25 +992,28 @@ class TerminalShellIntegrationBootstrapNativeTest {
                         nativeFailure to 7,
                         "Get-Location" to 0,
                         "Write-Error 'expected error'" to 1,
+                        "$nativeSuccess; Get-Item -LiteralPath 'missing-file'" to 1,
+                        "$nativeFailure; Write-Output done" to 0,
                         "Write-Output ('KETRA_STATUS=' + \$LASTEXITCODE)" to 0,
                     )
-                for ((index, execution) in commands.withIndex()) {
-                    val (command, expectedExitCode) = execution
-                    session.awaitLine("")
-                    val previousRecord = state.latestCommandRecordId()
-                    session.submitInput(TerminalPasteEvent(command))
-                    session.awaitLine(command)
-                    session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
-                    withTimeout(15.seconds) {
-                        state.revision.first {
-                            val record = state.latestCommandRecordId()
-                            record != previousRecord && state.commandMetadata(record)?.finishedAtEpochMillis != null
+                val reported =
+                    commands.map { (command, _) ->
+                        session.awaitLine("")
+                        val previousRecord = state.latestCommandRecordId()
+                        session.submitInput(TerminalPasteEvent(command))
+                        session.awaitLine(command)
+                        session.submitInput(TerminalKeyEvent.key(TerminalKey.ENTER))
+                        withTimeout(15.seconds) {
+                            state.revision.first {
+                                val record = state.latestCommandRecordId()
+                                record != previousRecord && state.commandMetadata(record)?.finishedAtEpochMillis != null
+                            }
                         }
+                        val finished = assertNotNull(state.commandMetadata(state.latestCommandRecordId()))
+                        assertEquals(command, finished.commandText)
+                        command to finished.exitCode
                     }
-                    val finished = assertNotNull(state.commandMetadata(state.latestCommandRecordId()))
-                    assertEquals(command, finished.commandText)
-                    assertEquals(expectedExitCode, finished.exitCode, "Command ${index + 1}: $command")
-                }
+                assertEquals(commands, reported)
                 val output = assertNotNull(session.commandOutputText(state.latestCommandRecordId(), maxChars = 128, maxRows = 4))
                 assertEquals("KETRA_STATUS=7", output.text.trim())
             }
@@ -1300,6 +1312,54 @@ class TerminalShellIntegrationBootstrapNativeTest {
             }
         }
 
+    @ParameterizedTest(name = "PowerShell F12 ownership [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell completion preserves user F12 bindings across prompts`(
+        executableName: String,
+        @TempDir directory: Path,
+    ) {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val hook = checkNotNull(javaClass.getResourceAsStream("powershell-completion.ps1")).use { it.readBytes().toString(Charsets.UTF_8) }
+        val script =
+            """
+            ${'$'}ErrorActionPreference = 'Stop'
+            Import-Module PSReadLine
+            $hook
+            function Assert-UserBinding([string] ${'$'}key) {
+                ${'$'}binding = Get-PSReadLineKeyHandler -Bound | Where-Object Key -CEQ ${'$'}key
+                if (${'$'}binding.Function -ne 'HistorySearchBackward') { throw ('Lost user shortcut ' + ${'$'}key) }
+            }
+
+            Set-PSReadLineOption -EditMode Windows
+            Set-PSReadLineKeyHandler -Chord F12 -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding F12
+
+            Set-PSReadLineOption -EditMode Vi
+            Set-PSReadLineKeyHandler -Chord 'F12,q' -ViMode Command -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            Assert-UserBinding '<F12,q>'
+
+            Set-PSReadLineOption -EditMode Windows
+            Set-PSReadLineKeyHandler -Chord 'F12,s' -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding 'F12,s'
+            Set-PSReadLineKeyHandler -Chord F12 -Function HistorySearchBackward
+            global:__KetraTermCompletionReady
+            global:__KetraTermCompletionReady
+            Assert-UserBinding F12
+            """.trimIndent()
+        val scriptPath = Files.writeString(directory.resolve("f12-bindings.ps1"), script)
+        val result =
+            runProcess(listOf(executable!!, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath.toString()))
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertEquals(2, Regex("KetraTermCompletion;3;Ready;").findAll(result.stdout).count(), visibleEscapes(result.stdout))
+    }
+
     @Test
     fun `PowerShell native hook uses functions aliases and registered completers from its own session`(
         @TempDir directory: Path,
@@ -1468,6 +1528,27 @@ class TerminalShellIntegrationBootstrapNativeTest {
                     Path.of(URI("file", null, uri.path, null)).toRealPath()
                 }.toList()
         assertEquals(listOf(home.toRealPath(), nextDirectory.toRealPath(), nextDirectory.toRealPath()), reportedDirectories)
+    }
+
+    @Test
+    fun `Bash prompt directory reports preserve REPLY between commands`(
+        @TempDir directory: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "Bash is not installed")
+        val profile = TerminalProfile("bash", "Bash", listOf(bash!!, "--noprofile", "--norc", "-i"))
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory.resolve("hooks")).profile
+        val result =
+            runProcess(
+                launch.command,
+                launch.environment,
+                standardInput = "read -r <<< 'hello'\nprintf '\\nREAD_RESULT=%s\\n' \"\$REPLY\"\nexit\n",
+                workingDirectory = directory,
+            )
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it == "READ_RESULT=hello" }, visibleEscapes(result.stdout))
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
     }
 
     @Test
@@ -1989,6 +2070,46 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
     }
 
+    @ParameterizedTest(name = "PowerShell custom prompt status [{0}]")
+    @ValueSource(strings = ["powershell.exe", "pwsh"])
+    fun `PowerShell custom prompts see the command status without a synthetic error in history`(
+        executableName: String,
+        @TempDir directory: Path,
+    ) {
+        val executable = installedExecutable(executableName)
+        assumeTrue(executable != null, "$executableName is not installed")
+        val profile = TerminalProfile("powershell", "PowerShell", listOf(executable!!))
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
+        val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
+        val script =
+            """
+            function global:prompt {
+                if (${'$'}?) { 'PROMPT_OK' } else { 'PROMPT_FAIL' }
+            }
+            $bootstrap
+            ${'$'}ErrorActionPreference = 'Stop'
+            ${'$'}Error.Clear()
+            ${'$'}global:__KetraTermCommandStarted = ${'$'}true
+            Get-Item -LiteralPath 'missing-file' -ErrorAction Continue
+            prompt | Out-Host
+            ${'$'}global:__KetraTermCommandStarted = ${'$'}true
+            Get-Location | Out-Null
+            prompt | Out-Host
+            [Console]::WriteLine('ERROR_HISTORY=' + ${'$'}Error.Count + ':' + ${'$'}Error[0].CategoryInfo.Reason)
+            """.trimIndent()
+        val invocation = Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE))
+        val result = runProcess(listOf(executable, "-NoProfile", "-EncodedCommand", invocation), workingDirectory = directory)
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        val events =
+            Regex("\u001B]133;D;([01])\u0007|(PROMPT_(?:OK|FAIL))(?=\u001B]133;B\u0007)")
+                .findAll(result.stdout)
+                .map { it.groups[1]?.value ?: it.groupValues[2] }
+                .toList()
+        assertEquals(listOf("1", "PROMPT_FAIL", "0", "PROMPT_OK"), events, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it == "ERROR_HISTORY=1:ItemNotFoundException" }, visibleEscapes(result.stdout))
+    }
+
     @ParameterizedTest(name = "PowerShell directory URI encoding [{0}]")
     @ValueSource(strings = ["powershell.exe", "pwsh"])
     fun `PowerShell directory reports preserve literal percent escapes`(
@@ -2153,6 +2274,114 @@ class TerminalShellIntegrationBootstrapNativeTest {
         assertEquals(1, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;0", "A", "C", "D;1", "A")
         assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
+    }
+
+    @Test
+    fun `zsh rebuilds the prompt boundary while preserving REPLY and Korn array indexing`(
+        @TempDir directory: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val project = Files.createDirectory(directory.resolve("space # %"))
+        val expectedPath =
+            project
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        Files.writeString(directory.resolve(".zshrc"), "PROMPT='before> '\n")
+        val profile =
+            TerminalProfile(
+                "zsh",
+                "Zsh",
+                listOf(assertNotNull(zsh), "-d", "-i"),
+                environment = mapOf("ZDOTDIR" to directory.toString()),
+                workingDirectory = project,
+            )
+        TerminalWorkspace().use { workspace ->
+            val session = workspace.openTab(profile, TerminalWorkspaceOpenOptions()).session
+            runBlocking {
+                session.awaitLine("")
+                val changeTheme = "REPLY=hello; setopt KSH_ARRAYS; theme_prompt() { PROMPT='after> '; }; add-zsh-hook precmd theme_prompt"
+                session.submitPromptTestCommand(changeTheme)
+                session.awaitLine("", "first prompt after zsh theme change")
+                session.assertReportedDirectoryPath(expectedPath)
+
+                val record = session.submitPromptTestCommand("printf '%s\\n' \"\$REPLY\"; [[ -o KSH_ARRAYS ]]")
+                session.awaitLine("", "second prompt after zsh theme change")
+                assertEquals(0, session.shellIntegrationState.commandMetadata(record)?.exitCode)
+                assertEquals("hello", session.commandOutputText(record, maxChars = 128, maxRows = 4)?.text?.trim())
+                session.assertReportedDirectoryPath(expectedPath)
+            }
+        }
+    }
+
+    @Test
+    fun `fish prompt replacement preserves directory reports and buffer confirmation on successive prompts`(
+        @TempDir directory: Path,
+    ) {
+        val fish = installedExecutable("fish", "fish.exe")
+        assumeTrue(fish != null, "fish is not installed")
+        assumeTrue(installedExecutable("base64", "base64.exe") != null, "base64 is not installed")
+        val first = Files.createDirectory(directory.resolve("first # %"))
+        val second = Files.createDirectory(directory.resolve("second # %"))
+        val firstPath =
+            first
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        val secondPath =
+            second
+                .toRealPath()
+                .toUri()
+                .path
+                .trimEnd('/')
+        val setup = "set -g fish_greeting; fish_default_key_bindings; function fish_prompt; printf 'before> '; end"
+        val profile =
+            TerminalProfile(
+                "fish",
+                "Fish",
+                listOf(assertNotNull(fish), "--no-config", "-C", setup, "-i"),
+                environment = mapOf("XDG_DATA_HOME" to directory.toString()),
+                workingDirectory = directory,
+            )
+        TerminalWorkspace().use { workspace ->
+            val session = workspace.openTab(profile, TerminalWorkspaceOpenOptions()).session
+            runBlocking {
+                assertTrue(session.confirmCommandEdit(session.awaitLine("")), "The original fish prompt must confirm its buffer")
+                val changeTheme =
+                    "functions --copy fish_prompt theme_previous_prompt; " +
+                        "function fish_prompt; theme_previous_prompt; printf 'after> '; end; cd 'first # %'"
+                for ((command, expectedPath) in listOf(changeTheme to firstPath, "cd '../second # %'" to secondPath)) {
+                    session.submitPromptTestCommand(command)
+                    val edit = session.awaitLine("", "prompt after $command")
+                    session.assertReportedDirectoryPath(expectedPath)
+                    assertTrue(session.confirmCommandEdit(edit), "The replacement fish prompt must confirm its buffer")
+                }
+            }
+        }
+    }
+
+    private fun TerminalSession.assertReportedDirectoryPath(expectedPath: String) {
+        val uri = assertNotNull(currentWorkingDirectoryUri(), "The shell did not report a working directory")
+        assertEquals(expectedPath, URI(uri).path)
+    }
+
+    private suspend fun TerminalSession.submitPromptTestCommand(command: String): Int {
+        val state = shellIntegrationState
+        val previous = state.latestCommandRecordId()
+        assertEquals(
+            TerminalInputAdmission.ACCEPTED,
+            submitInput(listOf(TerminalPasteEvent(command), TerminalKeyEvent.key(TerminalKey.ENTER))),
+        )
+        withTimeout(15.seconds) {
+            state.revision.first {
+                val record = state.latestCommandRecordId()
+                record != previous && state.commandMetadata(record)?.finishedAtEpochMillis != null
+            }
+        }
+        return state.latestCommandRecordId()
     }
 
     @Test

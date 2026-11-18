@@ -28,8 +28,9 @@ function global:Get-Module { param([string] $Name) [pscustomobject]@{ Name = 'PS
 $global:TestEditMode = 'Windows'
 $global:CompletionHandlers = @{}
 function global:Get-PSReadLineOption { [pscustomobject]@{ EditMode = $global:TestEditMode } }
+function global:Get-PSReadLineKeyHandler { [CmdletBinding()] param([switch] $Bound) }
 function global:Set-PSReadLineKeyHandler {
-    [CmdletBinding()] param([string] $Chord, [scriptblock] $ScriptBlock, [string] $ViMode = '')
+    [CmdletBinding()] param([string] $Chord, [scriptblock] $ScriptBlock, [string] $BriefDescription, [string] $ViMode = '')
     $global:CompletionHandlers[$ViMode + $Chord] = $ScriptBlock
 }
 __SCRIPT__
