@@ -12,6 +12,13 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Complete Windows paths such as `/logs/` on the terminal's current drive.
+- Resolve PowerShell completion and relative file links from the correct directory
+  when using a session drive or a folder name containing a literal percent escape.
+- Show the exact exit code when consecutive PowerShell commands return the same
+  native failure code.
+- Keep Bash startup `DEBUG` hooks working across prompts while preserving
+  directory updates and suggestions.
 - Keep split panes aligned in full-screen applications that display bidirectional text.
 - The cursor returns to its correct position when widening the window after
   narrowing moves only the cursor onto the next line.

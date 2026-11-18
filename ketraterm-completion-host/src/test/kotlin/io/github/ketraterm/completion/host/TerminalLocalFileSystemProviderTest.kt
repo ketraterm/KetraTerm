@@ -183,6 +183,24 @@ class TerminalLocalFileSystemProviderTest {
         }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
+    fun `root-relative prefixes use the terminal drive when it differs from the JVM drive`() {
+        val jvmRoot = Path.of("").toAbsolutePath().root
+        val terminalDrive = if (jvmRoot == Path.of("D:/")) "C" else "D"
+        val workingDirectoryUri = "file://localhost/$terminalDrive:/project"
+        val resolver = TerminalCompletionPathResolver()
+
+        for ((prefix, expected) in listOf(
+            "/logs/" to "$terminalDrive:/logs",
+            "/" to "$terminalDrive:/",
+            "sub/" to "$terminalDrive:/project/sub",
+            "Z:/logs/" to "Z:/logs",
+        )) {
+            assertEquals(Path.of(expected), resolver.resolve(TerminalDirectoryListingRequest(workingDirectoryUri, prefix, "")), prefix)
+        }
+    }
+
+    @Test
     fun `canonical directory prefixes retain native filesystem meaning`() {
         val directory = Path.of("completion-directory").toAbsolutePath().normalize()
         val windows = directory.fileSystem.separator == "\\"
@@ -190,6 +208,7 @@ class TerminalLocalFileSystemProviderTest {
         val cases =
             listOf(
                 "foo\\bar/" to if (windows) null else directory.resolve("foo\\bar"),
+                "/workspace/" to directory.root.resolve("workspace"),
                 "C:/workspace/" to if (windows) Path.of("C:/workspace") else null,
                 "//server/share/" to if (windows) Path.of("//server/share") else null,
             )

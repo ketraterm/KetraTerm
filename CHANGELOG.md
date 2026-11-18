@@ -12,6 +12,16 @@ Released versions: [1.0.0](#100---2026-11-17) · [0.5.0](#050---2026-11-09) ·
 
 ### Fixed
 
+- Resolve root-relative Windows completion paths on the terminal's current drive.
+
+- Report native filesystem directories for PowerShell session drives and preserve
+  literal percent sequences in working-directory URIs.
+
+- Report repeated native exit codes accurately in PowerShell command-finished events.
+
+- Preserve existing Bash `DEBUG` traps while keeping prompt markers, directory
+  updates, and supported completion active.
+
 - Keep alternate-screen pane borders, text, cursors, and selections at their
   application positions when rows contain bidirectional text.
 

@@ -595,7 +595,10 @@ internal object TerminalShellIntegrationBootstrap {
                 __ketraterm_command_started=1
                 __ketraterm_osc133 C
             }
-            trap '__ketraterm_preexec' DEBUG
+            # Preserve existing DEBUG handlers, including an explicitly ignored trap.
+            if [[ -z ${'$'}(builtin trap -p DEBUG) ]]; then
+                builtin trap '__ketraterm_preexec' DEBUG
+            fi
         fi
         __ketraterm_prompt_command "${'$'}__ketraterm_prompt_status"
         """.trimIndent()
@@ -734,9 +737,13 @@ internal object TerminalShellIntegrationBootstrap {
                     if (${'$'}location.Provider.Name -ne 'FileSystem') {
                         return
                     }
-                    ${'$'}builder = [System.UriBuilder]::new('file', 'localhost')
-                    ${'$'}builder.Path = ${'$'}location.Path
-                    [Console]::Write(([string][char]27) + ']7;' + ${'$'}builder.Uri.AbsoluteUri + ([string][char]7))
+                    ${'$'}path = ${'$'}location.ProviderPath.Replace([IO.Path]::DirectorySeparatorChar, [char]47)
+                    if (-not ${'$'}path.StartsWith('/')) {
+                        ${'$'}path = '/' + ${'$'}path
+                    }
+                    # Escape raw filenames first so literal percent escapes survive one URI decode.
+                    ${'$'}encodedPath = [Uri]::EscapeDataString(${'$'}path).Replace('%2F', '/').Replace('%3A', ':')
+                    [Console]::Write(([string][char]27) + ']7;file://localhost' + ${'$'}encodedPath + ([string][char]7))
                 } catch {
                 }
             }
@@ -745,7 +752,9 @@ internal object TerminalShellIntegrationBootstrap {
                 ${'$'}success = ${'$'}?
                 ${'$'}nativeExitCode = ${'$'}global:LASTEXITCODE
                 if (${'$'}global:__KetraTermCommandStarted) {
-                    if (${'$'}nativeExitCode -is [int] -and ${'$'}nativeExitCode -ne ${'$'}global:__KetraTermLastExitCodeBeforeCommand) {
+                    # PowerShell stores a new boxed Int32 on each native exit, even when the code repeats.
+                    if (${'$'}nativeExitCode -is [int] -and
+                        -not [object]::ReferenceEquals(${'$'}nativeExitCode, ${'$'}global:__KetraTermLastExitCodeBeforeCommand)) {
                         ${'$'}exitCode = ${'$'}nativeExitCode
                     } elseif (${'$'}success) {
                         ${'$'}exitCode = 0
