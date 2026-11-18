@@ -94,7 +94,7 @@ The view preserves those values across bindings and settings changes.</p>
 <p>Text access marshals to the EDT. Accessibility creates text snapshots only after
 an accessible context is requested. The context reports the current viewport;
 scrolling changes its text indices. It does not create an editable document.
-See <a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt">the context contract</a>
+See <a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt">the context contract</a>
 for Unicode indices, selection limits, notifications, and lifecycle behavior.</p>
 <h3 id="binding-and-configuration-ownership">Binding and configuration ownership</h3>
 <p>The host owns the session. <code>unbind()</code> and <code>dispose()</code> cancel view work without
@@ -205,7 +205,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedTextAsync()</code> reads the complete retained selection on a worker without
@@ -682,7 +682,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e7c3177890b8b8de762aef19f618b9d3ce61d507/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3542e4a28086b9eb4594009c95040f99eaa33ff3/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
