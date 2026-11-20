@@ -67,8 +67,9 @@ internal class KeyboardEncoder(
         win32Input: Boolean = false,
     ) {
         val kittyFlags = TerminalInputState.kittyKeyboardFlags(modeBits)
+        val useKittyEncoding = kittyFlags and KITTY_ENCODING_FLAGS != 0
         if (win32Input &&
-            kittyFlags == 0 &&
+            !useKittyEncoding &&
             event.key == TerminalKey.ENTER &&
             event.modifiers and (TerminalModifiers.SHIFT or TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK).inv() == 0
         ) {
@@ -104,10 +105,18 @@ internal class KeyboardEncoder(
             }
             return
         }
-        if (kittyFlags > 0) {
+        if (useKittyEncoding) {
             kitty.encode(event, kittyFlags, modeBits)
         } else {
             legacy.encode(event, modeBits)
         }
+    }
+
+    private companion object {
+        // Alternate keys and associated text only add fields to reports selected by these flags.
+        const val KITTY_ENCODING_FLAGS =
+            KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES
     }
 }

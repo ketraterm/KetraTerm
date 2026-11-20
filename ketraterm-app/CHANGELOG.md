@@ -16,6 +16,8 @@ Released versions: [1.0.1](#101---2026-11-18) · [1.0.0](#100---2026-11-17) ·
 - Shift+Enter inserts a newline in Codex CLI on Windows. Enter submits the prompt.
 - Applications that enable Kitty keyboard disambiguation can now distinguish
   modified keypresses such as Shift+Enter, Ctrl+Tab, and Ctrl+Backspace.
+- Applications can distinguish keypad Enter and keypad arrows from their
+  main-keyboard equivalents in modes that report keypad keys separately.
 
 ## [1.0.1] - 2026-11-18
 

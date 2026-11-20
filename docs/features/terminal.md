@@ -51,7 +51,7 @@ placement can depend on input chunk boundaries. See the
 | --- | --- |
 | Keyboard | Cursor/function/keypad keys, modifiers, application modes, Backarrow mode, and committed text. |
 | xterm key resources | modifyOtherKeys and independent modifier/format resources with status queries. |
-| Win32 keyboard | ConPTY private mode 9001 enables Windows key records for main-keyboard Enter and Shift+Enter. Kitty negotiation takes precedence. |
+| Win32 keyboard | ConPTY private mode 9001 enables Windows key records for main-keyboard Enter and Shift+Enter. Kitty disambiguation, event-type reporting, or report-all mode takes precedence. |
 | Kitty keyboard | Progressive flag negotiation and encoding, with screen-local stacks that restore set baselines; available flags depend on host input metadata. [Stack contract](../../ketraterm-core/docs/terminal-core-contract.md#mode-state-contract). |
 | Paste | Bracketed paste, control-character protection, and configurable newline handling. |
 | Mouse tracking | X10, normal, button-event, and any-event tracking. |

@@ -15,7 +15,9 @@ Released versions: [1.0.1](#101---2026-11-18) · [1.0.0](#100---2026-11-17) ·
 
 - Preserve modifiers on Enter, Tab, and Backspace in Kitty disambiguation mode.
   Unmodified presses and repeats use their legacy bytes unless the application
-  requests all keys as escape codes.
+  requests all keys as escape codes. Plain Backspace honors DECBKM, and requesting
+  alternate key codes alone preserves the active keyboard encoding.
+- Preserve keypad Enter and both AWT forms of keypad arrow keys in Swing.
 - Preserve Shift+Enter in native Windows applications such as Codex CLI when
   ConPTY requests Win32 input mode.
 

@@ -22,7 +22,6 @@ import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.impl.TerminalSequences
-import io.github.ketraterm.input.policy.BackspacePolicy
 import io.github.ketraterm.input.policy.EnterNewLineModePolicy
 import io.github.ketraterm.input.policy.MetaKeyPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
@@ -170,7 +169,7 @@ internal class KittyKeyboardEncoder(
                             kittyModifiers = true,
                         )
                     } else {
-                        output.writeByte(configuredBackspaceByte())
+                        output.writeByte(policy.legacyBackspaceByte(modeBits))
                     }
                     return
                 }
@@ -241,12 +240,6 @@ internal class KittyKeyboardEncoder(
         }
     }
 
-    private fun configuredBackspaceByte(): Int =
-        when (policy.backspacePolicy) {
-            BackspacePolicy.DELETE -> ControlCode.DEL
-            BackspacePolicy.BACKSPACE -> BS
-        }
-
     /**
      * Determines if a key event with a Meta modifier should be suppressed based on the Meta Key Policy.
      *
@@ -284,7 +277,6 @@ internal class KittyKeyboardEncoder(
         key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal
 
     private companion object {
-        private const val BS: Int = 0x08
         private const val NO_EVENT_TYPE: Int = 0
     }
 }

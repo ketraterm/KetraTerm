@@ -43,8 +43,8 @@ These layouts require the relevant modifier resource to select extended
 reporting. Setting a format alone does not enable it. `modifyOtherKeys` level 1
 extends combinations that legacy encoding cannot distinguish or represent, level 2 extends
 modified ordinary keys, and level 3 also reports unmodified ordinary keys.
-A nonzero Kitty mode takes precedence; its modifier mapping and functional-key
-identities differ from xterm's. See the
+Kitty disambiguation, event-type reporting, or report-all mode takes precedence.
+Alternate-key metadata alone preserves the active encoding. See the
 [xterm resource contract](terminal-input-contract.md#xterm-key-resources) and
 [keyboard contract](terminal-input-contract.md#keyboard-contract).
 

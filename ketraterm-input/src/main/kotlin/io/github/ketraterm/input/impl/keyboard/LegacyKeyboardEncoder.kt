@@ -253,15 +253,10 @@ internal class LegacyKeyboardEncoder(
 
         if (!writeModifierPrefixOrSuppress(modifiers)) return
 
-        val baseByte =
-            if (TerminalInputState.backarrowSendsBackspace(modeBits, policy.backspacePolicy == BackspacePolicy.BACKSPACE)) {
-                BS
-            } else {
-                ControlCode.DEL
-            }
+        val baseByte = policy.legacyBackspaceByte(modeBits)
 
         if (TerminalModifiers.hasCtrl(modifiers)) {
-            output.writeByte(if (baseByte == ControlCode.DEL) BS else ControlCode.DEL)
+            output.writeByte(if (baseByte == ControlCode.DEL) ControlCode.BS else ControlCode.DEL)
         } else {
             output.writeByte(baseByte)
         }
@@ -503,7 +498,6 @@ internal class LegacyKeyboardEncoder(
     }
 
     private companion object {
-        private const val BS: Int = 0x08
         private const val BACKSPACE_CODEPOINT: Int = 0x08
         private const val ESCAPE_CODEPOINT: Int = 0x1b
         private const val ENTER_CODEPOINT: Int = 0x0d
@@ -512,3 +506,14 @@ internal class LegacyKeyboardEncoder(
         private val TERMINAL_KEYS = TerminalKey.entries
     }
 }
+
+internal fun TerminalInputPolicy.legacyBackspaceByte(modeBits: Long): Int =
+    if (TerminalInputState.backarrowSendsBackspace(
+            modeBits,
+            backspacePolicy == BackspacePolicy.BACKSPACE,
+        )
+    ) {
+        ControlCode.BS
+    } else {
+        ControlCode.DEL
+    }
