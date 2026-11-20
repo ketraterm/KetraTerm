@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.buffer.impl
 
+import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalKeyboardModeSnapshot
 import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.engine.MutationEngine
@@ -28,8 +30,30 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Proxy
 
 class TerminalModeControllerImplTest {
+    @Test
+    fun `buffers implementing only the earlier keyboard API retain their encoding`() {
+        val bits = 0x1234L
+        val type = TerminalBuffer::class.java
+        val buffer =
+            type.cast(
+                Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { proxy, method, args ->
+                    when (method.name) {
+                        "getInputModeBits" -> bits
+                        else -> InvocationHandler.invokeDefault(proxy, method, *(args ?: emptyArray()))
+                    }
+                },
+            )
+
+        for (enabled in listOf(true, false)) {
+            buffer.setWin32InputEnabled(enabled)
+            assertEquals(TerminalKeyboardModeSnapshot(bits, win32Input = false), buffer.getKeyboardModeSnapshot())
+        }
+    }
+
     @ParameterizedTest(name = "cursor presentation invalidation with blinkingMode={0}")
     @ValueSource(booleans = [false, true])
     fun `cursor presentation modes invalidate only on transitions`(blinkingMode: Boolean) {
