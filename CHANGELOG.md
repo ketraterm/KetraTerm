@@ -9,6 +9,16 @@ Released versions: [1.0.1](#101---2026-11-18) · [1.0.0](#100---2026-11-17) ·
 [0.1.3](#013---2026-07-08) · [0.1.2](#012---2026-07-03) · [0.1.1](#011---2026-07-02) ·
 [0.1.0](#010---2026-06-30)
 
+## [Unreleased]
+
+### Fixed
+
+- Preserve modifiers on Enter, Tab, and Backspace in Kitty disambiguation mode.
+  Unmodified presses and repeats use their legacy bytes unless the application
+  requests all keys as escape codes.
+- Preserve Shift+Enter in native Windows applications such as Codex CLI when
+  ConPTY requests Win32 input mode.
+
 ## [1.0.1] - 2026-11-18
 
 ### Improvements

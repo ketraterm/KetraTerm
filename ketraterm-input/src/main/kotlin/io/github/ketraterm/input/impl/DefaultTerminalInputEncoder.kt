@@ -59,8 +59,8 @@ internal class DefaultTerminalInputEncoder(
      * @param event non-printable key or printable Unicode scalar event.
      */
     override fun encodeKey(event: TerminalKeyEvent) {
-        val modeBits = inputState.getInputModeBits()
-        keyboard.encode(event, modeBits)
+        val modes = inputState.getKeyboardModeSnapshot()
+        keyboard.encode(event, modes.bits, modes.win32Input)
     }
 
     /**

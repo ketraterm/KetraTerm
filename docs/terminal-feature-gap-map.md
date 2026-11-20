@@ -59,6 +59,7 @@ Remaining work:
 
 | Owner | Remaining work |
 | --- | --- |
+| `TODO(host/profile)` | Full Win32 key records beyond main-keyboard Enter and Shift+Enter require native key identity and modifier metadata. |
 | `TODO(host/profile)` | Native rich-input adapters with layout-aware key identity, IME text, and complete lifecycle metadata. Portable Swing must not advertise Kitty flags 2, 4, or 16 before these inputs are reliable. |
 | `TODO(parser/core/input)` | Layout-aware modifyOtherKeys modifier masks, including `CSI > 4 : 1 m`. The parser rejects colon subparameters for this command; no corresponding negotiated mask is stored or applied by the encoder. |
 

@@ -15,12 +15,9 @@
  */
 package io.github.ketraterm.core.model
 
-import io.github.ketraterm.core.api.TerminalInputState
-import io.github.ketraterm.core.api.TerminalModeBits
-import io.github.ketraterm.core.api.TerminalModeSnapshot
-import io.github.ketraterm.core.api.XtermKeyResourceBits
+import io.github.ketraterm.core.api.*
 import io.github.ketraterm.protocol.keyboard.XtermKeyResource
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Durable terminal behavioral modes, with atomic input/render snapshots.
@@ -31,7 +28,7 @@ import java.util.concurrent.atomic.AtomicLong
  * response subscriptions remain single-writer state outside those snapshots.
  */
 internal class TerminalModes : TerminalInputState {
-    private val modeBits = AtomicLong(DEFAULT_MODE_BITS)
+    private val modes = AtomicReference(TerminalKeyboardModeSnapshot(DEFAULT_MODE_BITS))
 
     // Response-only subscriptions belong to serialized core state, not the input snapshot.
     var isColorSchemeReportingEnabled: Boolean = false
@@ -68,16 +65,13 @@ internal class TerminalModes : TerminalInputState {
 
     /** Atomically records the explicit DECBKM selection for input encoding. */
     fun setBackarrowKeyMode(sendsBackspace: Boolean) {
-        while (true) {
-            val old = modeBits.get()
-            val withExplicit = old or TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT
-            val new =
-                if (sendsBackspace) {
-                    withExplicit or TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE
-                } else {
-                    withExplicit and TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE.inv()
-                }
-            if (old == new || modeBits.compareAndSet(old, new)) return
+        updateBits { bits ->
+            val explicit = bits or TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT
+            if (sendsBackspace) {
+                explicit or TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE
+            } else {
+                explicit and TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE.inv()
+            }
         }
     }
 
@@ -185,9 +179,9 @@ internal class TerminalModes : TerminalInputState {
 
     private inline fun updateBits(transform: (Long) -> Long) {
         while (true) {
-            val old = modeBits.get()
-            val new = transform(old)
-            if (old == new || modeBits.compareAndSet(old, new)) return
+            val old = modes.get()
+            val bits = transform(old.bits)
+            if (bits == old.bits || modes.compareAndSet(old, old.copy(bits = bits))) return
         }
     }
 
@@ -223,17 +217,23 @@ internal class TerminalModes : TerminalInputState {
         set(value) = setFlag(TerminalModeBits.POP_ON_BELL, value)
 
     private val currentBits: Long
-        get() = modeBits.get()
+        get() = modes.get().bits
 
     /** Returns a coherent packed mode word for future input-side fast paths. */
-    fun getModeBitsSnapshot(): Long = modeBits.get()
+    fun getModeBitsSnapshot(): Long = modes.get().bits
 
     /** Returns a coherent packed mode word for input encoders. */
-    override fun getInputModeBits(): Long = modeBits.get()
+    override fun getInputModeBits(): Long = modes.get().bits
+
+    override fun getKeyboardModeSnapshot(): TerminalKeyboardModeSnapshot = modes.get()
+
+    fun setWin32InputEnabled(enabled: Boolean) {
+        modes.updateAndGet { if (it.win32Input == enabled) it else it.copy(win32Input = enabled) }
+    }
 
     /** Returns an immutable typed snapshot decoded from one atomic read. */
     fun getModeSnapshot(): TerminalModeSnapshot {
-        val bits = modeBits.get()
+        val bits = modes.get().bits
         return TerminalModeSnapshot(
             isInsertMode = TerminalModeBits.hasFlag(bits, TerminalModeBits.INSERT_MODE),
             isAutoWrap = TerminalModeBits.hasFlag(bits, TerminalModeBits.AUTO_WRAP),
@@ -266,7 +266,7 @@ internal class TerminalModes : TerminalInputState {
      * Called on hard reset.
      */
     fun reset() {
-        modeBits.set(DEFAULT_MODE_BITS)
+        modes.set(TerminalKeyboardModeSnapshot(DEFAULT_MODE_BITS))
         resetChangeReporting()
         resetReverseWrap()
     }
@@ -278,8 +278,8 @@ internal class TerminalModes : TerminalInputState {
      * and input-facing protocol flags while preserving width policy and mouse-routing preferences.
      */
     fun softReset() {
-        val preserved = modeBits.get() and SOFT_RESET_PRESERVE_MASK
-        modeBits.set(preserved or SOFT_RESET_MODE_BITS)
+        val preserved = modes.get().bits and SOFT_RESET_PRESERVE_MASK
+        modes.set(TerminalKeyboardModeSnapshot(preserved or SOFT_RESET_MODE_BITS))
         resetChangeReporting()
         resetReverseWrap()
     }

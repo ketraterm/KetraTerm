@@ -950,7 +950,7 @@ class KeyboardEncoderTest {
         val bitsDisambiguate = kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
         val bitsReportAll = kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES)
 
-        // DISAMBIGUATE_ESCAPE_CODES keeps reset-safe control keys in legacy form.
+        // Plain control keys keep their legacy bytes so shell recovery still works.
         assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER), bitsDisambiguate)
         assertBytes(
             bytes(0x0d, 0x0a),
@@ -963,31 +963,31 @@ class KeyboardEncoderTest {
             modeBits = bitsDisambiguate or TerminalModeBits.NEW_LINE_MODE,
             policy = TerminalInputPolicy(enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR),
         )
-        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL), bitsDisambiguate)
-        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT), bitsDisambiguate)
-        assertBytes(bytes(0x1b, 0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.ALT), bitsDisambiguate)
+        assertBytes(esc("[13;5u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(esc("[13;2u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(esc("[13;3u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.ALT), bitsDisambiguate)
         assertBytes(
-            bytes(0x1b, 0x0d),
+            esc("[13;7u"),
             TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL or TerminalModifiers.ALT),
             bitsDisambiguate,
         )
 
         assertBytes(bytes(0x09), TerminalKeyEvent.key(TerminalKey.TAB), bitsDisambiguate)
-        assertBytes(bytes(0x09), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.CTRL), bitsDisambiguate)
-        assertBytes(esc("[Z"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT), bitsDisambiguate)
-        assertBytes(bytes(0x1b, 0x09), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.ALT), bitsDisambiguate)
+        assertBytes(esc("[9;5u"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(esc("[9;2u"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(esc("[9;3u"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.ALT), bitsDisambiguate)
         assertBytes(
-            bytes(0x1b, 0x1b, 0x5b, 0x5a),
+            esc("[9;4u"),
             TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT or TerminalModifiers.ALT),
             bitsDisambiguate,
         )
 
         assertBytes(esc("[27u"), TerminalKeyEvent.key(TerminalKey.ESCAPE), bitsDisambiguate)
         assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE), bitsDisambiguate)
-        assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.SHIFT), bitsDisambiguate)
-        assertBytes(bytes(0x08), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(esc("[127;2u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(esc("[127;5u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), bitsDisambiguate)
         assertBytes(
-            bytes(0x1b, 0x08),
+            esc("[127;7u"),
             TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL or TerminalModifiers.ALT),
             bitsDisambiguate,
         )
@@ -998,7 +998,7 @@ class KeyboardEncoderTest {
             policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
         )
         assertBytes(
-            expected = bytes(0x7f),
+            expected = esc("[127;5u"),
             event = TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL),
             modeBits = bitsDisambiguate,
             policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
@@ -1041,9 +1041,14 @@ class KeyboardEncoderTest {
             eventTypeBits,
         )
         assertBytes(
-            esc("[13;1:2u"),
+            bytes(0x0d),
             TerminalKeyEvent.key(TerminalKey.ENTER, type = TerminalKeyEventType.REPEAT),
             eventTypeBits,
+        )
+        assertBytes(
+            esc("[13;2:2u"),
+            TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT, TerminalKeyEventType.REPEAT),
+            eventTypeBits or kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES),
         )
         assertBytes(
             bytes(),

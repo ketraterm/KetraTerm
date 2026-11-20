@@ -333,6 +333,11 @@ public class TerminalSession private constructor(
                     check(Thread.holdsLock(outboundWriteLock)) { "Modes are available only during input encoding" }
                     return terminal.getInputModeBits()
                 }
+
+                override fun getKeyboardModeSnapshot(): TerminalKeyboardModeSnapshot {
+                    check(Thread.holdsLock(outboundWriteLock)) { "Modes are available only during input encoding" }
+                    return terminal.getKeyboardModeSnapshot()
+                }
             },
             object : SessionTerminalHostOutput() {
                 override fun writeBytes(
@@ -348,7 +353,7 @@ public class TerminalSession private constructor(
         )
 
     // Only the outbound worker uses this mode word, encoder, and its scratch.
-    private var bulkInputModeBits = 0L
+    private var bulkInputModes = TerminalKeyboardModeSnapshot(0L)
     private val streamingOutput =
         object : SessionTerminalHostOutput() {
             override fun writeBytes(
@@ -368,7 +373,12 @@ public class TerminalSession private constructor(
             object : TerminalInputState {
                 override fun getInputModeBits(): Long {
                     check(state.value === TerminalSessionState.Running) { "Modes are unavailable before session start" }
-                    return bulkInputModeBits
+                    return bulkInputModes.bits
+                }
+
+                override fun getKeyboardModeSnapshot(): TerminalKeyboardModeSnapshot {
+                    check(state.value === TerminalSessionState.Running) { "Modes are unavailable before session start" }
+                    return bulkInputModes
                 }
             },
             streamingOutput,
@@ -613,6 +623,8 @@ public class TerminalSession private constructor(
      * after closure through [TerminalInputState]'s decoding helpers.
      */
     override fun getInputModeBits(): Long = synchronized(mutationLock) { terminal.getInputModeBits() }
+
+    override fun getKeyboardModeSnapshot(): TerminalKeyboardModeSnapshot = synchronized(mutationLock) { terminal.getKeyboardModeSnapshot() }
 
     /**
      * Records host window minimization for terminal window reports; ignored after closure.
@@ -1702,10 +1714,10 @@ public class TerminalSession private constructor(
         crossinline encode: TerminalInputEncoder.() -> Unit,
     ) {
         if (workUnits != 0L) {
-            val modeBits = terminal.getInputModeBits()
+            val modes = terminal.getKeyboardModeSnapshot()
             val policy = inputPolicy
             outboundWriter.submitBulk(workUnits, signal = false) {
-                bulkInputModeBits = modeBits
+                bulkInputModes = modes
                 bulkInputEncoder.setInputPolicy(policy)
                 bulkInputEncoder.encode()
             }

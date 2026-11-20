@@ -26,5 +26,7 @@ internal class TerminalModeReaderImpl(
 
     override fun getInputModeBits(): Long = state.modes.getInputModeBits()
 
+    override fun getKeyboardModeSnapshot() = state.modes.getKeyboardModeSnapshot()
+
     override fun getModeSnapshot(): TerminalModeSnapshot = state.modes.getModeSnapshot()
 }

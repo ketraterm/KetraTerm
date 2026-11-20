@@ -67,7 +67,11 @@ SGR-family encoding suppresses a release without button identity.
 
 ## Mode-State Contract
 
-The factory implementation reads `TerminalInputState.getInputModeBits()` once
+For keyboard events the encoder reads `getKeyboardModeSnapshot()`, which also captures
+Win32 input mode (9001). With that mode enabled and Kitty flags clear, main-keyboard
+Enter and Shift+Enter produce Win32 press, repeat, and release records.
+
+For other events the factory implementation reads `TerminalInputState.getInputModeBits()` once
 per event. An entire text replacement uses that same snapshot for Delete,
 Backspace, and paste phases. Custom state implementations must return one
 coherent mode word. Interpret it with `TerminalInputState` helpers, not raw bit
@@ -137,6 +141,10 @@ and flag `16` uses validated associated text. A host session must admit only the
 flags for which its adapter supplies complete metadata; encoder capability alone
 is not a host capability declaration. Without event-type reporting, repeat uses
 press encoding and release is suppressed.
+
+Kitty disambiguation reports modified Enter, Tab, and Backspace as CSI-u.
+Without report-all, unmodified presses and repeats retain their legacy bytes
+and releases are suppressed. Lock modifiers alone do not change that fallback.
 
 ### Xterm key resources
 

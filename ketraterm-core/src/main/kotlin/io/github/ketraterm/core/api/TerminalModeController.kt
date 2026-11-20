@@ -116,6 +116,9 @@ public interface TerminalModeController {
      */
     public fun setAlternateScrollEnabled(enabled: Boolean)
 
+    /** Sets the peer request for Win32 keyboard input. */
+    public fun setWin32InputEnabled(enabled: Boolean)
+
     /**
      * Requests Shift as a mouse reporting modifier (XTSHIFTESCAPE).
      * Disabled by default so Shift restores local interaction. Hosts may deny reporting.

@@ -20,6 +20,7 @@ import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 import io.github.ketraterm.testkit.MockConnector
@@ -34,6 +35,45 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalKeyboardProtocolTest {
+    @Test
+    fun `ConPTY Return records follow mode changes Kitty negotiation and reset`() =
+        runTest {
+            val connector = MockConnector()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(40, 8),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(40, 8)
+                    val shiftEnter = TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT)
+
+                    fun feed(wire: String) = connector.feedFromHost(wire.encodeToByteArray())
+                    session.encodeKey(shiftEnter)
+                    feed("\u001b[?90")
+                    feed("01h")
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
+                    session.encodeKey(shiftEnter)
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT, TerminalKeyEventType.REPEAT))
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER, type = TerminalKeyEventType.RELEASE))
+                    feed("\u001b[>1u")
+                    session.encodeKey(shiftEnter)
+                    feed("\u001b[<u\u001b[?9001l")
+                    session.encodeKey(shiftEnter)
+                    feed("\u001b[?9001h\u001bc")
+                    session.encodeKey(shiftEnter)
+                    runCurrent()
+                    assertEquals(
+                        "\r\u001b[13;28;13;1;0;1_\u001b[13;28;13;1;16;1_\u001b[13;28;13;1;16;1_" +
+                            "\u001b[13;28;13;0;0;1_\u001b[13;2u\r\r",
+                        connector.writtenBytes.decodeToString(),
+                    )
+                }
+        }
+
     @Test
     fun `wire Kitty baseline restoration agrees with replies and keyboard encoding at every split`() =
         runTest {
