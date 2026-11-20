@@ -67,7 +67,11 @@ SGR-family encoding suppresses a release without button identity.
 
 ## Mode-State Contract
 
-The factory implementation reads `TerminalInputState.getInputModeBits()` once
+For keyboard events the encoder reads `getKeyboardModeSnapshot()`, which also captures
+Win32 input mode (9001). With that mode enabled and no Kitty encoding flag (1, 2, or 8) active, main-keyboard
+Enter and Shift+Enter produce Win32 press, repeat, and release records.
+
+For other events the factory implementation reads `TerminalInputState.getInputModeBits()` once
 per event. An entire text replacement uses that same snapshot for Delete,
 Backspace, and paste phases. Custom state implementations must return one
 coherent mode word. Interpret it with `TerminalInputState` helpers, not raw bit
@@ -130,13 +134,18 @@ emits nothing in these text modes. This is committed text, so paste framing and
 paste transformations do not apply. The marker `0` never becomes a NUL byte.
 
 In Kitty report-all mode, text-only events require associated-text flag `16` and
-use CSI-u key code `0`; without flag `16`, the event is suppressed. Nonzero Kitty
-flags take precedence over xterm resource encoding for known keys. Event-type
-flag `2` encodes lifecycle metadata, flag `4` uses supplied alternate-key values,
+use CSI-u key code `0`; without flag `16`, the event is suppressed. Kitty flags
+`1`, `2`, and `8` select Kitty encoding for known keys. Event-type
+flag `2` encodes lifecycle metadata, flag `4` adds supplied alternate-key values to Kitty reports,
 and flag `16` uses validated associated text. A host session must admit only the
 flags for which its adapter supplies complete metadata; encoder capability alone
 is not a host capability declaration. Without event-type reporting, repeat uses
 press encoding and release is suppressed.
+
+Kitty disambiguation reports modified Enter, Tab, and Backspace as CSI-u.
+Without report-all, unmodified presses and repeats retain their legacy bytes
+and releases are suppressed. Plain Backspace honors the current DECBKM setting.
+Lock modifiers alone do not change that fallback.
 
 ### Xterm key resources
 

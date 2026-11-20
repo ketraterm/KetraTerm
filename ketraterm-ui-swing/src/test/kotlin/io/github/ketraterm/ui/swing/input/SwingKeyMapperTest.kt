@@ -266,6 +266,27 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsKeypadEnterAndBothArrowFormsOnPressAndRelease() {
+        val numpad = KeyEvent.KEY_LOCATION_NUMPAD
+        val standard = KeyEvent.KEY_LOCATION_STANDARD
+        for ((code, location, expected) in listOf(
+            Triple(KeyEvent.VK_ENTER, standard, TerminalKey.ENTER),
+            Triple(KeyEvent.VK_ENTER, numpad, TerminalKey.NUMPAD_ENTER),
+            Triple(KeyEvent.VK_UP, numpad, TerminalKey.NUMPAD_UP),
+            Triple(KeyEvent.VK_DOWN, numpad, TerminalKey.NUMPAD_DOWN),
+            Triple(KeyEvent.VK_LEFT, numpad, TerminalKey.NUMPAD_LEFT),
+            Triple(KeyEvent.VK_RIGHT, numpad, TerminalKey.NUMPAD_RIGHT),
+            Triple(KeyEvent.VK_KP_UP, KeyEvent.KEY_LOCATION_UNKNOWN, TerminalKey.NUMPAD_UP),
+            Triple(KeyEvent.VK_KP_DOWN, KeyEvent.KEY_LOCATION_UNKNOWN, TerminalKey.NUMPAD_DOWN),
+            Triple(KeyEvent.VK_KP_LEFT, KeyEvent.KEY_LOCATION_UNKNOWN, TerminalKey.NUMPAD_LEFT),
+            Triple(KeyEvent.VK_KP_RIGHT, KeyEvent.KEY_LOCATION_UNKNOWN, TerminalKey.NUMPAD_RIGHT),
+        )) {
+            assertEquals(expected, mapper.keyPressed(pressed(code, keyLocation = location))?.key)
+            assertEquals(expected, mapper.keyReleased(released(code, keyLocation = location))?.key)
+        }
+    }
+
+    @Test
     fun mapsNumpadNavigationFromKeyLocation() {
         val mapped = mapper.keyPressed(pressed(KeyEvent.VK_END, keyLocation = KeyEvent.KEY_LOCATION_NUMPAD))
 

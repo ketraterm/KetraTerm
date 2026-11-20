@@ -16,8 +16,10 @@
 package io.github.ketraterm.input.impl.keyboard
 
 import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalKeyEventType
+import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -62,8 +64,27 @@ internal class KeyboardEncoder(
     fun encode(
         event: TerminalKeyEvent,
         modeBits: Long,
+        win32Input: Boolean = false,
     ) {
         val kittyFlags = TerminalInputState.kittyKeyboardFlags(modeBits)
+        val useKittyEncoding = kittyFlags and KITTY_ENCODING_FLAGS != 0
+        if (win32Input &&
+            !useKittyEncoding &&
+            event.key == TerminalKey.ENTER &&
+            event.modifiers and (TerminalModifiers.SHIFT or TerminalModifiers.CAPS_LOCK or TerminalModifiers.NUM_LOCK).inv() == 0
+        ) {
+            // VK_RETURN, scan code 0x1c, Unicode CR, key-down, console control flags, repeat count.
+            val down = event.type != TerminalKeyEventType.RELEASE
+            var flags = if (TerminalModifiers.hasShift(event.modifiers)) 0x10 else 0
+            if (event.modifiers and TerminalModifiers.NUM_LOCK != 0) flags = flags or 0x20
+            if (event.modifiers and TerminalModifiers.CAPS_LOCK != 0) flags = flags or 0x80
+            scratch.clear()
+            scratch.appendAscii(if (down) "\u001b[13;28;13;1;" else "\u001b[13;28;13;0;")
+            scratch.appendDecimal(flags)
+            scratch.appendAscii(";1_")
+            scratch.writeTo(output)
+            return
+        }
         if (
             event.type == TerminalKeyEventType.RELEASE &&
             (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) == 0
@@ -84,10 +105,18 @@ internal class KeyboardEncoder(
             }
             return
         }
-        if (kittyFlags > 0) {
+        if (useKittyEncoding) {
             kitty.encode(event, kittyFlags, modeBits)
         } else {
             legacy.encode(event, modeBits)
         }
+    }
+
+    private companion object {
+        // Alternate keys and associated text only add fields to reports selected by these flags.
+        const val KITTY_ENCODING_FLAGS =
+            KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES
     }
 }

@@ -18,9 +18,11 @@ public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io
 public final class io/github/ketraterm/core/api/TerminalBuffer$DefaultImpls {
 	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalBuffer;)J
+	public static fun getKeyboardModeSnapshot (Lio/github/ketraterm/core/api/TerminalBuffer;)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
 	public static fun requestTerminalVersion (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
 	public static fun setTerminfoBackspaceDefault (Lio/github/ketraterm/core/api/TerminalBuffer;Z)V
+	public static fun setWin32InputEnabled (Lio/github/ketraterm/core/api/TerminalBuffer;Z)V
 	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalBuffer;[BII)V
 }
 
@@ -78,6 +80,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 	public static fun backarrowSendsBackspace (JZ)Z
 	public static fun formatOtherKeysMode (J)I
 	public abstract fun getInputModeBits ()J
+	public fun getKeyboardModeSnapshot ()Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
 	public static fun isAlternateScrollEnabled (J)Z
 	public static fun isApplicationCursorKeys (J)Z
 	public static fun isApplicationKeypad (J)Z
@@ -119,11 +122,29 @@ public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
 	public final fun withKeyModifierOption (JII)J
 }
 
+public final class io/github/ketraterm/core/api/TerminalInputState$DefaultImpls {
+	public static fun getKeyboardModeSnapshot (Lio/github/ketraterm/core/api/TerminalInputState;)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
+}
+
 public abstract interface class io/github/ketraterm/core/api/TerminalInspector {
 	public abstract fun getAllAsString ()Ljava/lang/String;
 	public abstract fun getAttrAt (II)Lio/github/ketraterm/core/model/CellAttributes;
 	public abstract fun getLineAsString (I)Ljava/lang/String;
 	public abstract fun getScreenAsString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/core/api/TerminalKeyboardModeSnapshot {
+	public fun <init> (JZ)V
+	public synthetic fun <init> (JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()Z
+	public final fun copy (JZ)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
+	public static synthetic fun copy$default (Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;JZILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBits ()J
+	public final fun getWin32Input ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalLine {
@@ -237,10 +258,12 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeControl
 	public abstract fun setSynchronizedOutput (Z)V
 	public abstract fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
 	public abstract fun setTreatAmbiguousAsWide (Z)V
+	public fun setWin32InputEnabled (Z)V
 }
 
 public final class io/github/ketraterm/core/api/TerminalModeController$DefaultImpls {
 	public static synthetic fun resetPaletteColors$default (Lio/github/ketraterm/core/api/TerminalModeController;[IIILjava/lang/Object;)V
+	public static fun setWin32InputEnabled (Lio/github/ketraterm/core/api/TerminalModeController;Z)V
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalModeReader : io/github/ketraterm/core/api/TerminalInputState {
@@ -251,6 +274,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeReader 
 
 public final class io/github/ketraterm/core/api/TerminalModeReader$DefaultImpls {
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalModeReader;)J
+	public static fun getKeyboardModeSnapshot (Lio/github/ketraterm/core/api/TerminalModeReader;)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
 }
 
 public final class io/github/ketraterm/core/api/TerminalModeSnapshot {
@@ -328,11 +352,13 @@ public abstract interface class io/github/ketraterm/core/api/TerminalRenderBuffe
 public final class io/github/ketraterm/core/api/TerminalRenderBuffer$DefaultImpls {
 	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)J
+	public static fun getKeyboardModeSnapshot (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/core/api/TerminalRenderBuffer;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun requestTerminalVersion (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)V
 	public static fun setTerminfoBackspaceDefault (Lio/github/ketraterm/core/api/TerminalRenderBuffer;Z)V
+	public static fun setWin32InputEnabled (Lio/github/ketraterm/core/api/TerminalRenderBuffer;Z)V
 	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalRenderBuffer;[BII)V
 }
 

@@ -216,6 +216,23 @@ class XtermKeyResourceEncoderTest {
     }
 
     @Test
+    fun `Kitty disambiguation distinguishes shifted Enter across core mode changes`() {
+        val terminal = TerminalBuffers.create(10, 3)
+        val output = RecordingOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+        val shiftEnter = TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT)
+
+        encoder.encodeKey(shiftEnter)
+        terminal.setKittyKeyboardFlags(1)
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
+        encoder.encodeKey(shiftEnter)
+        terminal.setKittyKeyboardFlags(0)
+        encoder.encodeKey(shiftEnter)
+
+        assertEquals("\r\r\u001B[13;2u\r", output.text())
+    }
+
+    @Test
     fun `one family cannot change another family format or ordinary key handling`() {
         val terminal = TerminalBuffers.create(10, 3)
         terminal.setKeyModifierOption(1, 4)

@@ -108,6 +108,7 @@ public final class io/github/ketraterm/protocol/DecPrivateMode {
 	public static final field REVERSE_WRAP_EXTENDED I
 	public static final field SAVE_RESTORE_CURSOR I
 	public static final field SYNCHRONIZED_OUTPUT I
+	public static final field WIN32_INPUT I
 }
 
 public final class io/github/ketraterm/protocol/DecRectangleAttribute {

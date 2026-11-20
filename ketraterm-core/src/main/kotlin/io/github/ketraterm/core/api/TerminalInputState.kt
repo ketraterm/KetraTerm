@@ -33,6 +33,9 @@ public interface TerminalInputState {
      */
     public fun getInputModeBits(): Long
 
+    /** Captures all keyboard modes at one instant. */
+    public fun getKeyboardModeSnapshot(): TerminalKeyboardModeSnapshot = TerminalKeyboardModeSnapshot(getInputModeBits())
+
     /**
      * Helper methods for constructing and decoding packed input mode snapshots.
      */
@@ -251,3 +254,13 @@ public interface TerminalInputState {
             )
     }
 }
+
+/**
+ * Keyboard modes from one publication.
+ * @property bits the published [TerminalModeBits] layout.
+ * @property win32Input whether the peer requested Microsoft Win32 key records.
+ */
+public data class TerminalKeyboardModeSnapshot(
+    val bits: Long,
+    val win32Input: Boolean = false,
+)

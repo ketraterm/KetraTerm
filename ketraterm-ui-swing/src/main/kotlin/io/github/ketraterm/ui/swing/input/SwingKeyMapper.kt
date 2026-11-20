@@ -193,6 +193,10 @@ internal class SwingKeyMapper(
         keyLocation: Int,
     ): TerminalKey? =
         when (keyCode) {
+            KeyEvent.VK_KP_UP -> TerminalKey.NUMPAD_UP
+            KeyEvent.VK_KP_DOWN -> TerminalKey.NUMPAD_DOWN
+            KeyEvent.VK_KP_LEFT -> TerminalKey.NUMPAD_LEFT
+            KeyEvent.VK_KP_RIGHT -> TerminalKey.NUMPAD_RIGHT
             KeyEvent.VK_UP -> TerminalKey.UP
             KeyEvent.VK_DOWN -> TerminalKey.DOWN
             KeyEvent.VK_LEFT -> TerminalKey.LEFT
@@ -250,6 +254,7 @@ internal class SwingKeyMapper(
 
     private fun keypadNavigationKey(keyCode: Int): TerminalKey? =
         when (keyCode) {
+            KeyEvent.VK_ENTER -> TerminalKey.NUMPAD_ENTER
             KeyEvent.VK_LEFT -> TerminalKey.NUMPAD_LEFT
             KeyEvent.VK_RIGHT -> TerminalKey.NUMPAD_RIGHT
             KeyEvent.VK_UP -> TerminalKey.NUMPAD_UP

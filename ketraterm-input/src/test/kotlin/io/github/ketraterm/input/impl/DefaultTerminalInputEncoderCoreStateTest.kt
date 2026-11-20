@@ -17,15 +17,55 @@ package io.github.ketraterm.input.impl
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.input.policy.BackspacePolicy
+import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.MouseEncodingMode
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class DefaultTerminalInputEncoderCoreStateTest {
+    @Test
+    fun `alternate key metadata alone preserves the negotiated Enter encoding`() {
+        val terminal = TerminalBuffers.create(4, 2)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+        val alternate = KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS
+        val shiftEnter = TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT)
+
+        terminal.setKittyKeyboardFlags(alternate)
+        encoder.encodeKey(shiftEnter)
+        terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.MODE_2)
+        encoder.encodeKey(shiftEnter)
+        terminal.setWin32InputEnabled(true)
+        encoder.encodeKey(shiftEnter)
+        terminal.setKittyKeyboardFlags(alternate or KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
+        encoder.encodeKey(shiftEnter)
+
+        assertArrayEquals(byteArrayOf(13) + esc("[27;2;13~") + esc("[13;28;13;1;16;1_") + esc("[13;2u"), output.bytes)
+    }
+
+    @Test
+    fun `plain Kitty Backspace follows DECBKM while modified Backspace keeps its key identity`() {
+        val terminal = TerminalBuffers.create(4, 2)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+        val backspace = TerminalKeyEvent.key(TerminalKey.BACKSPACE)
+        terminal.setBackarrowKeyMode(true)
+        terminal.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
+        encoder.encodeKey(backspace)
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL))
+        terminal.setBackarrowKeyMode(false)
+        encoder.setInputPolicy(TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE))
+        encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.REPEAT))
+
+        assertArrayEquals(byteArrayOf(8) + esc("[127;5u") + byteArrayOf(127), output.bytes)
+    }
+
     @Test
     fun `real Kitty flag transitions keep control keys usable and report locks when requested`() {
         val terminal = TerminalBuffers.create(4, 2)

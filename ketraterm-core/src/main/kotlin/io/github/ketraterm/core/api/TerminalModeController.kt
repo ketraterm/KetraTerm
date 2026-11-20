@@ -117,6 +117,13 @@ public interface TerminalModeController {
     public fun setAlternateScrollEnabled(enabled: Boolean)
 
     /**
+     * Requests Win32 keyboard input (DEC private mode 9001). The default ignores
+     * the request so buffers without Win32 support retain their current encoding.
+     * Buffers that support this mode publish it through [TerminalInputState.getKeyboardModeSnapshot].
+     */
+    public fun setWin32InputEnabled(enabled: Boolean) {}
+
+    /**
      * Requests Shift as a mouse reporting modifier (XTSHIFTESCAPE).
      * Disabled by default so Shift restores local interaction. Hosts may deny reporting.
      * Preserves pending wrap and survives screen switches, resize, and DECSTR.

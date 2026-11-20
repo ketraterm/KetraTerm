@@ -147,6 +147,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun getForegroundProcessName ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getHostNotificationsAllowed ()Z
 	public fun getInputModeBits ()J
+	public fun getKeyboardModeSnapshot ()Lio/github/ketraterm/core/api/TerminalKeyboardModeSnapshot;
 	public final fun getModeSnapshot ()Lio/github/ketraterm/core/api/TerminalModeSnapshot;
 	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun getPointerShape ()Lio/github/ketraterm/protocol/TerminalPointerShape;
