@@ -21,6 +21,9 @@ package io.github.ketraterm.protocol
  * Toggled via CSI ? Pn h (DECSET) and CSI ? Pn l (DECRST).
  */
 public object DecPrivateMode {
+    /** Microsoft ConPTY Win32 input mode. */
+    public const val WIN32_INPUT: Int = 9001
+
     /** Application cursor keys mode (DECCKM). */
     public const val APPLICATION_CURSOR_KEYS: Int = 1
 

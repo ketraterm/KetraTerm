@@ -92,6 +92,8 @@ internal class TerminalModeControllerImpl(
         state.modes.isFocusReportingEnabled = enabled
     }
 
+    override fun setWin32InputEnabled(enabled: Boolean) = state.modes.setWin32InputEnabled(enabled)
+
     override fun setAlternateScrollEnabled(enabled: Boolean) {
         state.modes.isAlternateScrollEnabled = enabled
     }
