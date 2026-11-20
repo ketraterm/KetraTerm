@@ -169,6 +169,10 @@ placement can depend on input chunk boundaries. See the
 <td>modifyOtherKeys and independent modifier/format resources with status queries.</td>
 </tr>
 <tr>
+<td>Win32 keyboard</td>
+<td>ConPTY private mode 9001 enables Windows key records for main-keyboard Enter and Shift+Enter. Kitty disambiguation, event-type reporting, or report-all mode takes precedence.</td>
+</tr>
+<tr>
 <td>Kitty keyboard</td>
 <td>Progressive flag negotiation and encoding, with screen-local stacks that restore set baselines; available flags depend on host input metadata. <a href="../../ketraterm-core/docs/terminal-core-contract.html#mode-state-contract">Stack contract</a>.</td>
 </tr>
@@ -255,7 +259,7 @@ defines event and encoding behavior.</p>
 </tr>
 <tr>
 <td>Kitty graphics</td>
-<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/3cc3fd61d06ca9ed00ad1de07ee2d14a6401cce6/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
+<td>Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available; bounded raster reuse covers scrolling out of view and back. <a href="https://github.com/ketraterm/KetraTerm/blob/3a54df245807ca59c25083f1490d9236b08d7bd3/tools/kitty-graphics/README.md#real-application-smoke-tests">Real application verification</a>. <a href="../../ketraterm-pty/docs/pty4j-backend-limitations.html#windows-graphics-cursor-desynchronization">Windows backend caveats</a>. <a href="../terminal-feature-gap-map.html#optional-protocol-work">Remaining extensions</a>.</td>
 </tr>
 <tr>
 <td>Custom OSC</td>
@@ -272,7 +276,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3cc3fd61d06ca9ed00ad1de07ee2d14a6401cce6/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3a54df245807ca59c25083f1490d9236b08d7bd3/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -108,8 +108,8 @@ merged Super/Hyper/Meta adds 8. Lock bits do not alter xterm parameters.</p>
 reporting. Setting a format alone does not enable it. <code>modifyOtherKeys</code> level 1
 extends combinations that legacy encoding cannot distinguish or represent, level 2 extends
 modified ordinary keys, and level 3 also reports unmodified ordinary keys.
-A nonzero Kitty mode takes precedence; its modifier mapping and functional-key
-identities differ from xterm&#39;s. See the
+Kitty disambiguation, event-type reporting, or report-all mode takes precedence.
+Alternate-key metadata alone preserves the active encoding. See the
 <a href="terminal-input-contract.html#xterm-key-resources">xterm resource contract</a> and
 <a href="terminal-input-contract.html#keyboard-contract">keyboard contract</a>.</p>
 <h2 id="mouse-tracking-and-encoding-protocols">Mouse tracking and encoding protocols</h2>
@@ -152,7 +152,7 @@ legacy-family releases use base code 3 and the encoding&#39;s normal final byte.
 have a limit of 2015. Decimal encodings safely accept the full non-negative
 <code>Int</code> range. See the <a href="terminal-input-contract.html#mouse-contract">mouse contract</a>
 for suppression, clamping, tracking modes, and release identity rules.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3cc3fd61d06ca9ed00ad1de07ee2d14a6401cce6/ketraterm-input/docs/keyboard-mouse-encoding.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/3a54df245807ca59c25083f1490d9236b08d7bd3/ketraterm-input/docs/keyboard-mouse-encoding.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
